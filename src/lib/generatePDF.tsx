@@ -213,12 +213,16 @@ interface InspectionMeta {
     landlord_email?: string;
     tenant_name?: string;
     tenant_email?: string;
+    ejari_ref?: string;
+    contract_from?: string;
+    contract_to?: string;
   };
   property: {
-    address?: string;
+    building_name?: string;
     unit_number?: string;
+    location?: string;
+    address?: string;
     property_type?: string;
-    ejari_ref?: string;
   } | null;
   agent: {
     full_name?: string;
@@ -256,17 +260,29 @@ function InspectionReport({
         </View>
 
         <View style={s.coverBody}>
-          <Text style={s.coverAddress}>{meta.property?.address ?? "Property Address"}</Text>
-          {meta.property?.unit_number && <Text style={s.coverUnit}>Unit {meta.property.unit_number}</Text>}
+          <Text style={s.coverAddress}>
+            {meta.property?.building_name && meta.property?.unit_number
+              ? `${meta.property.building_name} — Unit ${meta.property.unit_number}`
+              : meta.property?.address ?? "Property Address"}
+          </Text>
+          {meta.property?.location && <Text style={s.coverUnit}>{meta.property.location}</Text>}
 
           <View style={s.coverRow}>
             <Text style={s.coverLabel}>Date of Inspection</Text>
             <Text style={s.coverValue}>{formatDate(meta.inspection.created_at)}</Text>
           </View>
-          {meta.property?.ejari_ref && (
+          {meta.inspection?.ejari_ref && (
             <View style={s.coverRow}>
               <Text style={s.coverLabel}>Ejari Reference</Text>
-              <Text style={s.coverValue}>{meta.property.ejari_ref}</Text>
+              <Text style={s.coverValue}>{meta.inspection.ejari_ref}</Text>
+            </View>
+          )}
+          {(meta.inspection?.contract_from || meta.inspection?.contract_to) && (
+            <View style={s.coverRow}>
+              <Text style={s.coverLabel}>Contract Period</Text>
+              <Text style={s.coverValue}>
+                {[meta.inspection.contract_from, meta.inspection.contract_to].filter(Boolean).map(formatDate).join(" – ")}
+              </Text>
             </View>
           )}
           {meta.property?.property_type && (

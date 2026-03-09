@@ -22,12 +22,14 @@ export default async function InspectionPage({
 
   const { data: property } = await supabase
     .from("properties")
-    .select("address, unit_number")
+    .select("building_name, unit_number, location, address")
     .eq("id", inspection.property_id)
     .single();
 
   const address = property
-    ? [property.address, property.unit_number].filter(Boolean).join(", ")
+    ? (property.building_name && property.unit_number
+        ? `${property.building_name} — Unit ${property.unit_number}`
+        : property.address ?? "Property")
     : "Property";
 
   const { data: rooms } = await supabase

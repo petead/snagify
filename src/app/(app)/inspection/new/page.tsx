@@ -54,11 +54,17 @@ type PropertyTypeId = (typeof PROPERTY_TYPES)[number]["id"];
 
 interface DetailsForm {
   inspectionType: "check-in" | "check-out";
-  address: string;
+  buildingName: string;
   unitNumber: string;
+  location: string;
+  address: string;
   propertyType: PropertyTypeId | "";
   propertySize: string;
   ejariRef: string;
+  contractFrom: string;
+  contractTo: string;
+  annualRent: string;
+  securityDeposit: string;
   landlordName: string;
   landlordEmail: string;
   landlordPhone: string;
@@ -69,11 +75,17 @@ interface DetailsForm {
 
 const initialDetails: DetailsForm = {
   inspectionType: "check-in",
-  address: "",
+  buildingName: "",
   unitNumber: "",
+  location: "",
+  address: "",
   propertyType: "",
   propertySize: "",
   ejariRef: "",
+  contractFrom: "",
+  contractTo: "",
+  annualRent: "",
+  securityDeposit: "",
   landlordName: "",
   landlordEmail: "",
   landlordPhone: "",
@@ -87,22 +99,40 @@ function mapExtractedToForm(extracted: Record<string, unknown>): Partial<Details
     const v = extracted[k];
     return v != null && typeof v === "string" ? v : "";
   };
+  const getNum = (k: string) => {
+    const v = extracted[k];
+    if (v == null) return undefined;
+    if (typeof v === "number" && !Number.isNaN(v)) return String(v);
+    if (typeof v === "string") return v.trim() || undefined;
+    return undefined;
+  };
   const building = get("building_name");
   const location = get("location");
-  const address = [building, location].filter(Boolean).join(", ") || get("property_no") || "";
+  const address = (extracted.address != null && typeof extracted.address === "string")
+    ? String(extracted.address).trim()
+    : [building, location].filter(Boolean).join(", ") || "";
   const propType = (get("property_type") || "").toLowerCase();
   let propertyType: PropertyTypeId | "" = "";
   if (propType.includes("villa")) propertyType = "villa";
   else if (propType.includes("apartment") || propType.includes("flat")) propertyType = "apartment";
   else if (propType.includes("studio")) propertyType = "studio";
   else if (propType.includes("town") || propType.includes("house")) propertyType = "townhouse";
+  const inspType = (get("inspection_type") || "check-in").toLowerCase();
+  const inspectionType: "check-in" | "check-out" = inspType.includes("check-out") ? "check-out" : "check-in";
 
   return {
-    address: address || undefined,
+    buildingName: building || undefined,
     unitNumber: get("unit_number") || undefined,
+    location: location || undefined,
+    address: address || undefined,
     propertyType: propertyType || undefined,
-    propertySize: extracted.property_size != null ? String(extracted.property_size) : undefined,
+    propertySize: getNum("property_size") ?? undefined,
     ejariRef: get("ejari_ref") || undefined,
+    contractFrom: get("contract_from") || undefined,
+    contractTo: get("contract_to") || undefined,
+    annualRent: getNum("annual_rent") ?? undefined,
+    securityDeposit: getNum("security_deposit") ?? undefined,
+    inspectionType,
     landlordName: get("landlord_name") || undefined,
     landlordEmail: get("landlord_email") || undefined,
     landlordPhone: get("landlord_phone") || undefined,
@@ -238,7 +268,8 @@ export default function NewInspectionPage() {
   };
 
   const step2Valid =
-    details.address.trim() !== "" &&
+    (details.buildingName.trim() !== "" || details.address.trim() !== "") &&
+    details.unitNumber.trim() !== "" &&
     details.propertyType !== "" &&
     details.landlordName.trim() !== "" &&
     details.landlordEmail.trim() !== "" &&
@@ -271,36 +302,67 @@ export default function NewInspectionPage() {
       return;
     }
 
-    const { data: prop, error: propErr } = await supabase
-      .from("properties")
-      .insert({
-        agent_id: user.id,
-        address: (details.address ?? "").trim(),
-        unit_number: (details.unitNumber ?? "").trim() || null,
-        property_type: details.propertyType || null,
-        furnished: false,
-        ejari_ref: (details.ejariRef ?? "").trim() || null,
-      })
-      .select("id")
-      .single();
+    const buildingName = (details.buildingName ?? "").trim() || null;
+    const unitNumber = (details.unitNumber ?? "").trim() || null;
+    const address = (details.address ?? "").trim() || (buildingName && unitNumber ? `${buildingName}, ${details.location || ""}`.trim() : "") || null;
+    const location = (details.location ?? "").trim() || null;
 
-    if (propErr || !prop) {
-      setError(propErr?.message ?? "Failed to create property.");
-      setSaving(false);
-      return;
+    let existingQuery = supabase
+      .from("properties")
+      .select("id")
+      .eq("agent_id", user.id);
+    existingQuery = buildingName != null && buildingName !== ""
+      ? existingQuery.eq("building_name", buildingName)
+      : existingQuery.is("building_name", null);
+    existingQuery = unitNumber != null && unitNumber !== ""
+      ? existingQuery.eq("unit_number", unitNumber)
+      : existingQuery.is("unit_number", null);
+    const { data: existing } = await existingQuery.maybeSingle();
+
+    let propertyId: string;
+    if (existing?.id) {
+      propertyId = existing.id;
+    } else {
+      const { data: prop, error: propErr } = await supabase
+        .from("properties")
+        .insert({
+          agent_id: user.id,
+          building_name: buildingName,
+          unit_number: unitNumber,
+          location,
+          address,
+          property_type: details.propertyType || null,
+          furnished: false,
+        })
+        .select("id")
+        .single();
+      if (propErr || !prop) {
+        setError(propErr?.message ?? "Failed to create property.");
+        setSaving(false);
+        return;
+      }
+      propertyId = prop.id;
     }
 
     const { data: insp, error: inspErr } = await supabase
       .from("inspections")
       .insert({
-        property_id: prop.id,
+        property_id: propertyId,
         agent_id: user.id,
         type: details.inspectionType,
         status: "draft",
+        ejari_ref: (details.ejariRef ?? "").trim() || null,
+        contract_from: details.contractFrom?.trim() || null,
+        contract_to: details.contractTo?.trim() || null,
+        annual_rent: details.annualRent ? Number(details.annualRent) : null,
+        security_deposit: details.securityDeposit ? Number(details.securityDeposit) : null,
+        property_size: details.propertySize ? Number(details.propertySize) : null,
         landlord_name: (details.landlordName ?? "").trim(),
         landlord_email: (details.landlordEmail ?? "").trim(),
+        landlord_phone: (details.landlordPhone ?? "").trim() || null,
         tenant_name: (details.tenantName ?? "").trim(),
         tenant_email: (details.tenantEmail ?? "").trim(),
+        tenant_phone: (details.tenantPhone ?? "").trim() || null,
       })
       .select("id")
       .single();
@@ -533,7 +595,49 @@ export default function NewInspectionPage() {
 
               <div>
                 <label className="block font-body text-sm font-medium text-brand-dark mb-1.5">
-                  Address *
+                  Building Name *
+                </label>
+                <input
+                  value={details.buildingName}
+                  onChange={(e) =>
+                    setDetails((d) => ({ ...d, buildingName: e.target.value }))
+                  }
+                  className={inputClass}
+                  placeholder="e.g. Creek Rise Tower 1"
+                />
+              </div>
+
+              <div>
+                <label className="block font-body text-sm font-medium text-brand-dark mb-1.5">
+                  Unit Number *
+                </label>
+                <input
+                  value={details.unitNumber}
+                  onChange={(e) =>
+                    setDetails((d) => ({ ...d, unitNumber: e.target.value }))
+                  }
+                  className={inputClass}
+                  placeholder="e.g. 3301"
+                />
+              </div>
+
+              <div>
+                <label className="block font-body text-sm font-medium text-brand-dark mb-1.5">
+                  Location / Area
+                </label>
+                <input
+                  value={details.location}
+                  onChange={(e) =>
+                    setDetails((d) => ({ ...d, location: e.target.value }))
+                  }
+                  className={inputClass}
+                  placeholder="Area, Dubai"
+                />
+              </div>
+
+              <div>
+                <label className="block font-body text-sm font-medium text-brand-dark mb-1.5">
+                  Full Address
                 </label>
                 <input
                   value={details.address}
@@ -542,20 +646,6 @@ export default function NewInspectionPage() {
                   }
                   className={inputClass}
                   placeholder="Building, Street, Area, Dubai"
-                />
-              </div>
-
-              <div>
-                <label className="block font-body text-sm font-medium text-brand-dark mb-1.5">
-                  Unit Number
-                </label>
-                <input
-                  value={details.unitNumber}
-                  onChange={(e) =>
-                    setDetails((d) => ({ ...d, unitNumber: e.target.value }))
-                  }
-                  className={inputClass}
-                  placeholder="Apt 2301"
                 />
               </div>
 
@@ -585,8 +675,70 @@ export default function NewInspectionPage() {
                     setDetails((d) => ({ ...d, ejariRef: e.target.value }))
                   }
                   className={inputClass}
-                  placeholder="Ejari contract number (optional)"
+                  placeholder="Contract number (optional)"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-body text-sm font-medium text-brand-dark mb-1.5">
+                    Contract From
+                  </label>
+                  <input
+                    type="date"
+                    value={details.contractFrom}
+                    onChange={(e) =>
+                      setDetails((d) => ({ ...d, contractFrom: e.target.value }))
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="block font-body text-sm font-medium text-brand-dark mb-1.5">
+                    Contract To
+                  </label>
+                  <input
+                    type="date"
+                    value={details.contractTo}
+                    onChange={(e) =>
+                      setDetails((d) => ({ ...d, contractTo: e.target.value }))
+                    }
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-body text-sm font-medium text-brand-dark mb-1.5">
+                    Annual Rent
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={details.annualRent}
+                    onChange={(e) =>
+                      setDetails((d) => ({ ...d, annualRent: e.target.value }))
+                    }
+                    className={inputClass}
+                    placeholder="e.g. 120000"
+                  />
+                </div>
+                <div>
+                  <label className="block font-body text-sm font-medium text-brand-dark mb-1.5">
+                    Security Deposit
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={details.securityDeposit}
+                    onChange={(e) =>
+                      setDetails((d) => ({ ...d, securityDeposit: e.target.value }))
+                    }
+                    className={inputClass}
+                    placeholder="e.g. 5000"
+                  />
+                </div>
               </div>
 
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mt-6 mb-2">

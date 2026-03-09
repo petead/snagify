@@ -4,14 +4,37 @@ import Anthropic from "@anthropic-ai/sdk";
 // Allow up to 60s for Claude to process the document (PDF can be slow)
 export const maxDuration = 60;
 
-const EXTRACT_PROMPT = `Extract the following fields from this Dubai tenancy contract.
-Return ONLY a JSON object with these exact keys:
-tenant_name, tenant_email, tenant_phone,
-landlord_name, landlord_email, landlord_phone,
-building_name, location, unit_number, property_no,
-property_type, property_size, ejari_ref,
-contract_from, contract_to, annual_rent, security_deposit
-If a field is not found, use null.
+const EXTRACT_PROMPT = `Extract from this Dubai tenancy contract.
+Return ONLY JSON with these exact keys:
+
+PROPERTY fields (physical, never changes):
+- building_name: the building name (e.g. 'Creek Rise Tower 1')
+- unit_number: the Property No field (e.g. '3301') — NOT Premises No
+- location: the Location/area field
+- property_type: normalize to one of: apartment/villa/studio/townhouse
+- address: full address combining building + location
+
+INSPECTION/CONTRACT fields (change per contract):
+- ejari_ref: the contract number (e.g. '3301-CT1-2026')
+- landlord_name
+- landlord_email
+- landlord_phone
+- tenant_name
+- tenant_email
+- tenant_phone
+- contract_from: date in YYYY-MM-DD format
+- contract_to: date in YYYY-MM-DD format
+- annual_rent: number only, no currency
+- security_deposit: number only
+- property_size: number only in m²
+- inspection_type: always 'check-in' for a new tenancy contract
+
+IMPORTANT:
+- unit_number comes from 'Property No' field, NOT 'Premises No (DEWA)'
+- building_name comes from 'Building Name' field
+- Do not confuse Property No with Plot No or Premises No
+
+Return null for any field not found.
 Return only the JSON, no other text.`;
 
 export async function POST(request: Request) {

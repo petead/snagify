@@ -26,15 +26,33 @@ export default function DashboardLoading() {
           ))}
         </div>
 
-        {/* Section title skeleton */}
-        <div className="h-6 w-40 bg-gray-200 rounded animate-pulse mt-8 mb-4" />
+        {/* Section title */}
+        <div className="h-6 w-36 bg-gray-200 rounded animate-pulse mt-8 mb-3" />
 
-        {/* Empty state skeleton */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-8 flex flex-col items-center justify-center gap-4">
-          <div className="w-16 h-16 bg-gray-100 rounded-full animate-pulse" />
-          <div className="h-5 w-32 bg-gray-200 rounded animate-pulse" />
-          <div className="h-4 w-48 bg-gray-100 rounded animate-pulse" />
-          <div className="h-12 w-40 bg-gray-200 rounded-xl animate-pulse" />
+        {/* Search skeleton */}
+        <div className="h-11 rounded-xl bg-gray-100 animate-pulse mb-4" />
+
+        {/* Property card skeletons */}
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="rounded-2xl border border-gray-100 bg-white"
+            >
+              <div className="p-4 flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-gray-100 animate-pulse flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-3 w-1/3 bg-gray-100 rounded animate-pulse" />
+                </div>
+                <div className="h-6 w-24 rounded-full bg-gray-100 animate-pulse" />
+              </div>
+              <div className="border-t border-gray-50 px-4 py-2.5 flex gap-2">
+                <div className="h-6 w-20 rounded-full bg-gray-100 animate-pulse" />
+                <div className="h-6 w-24 rounded-full bg-gray-100 animate-pulse" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

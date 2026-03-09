@@ -11,10 +11,13 @@ interface ReportClientProps {
     completedAt?: string | null;
     reportUrl?: string | null;
     documentHash?: string | null;
+    ejariRef?: string | null;
+    contractFrom?: string | null;
+    contractTo?: string | null;
   };
   property: {
     address: string;
-    unitNumber?: string | null;
+    location?: string | null;
     type?: string | null;
   };
   overallCondition: string;
@@ -118,8 +121,8 @@ export function ReportClient({
               <h3 className="font-heading font-bold text-lg text-brand-dark">
                 {property.address}
               </h3>
-              {property.unitNumber && (
-                <p className="font-body text-sm text-gray-500">Unit {property.unitNumber}</p>
+              {property.location && (
+                <p className="font-body text-sm text-gray-500">{property.location}</p>
               )}
             </div>
             <span className="px-3 py-1 rounded-full bg-[#F0EDFF] text-[#9A88FD] font-heading font-bold text-xs">
@@ -128,6 +131,20 @@ export function ReportClient({
           </div>
 
           <div className="grid grid-cols-2 gap-3 mt-4">
+            {inspection.ejariRef && (
+              <div>
+                <p className="font-body text-xs text-gray-400 mb-1">Ejari Ref</p>
+                <p className="font-body text-sm text-brand-dark">{inspection.ejariRef}</p>
+              </div>
+            )}
+            {(inspection.contractFrom || inspection.contractTo) && (
+              <div>
+                <p className="font-body text-xs text-gray-400 mb-1">Contract</p>
+                <p className="font-body text-sm text-brand-dark">
+                  {[inspection.contractFrom, inspection.contractTo].filter(Boolean).map(formatDate).join(" – ")}
+                </p>
+              </div>
+            )}
             <div>
               <p className="font-body text-xs text-gray-400 mb-1">Overall Condition</p>
               <span className={`inline-block px-3 py-1 rounded-full font-heading font-bold text-sm ${cs.bg} ${cs.text}`}>

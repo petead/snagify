@@ -100,14 +100,21 @@ export async function POST(request: Request) {
         landlord_email: inspection.landlord_email,
         tenant_name: inspection.tenant_name,
         tenant_email: inspection.tenant_email,
+        ejari_ref: inspection.ejari_ref,
+        contract_from: inspection.contract_from,
+        contract_to: inspection.contract_to,
+        annual_rent: inspection.annual_rent,
+        security_deposit: inspection.security_deposit,
+        property_size: inspection.property_size,
       },
       property: property
         ? {
-            address: property.address,
+            building_name: property.building_name,
             unit_number: property.unit_number,
+            location: property.location,
+            address: property.address,
             property_type: property.property_type,
             furnished: property.furnished,
-            ejari_ref: property.ejari_ref,
           }
         : null,
       agent: agent

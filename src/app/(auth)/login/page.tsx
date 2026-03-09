@@ -1,129 +1,85 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Eye, EyeOff } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
-  const supabase = createClient();
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    setLoading(false);
-
-    if (signInError) {
-      setError(signInError.message);
-      return;
+  const handleLogin = async () => {
+    setLoading(true)
+    setError('')
+    
+    const { error } = await supabase.auth.signInWithPassword({ 
+      email, 
+      password 
+    })
+    
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+      return
     }
-
-    router.push("/dashboard");
-    router.refresh();
+    
+    router.push('/dashboard')
   }
 
   return (
-    <>
-      <div className="mb-8">
-        <h1 className="font-heading font-extrabold text-3xl text-brand-dark mb-1.5">
-          Welcome back
-        </h1>
-        <p className="font-body text-sm text-gray-500">
-          Sign in to your Snagify account
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-5">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow p-8 w-full max-w-sm">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Sign In</h1>
+        
         {error && (
-          <div
-            role="alert"
-            className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-body"
-          >
+          <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-3 text-sm mb-4">
             {error}
           </div>
         )}
-
-        <div>
-          <label
-            htmlFor="email"
-            className="block font-body text-sm font-medium text-brand-dark mb-1.5"
-          >
-            Email
-          </label>
+        
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <input
-            id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-            className="w-full h-[52px] px-4 rounded-xl border-[1.5px] border-gray-200 bg-white font-body text-brand-dark placeholder-gray-400 focus:outline-none focus:border-[#9A88FD] focus:ring-2 focus:ring-[#9A88FD]/20 transition-all"
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-400"
             placeholder="you@example.com"
           />
         </div>
-
-        <div>
-          <label
-            htmlFor="password"
-            className="block font-body text-sm font-medium text-brand-dark mb-1.5"
-          >
-            Password
-          </label>
-          <div className="relative">
-            <input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              className="w-full h-[52px] px-4 pr-12 rounded-xl border-[1.5px] border-gray-200 bg-white font-body text-brand-dark placeholder-gray-400 focus:outline-none focus:border-[#9A88FD] focus:ring-2 focus:ring-[#9A88FD]/20 transition-all"
-              placeholder="••••••••"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-              tabIndex={-1}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-            </button>
-          </div>
+        
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-400"
+            placeholder="••••••••"
+          />
         </div>
-
+        
         <button
-          type="submit"
+          onClick={handleLogin}
           disabled={loading}
-          className="w-full h-[52px] rounded-xl bg-[#9A88FD] text-white font-heading font-medium text-base hover:bg-[#7B65FC] active:scale-[0.97] focus:outline-none focus:ring-2 focus:ring-[#9A88FD] focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+          className="w-full bg-[#9A88FD] text-white font-semibold py-3 rounded-xl"
         >
-          {loading ? "Signing in…" : "Sign In"}
+          {loading ? 'Signing in...' : 'Sign In'}
         </button>
-      </form>
-
-      <p className="mt-8 text-center font-body text-sm text-gray-500">
-        Don&apos;t have an account?{" "}
-        <Link
-          href="/register"
-          className="font-medium text-[#9A88FD] hover:text-[#7B65FC] hover:underline"
-        >
-          Create one
-        </Link>
-      </p>
-    </>
-  );
+        
+        <p className="text-center text-sm text-gray-500 mt-4">
+          No account?{' '}
+          <a href="/register" className="text-[#9A88FD] font-medium">Register</a>
+        </p>
+      </div>
+    </div>
+  )
 }

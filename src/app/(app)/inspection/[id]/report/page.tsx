@@ -12,7 +12,7 @@ export default async function ReportPage({
 
   const { data: inspection, error } = await supabase
     .from("inspections")
-    .select("id, type, status, report_url, completed_at, landlord_name, tenant_name, property_id, document_hash")
+    .select("id, type, status, report_url, completed_at, landlord_name, tenant_name, property_id, document_hash, ejari_ref, contract_from, contract_to")
     .eq("id", id)
     .single();
 
@@ -20,7 +20,7 @@ export default async function ReportPage({
 
   const { data: property } = await supabase
     .from("properties")
-    .select("address, unit_number, property_type, ejari_ref")
+    .select("building_name, unit_number, location, address, property_type")
     .eq("id", inspection.property_id)
     .single();
 
@@ -36,6 +36,11 @@ export default async function ReportPage({
   const overallCondition =
     poorCount > 0 ? "Poor" : fairCount > roomConditions.length / 2 ? "Fair" : "Good";
 
+  const propertyTitle =
+    property?.building_name && property?.unit_number
+      ? `${property.building_name} — Unit ${property.unit_number}`
+      : property?.address ?? "Property";
+
   return (
     <ReportClient
       inspectionId={id}
@@ -45,10 +50,13 @@ export default async function ReportPage({
         completedAt: inspection.completed_at,
         reportUrl: inspection.report_url,
         documentHash: inspection.document_hash,
+        ejariRef: inspection.ejari_ref,
+        contractFrom: inspection.contract_from,
+        contractTo: inspection.contract_to,
       }}
       property={{
-        address: property?.address ?? "Property",
-        unitNumber: property?.unit_number,
+        address: propertyTitle,
+        location: property?.location,
         type: property?.property_type,
       }}
       overallCondition={overallCondition}
