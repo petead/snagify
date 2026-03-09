@@ -3,6 +3,21 @@ import twilio from "twilio";
 import { createClient } from "@/lib/supabase/server";
 import crypto from "crypto";
 
+// Make sure NEXT_PUBLIC_APP_URL=https://snagify.vercel.app
+// is set in Vercel environment variables
+
+function normalizePhone(phone: string): string | null {
+  if (!phone) return null;
+  let cleaned = phone.replace(/[\s\-\(\)]/g, "");
+  cleaned = cleaned.replace(/^0+/, "");
+  if (cleaned.startsWith("971")) {
+    cleaned = "+" + cleaned;
+  } else if (!cleaned.startsWith("+")) {
+    cleaned = "+971" + cleaned;
+  }
+  return cleaned;
+}
+
 export async function POST(request: Request) {
   const { inspectionId, signerType, phone } = (await request.json()) as {
     inspectionId: string;
@@ -16,6 +31,12 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+
+  const formattedPhone = normalizePhone(phone);
+  if (!formattedPhone) {
+    return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
+  }
+  const whatsappTo = `whatsapp:${formattedPhone}`;
 
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -71,9 +92,6 @@ export async function POST(request: Request) {
     }
   }
 
-  const formattedPhone = phone.startsWith("+") ? phone : `+${phone}`;
-  const whatsappTo = `whatsapp:${formattedPhone}`;
-
   const { data: inspection } = await supabase
     .from("inspections")
     .select("type, properties(building_name, unit_number)")
@@ -90,15 +108,33 @@ export async function POST(request: Request) {
       ? `${propObj.building_name}, Unit ${propObj.unit_number}`
       : "the property";
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://snagify.vercel.app";
   const signUrl = `${appUrl}/sign/${token}`;
-  const typeLabel = (inspection?.type === "check-in" ? "Check-In" : "Check-Out") as string;
+  const inspectionType = inspection?.type === "check-in" ? "Check-In" : "Check-Out";
+
+  console.log("Sending WhatsApp to:", whatsappTo);
+  console.log("Sign URL:", signUrl);
+
+  const body = `🏢 *Snagify — Property Inspection Report*
+
+You have been invited to review and sign the ${inspectionType} inspection report for:
+*${propertyName}*
+
+Your verification code is:
+*${otp}*
+
+_Valid for 30 minutes_
+
+To sign the report, tap the link below:
+${signUrl}
+
+_Powered by Snagify_`;
 
   try {
     await client.messages.create({
       from: whatsappFrom,
       to: whatsappTo,
-      body: `🏢 *Snagify — Property Inspection Report*\n\nYou have been invited to review and sign the ${typeLabel} inspection report for:\n*${propertyName}*\n\nYour verification code is:\n*${otp}*\n\n_Valid for 30 minutes_\n\nSign here: ${signUrl}`,
+      body,
     });
   } catch (twilioError: unknown) {
     console.error("Twilio error:", twilioError);
