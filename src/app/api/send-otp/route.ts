@@ -16,7 +16,9 @@ export async function POST(request: Request) {
     console.log("send-otp called with:", { email, inspectionId, signerType });
 
     // 1. Init clients
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    // TEMP DEBUG - remove after testing
+    const resend = new Resend("re_Bq1zVbEQ_AZZZSMF8e25WYi1k2uxKsnzq");
+    // const resend = new Resend(process.env.RESEND_API_KEY);
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
