@@ -12,11 +12,27 @@ export default async function ReportPage({
 
   const { data: inspection, error } = await supabase
     .from("inspections")
-    .select("id, type, status, report_url, completed_at, landlord_name, tenant_name, property_id, document_hash, ejari_ref, contract_from, contract_to")
+    .select("id, type, status, report_url, completed_at, property_id, document_hash, tenancy_id")
     .eq("id", id)
     .single();
 
   if (error || !inspection) notFound();
+
+  let ejariRef: string | null = null;
+  let contractFrom: string | null = null;
+  let contractTo: string | null = null;
+  if (inspection.tenancy_id) {
+    const { data: tenancy } = await supabase
+      .from("tenancies")
+      .select("ejari_ref, contract_from, contract_to")
+      .eq("id", inspection.tenancy_id)
+      .single();
+    if (tenancy) {
+      ejariRef = tenancy.ejari_ref ?? null;
+      contractFrom = tenancy.contract_from ?? null;
+      contractTo = tenancy.contract_to ?? null;
+    }
+  }
 
   const { data: property } = await supabase
     .from("properties")
@@ -50,9 +66,9 @@ export default async function ReportPage({
         completedAt: inspection.completed_at,
         reportUrl: inspection.report_url,
         documentHash: inspection.document_hash,
-        ejariRef: inspection.ejari_ref,
-        contractFrom: inspection.contract_from,
-        contractTo: inspection.contract_to,
+        ejariRef,
+        contractFrom,
+        contractTo,
       }}
       property={{
         address: propertyTitle,

@@ -20,8 +20,6 @@ type InspectionRow = {
   status: string | null;
   created_at: string | null;
   completed_at: string | null;
-  tenant_name: string | null;
-  landlord_name: string | null;
 };
 
 type TenancyRow = {
@@ -156,7 +154,7 @@ export function DashboardClient({
         const building = (p.building_name ?? "").toLowerCase();
         const unit = (p.unit_number ?? "").toLowerCase();
         const addr = (p.address ?? "").toLowerCase();
-        const tenant = (p.inspections?.[0]?.tenant_name ?? "").toLowerCase();
+        const tenant = (p.tenancies?.[0]?.tenant_name ?? "").toLowerCase();
         return building.includes(q) || unit.includes(q) || addr.includes(q) || tenant.includes(q);
       })
     : properties;

@@ -430,25 +430,13 @@ function NewInspectionContent() {
       }
     }
 
-    // 3. Create inspection (with tenancy_id if we have it; contract fields from tenancy or form)
+    // 3. Create inspection — only core fields; contract/tenant data lives in tenancies
     const inspPayload = {
       property_id: propertyId,
       ...(tenancyId && { tenancy_id: tenancyId }),
       agent_id: user.id,
       type: details.inspectionType,
-      status: "draft",
-      ejari_ref: (tenancyData?.ejari_ref ?? details.ejariRef ?? "").toString().trim() || null,
-      contract_from: (tenancyData?.contract_from ?? details.contractFrom)?.toString().trim() || null,
-      contract_to: (tenancyData?.contract_to ?? details.contractTo)?.toString().trim() || null,
-      annual_rent: tenancyData?.annual_rent ?? (details.annualRent ? Number(details.annualRent) : null),
-      security_deposit: tenancyData?.security_deposit ?? (details.securityDeposit ? Number(details.securityDeposit) : null),
-      property_size: tenancyData?.property_size ?? (details.propertySize ? Number(details.propertySize) : null),
-      landlord_name: (tenancyData?.landlord_name ?? details.landlordName ?? "").toString().trim(),
-      landlord_email: (tenancyData?.landlord_email ?? details.landlordEmail ?? "").toString().trim(),
-      landlord_phone: (tenancyData?.landlord_phone ?? details.landlordPhone ?? "").toString().trim() || null,
-      tenant_name: (tenancyData?.tenant_name ?? details.tenantName ?? "").toString().trim(),
-      tenant_email: (tenancyData?.tenant_email ?? details.tenantEmail ?? "").toString().trim(),
-      tenant_phone: (tenancyData?.tenant_phone ?? details.tenantPhone ?? "").toString().trim() || null,
+      status: "in_progress",
     };
     const { data: insp, error: inspErr } = await supabase
       .from("inspections")

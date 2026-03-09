@@ -47,8 +47,6 @@ export default async function DashboardPage() {
       status: string | null;
       created_at: string | null;
       completed_at: string | null;
-      tenant_name: string | null;
-      landlord_name: string | null;
     }>;
   }> = [];
 
@@ -59,7 +57,7 @@ export default async function DashboardPage() {
         `
         id, building_name, unit_number, address, property_type, created_at,
         tenancies (id, tenant_name, contract_from, contract_to, actual_end_date),
-        inspections (id, type, status, created_at, completed_at, tenant_name, landlord_name)
+        inspections (id, type, status, created_at, completed_at)
       `
       )
       .eq("agent_id", user.id)
@@ -73,7 +71,7 @@ export default async function DashboardPage() {
         .select(
           `
           id, building_name, unit_number, address, property_type, created_at,
-          inspections (id, type, status, created_at, completed_at, tenant_name, landlord_name)
+          inspections (id, type, status, created_at, completed_at)
         `
         )
         .eq("agent_id", user.id)

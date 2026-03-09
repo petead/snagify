@@ -14,14 +14,6 @@ type InspectionWithRooms = {
   created_at: string | null;
   completed_at: string | null;
   tenancy_id?: string | null;
-  ejari_ref?: string | null;
-  contract_from?: string | null;
-  contract_to?: string | null;
-  landlord_name?: string | null;
-  tenant_name?: string | null;
-  tenant_email?: string | null;
-  annual_rent?: number | null;
-  property_size?: number | null;
   rooms?: { id: string }[] | null;
 };
 
@@ -83,6 +75,7 @@ export default async function PropertyPage({
         actual_end_date,
         annual_rent,
         ejari_ref,
+        property_size,
         inspections (
           id, type, status, created_at, completed_at, tenancy_id,
           rooms (id)
@@ -177,7 +170,7 @@ export default async function PropertyPage({
     );
   }
 
-  // Fallback: fetch property with inspections only (no tenancies table or empty)
+  // Fallback: fetch property with inspections only (no tenancies table or empty; contract data lives in tenancies)
   const { data: property, error: propError } = await supabase
     .from("properties")
     .select(
@@ -189,9 +182,6 @@ export default async function PropertyPage({
       property_type,
       inspections (
         id, type, status, created_at, completed_at,
-        ejari_ref, contract_from, contract_to,
-        landlord_name, tenant_name, tenant_email,
-        annual_rent, property_size,
         rooms (id)
       )
     `
@@ -214,21 +204,13 @@ export default async function PropertyPage({
       status: i.status,
       created_at: i.created_at,
       completed_at: i.completed_at,
-      ejari_ref: i.ejari_ref,
-      contract_from: i.contract_from,
-      contract_to: i.contract_to,
-      landlord_name: i.landlord_name,
-      tenant_name: i.tenant_name,
-      tenant_email: i.tenant_email,
-      annual_rent: i.annual_rent,
       room_count: Array.isArray(i.rooms) ? i.rooms.length : 0,
     }));
 
   const groupedByContract = inspections.reduce<
     Record<string, { id: string; type: string | null; status: string | null; created_at: string | null; completed_at: string | null; room_count: number }[]>
   >((groups, inspection) => {
-    const key =
-      inspection.ejari_ref ?? inspection.tenant_name ?? "unknown";
+    const key = inspection.id;
     if (!groups[key]) groups[key] = [];
     groups[key].push({
       id: inspection.id,
@@ -242,22 +224,19 @@ export default async function PropertyPage({
   }, {});
 
   const contractGroups: TenancyGroup[] = Object.entries(groupedByContract).map(
-    ([key, inspList]) => {
-      const first = rawInspections.find((i) => i.id === inspList[0]?.id);
-      return {
-        tenancyId: null,
-        key,
-        status: "active",
-        tenantName: first?.tenant_name ?? null,
-        ejariRef: first?.ejari_ref ?? null,
-        contractFrom: first?.contract_from ?? null,
-        contractTo: first?.contract_to ?? null,
-        annualRent: first?.annual_rent ?? null,
-        canStartCheckIn: { allowed: true, reason: null },
-        canStartCheckOut: { allowed: true, reason: null },
-        inspections: inspList,
-      };
-    }
+    ([key, inspList]) => ({
+      tenancyId: null,
+      key,
+      status: "active",
+      tenantName: null,
+      ejariRef: null,
+      contractFrom: null,
+      contractTo: null,
+      annualRent: null,
+      canStartCheckIn: { allowed: true, reason: null },
+      canStartCheckOut: { allowed: true, reason: null },
+      inspections: inspList,
+    })
   );
 
   contractGroups.sort((a, b) => {
@@ -266,8 +245,7 @@ export default async function PropertyPage({
     return new Date(bLatest).getTime() - new Date(aLatest).getTime();
   });
 
-  const withSize = rawInspections.find((i) => i.property_size != null);
-  const sizeM2 = withSize?.property_size ?? null;
+  const sizeM2: number | null = null;
 
   return (
     <PropertyClient

@@ -42,11 +42,32 @@ export async function POST(request: Request) {
 
     const { data: inspection, error: inspErr } = await supabase
       .from("inspections")
-      .select("*")
+      .select("id, type, status, created_at, property_id, agent_id, tenancy_id")
       .eq("id", inspectionId)
       .single();
     if (inspErr || !inspection) {
       return NextResponse.json({ error: "Inspection not found" }, { status: 404 });
+    }
+
+    let tenancy: {
+      landlord_name?: string | null;
+      landlord_email?: string | null;
+      tenant_name?: string | null;
+      tenant_email?: string | null;
+      ejari_ref?: string | null;
+      contract_from?: string | null;
+      contract_to?: string | null;
+      annual_rent?: number | null;
+      security_deposit?: number | null;
+      property_size?: number | null;
+    } | null = null;
+    if (inspection.tenancy_id) {
+      const { data: t } = await supabase
+        .from("tenancies")
+        .select("landlord_name, landlord_email, tenant_name, tenant_email, ejari_ref, contract_from, contract_to, annual_rent, security_deposit, property_size")
+        .eq("id", inspection.tenancy_id)
+        .single();
+      tenancy = t ?? null;
     }
 
     const { data: property } = await supabase
@@ -96,16 +117,16 @@ export async function POST(request: Request) {
         type: inspection.type,
         status: inspection.status,
         created_at: inspection.created_at,
-        landlord_name: inspection.landlord_name,
-        landlord_email: inspection.landlord_email,
-        tenant_name: inspection.tenant_name,
-        tenant_email: inspection.tenant_email,
-        ejari_ref: inspection.ejari_ref,
-        contract_from: inspection.contract_from,
-        contract_to: inspection.contract_to,
-        annual_rent: inspection.annual_rent,
-        security_deposit: inspection.security_deposit,
-        property_size: inspection.property_size,
+        landlord_name: tenancy?.landlord_name ?? null,
+        landlord_email: tenancy?.landlord_email ?? null,
+        tenant_name: tenancy?.tenant_name ?? null,
+        tenant_email: tenancy?.tenant_email ?? null,
+        ejari_ref: tenancy?.ejari_ref ?? null,
+        contract_from: tenancy?.contract_from ?? null,
+        contract_to: tenancy?.contract_to ?? null,
+        annual_rent: tenancy?.annual_rent ?? null,
+        security_deposit: tenancy?.security_deposit ?? null,
+        property_size: tenancy?.property_size ?? null,
       },
       property: property
         ? {
