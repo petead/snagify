@@ -81,9 +81,20 @@ function getPropertyTenancyStatus(prop: PropertyRow): {
   return { label: "Vacant", emoji: "⬜" };
 }
 
+export type AlertItem = {
+  type: string;
+  color: string;
+  icon: string;
+  title: string;
+  subtitle: string;
+  href: string;
+  actionLabel: string;
+};
+
 interface DashboardClientProps {
   displayName: string;
   properties: PropertyRow[];
+  alerts?: AlertItem[];
 }
 
 function getGreeting(): string {
@@ -124,6 +135,7 @@ function normalizeProperties(rows: PropertyRow[]): PropertyRow[] {
 export function DashboardClient({
   displayName,
   properties: initialProperties,
+  alerts = [],
 }: DashboardClientProps) {
   const [properties] = useState(() => normalizeProperties(initialProperties));
   const [search, setSearch] = useState("");
@@ -262,6 +274,45 @@ export function DashboardClient({
           </Link>
         </div>
 
+        {alerts.length > 0 && (
+          <div className="mx-4 mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" aria-hidden />
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                Action Required
+              </span>
+              <span
+                className="ml-auto bg-red-400 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center"
+                aria-label={`${alerts.length} alerts`}
+              >
+                {alerts.length}
+              </span>
+            </div>
+            {alerts.map((alert, i) => (
+              <div
+                key={`${alert.type}-${i}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => router.push(alert.href)}
+                onKeyDown={(e) => e.key === "Enter" && router.push(alert.href)}
+                className="flex items-center gap-3 p-3 rounded-xl mb-2 cursor-pointer active:scale-[0.98] transition-transform border border-gray-100 bg-white"
+                style={{
+                  borderLeft: `4px solid ${alert.color === "#FEDE80" ? "#F59E0B" : "#9A88FD"}`,
+                }}
+              >
+                <span className="text-xl flex-shrink-0">{alert.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">{alert.title}</p>
+                  <p className="text-xs text-gray-400 truncate">{alert.subtitle}</p>
+                </div>
+                <span className="text-xs font-semibold text-[#9A88FD] flex-shrink-0">
+                  {alert.actionLabel}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3 mx-4 mb-4">
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <div style={{ color: "#7B65FC" }}>
@@ -309,31 +360,24 @@ export function DashboardClient({
           </div>
         </div>
 
-        <h2 className="font-heading font-bold text-lg mt-8 mb-3 px-4" style={{ color: "#111827" }}>
-          My Properties
-        </h2>
-
-        {properties.length > 0 && (
-          <div className="relative mb-4 px-4">
-            <Search
-              size={18}
-              className="absolute left-7 top-1/2 pointer-events-none"
-              style={{ color: "#9ca3af", transform: "translateY(-50%)" }}
-            />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by address, unit, or tenant..."
-              className="w-full h-11 pl-10 pr-4 rounded-xl border border-gray-200 bg-white font-body text-sm focus:outline-none"
-              style={{ color: "#111827" }}
-            />
-          </div>
-        )}
+        <div className="flex items-center justify-between mt-8 mb-3 px-4">
+          <h2 className="font-heading font-bold text-lg m-0" style={{ color: "#111827" }}>
+            Recent Activity
+          </h2>
+          {properties.length > 0 && (
+            <Link
+              href="/properties"
+              className="text-sm font-semibold"
+              style={{ color: "#9A88FD" }}
+            >
+              View all →
+            </Link>
+          )}
+        </div>
 
         {filtered.length > 0 ? (
           <div className="px-0">
-            {filtered.map((prop) => {
+            {filtered.slice(0, 3).map((prop) => {
               const inspections = prop.inspections ?? [];
               const inspCount = inspections.length;
               const sorted = [...inspections].sort(
@@ -401,18 +445,8 @@ export function DashboardClient({
               );
             })}
           </div>
-        ) : properties.length > 0 ? (
-          <div className="mx-4 rounded-2xl border border-gray-100 bg-white shadow-sm p-8 flex flex-col items-center justify-center gap-3 min-h-[160px]">
-            <Search size={32} style={{ color: "#d1d5db" }} />
-            <p className="font-heading font-semibold mt-0 mb-0" style={{ color: "#111827" }}>
-              No results
-            </p>
-            <p className="font-body text-sm text-center mt-0 mb-0" style={{ color: "#6b7280" }}>
-              No properties match &ldquo;{search}&rdquo;
-            </p>
-          </div>
         ) : (
-          <div className="mx-4 rounded-2xl border border-gray-100 bg-white shadow-sm p-8 flex flex-col items-center justify-center gap-4 min-h-[240px]">
+          <div className="mx-4 rounded-2xl border border-gray-100 bg-white shadow-sm p-8 flex flex-col items-center justify-center gap-4 min-h-[200px]">
             <span className="text-5xl" role="img" aria-hidden>
               🏙️
             </span>

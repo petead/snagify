@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
-import { DashboardBottomNav } from "@/components/layout/DashboardBottomNav";
 import { DashboardClient } from "./DashboardClient";
 
 export default async function DashboardPage() {
@@ -50,6 +49,83 @@ export default async function DashboardPage() {
     }>;
   }> = [];
 
+  // Alerts: expiring tenancies + inspections pending signature
+  type AlertItem = {
+    type: string;
+    color: string;
+    icon: string;
+    title: string;
+    subtitle: string;
+    href: string;
+    actionLabel: string;
+  };
+  let alerts: AlertItem[] = [];
+
+  if (user) {
+    const { data: expiringSoon } = await supabase
+      .from("tenancies")
+      .select("*, property(building_name, unit_number)")
+      .eq("agent_id", user.id);
+    const expiringList = (expiringSoon ?? []).filter((t: { contract_to?: string | null }) => {
+      if (!t.contract_to) return false;
+      const end = new Date(t.contract_to);
+      const now = new Date();
+      const daysLeft = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      return daysLeft <= 30 && daysLeft >= 0;
+    });
+    const { data: pendingSignature } = await supabase
+      .from("inspections")
+      .select("id, property_id, property(building_name, unit_number)")
+      .eq("agent_id", user.id)
+      .eq("status", "completed");
+    const pendingList = pendingSignature ?? [];
+    const signedInspectionIds = new Set<string>();
+    if (pendingList.length > 0) {
+      const { data: sigs } = await supabase
+        .from("signatures")
+        .select("inspection_id")
+        .not("signed_at", "is", null);
+      (sigs ?? []).forEach((s: { inspection_id: string }) => signedInspectionIds.add(s.inspection_id));
+    }
+    const trulyPending = pendingList.filter((i: { id: string }) => !signedInspectionIds.has(i.id));
+
+    const propObj = (x: unknown): { building_name?: string | null; unit_number?: string | null } | null => {
+      if (x == null) return null;
+      if (Array.isArray(x)) return (x[0] as { building_name?: string | null; unit_number?: string | null }) ?? null;
+      return x as { building_name?: string | null; unit_number?: string | null };
+    };
+    alerts = [
+      ...expiringList.map((t: { tenant_name?: string | null; property_id: string; property?: unknown }) => {
+        const p = propObj(t.property);
+        return {
+          type: "expiring",
+          color: "#FEDE80",
+          icon: "⚠️",
+          title: `${(t.tenant_name ?? "Tenant").split(" ")[0]} — contract expiring soon`,
+          subtitle: p?.building_name && p?.unit_number
+            ? `${p.building_name}, Unit ${p.unit_number}`
+            : (p?.building_name ?? p?.unit_number ?? "Property"),
+          href: `/property/${t.property_id}`,
+          actionLabel: "View →",
+        };
+      }),
+      ...trulyPending.map((i: { id: string; property?: unknown }) => {
+        const p = propObj(i.property);
+        return {
+          type: "signature",
+          color: "#F0EDFF",
+          icon: "✍️",
+          title: "Report waiting for signature",
+          subtitle: p?.building_name && p?.unit_number
+            ? `${p.building_name}, Unit ${p.unit_number}`
+            : (p?.building_name ?? p?.unit_number ?? "Inspection"),
+          href: `/inspection/${i.id}/report`,
+          actionLabel: "Send →",
+        };
+      }),
+    ];
+  }
+
   if (user) {
     const { data: withTenancies, error: tenErr } = await supabase
       .from("properties")
@@ -81,15 +157,15 @@ export default async function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 max-w-lg mx-auto">
+    <main className="min-h-screen bg-[#fcfcfc]">
       <header className="bg-white border-b border-gray-100 px-4 h-16 flex items-center justify-between sticky top-0 z-50">
         <DashboardHeader fullName={fullName} userEmail={user?.email ?? null} />
       </header>
       <DashboardClient
         displayName={displayName}
         properties={propertiesData}
+        alerts={alerts}
       />
-      <DashboardBottomNav />
     </main>
   );
 }
