@@ -80,8 +80,12 @@ export default function ReportsPage() {
       return true;
     }) ?? [];
 
-  const prop = (r: ReportRow) => first(r.properties ?? r.property);
-  const ten = (r: ReportRow) => first(r.tenancies ?? r.tenancy);
+  type PropShape = { building_name?: string | null; unit_number?: string | null };
+  type TenShape = { tenant_name?: string | null };
+  const prop = (r: ReportRow): PropShape | null =>
+    first(r.properties ?? r.property) as PropShape | null;
+  const ten = (r: ReportRow): TenShape | null =>
+    first(r.tenancies ?? r.tenancy) as TenShape | null;
 
   return (
     <main className="min-h-screen bg-[#fcfcfc] pb-24 max-w-lg mx-auto">
@@ -119,9 +123,9 @@ export default function ReportsPage() {
             const isSigned = report.status === "signed" || signedIds.has(report.id);
             const p = prop(report);
             const t = ten(report);
-            const buildingName = (p?.building_name ?? "") as string;
-            const unitNumber = (p?.unit_number ?? "") as string;
-            const tenantName = (t?.tenant_name ?? "") as string;
+            const buildingName = p?.building_name ?? "";
+            const unitNumber = p?.unit_number ?? "";
+            const tenantName = t?.tenant_name ?? "";
 
             return (
               <div
