@@ -9,6 +9,20 @@ const normalizePhone = (phone: string) => {
 };
 
 export async function POST(request: Request) {
+  console.log("=== ENV CHECK ===");
+  console.log("ACCOUNT_SID:", process.env.TWILIO_ACCOUNT_SID?.substring(0, 10) + "...");
+  console.log("AUTH_TOKEN:", process.env.TWILIO_AUTH_TOKEN?.substring(0, 10) + "...");
+  console.log("SMS_FROM:", process.env.TWILIO_SMS_FROM);
+  console.log("SUPABASE_URL:", process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30));
+  console.log("SERVICE_KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY?.substring(0, 10) + "...");
+
+  // Return early to test env only:
+  // return Response.json({
+  //   sid: process.env.TWILIO_ACCOUNT_SID?.substring(0, 10),
+  //   token: process.env.TWILIO_AUTH_TOKEN?.substring(0, 10),
+  //   from: process.env.TWILIO_SMS_FROM,
+  // });
+
   const { phone, inspectionId, signerType } = await request.json();
 
   const client = twilio(
