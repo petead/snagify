@@ -57,7 +57,6 @@ export default async function PropertyPage({
         id: property.id,
         building_name: property.building_name,
         unit_number: property.unit_number,
-        location: property.location,
         address: property.address,
         property_type: property.property_type,
       }}

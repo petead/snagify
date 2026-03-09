@@ -27,7 +27,6 @@ type PropertyRow = {
   id: string;
   building_name: string | null;
   unit_number: string | null;
-  location: string | null;
   address: string | null;
   property_type: string | null;
   created_at: string | null;
@@ -106,10 +105,9 @@ export function DashboardClient({
         const q = search.toLowerCase();
         const building = (p.building_name ?? "").toLowerCase();
         const unit = (p.unit_number ?? "").toLowerCase();
-        const loc = (p.location ?? "").toLowerCase();
         const addr = (p.address ?? "").toLowerCase();
         const tenant = (p.inspections?.[0]?.tenant_name ?? "").toLowerCase();
-        return building.includes(q) || unit.includes(q) || loc.includes(q) || addr.includes(q) || tenant.includes(q);
+        return building.includes(q) || unit.includes(q) || addr.includes(q) || tenant.includes(q);
       })
     : properties;
 
@@ -323,15 +321,10 @@ export function DashboardClient({
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="font-heading font-bold text-sm truncate mt-0 mb-0" style={{ color: "#111827" }}>
-                          {prop.building_name && prop.unit_number
-                            ? `${prop.building_name} — Unit ${prop.unit_number}`
-                            : prop.address ?? "Untitled Property"}
+                          {prop.address ?? (prop.building_name && prop.unit_number
+                            ? `${prop.building_name}, Unit ${prop.unit_number}`
+                            : "Untitled Property")}
                         </p>
-                        {prop.location && (
-                          <p className="font-body text-xs mt-0 mb-0" style={{ color: "#6b7280" }}>
-                            {prop.location}
-                          </p>
-                        )}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">

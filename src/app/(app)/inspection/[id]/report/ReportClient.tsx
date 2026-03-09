@@ -17,7 +17,6 @@ interface ReportClientProps {
   };
   property: {
     address: string;
-    location?: string | null;
     type?: string | null;
   };
   overallCondition: string;
@@ -121,9 +120,6 @@ export function ReportClient({
               <h3 className="font-heading font-bold text-lg text-brand-dark">
                 {property.address}
               </h3>
-              {property.location && (
-                <p className="font-body text-sm text-gray-500">{property.location}</p>
-              )}
             </div>
             <span className="px-3 py-1 rounded-full bg-[#F0EDFF] text-[#9A88FD] font-heading font-bold text-xs">
               {inspType}

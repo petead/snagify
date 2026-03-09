@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * If properties table is missing 'address' or still has 'location', run in Supabase SQL Editor:
+ * -- ALTER TABLE properties ADD COLUMN IF NOT EXISTS address text;
+ * -- ALTER TABLE properties DROP COLUMN IF EXISTS location;
+ */
+
 import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -56,7 +62,6 @@ interface DetailsForm {
   inspectionType: "check-in" | "check-out";
   buildingName: string;
   unitNumber: string;
-  location: string;
   address: string;
   propertyType: PropertyTypeId | "";
   propertySize: string;
@@ -77,7 +82,6 @@ const initialDetails: DetailsForm = {
   inspectionType: "check-in",
   buildingName: "",
   unitNumber: "",
-  location: "",
   address: "",
   propertyType: "",
   propertySize: "",
@@ -107,10 +111,10 @@ function mapExtractedToForm(extracted: Record<string, unknown>): Partial<Details
     return undefined;
   };
   const building = get("building_name");
-  const location = get("location");
+  const unitNum = get("unit_number");
   const address = (extracted.address != null && typeof extracted.address === "string")
     ? String(extracted.address).trim()
-    : [building, location].filter(Boolean).join(", ") || "";
+    : building && unitNum ? `${building}, Unit ${unitNum}` : "";
   const propType = (get("property_type") || "").toLowerCase();
   let propertyType: PropertyTypeId | "" = "";
   if (propType.includes("villa")) propertyType = "villa";
@@ -122,8 +126,7 @@ function mapExtractedToForm(extracted: Record<string, unknown>): Partial<Details
 
   return {
     buildingName: building || undefined,
-    unitNumber: get("unit_number") || undefined,
-    location: location || undefined,
+    unitNumber: unitNum || undefined,
     address: address || undefined,
     propertyType: propertyType || undefined,
     propertySize: getNum("property_size") ?? undefined,
@@ -304,8 +307,7 @@ export default function NewInspectionPage() {
 
     const buildingName = (details.buildingName ?? "").trim() || null;
     const unitNumber = (details.unitNumber ?? "").trim() || null;
-    const address = (details.address ?? "").trim() || (buildingName && unitNumber ? `${buildingName}, ${details.location || ""}`.trim() : "") || null;
-    const location = (details.location ?? "").trim() || null;
+    const address = (details.address ?? "").trim() || (buildingName && unitNumber ? `${buildingName}, Unit ${unitNumber}` : "") || null;
 
     let existingQuery = supabase
       .from("properties")
@@ -329,7 +331,6 @@ export default function NewInspectionPage() {
           agent_id: user.id,
           building_name: buildingName,
           unit_number: unitNumber,
-          location,
           address,
           property_type: details.propertyType || null,
           furnished: false,
@@ -623,21 +624,7 @@ export default function NewInspectionPage() {
 
               <div>
                 <label className="block font-body text-sm font-medium text-brand-dark mb-1.5">
-                  Location / Area
-                </label>
-                <input
-                  value={details.location}
-                  onChange={(e) =>
-                    setDetails((d) => ({ ...d, location: e.target.value }))
-                  }
-                  className={inputClass}
-                  placeholder="Area, Dubai"
-                />
-              </div>
-
-              <div>
-                <label className="block font-body text-sm font-medium text-brand-dark mb-1.5">
-                  Full Address
+                  Address
                 </label>
                 <input
                   value={details.address}
@@ -645,8 +632,13 @@ export default function NewInspectionPage() {
                     setDetails((d) => ({ ...d, address: e.target.value }))
                   }
                   className={inputClass}
-                  placeholder="Building, Street, Area, Dubai"
+                  placeholder="Creek Rise Tower 1, Unit 3301"
                 />
+                {details.buildingName && details.unitNumber && !details.address && (
+                  <p className="mt-1 font-body text-xs text-gray-500">
+                    Or leave blank to use: {details.buildingName}, Unit {details.unitNumber}
+                  </p>
+                )}
               </div>
 
               <div>

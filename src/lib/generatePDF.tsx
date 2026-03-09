@@ -220,7 +220,6 @@ interface InspectionMeta {
   property: {
     building_name?: string;
     unit_number?: string;
-    location?: string;
     address?: string;
     property_type?: string;
   } | null;
@@ -261,11 +260,10 @@ function InspectionReport({
 
         <View style={s.coverBody}>
           <Text style={s.coverAddress}>
-            {meta.property?.building_name && meta.property?.unit_number
-              ? `${meta.property.building_name} — Unit ${meta.property.unit_number}`
-              : meta.property?.address ?? "Property Address"}
+            {meta.property?.address ?? (meta.property?.building_name && meta.property?.unit_number
+              ? `${meta.property.building_name}, Unit ${meta.property.unit_number}`
+              : "Property Address")}
           </Text>
-          {meta.property?.location && <Text style={s.coverUnit}>{meta.property.location}</Text>}
 
           <View style={s.coverRow}>
             <Text style={s.coverLabel}>Date of Inspection</Text>

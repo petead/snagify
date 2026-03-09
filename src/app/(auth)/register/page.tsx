@@ -55,12 +55,12 @@ export default function RegisterPage() {
   const strength = getPasswordStrength(password);
   const strengthLabel = strength <= 1 ? "Weak" : strength <= 3 ? "Medium" : "Strong";
 
-  function formatPhone(value: string) {
+  function formatUAEPhone(value: string) {
     const digits = value.replace(/\D/g, "").slice(0, 9);
-    if (digits.length === 0) return "";
-    return digits.replace(/(\d{3})(\d{0,3})(\d{0,})/, (_, a, b, c) =>
-      [a, b, c].filter(Boolean).join(" ")
-    );
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 5) return digits.slice(0, 2) + " " + digits.slice(2);
+    if (digits.length <= 8) return digits.slice(0, 2) + " " + digits.slice(2, 5) + " " + digits.slice(5);
+    return digits.slice(0, 2) + " " + digits.slice(2, 5) + " " + digits.slice(5, 9);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -69,7 +69,7 @@ export default function RegisterPage() {
     setLoading(true);
     setSuccess(false);
 
-    const fullPhone = phone ? `${UAE_PHONE_PREFIX} ${phone.trim()}` : null;
+    const fullPhone = phone ? UAE_PHONE_PREFIX + phone.replace(/\s/g, "") : null;
 
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
@@ -176,17 +176,17 @@ export default function RegisterPage() {
             Phone
           </label>
           <div className="flex h-[52px] min-h-[52px] rounded-xl border border-gray-200 bg-white focus-within:border-[#9A88FD] focus-within:ring-2 focus-within:ring-[#9A88FD]/20 transition-all">
-            <span className="inline-flex items-center px-4 font-body text-sm text-gray-500 border-r border-gray-200 select-none">
+            <span className="inline-flex items-center px-4 font-body text-sm text-gray-500 border-r border-gray-200 select-none" aria-hidden>
               {UAE_PHONE_PREFIX}
             </span>
             <input
               id="phone"
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(formatPhone(e.target.value))}
+              onChange={(e) => setPhone(formatUAEPhone(e.target.value))}
               autoComplete="tel"
               className="flex-1 min-w-0 h-full px-4 rounded-r-xl font-body text-[#1A1A1A] placeholder-gray-400 focus:outline-none bg-transparent"
-              placeholder="50 123 4567"
+              placeholder="58 516 9329"
             />
           </div>
         </div>

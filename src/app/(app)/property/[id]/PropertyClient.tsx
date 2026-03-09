@@ -22,7 +22,6 @@ interface PropertyClientProps {
     id: string;
     building_name: string | null;
     unit_number: string | null;
-    location: string | null;
     address: string | null;
     property_type: string | null;
   };
@@ -84,9 +83,9 @@ function timelineDotColor(status: string | null): string {
 
 export function PropertyClient({ property, inspections }: PropertyClientProps) {
   const title =
-    property.building_name && property.unit_number
-      ? `${property.building_name} — Unit ${property.unit_number}`
-      : property.address ?? "Property";
+    property.address ?? (property.building_name && property.unit_number
+      ? `${property.building_name}, Unit ${property.unit_number}`
+      : "Property");
   const truncTitle = title.length > 26 ? title.slice(0, 23) + "…" : title;
   const latest = inspections[0] ?? null;
 
@@ -124,13 +123,10 @@ export function PropertyClient({ property, inspections }: PropertyClientProps) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-heading font-bold text-lg text-[#1A1A1A]">
-                {property.building_name && property.unit_number
-                  ? `${property.building_name} — Unit ${property.unit_number}`
-                  : property.address ?? "Untitled"}
+                {property.address ?? (property.building_name && property.unit_number
+                  ? `${property.building_name}, Unit ${property.unit_number}`
+                  : "Untitled")}
               </p>
-              {property.location && (
-                <p className="font-body text-sm text-[#6b7280] mt-0.5">{property.location}</p>
-              )}
               {property.property_type && (
                 <p className="font-body text-sm text-[#9A88FD] capitalize mt-0.5">
                   {property.property_type}

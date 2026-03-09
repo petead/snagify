@@ -10,9 +10,8 @@ Return ONLY JSON with these exact keys:
 PROPERTY fields (physical, never changes):
 - building_name: the building name (e.g. 'Creek Rise Tower 1')
 - unit_number: the Property No field (e.g. '3301') — NOT Premises No
-- location: the Location/area field
 - property_type: normalize to one of: apartment/villa/studio/townhouse
-- address: full address combining building + location
+- address: building name + ", Unit " + property number (e.g. "Creek Rise Tower 1, Unit 3301"). Do NOT use location/area in address.
 
 INSPECTION/CONTRACT fields (change per contract):
 - ejari_ref: the contract number (e.g. '3301-CT1-2026')

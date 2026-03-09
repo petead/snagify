@@ -20,7 +20,7 @@ export default async function ReportPage({
 
   const { data: property } = await supabase
     .from("properties")
-    .select("building_name, unit_number, location, address, property_type")
+    .select("building_name, unit_number, address, property_type")
     .eq("id", inspection.property_id)
     .single();
 
@@ -37,9 +37,9 @@ export default async function ReportPage({
     poorCount > 0 ? "Poor" : fairCount > roomConditions.length / 2 ? "Fair" : "Good";
 
   const propertyTitle =
-    property?.building_name && property?.unit_number
-      ? `${property.building_name} — Unit ${property.unit_number}`
-      : property?.address ?? "Property";
+    property?.address ?? (property?.building_name && property?.unit_number
+      ? `${property.building_name}, Unit ${property.unit_number}`
+      : "Property");
 
   return (
     <ReportClient
@@ -56,7 +56,6 @@ export default async function ReportPage({
       }}
       property={{
         address: propertyTitle,
-        location: property?.location,
         type: property?.property_type,
       }}
       overallCondition={overallCondition}

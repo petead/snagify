@@ -111,7 +111,6 @@ export async function POST(request: Request) {
         ? {
             building_name: property.building_name,
             unit_number: property.unit_number,
-            location: property.location,
             address: property.address,
             property_type: property.property_type,
             furnished: property.furnished,
