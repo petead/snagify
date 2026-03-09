@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
     // 4. Send email
     const { data, error: emailError } = await resend.emails.send({
-      from: "Snagify <onboarding@resend.dev>",
+      from: "Snagify <noreply@snagify.net>",
       to: email,
       subject: `Sign your inspection report — ${propertyName}`,
       html: `
