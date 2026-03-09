@@ -35,14 +35,21 @@ const formatDateShort = (d: string | null | undefined) =>
 const formatCurrency = (n: number | null | undefined) =>
   n != null ? `AED ${n.toLocaleString("en-AE")}` : "—";
 
-const getConditionStyle = (condition: string | null | undefined) =>
-  (
-    {
-      good: { bg: "#cafe8733", text: "#5a7a2e" },
-      fair: { bg: "#FEDE8033", text: "#8a6a00" },
-      poor: { bg: "#FF6B6B33", text: "#cc2222" },
-    } as Record<string, { bg: string; text: string }>
-  )[condition?.toLowerCase() ?? ""] || { bg: "#F3F4F6", text: "#6B7280" };
+const getConditionStyle = (
+  condition: string | null | undefined
+): { backgroundColor: string; color: string } => {
+  const styles: Record<string, { backgroundColor: string; color: string }> = {
+    good: { backgroundColor: "#cafe8733", color: "#5a7a2e" },
+    fair: { backgroundColor: "#FEDE8033", color: "#8a6a00" },
+    poor: { backgroundColor: "#FF6B6B33", color: "#cc2222" },
+  };
+  return (
+    styles[condition?.toLowerCase() ?? ""] || {
+      backgroundColor: "#F3F4F6",
+      color: "#6B7280",
+    }
+  );
+};
 
 function Avatar({
   name,
@@ -322,9 +329,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
           .sort(
             (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
           )
-          .map((room) => {
-            const condStyle = getConditionStyle(room.overall_condition);
-            return (
+          .map((room) => (
               <div
                 key={room.id}
                 className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-3"
@@ -338,10 +343,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                   </p>
                   <span
                     className="text-xs px-2 py-1 rounded-full font-medium"
-                    style={{
-                      backgroundColor: condStyle.bg,
-                      color: condStyle.text,
-                    }}
+                    style={getConditionStyle(room.overall_condition)}
                   >
                     {room.overall_condition ?? "Not assessed"}
                   </span>
@@ -372,8 +374,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                   </div>
                 ))}
               </div>
-            );
-          })}
+            ))}
       </div>
 
       {/* SECTION 7 — Legal Info */}
