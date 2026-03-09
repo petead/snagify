@@ -62,6 +62,7 @@ export function ReportClient({
 }: ReportClientProps) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState({ landlord: false, tenant: false });
+  const [sentSignUrl, setSentSignUrl] = useState<{ landlord?: string; tenant?: string }>({});
   const [showSignModal, setShowSignModal] = useState(false);
 
   const handleSendOTP = async (signerType: "landlord" | "tenant", phone: string) => {
@@ -83,6 +84,7 @@ export function ReportClient({
       const data = await res.json();
       if (data.success) {
         setSent((prev) => ({ ...prev, [signerType]: true }));
+        setSentSignUrl((prev) => ({ ...prev, [signerType]: data.signUrl }));
       } else {
         alert(
           "Twilio Error: " +
@@ -300,6 +302,11 @@ export function ReportClient({
               >
                 {sent.landlord ? "✓ Sent on WhatsApp" : "💬 Send WhatsApp OTP"}
               </button>
+              {sent.landlord && sentSignUrl.landlord && (
+                <p className="text-xs text-gray-400 mt-2 break-all">
+                  🔗 {sentSignUrl.landlord}
+                </p>
+              )}
             </div>
 
             <div className="bg-gray-50 rounded-2xl p-4 mb-6">
@@ -318,6 +325,11 @@ export function ReportClient({
               >
                 {sent.tenant ? "✓ Sent on WhatsApp" : "💬 Send WhatsApp OTP"}
               </button>
+              {sent.tenant && sentSignUrl.tenant && (
+                <p className="text-xs text-gray-400 mt-2 break-all">
+                  🔗 {sentSignUrl.tenant}
+                </p>
+              )}
             </div>
 
             {sent.landlord && sent.tenant && (

@@ -1,4 +1,5 @@
 import twilio from "twilio";
+import { createClient } from "@/lib/supabase/server";
 
 const normalizePhone = (phone: string) => {
   let cleaned = phone.replace(/[\s\-\(\)]/g, "").replace(/^0+/, "");
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
   const signUrl = `${appUrl}/sign?inspectionId=${inspectionId}&signerType=${signerType}&phone=${encodeURIComponent(formattedPhone)}`;
 
   try {
-    // Twilio Verify sends OTP via SMS
+    // Twilio Verify sends OTP via SMS (no custom message text)
     await client.verify.v2
       .services(process.env.TWILIO_VERIFY_SERVICE_SID!)
       .verifications.create({
@@ -35,12 +36,18 @@ export async function POST(request: Request) {
         channel: "sms",
       });
 
-    // Send sign URL in a follow-up SMS
-    await client.messages.create({
-      from: process.env.TWILIO_SMS_FROM!,
-      to: formattedPhone,
-      body: `Sign your Snagify inspection report here:\n${signUrl}`,
-    });
+    // Store sign URL in Supabase so the agent can share it manually if needed
+    const supabase = await createClient();
+    await supabase.from("signatures").upsert(
+      {
+        inspection_id: inspectionId,
+        signer_type: signerType,
+        phone: formattedPhone,
+        sign_url: signUrl,
+        created_at: new Date().toISOString(),
+      },
+      { onConflict: "inspection_id,signer_type" }
+    );
 
     return Response.json({ success: true, signUrl });
   } catch (error: unknown) {
