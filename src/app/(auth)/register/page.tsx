@@ -3,10 +3,33 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Check, Loader2 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
 const UAE_PHONE_PREFIX = "+971";
+
+function getPasswordStrength(pwd: string): number {
+  let score = 0;
+  if (pwd.length >= 8) score++;
+  if (/[A-Z]/.test(pwd)) score++;
+  if (/[0-9]/.test(pwd)) score++;
+  if (/[^A-Za-z0-9]/.test(pwd)) score++;
+  return score;
+}
+
+function getErrorMessage(error: string): string {
+  if (error.includes("Invalid login credentials"))
+    return "❌ Wrong email or password. Please try again.";
+  if (error.includes("Email not confirmed"))
+    return "📧 Please check your email and confirm your account.";
+  if (error.includes("already registered") || error.includes("already in use"))
+    return "📧 This email is already registered. Try signing in.";
+  if (error.includes("Too many requests"))
+    return "⏳ Too many attempts. Please wait a few minutes.";
+  if (error.includes("Network"))
+    return "🌐 Connection issue. Check your internet.";
+  return "⚠️ " + error;
+}
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState("");
@@ -17,6 +40,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   const router = useRouter();
 
   const supabase = useMemo(
@@ -28,6 +52,9 @@ export default function RegisterPage() {
     []
   );
 
+  const strength = getPasswordStrength(password);
+  const strengthLabel = strength <= 1 ? "Weak" : strength <= 3 ? "Medium" : "Strong";
+
   function formatPhone(value: string) {
     const digits = value.replace(/\D/g, "").slice(0, 9);
     if (digits.length === 0) return "";
@@ -36,14 +63,11 @@ export default function RegisterPage() {
     );
   }
 
-  function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setPhone(formatPhone(e.target.value));
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    setSuccess(false);
 
     const fullPhone = phone ? `${UAE_PHONE_PREFIX} ${phone.trim()}` : null;
 
@@ -60,8 +84,8 @@ export default function RegisterPage() {
     });
 
     if (signUpError) {
-      setLoading(false);
       setError(signUpError.message);
+      setLoading(false);
       return;
     }
 
@@ -86,18 +110,21 @@ export default function RegisterPage() {
       }
     }
 
+    setSuccess(true);
     setLoading(false);
-    router.push("/dashboard");
-    router.refresh();
+    setTimeout(() => {
+      router.push("/dashboard");
+      router.refresh();
+    }, 800);
   }
 
   const inputClass =
-    "w-full h-[52px] px-4 rounded-xl border-[1.5px] border-gray-200 bg-white font-body text-brand-dark placeholder-gray-400 focus:outline-none focus:border-[#9A88FD] focus:ring-2 focus:ring-[#9A88FD]/20 transition-all";
+    "w-full h-[52px] min-h-[52px] px-4 rounded-xl border border-gray-200 bg-white font-body text-[#1A1A1A] placeholder-gray-400 focus:outline-none focus:border-[#9A88FD] focus:ring-2 focus:ring-[#9A88FD]/20 transition-all";
 
   return (
     <>
       <div className="mb-8">
-        <h1 className="font-heading font-extrabold text-3xl text-brand-dark mb-1.5">
+        <h1 className="font-heading font-extrabold text-[28px] text-[#1A1A1A] mb-1.5">
           Create your account
         </h1>
         <p className="font-body text-sm text-gray-500">
@@ -109,17 +136,14 @@ export default function RegisterPage() {
         {error && (
           <div
             role="alert"
-            className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-body"
+            className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3 text-sm text-red-600 animate-shake"
           >
-            {error}
+            {getErrorMessage(error)}
           </div>
         )}
 
         <div>
-          <label
-            htmlFor="fullName"
-            className="block font-body text-sm font-medium text-brand-dark mb-1.5"
-          >
+          <label htmlFor="fullName" className="block font-body text-sm font-medium text-[#1A1A1A] mb-1.5">
             Full name
           </label>
           <input
@@ -134,10 +158,7 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label
-            htmlFor="agencyName"
-            className="block font-body text-sm font-medium text-brand-dark mb-1.5"
-          >
+          <label htmlFor="agencyName" className="block font-body text-sm font-medium text-[#1A1A1A] mb-1.5">
             Agency name
           </label>
           <input
@@ -151,13 +172,10 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label
-            htmlFor="phone"
-            className="block font-body text-sm font-medium text-brand-dark mb-1.5"
-          >
+          <label htmlFor="phone" className="block font-body text-sm font-medium text-[#1A1A1A] mb-1.5">
             Phone
           </label>
-          <div className="flex h-[52px] rounded-xl border-[1.5px] border-gray-200 bg-white focus-within:border-[#9A88FD] focus-within:ring-2 focus-within:ring-[#9A88FD]/20 transition-all">
+          <div className="flex h-[52px] min-h-[52px] rounded-xl border border-gray-200 bg-white focus-within:border-[#9A88FD] focus-within:ring-2 focus-within:ring-[#9A88FD]/20 transition-all">
             <span className="inline-flex items-center px-4 font-body text-sm text-gray-500 border-r border-gray-200 select-none">
               {UAE_PHONE_PREFIX}
             </span>
@@ -165,19 +183,16 @@ export default function RegisterPage() {
               id="phone"
               type="tel"
               value={phone}
-              onChange={handlePhoneChange}
+              onChange={(e) => setPhone(formatPhone(e.target.value))}
               autoComplete="tel"
-              className="flex-1 min-w-0 h-full px-4 rounded-r-xl font-body text-brand-dark placeholder-gray-400 focus:outline-none bg-transparent"
+              className="flex-1 min-w-0 h-full px-4 rounded-r-xl font-body text-[#1A1A1A] placeholder-gray-400 focus:outline-none bg-transparent"
               placeholder="50 123 4567"
             />
           </div>
         </div>
 
         <div>
-          <label
-            htmlFor="email"
-            className="block font-body text-sm font-medium text-brand-dark mb-1.5"
-          >
+          <label htmlFor="email" className="block font-body text-sm font-medium text-[#1A1A1A] mb-1.5">
             Email
           </label>
           <input
@@ -193,10 +208,7 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label
-            htmlFor="password"
-            className="block font-body text-sm font-medium text-brand-dark mb-1.5"
-          >
+          <label htmlFor="password" className="block font-body text-sm font-medium text-[#1A1A1A] mb-1.5">
             Password
           </label>
           <div className="relative">
@@ -221,26 +233,57 @@ export default function RegisterPage() {
               {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           </div>
-          <p className="mt-1 font-body text-xs text-gray-400">
-            At least 6 characters
+          <div className="flex gap-1 mt-1.5">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className={`h-1 flex-1 rounded-full transition-all ${
+                  i <= strength
+                    ? strength <= 1
+                      ? "bg-red-400"
+                      : strength <= 3
+                        ? "bg-yellow-400"
+                        : "bg-green-400"
+                    : "bg-gray-200"
+                }`}
+              />
+            ))}
+          </div>
+          <p className="mt-1 font-body text-xs text-gray-500">
+            {password.length > 0 ? strengthLabel : "At least 8 characters, mix of letters, numbers & symbols"}
           </p>
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-[52px] rounded-xl bg-[#9A88FD] text-white font-heading font-medium text-base hover:bg-[#7B65FC] active:scale-[0.97] focus:outline-none focus:ring-2 focus:ring-[#9A88FD] focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+          className={`w-full h-[52px] min-h-[52px] font-semibold rounded-xl transition-all flex items-center justify-center gap-2
+            ${success
+              ? "bg-green-500 text-white cursor-default"
+              : loading
+                ? "bg-[#9A88FD] text-white opacity-80 cursor-wait"
+                : "bg-[#9A88FD] text-white hover:bg-[#7B65FC] hover:shadow-lg active:scale-[0.98]"
+            }`}
         >
-          {loading ? "Creating account…" : "Create Account"}
+          {success ? (
+            <>
+              <Check size={20} strokeWidth={2.5} />
+              Account created!
+            </>
+          ) : loading ? (
+            <>
+              <Loader2 size={20} className="animate-spin text-white" />
+              Creating account...
+            </>
+          ) : (
+            "Create Account"
+          )}
         </button>
       </form>
 
       <p className="mt-8 text-center font-body text-sm text-gray-500">
         Already have an account?{" "}
-        <Link
-          href="/login"
-          className="font-medium text-[#9A88FD] hover:text-[#7B65FC] hover:underline"
-        >
+        <Link href="/login" className="font-medium text-[#9A88FD] hover:underline">
           Sign in
         </Link>
       </p>
