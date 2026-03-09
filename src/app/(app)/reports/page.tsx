@@ -1,85 +1,224 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import { DashboardHeader } from "@/components/layout/DashboardHeader";
-import { ReportsClient } from "./ReportsClient";
+"use client";
 
-export default async function ReportsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
-  let fullName: string | null = null;
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", user.id)
-    .single();
-  fullName = profile?.full_name ?? null;
+type ReportRow = {
+  id: string;
+  type: string | null;
+  status: string | null;
+  signed_at?: string | null;
+  created_at: string;
+  property?: unknown;
+  properties?: unknown;
+  tenancy?: unknown;
+  tenancies?: unknown;
+};
 
-  const { data: reports } = await supabase
-    .from("inspections")
-    .select(
-      `
-      id, type, status, completed_at, created_at,
-      properties(building_name, unit_number),
-      tenancies(tenant_name, ejari_ref)
-    `
-    )
-    .eq("agent_id", user.id)
-    .in("status", ["completed", "signed"])
-    .order("completed_at", { ascending: false });
+function first<T>(x: T | T[] | null | undefined): T | null {
+  if (x == null) return null;
+  return Array.isArray(x) ? (x[0] ?? null) : x;
+}
 
-  const inspectionIds = (reports ?? []).map((r: { id: string }) => r.id);
-  let signedSet = new Set<string>();
-  if (inspectionIds.length > 0) {
-    const { data: sigs } = await supabase
-      .from("signatures")
-      .select("inspection_id")
-      .in("inspection_id", inspectionIds)
-      .not("signed_at", "is", null);
-    (sigs ?? []).forEach((s: { inspection_id: string }) => signedSet.add(s.inspection_id));
-  }
+export default function ReportsPage() {
+  const router = useRouter();
+  const [reports, setReports] = useState<ReportRow[]>([]);
+  const [signedIds, setSignedIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "pending" | "signed">("all");
 
-  const first = (x: unknown): Record<string, unknown> | null => {
-    if (x == null) return null;
-    return Array.isArray(x) ? (x[0] as Record<string, unknown>) ?? null : (x as Record<string, unknown>);
-  };
+  useEffect(() => {
+    const load = async () => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
 
-  const reportsWithSigned = (reports ?? []).map(
-    (r: {
-      id: string;
-      type: string | null;
-      status: string | null;
-      completed_at: string | null;
-      created_at: string | null;
-      properties?: unknown;
-      tenancies?: unknown;
-    }) => {
-      const prop = first(r.properties);
-      const ten = first(r.tenancies);
-      return {
-        id: r.id,
-        type: r.type,
-        status: r.status,
-        completed_at: r.completed_at,
-        created_at: r.created_at,
-        building_name: (prop?.building_name as string | null) ?? null,
-        unit_number: (prop?.unit_number as string | null) ?? null,
-        tenant_name: (ten?.tenant_name as string | null) ?? null,
-        ejari_ref: (ten?.ejari_ref as string | null) ?? null,
-        isSigned: r.status === "signed" || signedSet.has(r.id),
-      };
-    }
-  );
+      const { data: reportsData } = await supabase
+        .from("inspections")
+        .select(
+          `
+          id, type, status, signed_at, created_at,
+          properties (building_name, unit_number, property_type),
+          tenancies (tenant_name, ejari_ref, contract_from, contract_to)
+        `
+        )
+        .eq("agent_id", user.id)
+        .in("status", ["completed", "signed", "in_progress"])
+        .order("created_at", { ascending: false });
+
+      const list = (reportsData ?? []) as ReportRow[];
+      setReports(list);
+
+      const ids = list.map((r) => r.id);
+      if (ids.length > 0) {
+        const { data: sigs } = await supabase
+          .from("signatures")
+          .select("inspection_id")
+          .in("inspection_id", ids)
+          .not("signed_at", "is", null);
+        const set = new Set<string>();
+        (sigs ?? []).forEach((s: { inspection_id: string }) => set.add(s.inspection_id));
+        setSignedIds(set);
+      }
+
+      setLoading(false);
+    };
+    load();
+  }, [router]);
+
+  const filtered =
+    reports?.filter((r) => {
+      const isSigned = r.status === "signed" || signedIds.has(r.id);
+      if (filter === "pending") return r.status === "completed" && !isSigned;
+      if (filter === "signed") return isSigned;
+      return true;
+    }) ?? [];
+
+  const prop = (r: ReportRow) => first(r.properties ?? r.property);
+  const ten = (r: ReportRow) => first(r.tenancies ?? r.tenancy);
 
   return (
-    <main className="min-h-screen bg-[#fcfcfc]">
-      <header className="bg-white border-b border-gray-100 px-4 h-16 flex items-center justify-between sticky top-0 z-50">
-        <DashboardHeader fullName={fullName} userEmail={user.email ?? null} />
+    <main className="min-h-screen bg-[#fcfcfc] pb-24 max-w-lg mx-auto">
+      <header className="bg-white border-b border-gray-100 px-4 h-14 flex items-center sticky top-0 z-50">
+        <h1 className="text-lg font-bold text-gray-900" style={{ fontFamily: "Poppins, sans-serif" }}>
+          Reports
+        </h1>
+        <span className="ml-2 bg-[#F0EDFF] text-[#9A88FD] text-xs font-semibold px-2 py-1 rounded-full">
+          {reports?.length ?? 0}
+        </span>
       </header>
-      <ReportsClient reports={reportsWithSigned} />
+
+      <div className="flex gap-2 px-4 py-3 bg-white border-b border-gray-100">
+        {(["all", "pending", "signed"] as const).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setFilter(f)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+              filter === f ? "bg-[#9A88FD] text-white" : "bg-gray-100 text-gray-500"
+            }`}
+          >
+            {f === "all" ? "All" : f === "pending" ? "✍️ Pending" : "✅ Signed"}
+          </button>
+        ))}
+      </div>
+
+      <div className="px-4 pt-3">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="w-8 h-8 border-2 border-[#9A88FD] border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : filtered.length > 0 ? (
+          filtered.map((report) => {
+            const isSigned = report.status === "signed" || signedIds.has(report.id);
+            const p = prop(report);
+            const t = ten(report);
+            const buildingName = (p?.building_name ?? "") as string;
+            const unitNumber = (p?.unit_number ?? "") as string;
+            const tenantName = (t?.tenant_name ?? "") as string;
+
+            return (
+              <div
+                key={report.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => router.push(`/inspection/${report.id}/report`)}
+                onKeyDown={(e) => e.key === "Enter" && router.push(`/inspection/${report.id}/report`)}
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-3 cursor-pointer active:scale-[0.98] transition-transform"
+                style={{
+                  borderLeft: `4px solid ${
+                    report.status === "signed" || isSigned
+                      ? "#cafe87"
+                      : report.type === "check-in"
+                        ? "#9A88FD"
+                        : "#FEDE80"
+                  }`,
+                }}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="font-bold text-sm text-gray-900 truncate"
+                      style={{ fontFamily: "Poppins, sans-serif" }}
+                    >
+                      {buildingName && unitNumber
+                        ? `${buildingName}, Unit ${unitNumber}`
+                        : buildingName || unitNumber || "Property"}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">
+                      👤 {tenantName ? tenantName.split(" ").slice(0, 2).join(" ") : "Unknown"}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
+                    <span
+                      className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                        report.type === "check-in"
+                          ? "bg-[#F0EDFF] text-[#9A88FD]"
+                          : "bg-[#FEDE80] text-gray-700"
+                      }`}
+                    >
+                      {report.type === "check-in" ? "CHECK-IN" : "CHECK-OUT"}
+                    </span>
+                    <span
+                      className={`text-xs font-medium px-2 py-1 rounded-full ${
+                        report.status === "signed" || isSigned
+                          ? "bg-[#cafe87] text-gray-800"
+                          : report.status === "completed"
+                            ? "bg-[#F0EDFF] text-[#9A88FD]"
+                            : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      {report.status === "signed" || isSigned
+                        ? "✓ Signed"
+                        : report.status === "completed"
+                          ? "Completed"
+                          : "Draft"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
+                  <span className="text-xs text-gray-400">
+                    🗓{" "}
+                    {new Date(report.created_at).toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
+                  {report.status === "completed" && !isSigned && (
+                    <span className="text-xs font-semibold text-[#9A88FD]">
+                      Send for signature →
+                    </span>
+                  )}
+                  {(report.status === "signed" || isSigned) && (
+                    <span className="text-xs font-semibold text-green-600">View report →</span>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
+            <span className="text-5xl mb-4">📄</span>
+            <p
+              className="font-bold text-gray-800 mb-1"
+              style={{ fontFamily: "Poppins, sans-serif" }}
+            >
+              No reports yet
+            </p>
+            <p className="text-sm text-gray-400">
+              Complete an inspection to generate your first report
+            </p>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
