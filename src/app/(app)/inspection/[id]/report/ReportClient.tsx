@@ -200,7 +200,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-40">
+    <div className="min-h-screen bg-gray-50 pb-52">
       {/* SECTION 1 — Hero Banner */}
       <div
         className="rounded-b-3xl overflow-hidden"
@@ -530,7 +530,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
 
       {/* BOTTOM FIXED ACTIONS BAR */}
       <div
-        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 pt-3 max-w-lg mx-auto"
+        className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-100 px-4 pt-3 max-w-lg mx-auto"
         style={{ paddingBottom: "max(24px, env(safe-area-inset-bottom))" }}
       >
         {/* Row 1 — Download PDF (full width) */}

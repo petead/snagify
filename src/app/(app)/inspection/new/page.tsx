@@ -222,8 +222,8 @@ function Field({
 function BottomBar({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 pt-3 max-w-lg mx-auto"
-      style={{ paddingBottom: "max(20px, env(safe-area-inset-bottom))" }}
+      className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-100 px-4 pt-3 max-w-lg mx-auto"
+      style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}
     >
       {children}
     </div>
@@ -513,7 +513,7 @@ function NewInspectionContent() {
   // Render
   // ─────────────────────────────────────
   return (
-    <div className="min-h-screen bg-white max-w-lg mx-auto pb-32">
+    <div className="min-h-screen bg-white max-w-lg mx-auto pb-48">
       {/* HEADER */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
         <div className="flex items-center gap-3 px-4 py-3">
@@ -752,7 +752,7 @@ function NewInspectionContent() {
 
       {/* STEP 2 — Verify / Fill form */}
       {step === 2 && (
-        <div className="px-4 pt-4 pb-28">
+        <div className="px-4 pt-4 pb-44">
           {entryMode === "upload" && (
             <div className="bg-[#F0EDFF] rounded-xl p-3 mb-4 flex gap-2">
               <span className="text-sm">🤖</span>
@@ -949,7 +949,7 @@ function NewInspectionContent() {
 
       {/* STEP 3 — Rooms */}
       {step === 3 && (
-        <div className="pb-28">
+        <div className="pb-44">
           {/* Templates */}
           <div className="px-4 pt-5">
             <p className="text-xs text-gray-400 mb-2 uppercase tracking-wider font-semibold">
@@ -1049,7 +1049,7 @@ function NewInspectionContent() {
 
       {/* STEP 4 — Recap */}
       {step === 4 && (
-        <div className="px-4 pt-5 pb-32">
+        <div className="px-4 pt-5 pb-48">
           <h2
             className="text-xl font-bold mb-1"
             style={{ fontFamily: "Poppins,sans-serif" }}
