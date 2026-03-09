@@ -87,18 +87,18 @@ export function DashboardClient({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Flatten all inspections for stats
-  const allInspections = properties.flatMap((p) => p.inspections);
+  const allInspections = properties?.flatMap((p) => p.inspections ?? []) ?? [];
   const totalProperties = properties.length;
-  const totalInspections = allInspections.length;
-  const pendingSigCount = allInspections.filter(
-    (i) => i.status === "completed"
-  ).length;
+  const totalInspections = allInspections?.length ?? 0;
+  const pendingSigCount = allInspections?.filter(
+    (i) => i?.status === "completed"
+  )?.length ?? 0;
   const now = new Date();
-  const thisMonthCount = allInspections.filter((i) => {
-    if (!i.created_at) return false;
+  const thisMonthCount = allInspections?.filter((i) => {
+    if (!i?.created_at) return false;
     const d = new Date(i.created_at);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  }).length;
+  })?.length ?? 0;
 
   // Search filter
   const filtered = search.trim()
@@ -288,8 +288,9 @@ export function DashboardClient({
         {filtered.length > 0 ? (
           <div className="px-0">
             {filtered.map((prop) => {
-              const inspCount = prop.inspections.length;
-              const sorted = [...prop.inspections].sort(
+              const inspections = prop.inspections ?? [];
+              const inspCount = inspections.length;
+              const sorted = [...inspections].sort(
                 (a, b) =>
                   new Date(b.created_at ?? 0).getTime() -
                   new Date(a.created_at ?? 0).getTime()
