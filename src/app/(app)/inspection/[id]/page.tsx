@@ -12,66 +12,38 @@ export default async function InspectionPage({
 
   const { data: inspection, error: inspErr } = await supabase
     .from("inspections")
-    .select("id, property_id")
+    .select("id, type, property_id, properties(building_name, unit_number)")
     .eq("id", id)
     .single();
 
-  if (inspErr || !inspection) {
-    notFound();
-  }
+  if (inspErr || !inspection) notFound();
 
-  const { data: property } = await supabase
-    .from("properties")
-    .select("building_name, unit_number, address")
-    .eq("id", inspection.property_id)
-    .single();
-
-  const address = property
-    ? (property.address ?? (property.building_name && property.unit_number
-        ? `${property.building_name}, Unit ${property.unit_number}`
-        : "Property"))
-    : "Property";
+  const prop = Array.isArray(inspection.properties)
+    ? inspection.properties[0]
+    : inspection.properties;
 
   const { data: rooms } = await supabase
     .from("rooms")
-    .select("id, name, order_index, overall_condition")
+    .select(
+      "id, name, order_index, overall_condition, room_items(id)"
+    )
     .eq("inspection_id", id)
     .order("order_index", { ascending: true });
-
-  const roomIds = (rooms ?? []).map((r) => r.id);
-  let itemCountByRoom: Record<string, number> = {};
-  let photoCountByRoom: Record<string, number> = {};
-
-  if (roomIds.length > 0) {
-    const [itemsRes, photosRes] = await Promise.all([
-      supabase.from("room_items").select("room_id").in("room_id", roomIds),
-      supabase.from("photos").select("room_id").in("room_id", roomIds),
-    ]);
-    roomIds.forEach((rid) => {
-      itemCountByRoom[rid] = 0;
-      photoCountByRoom[rid] = 0;
-    });
-    (itemsRes.data ?? []).forEach((r) => {
-      itemCountByRoom[r.room_id] = (itemCountByRoom[r.room_id] ?? 0) + 1;
-    });
-    (photosRes.data ?? []).forEach((r) => {
-      photoCountByRoom[r.room_id] = (photoCountByRoom[r.room_id] ?? 0) + 1;
-    });
-  }
 
   const roomsWithMeta = (rooms ?? []).map((r) => ({
     id: r.id,
     name: r.name,
     order_index: r.order_index,
     overall_condition: r.overall_condition,
-    item_count: itemCountByRoom[r.id] ?? 0,
-    photo_count: photoCountByRoom[r.id] ?? 0,
+    item_count: (r.room_items as { id: string }[] | null)?.length ?? 0,
   }));
 
   return (
     <InspectionClient
       inspectionId={id}
-      address={address}
+      inspectionType={inspection.type ?? "check-in"}
+      buildingName={prop?.building_name ?? "Property"}
+      unitNumber={prop?.unit_number ?? ""}
       rooms={roomsWithMeta}
     />
   );
