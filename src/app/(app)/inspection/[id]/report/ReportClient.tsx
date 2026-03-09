@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Download, Share2, PenTool, ArrowLeft, CheckCircle } from "lucide-react";
 
@@ -14,6 +15,12 @@ interface ReportClientProps {
     ejariRef?: string | null;
     contractFrom?: string | null;
     contractTo?: string | null;
+  };
+  tenancy?: {
+    landlordName: string | null;
+    landlordPhone: string | null;
+    tenantName: string | null;
+    tenantPhone: string | null;
   };
   property: {
     address: string;
@@ -48,10 +55,44 @@ function formatDate(dateStr?: string | null) {
 export function ReportClient({
   inspectionId,
   inspection,
+  tenancy,
   property,
   overallCondition,
   roomCount,
 }: ReportClientProps) {
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState({ landlord: false, tenant: false });
+  const [showSignModal, setShowSignModal] = useState(false);
+
+  const handleSendOTP = async (signerType: "landlord" | "tenant", phone: string) => {
+    if (!phone?.trim()) {
+      alert("No phone number for this signer.");
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await fetch("/api/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inspectionId,
+          signerType,
+          phone: phone.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSent((prev) => ({ ...prev, [signerType]: true }));
+      } else {
+        alert("Error: " + (data.error ?? "Failed to send"));
+      }
+    } catch {
+      alert("Failed to send OTP");
+    } finally {
+      setSending(false);
+    }
+  };
+
   const cs = conditionStyle(overallCondition);
   const inspType = (inspection.type ?? "check-in").toUpperCase().replace("-", "‑");
 
@@ -187,6 +228,7 @@ export function ReportClient({
 
           <button
             type="button"
+            onClick={() => setShowSignModal(true)}
             className="w-full h-14 rounded-2xl bg-[#F0EDFF] text-[#9A88FD] font-heading font-bold text-base flex items-center justify-center gap-3"
           >
             <PenTool size={20} />
@@ -213,6 +255,74 @@ export function ReportClient({
           </Link>
         </div>
       </div>
+
+      {/* Send for Signature modal */}
+      {showSignModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
+          <div className="bg-white rounded-t-3xl w-full max-w-lg mx-auto p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2
+                className="text-lg font-bold text-gray-900"
+                style={{ fontFamily: "Poppins, sans-serif" }}
+              >
+                ✍️ Send for Signature
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowSignModal(false)}
+                className="p-2 text-gray-500 hover:text-gray-700"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-4 mb-3">
+              <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">Landlord</p>
+              <p className="font-semibold text-gray-900">{tenancy?.landlordName ?? "—"}</p>
+              <p className="text-sm text-gray-500 mb-3">{tenancy?.landlordPhone ?? "—"}</p>
+              <button
+                type="button"
+                onClick={() => handleSendOTP("landlord", tenancy?.landlordPhone ?? "")}
+                disabled={sent.landlord || sending}
+                className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  sent.landlord
+                    ? "bg-[#cafe87] text-gray-800 cursor-default"
+                    : "bg-[#25D366] text-white active:scale-[0.98]"
+                }`}
+              >
+                {sent.landlord ? "✓ Sent on WhatsApp" : "💬 Send WhatsApp OTP"}
+              </button>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-4 mb-6">
+              <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">Tenant</p>
+              <p className="font-semibold text-gray-900">{tenancy?.tenantName ?? "—"}</p>
+              <p className="text-sm text-gray-500 mb-3">{tenancy?.tenantPhone ?? "—"}</p>
+              <button
+                type="button"
+                onClick={() => handleSendOTP("tenant", tenancy?.tenantPhone ?? "")}
+                disabled={sent.tenant || sending}
+                className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  sent.tenant
+                    ? "bg-[#cafe87] text-gray-800 cursor-default"
+                    : "bg-[#25D366] text-white active:scale-[0.98]"
+                }`}
+              >
+                {sent.tenant ? "✓ Sent on WhatsApp" : "💬 Send WhatsApp OTP"}
+              </button>
+            </div>
+
+            {sent.landlord && sent.tenant && (
+              <div className="bg-[#F0EDFF] rounded-xl p-3 text-center">
+                <p className="text-sm text-[#9A88FD] font-medium">
+                  ✅ Both OTP codes sent! Waiting for signatures...
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
