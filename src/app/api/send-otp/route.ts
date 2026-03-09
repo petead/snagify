@@ -4,6 +4,20 @@ import { createClient } from "@supabase/supabase-js";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: Request) {
+  console.log("=== SEND OTP EMAIL DEBUG ===");
+  console.log("RESEND_KEY exists:", !!process.env.RESEND_API_KEY);
+  console.log("RESEND_KEY prefix:", process.env.RESEND_API_KEY?.slice(0, 8));
+
+  const body = (await request.json()) as {
+    email?: string;
+    inspectionId?: string;
+    signerType?: string;
+    signerName?: string;
+    propertyName?: string;
+    inspectionType?: string;
+  };
+  console.log("email received:", body.email);
+
   const {
     email,
     inspectionId,
@@ -11,7 +25,7 @@ export async function POST(request: Request) {
     signerName,
     propertyName,
     inspectionType,
-  } = await request.json();
+  } = body;
 
   if (!email?.trim() || !inspectionId || !signerType) {
     return Response.json(
