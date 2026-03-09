@@ -6,7 +6,7 @@
  * -- ALTER TABLE properties DROP COLUMN IF EXISTS location;
  */
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, Check } from "lucide-react";
@@ -146,7 +146,7 @@ function mapExtractedToForm(extracted: Record<string, unknown>): Partial<Details
   };
 }
 
-export default function NewInspectionPage() {
+function NewInspectionContent() {
   const searchParams = useSearchParams();
   const urlPropertyId = searchParams.get("propertyId");
   const urlTenancyId = searchParams.get("tenancyId");
@@ -1015,5 +1015,27 @@ export default function NewInspectionPage() {
         )}
       </main>
     </div>
+  );
+}
+
+function NewInspectionLoading() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div
+          className="w-8 h-8 border-2 border-[#9A88FD] border-t-transparent rounded-full animate-spin mx-auto mb-3"
+          aria-hidden
+        />
+        <p className="text-sm text-gray-500 font-body">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function NewInspectionPage() {
+  return (
+    <Suspense fallback={<NewInspectionLoading />}>
+      <NewInspectionContent />
+    </Suspense>
   );
 }
