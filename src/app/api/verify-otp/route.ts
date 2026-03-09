@@ -1,76 +1,62 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import twilio from "twilio";
+import { createClient } from "@supabase/supabase-js";
+
+const normalizePhone = (phone: string) => {
+  let cleaned = phone.replace(/[\s\-\(\)]/g, "").replace(/^0+/, "");
+  if (cleaned.startsWith("971")) cleaned = "+" + cleaned;
+  else if (!cleaned.startsWith("+")) cleaned = "+971" + cleaned;
+  return cleaned;
+};
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as {
-    token: string;
-    otp: string;
-    signatureData?: string | null;
-  };
-  const { token, otp, signatureData } = body;
+  const { phone, otp, signatureData, inspectionId, signerType } = await request.json();
 
-  if (!token || !otp) {
-    return NextResponse.json(
-      { error: "Missing token or otp" },
-      { status: 400 }
+  const client = twilio(
+    process.env.TWILIO_ACCOUNT_SID!,
+    process.env.TWILIO_AUTH_TOKEN!
+  );
+
+  const formattedPhone = normalizePhone(phone);
+
+  try {
+    // Verify OTP with Twilio
+    const check = await client.verify.v2
+      .services(process.env.TWILIO_VERIFY_SERVICE_SID!)
+      .verificationChecks.create({
+        to: formattedPhone,
+        code: otp,
+      });
+
+    if (check.status !== "approved") {
+      return Response.json({ error: "Invalid or expired code" }, { status: 400 });
+    }
+
+    // Save signature in Supabase
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
-  }
 
-  const supabase = await createClient();
-
-  const { data: signature, error: fetchErr } = await supabase
-    .from("signatures")
-    .select("*")
-    .eq("token", token)
-    .single();
-
-  if (fetchErr || !signature) {
-    return NextResponse.json({ error: "Invalid token" }, { status: 400 });
-  }
-
-  if (signature.otp_verified && signature.signed_at) {
-    return NextResponse.json({ error: "Already signed" }, { status: 400 });
-  }
-
-  const expiresAt = signature.expires_at as string | null;
-  if (expiresAt && new Date(expiresAt) < new Date()) {
-    return NextResponse.json(
-      { error: "Code expired. Please request a new one." },
-      { status: 400 }
-    );
-  }
-
-  if (signature.otp_code !== otp) {
-    return NextResponse.json(
-      { error: "Invalid code. Please try again." },
-      { status: 400 }
-    );
-  }
-
-  if (signatureData) {
-    const ip = request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "unknown";
-    const { error: updateErr } = await supabase
-      .from("signatures")
-      .update({
+    await supabase.from("signatures").upsert(
+      {
+        inspection_id: inspectionId,
+        signer_type: signerType,
+        phone: formattedPhone,
         otp_verified: true,
         signature_data: signatureData,
         signed_at: new Date().toISOString(),
-        ip_address: ip,
-      })
-      .eq("token", token);
-
-    if (updateErr) {
-      return NextResponse.json({ error: updateErr.message }, { status: 500 });
-    }
-
-    const { data: allSignatures } = await supabase
-      .from("signatures")
-      .select("signer_type, otp_verified, signed_at")
-      .eq("inspection_id", signature.inspection_id);
-
-    const bothSigned = (allSignatures ?? []).every(
-      (s) => s.otp_verified && (s as { signed_at?: string | null }).signed_at
+        ip_address: request.headers.get("x-forwarded-for") || "unknown",
+      },
+      { onConflict: "inspection_id,signer_type" }
     );
+
+    // Check if both landlord + tenant have signed
+    const { data: allSigs } = await supabase
+      .from("signatures")
+      .select("signer_type, otp_verified")
+      .eq("inspection_id", inspectionId);
+
+    const bothSigned = allSigs?.every((s) => s.otp_verified) ?? false;
 
     if (bothSigned) {
       await supabase
@@ -79,20 +65,13 @@ export async function POST(request: Request) {
           status: "signed",
           signed_at: new Date().toISOString(),
         })
-        .eq("id", signature.inspection_id);
+        .eq("id", inspectionId);
     }
 
-    return NextResponse.json({
-      success: true,
-      bothSigned,
-      inspectionId: signature.inspection_id,
-    });
+    return Response.json({ success: true, bothSigned });
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    console.error("Verify check error:", err.message);
+    return Response.json({ error: err.message ?? "Verify check failed" }, { status: 500 });
   }
-
-  await supabase
-    .from("signatures")
-    .update({ otp_verified: true })
-    .eq("token", token);
-
-  return NextResponse.json({ success: true });
 }
