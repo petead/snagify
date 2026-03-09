@@ -23,12 +23,14 @@ export default async function ReportPage({
   let contractTo: string | null = null;
   let landlordName: string | null = null;
   let landlordPhone: string | null = null;
+  let landlordEmail: string | null = null;
   let tenantName: string | null = null;
   let tenantPhone: string | null = null;
+  let tenantEmail: string | null = null;
   if (inspection.tenancy_id) {
     const { data: tenancy } = await supabase
       .from("tenancies")
-      .select("ejari_ref, contract_from, contract_to, landlord_name, landlord_phone, tenant_name, tenant_phone")
+      .select("ejari_ref, contract_from, contract_to, landlord_name, landlord_phone, landlord_email, tenant_name, tenant_phone, tenant_email")
       .eq("id", inspection.tenancy_id)
       .single();
     if (tenancy) {
@@ -37,8 +39,10 @@ export default async function ReportPage({
       contractTo = tenancy.contract_to ?? null;
       landlordName = tenancy.landlord_name ?? null;
       landlordPhone = tenancy.landlord_phone ?? null;
+      landlordEmail = tenancy.landlord_email ?? null;
       tenantName = tenancy.tenant_name ?? null;
       tenantPhone = tenancy.tenant_phone ?? null;
+      tenantEmail = tenancy.tenant_email ?? null;
     }
   }
 
@@ -81,8 +85,10 @@ export default async function ReportPage({
       tenancy={{
         landlordName,
         landlordPhone,
+        landlordEmail,
         tenantName,
         tenantPhone,
+        tenantEmail,
       }}
       property={{
         address: propertyTitle,

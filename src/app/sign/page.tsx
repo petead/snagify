@@ -6,7 +6,7 @@ import SignatureCanvas from "react-signature-canvas";
 
 function SignPageContent() {
   const searchParams = useSearchParams();
-  const phone = searchParams.get("phone") || "";
+  const email = searchParams.get("email") || "";
   const inspectionId = searchParams.get("inspectionId") || "";
   const signerType = searchParams.get("signerType") || "";
 
@@ -25,7 +25,7 @@ function SignPageContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          phone,
+          email,
           otp,
           inspectionId,
           signerType,
@@ -54,7 +54,7 @@ function SignPageContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          phone,
+          email,
           otp,
           inspectionId,
           signerType,
@@ -101,7 +101,7 @@ function SignPageContent() {
               Enter Verification Code
             </h2>
             <p className="text-sm text-gray-400 text-center mb-6">
-              Enter the 6-digit code sent to your WhatsApp or SMS
+              Enter the 6-digit code sent to your email
             </p>
 
             {error && (

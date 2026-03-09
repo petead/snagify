@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 export async function POST(request: Request) {
-  const { phone, otp, signatureData, inspectionId, signerType } = await request.json();
+  const { email, otp, signatureData, inspectionId, signerType } = await request.json();
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

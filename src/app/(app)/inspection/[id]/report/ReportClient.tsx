@@ -19,8 +19,10 @@ interface ReportClientProps {
   tenancy?: {
     landlordName: string | null;
     landlordPhone: string | null;
+    landlordEmail: string | null;
     tenantName: string | null;
     tenantPhone: string | null;
+    tenantEmail: string | null;
   };
   property: {
     address: string;
@@ -65,9 +67,13 @@ export function ReportClient({
   const [sentSignUrl, setSentSignUrl] = useState<{ landlord?: string; tenant?: string }>({});
   const [showSignModal, setShowSignModal] = useState(false);
 
-  const handleSendOTP = async (signerType: "landlord" | "tenant", phone: string) => {
-    if (!phone?.trim()) {
-      alert("No phone number for this signer.");
+  const handleSendOTP = async (
+    signerType: "landlord" | "tenant",
+    email: string,
+    signerName: string
+  ) => {
+    if (!email?.trim()) {
+      alert("No email for this signer.");
       return;
     }
     setSending(true);
@@ -76,9 +82,12 @@ export function ReportClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          email: email.trim(),
           inspectionId,
           signerType,
-          phone: phone.trim(),
+          signerName: signerName || "there",
+          propertyName: property.address,
+          inspectionType: inspection.type,
         }),
       });
       const data = await res.json();
@@ -86,17 +95,10 @@ export function ReportClient({
         setSent((prev) => ({ ...prev, [signerType]: true }));
         setSentSignUrl((prev) => ({ ...prev, [signerType]: data.signUrl }));
       } else {
-        alert(
-          "Twilio Error: " +
-            (data.error ?? "Unknown") +
-            "\nCode: " +
-            (data.code ?? "—") +
-            "\nInfo: " +
-            (data.moreInfo ?? "—")
-        );
+        alert("Error: " + (data.error ?? "Failed to send email"));
       }
     } catch {
-      alert("Failed to send OTP");
+      alert("Failed to send email");
     } finally {
       setSending(false);
     }
@@ -289,18 +291,25 @@ export function ReportClient({
             <div className="bg-gray-50 rounded-2xl p-4 mb-3">
               <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">Landlord</p>
               <p className="font-semibold text-gray-900">{tenancy?.landlordName ?? "—"}</p>
-              <p className="text-sm text-gray-500 mb-3">{tenancy?.landlordPhone ?? "—"}</p>
+              <p className="text-sm text-gray-500 mb-3">{tenancy?.landlordEmail ?? "—"}</p>
               <button
                 type="button"
-                onClick={() => handleSendOTP("landlord", tenancy?.landlordPhone ?? "")}
+                onClick={() =>
+                  handleSendOTP(
+                    "landlord",
+                    tenancy?.landlordEmail ?? "",
+                    tenancy?.landlordName ?? ""
+                  )
+                }
                 disabled={sent.landlord || sending}
                 className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   sent.landlord
                     ? "bg-[#cafe87] text-gray-800 cursor-default"
-                    : "bg-[#25D366] text-white active:scale-[0.98]"
+                    : "text-white active:scale-[0.98]"
                 }`}
+                style={!sent.landlord ? { background: "linear-gradient(135deg,#9A88FD,#7B65FC)" } : {}}
               >
-                {sent.landlord ? "✓ Sent on WhatsApp" : "💬 Send WhatsApp OTP"}
+                {sent.landlord ? "✓ Email Sent" : "📧 Send via Email"}
               </button>
               {sent.landlord && sentSignUrl.landlord && (
                 <p className="text-xs text-gray-400 mt-2 break-all">
@@ -312,18 +321,25 @@ export function ReportClient({
             <div className="bg-gray-50 rounded-2xl p-4 mb-6">
               <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">Tenant</p>
               <p className="font-semibold text-gray-900">{tenancy?.tenantName ?? "—"}</p>
-              <p className="text-sm text-gray-500 mb-3">{tenancy?.tenantPhone ?? "—"}</p>
+              <p className="text-sm text-gray-500 mb-3">{tenancy?.tenantEmail ?? "—"}</p>
               <button
                 type="button"
-                onClick={() => handleSendOTP("tenant", tenancy?.tenantPhone ?? "")}
+                onClick={() =>
+                  handleSendOTP(
+                    "tenant",
+                    tenancy?.tenantEmail ?? "",
+                    tenancy?.tenantName ?? ""
+                  )
+                }
                 disabled={sent.tenant || sending}
                 className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   sent.tenant
                     ? "bg-[#cafe87] text-gray-800 cursor-default"
-                    : "bg-[#25D366] text-white active:scale-[0.98]"
+                    : "text-white active:scale-[0.98]"
                 }`}
+                style={!sent.tenant ? { background: "linear-gradient(135deg,#9A88FD,#7B65FC)" } : {}}
               >
-                {sent.tenant ? "✓ Sent on WhatsApp" : "💬 Send WhatsApp OTP"}
+                {sent.tenant ? "✓ Email Sent" : "📧 Send via Email"}
               </button>
               {sent.tenant && sentSignUrl.tenant && (
                 <p className="text-xs text-gray-400 mt-2 break-all">
@@ -335,7 +351,7 @@ export function ReportClient({
             {sent.landlord && sent.tenant && (
               <div className="bg-[#F0EDFF] rounded-xl p-3 text-center">
                 <p className="text-sm text-[#9A88FD] font-medium">
-                  ✅ Both OTP codes sent! Waiting for signatures...
+                  ✅ Both emails sent! Waiting for signatures...
                 </p>
               </div>
             )}
