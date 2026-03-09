@@ -1,8 +1,41 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import Image from "next/image";
 import { X, Mic, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+
+interface SpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  readonly [index: number]: { readonly transcript: string; readonly confidence: number };
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  readonly [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionEvent {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent {
+  readonly error: string;
+  readonly message: string;
+}
+
+interface SpeechRecognitionInstance {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
 
 const DEFAULT_ITEMS: Record<string, string[]> = {
   "Living Room": ["TV", "AC", "Sofa", "Curtains", "Flooring", "Walls", "Ceiling", "Lights", "Windows"],
@@ -44,13 +77,21 @@ interface RoomDetailSheetProps {
   onSaved: () => void;
 }
 
+function getSpeechRecognitionAPI(): (new () => SpeechRecognitionInstance) | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as Record<string, unknown>;
+  return (w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null) as
+    | (new () => SpeechRecognitionInstance)
+    | null;
+}
+
 export function RoomDetailSheet({
   room,
   inspectionId,
   onClose,
   onSaved,
 }: RoomDetailSheetProps) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [overallCondition, setOverallCondition] = useState<string | null>(room.overall_condition);
   const [photos, setPhotos] = useState<
     { id?: string; url: string; ai?: string; aiCondition?: string; loading?: boolean; _tempId?: string }[]
@@ -70,17 +111,14 @@ export function RoomDetailSheet({
   const [isReformulating, setIsReformulating] = useState(false);
   const [showReformulatedBadge, setShowReformulatedBadge] = useState(false);
   const isRecordingRef = useRef(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const transcriptRef = useRef("");
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const SpeechRecognitionAPI =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognitionAPI) return;
+    const API = getSpeechRecognitionAPI();
+    if (!API) return;
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => stream.getTracks().forEach((t) => t.stop()))
@@ -148,7 +186,7 @@ export function RoomDetailSheet({
         }
       }
     })();
-  }, [room.id]);
+  }, [room.id, supabase]);
 
   const addPhoto = async (file: File) => {
     const tempId = `temp-${Date.now()}`;
@@ -241,9 +279,7 @@ export function RoomDetailSheet({
   const startRecording = () => {
     if (isRecordingRef.current) return;
 
-    const SpeechRecognitionAPI =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
+    const SpeechRecognitionAPI = getSpeechRecognitionAPI();
     if (!SpeechRecognitionAPI) {
       alert("Voice recognition not supported. Please type manually.");
       return;
@@ -265,7 +301,7 @@ export function RoomDetailSheet({
     recognition.interimResults = true;
     recognition.lang = "en-US";
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       let finalTranscript = "";
       let interimTranscript = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -282,7 +318,7 @@ export function RoomDetailSheet({
       setVoiceNote(transcriptRef.current + interimTranscript);
     };
 
-    recognition.onerror = (event: any) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error("Speech recognition error:", event.error);
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
         isRecordingRef.current = false;
@@ -449,14 +485,16 @@ export function RoomDetailSheet({
             <h3 className="font-heading font-semibold text-sm text-brand-dark mb-2">Photos</h3>
             <div className="flex gap-2 overflow-x-auto pb-2">
               {photos.map((p, i) => (
-                <div key={i} className="flex-shrink-0 relative">
-                  <img
+                <div key={i} className="flex-shrink-0 relative w-20 h-20">
+                  <Image
                     src={p.url}
                     alt=""
-                    className="w-20 h-20 rounded-xl object-cover bg-gray-100"
+                    fill
+                    className="rounded-xl object-cover bg-gray-100"
+                    unoptimized
                   />
                   {p.loading && (
-                    <div className="absolute inset-0 rounded-xl bg-black/60 flex flex-col items-center justify-center gap-1">
+                    <div className="absolute inset-0 rounded-xl bg-black/60 flex flex-col items-center justify-center gap-1 z-10">
                       <Loader2 size={18} className="text-white animate-spin" />
                       <span className="text-white text-xs">Analyzing...</span>
                     </div>
@@ -493,11 +531,15 @@ export function RoomDetailSheet({
                     key={`analysis-${idx}`}
                     className="rounded-xl p-3 bg-[#F0EDFF] flex gap-3"
                   >
-                    <img
-                      src={item.thumbnailUrl}
-                      alt=""
-                      className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                    />
+                    <div className="relative w-12 h-12 flex-shrink-0">
+                      <Image
+                        src={item.thumbnailUrl}
+                        alt=""
+                        fill
+                        className="rounded-lg object-cover"
+                        unoptimized
+                      />
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[#9A88FD] text-xs font-semibold mb-1">
                         🤖 AI Analysis

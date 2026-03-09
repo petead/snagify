@@ -49,7 +49,7 @@ const s = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
     color: PURPLE,
     marginBottom: 4,
-    textTransform: "uppercase" as any,
+    textTransform: "uppercase",
   },
   divider: { height: 2, backgroundColor: PURPLE, marginVertical: 20, borderRadius: 1 },
 
@@ -134,7 +134,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     minHeight: 120,
   },
-  sigRole: { fontSize: 10, fontFamily: "Helvetica-Bold", color: PURPLE, marginBottom: 8, textTransform: "uppercase" as any },
+  sigRole: { fontSize: 10, fontFamily: "Helvetica-Bold", color: PURPLE, marginBottom: 8, textTransform: "uppercase" },
   sigName: { fontSize: 10, marginBottom: 12 },
   sigPending: { fontSize: 10, color: "#999", fontStyle: "italic" },
   agentSigBox: {

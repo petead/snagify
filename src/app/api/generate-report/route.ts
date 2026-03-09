@@ -69,8 +69,8 @@ export async function POST(request: Request) {
 
     const roomIds = (rooms ?? []).map((r) => r.id);
 
-    let roomItems: Record<string, any[]> = {};
-    let roomPhotos: Record<string, any[]> = {};
+    const roomItems: Record<string, { room_id: string; name: string; condition: string | null; notes: string | null }[]> = {};
+    const roomPhotos: Record<string, { room_id: string; url: string; ai_analysis: string | null }[]> = {};
 
     if (roomIds.length > 0) {
       const [itemsRes, photosRes] = await Promise.all([
@@ -116,12 +116,12 @@ export async function POST(request: Request) {
       rooms: (rooms ?? []).map((r) => ({
         name: r.name,
         overall_condition: r.overall_condition,
-        items: (roomItems[r.id] ?? []).map((i: any) => ({
+        items: (roomItems[r.id] ?? []).map((i) => ({
           name: i.name,
           condition: i.condition,
           notes: i.notes,
         })),
-        photos: (roomPhotos[r.id] ?? []).map((p: any) => ({
+        photos: (roomPhotos[r.id] ?? []).map((p) => ({
           url: p.url,
           ai_analysis: p.ai_analysis,
         })),
