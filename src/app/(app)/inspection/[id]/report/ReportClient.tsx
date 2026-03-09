@@ -200,7 +200,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-32">
+    <div className="min-h-screen bg-gray-50 pb-40">
       {/* SECTION 1 — Hero Banner */}
       <div
         className="rounded-b-3xl overflow-hidden"
@@ -530,32 +530,64 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
 
       {/* BOTTOM FIXED ACTIONS BAR */}
       <div
-        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 flex gap-3 max-w-lg mx-auto"
-        style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 pt-3 max-w-lg mx-auto"
+        style={{ paddingBottom: "max(24px, env(safe-area-inset-bottom))" }}
       >
+        {/* Row 1 — Download PDF (full width) */}
         <button
           type="button"
           onClick={handleDownloadPDF}
-          className="flex-1 h-12 rounded-xl font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50"
-          style={{ background: "linear-gradient(135deg,#9A88FD,#7B65FC)" }}
           disabled={!inspection.report_url}
+          className="w-full h-12 rounded-2xl font-semibold text-white flex items-center justify-center gap-2 mb-3 disabled:opacity-50"
+          style={{
+            background: "linear-gradient(135deg, #9A88FD, #7B65FC)",
+            fontFamily: "Poppins, sans-serif",
+          }}
         >
           ⬇️ Download PDF
         </button>
-        {status !== "signed" && (
+
+        {/* Row 2 — Sign + Share */}
+        <div className="flex gap-3">
+          {status === "signed" ? (
+            <div
+              className="flex-1 h-12 rounded-2xl font-semibold bg-[#cafe87] text-gray-800 flex items-center justify-center gap-2 text-sm"
+              style={{ fontFamily: "Poppins, sans-serif" }}
+            >
+              ✅ Fully Signed
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowSignModal(true)}
+              className="flex-1 h-12 rounded-2xl font-semibold border-2 border-[#9A88FD] text-[#9A88FD] flex items-center justify-center gap-2 text-sm active:bg-[#F0EDFF] transition-colors"
+              style={{ fontFamily: "Poppins, sans-serif" }}
+            >
+              ✍️ Send for Signature
+            </button>
+          )}
+
           <button
             type="button"
-            onClick={() => setShowSignModal(true)}
-            className="flex-1 h-12 rounded-xl font-semibold border-2 border-[#9A88FD] text-[#9A88FD] flex items-center justify-center gap-2"
+            onClick={async () => {
+              const shareUrl = window.location.href;
+              if (navigator.share) {
+                await navigator.share({
+                  title: `Inspection Report — ${prop?.building_name ?? "Property"}`,
+                  text: `Inspection report for Unit ${prop?.unit_number ?? ""}`,
+                  url: shareUrl,
+                });
+              } else {
+                await navigator.clipboard.writeText(shareUrl);
+                alert("Link copied to clipboard!");
+              }
+            }}
+            className="flex-1 h-12 rounded-2xl font-semibold border-2 border-gray-200 text-gray-600 flex items-center justify-center gap-2 text-sm active:bg-gray-50 transition-colors"
+            style={{ fontFamily: "Poppins, sans-serif" }}
           >
-            ✍️ Sign
+            🔗 Share
           </button>
-        )}
-        {status === "signed" && (
-          <div className="flex-1 h-12 rounded-xl font-semibold bg-[#cafe87] text-gray-800 flex items-center justify-center gap-2">
-            ✅ Fully Signed
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Send for Signature modal */}
