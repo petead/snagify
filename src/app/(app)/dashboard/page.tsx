@@ -26,26 +26,61 @@ export default async function DashboardPage() {
         ? user.email.split("@")[0]
         : "there";
 
-  const { data: properties } = user
-    ? await supabase
+  // Try fetch with tenancies first (for status on cards)
+  let propertiesData: Array<{
+    id: string;
+    building_name: string | null;
+    unit_number: string | null;
+    address: string | null;
+    property_type: string | null;
+    created_at: string | null;
+    tenancies?: Array<{
+      id: string;
+      tenant_name: string | null;
+      contract_from: string | null;
+      contract_to: string | null;
+      actual_end_date?: string | null;
+    }>;
+    inspections?: Array<{
+      id: string;
+      type: string | null;
+      status: string | null;
+      created_at: string | null;
+      completed_at: string | null;
+      tenant_name: string | null;
+      landlord_name: string | null;
+    }>;
+  }> = [];
+
+  if (user) {
+    const { data: withTenancies, error: tenErr } = await supabase
+      .from("properties")
+      .select(
+        `
+        id, building_name, unit_number, address, property_type, created_at,
+        tenancies (id, tenant_name, contract_from, contract_to, actual_end_date),
+        inspections (id, type, status, created_at, completed_at, tenant_name, landlord_name)
+      `
+      )
+      .eq("agent_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (!tenErr && withTenancies?.length) {
+      propertiesData = withTenancies as typeof propertiesData;
+    } else {
+      const { data: fallback } = await supabase
         .from("properties")
         .select(
           `
-          *,
-          inspections (
-            id,
-            type,
-            status,
-            created_at,
-            completed_at,
-            tenant_name,
-            landlord_name
-          )
+          id, building_name, unit_number, address, property_type, created_at,
+          inspections (id, type, status, created_at, completed_at, tenant_name, landlord_name)
         `
         )
         .eq("agent_id", user.id)
-        .order("created_at", { ascending: false })
-    : { data: null };
+        .order("created_at", { ascending: false });
+      propertiesData = (fallback ?? []) as typeof propertiesData;
+    }
+  }
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 max-w-lg mx-auto">
@@ -54,7 +89,7 @@ export default async function DashboardPage() {
       </header>
       <DashboardClient
         displayName={displayName}
-        properties={properties ?? []}
+        properties={propertiesData}
       />
       <DashboardBottomNav />
     </main>

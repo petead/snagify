@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react";
+import { getTenancyStatus, getTenancyDaysLeft } from "@/lib/tenancy";
 
 type InspectionRow = {
   id: string;
@@ -23,6 +24,14 @@ type InspectionRow = {
   landlord_name: string | null;
 };
 
+type TenancyRow = {
+  id: string;
+  tenant_name: string | null;
+  contract_from: string | null;
+  contract_to: string | null;
+  actual_end_date?: string | null;
+};
+
 type PropertyRow = {
   id: string;
   building_name: string | null;
@@ -30,8 +39,49 @@ type PropertyRow = {
   address: string | null;
   property_type: string | null;
   created_at: string | null;
+  tenancies?: TenancyRow[] | null;
   inspections?: InspectionRow[] | null;
 };
+
+function getPropertyTenancyStatus(prop: PropertyRow): {
+  label: string;
+  emoji: string;
+  sub?: string;
+ } {
+  const tenancies = prop.tenancies ?? [];
+  if (!tenancies.length) {
+    return { label: "Vacant", emoji: "⬜" };
+  }
+  const statusOrder = ["active", "expiring_soon", "upcoming", "expired", "terminated_early"];
+  const sorted = [...tenancies].sort((a, b) => {
+    const sa = getTenancyStatus(a);
+    const sb = getTenancyStatus(b);
+    return statusOrder.indexOf(sa) - statusOrder.indexOf(sb);
+  });
+  const t = sorted[0];
+  const status = getTenancyStatus(t);
+  const name = t.tenant_name?.trim().split(/\s+/)[0] ?? "Tenant";
+  if (status === "active") {
+    return { label: `Active — ${name}`, emoji: "🟢" };
+  }
+  if (status === "expiring_soon") {
+    const days = getTenancyDaysLeft(t);
+    return {
+      label: days != null && days >= 0 ? `Expiring in ${days} days` : "Expiring Soon",
+      emoji: "⚠️",
+    };
+  }
+  if (status === "terminated_early") {
+    return { label: "Terminated", emoji: "🔴" };
+  }
+  if (status === "expired") {
+    return { label: "Expired", emoji: "⬜" };
+  }
+  if (status === "upcoming") {
+    return { label: `Upcoming — ${name}`, emoji: "⬜" };
+  }
+  return { label: "Vacant", emoji: "⬜" };
+}
 
 interface DashboardClientProps {
   displayName: string;
@@ -324,6 +374,9 @@ export function DashboardClient({
                           {prop.address ?? (prop.building_name && prop.unit_number
                             ? `${prop.building_name}, Unit ${prop.unit_number}`
                             : "Untitled Property")}
+                        </p>
+                        <p className="font-body text-xs mt-0.5 truncate" style={{ color: "#6b7280" }}>
+                          {getPropertyTenancyStatus(prop).emoji} {getPropertyTenancyStatus(prop).label}
                         </p>
                       </div>
                     </div>

@@ -6,11 +6,12 @@
  * -- ALTER TABLE properties DROP COLUMN IF EXISTS location;
  */
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { hasOverlapWarning } from "@/lib/tenancy";
 
 const PROPERTY_TYPES = [
   { id: "villa", label: "Villa", emoji: "🏠" },
@@ -146,6 +147,11 @@ function mapExtractedToForm(extracted: Record<string, unknown>): Partial<Details
 }
 
 export default function NewInspectionPage() {
+  const searchParams = useSearchParams();
+  const urlPropertyId = searchParams.get("propertyId");
+  const urlTenancyId = searchParams.get("tenancyId");
+  const urlType = searchParams.get("type");
+
   const [step, setStep] = useState(1);
   const [details, setDetails] = useState<DetailsForm>(initialDetails);
   const [fromContract, setFromContract] = useState(false);
@@ -293,6 +299,16 @@ export default function NewInspectionPage() {
     }
   };
 
+  // Pre-fill type from URL when coming from property page
+  useEffect(() => {
+    if (urlType === "check-in" || urlType === "check-out") {
+      setDetails((d) => ({
+        ...d,
+        inspectionType: urlType,
+      }));
+    }
+  }, [urlType]);
+
   const handleStartInspection = async () => {
     setError(null);
     setSaving(true);
@@ -309,22 +325,29 @@ export default function NewInspectionPage() {
     const unitNumber = (details.unitNumber ?? "").trim() || null;
     const address = (details.address ?? "").trim() || (buildingName && unitNumber ? `${buildingName}, Unit ${unitNumber}` : "") || null;
 
-    let existingQuery = supabase
-      .from("properties")
-      .select("id")
-      .eq("agent_id", user.id);
-    existingQuery = buildingName != null && buildingName !== ""
-      ? existingQuery.eq("building_name", buildingName)
-      : existingQuery.is("building_name", null);
-    existingQuery = unitNumber != null && unitNumber !== ""
-      ? existingQuery.eq("unit_number", unitNumber)
-      : existingQuery.is("unit_number", null);
-    const { data: existing } = await existingQuery.maybeSingle();
-
     let propertyId: string;
-    if (existing?.id) {
-      propertyId = existing.id;
+
+    if (urlPropertyId && urlTenancyId) {
+      // Adding check-out (or check-in) to existing tenancy: use URL propertyId and tenancyId
+      propertyId = urlPropertyId;
+    } else if (urlPropertyId) {
+      propertyId = urlPropertyId;
     } else {
+      let existingQuery = supabase
+        .from("properties")
+        .select("id")
+        .eq("agent_id", user.id);
+      existingQuery = buildingName != null && buildingName !== ""
+        ? existingQuery.eq("building_name", buildingName)
+        : existingQuery.is("building_name", null);
+      existingQuery = unitNumber != null && unitNumber !== ""
+        ? existingQuery.eq("unit_number", unitNumber)
+        : existingQuery.is("unit_number", null);
+      const { data: existing } = await existingQuery.maybeSingle();
+
+      if (existing?.id) {
+        propertyId = existing.id;
+      } else {
       const { data: prop, error: propErr } = await supabase
         .from("properties")
         .insert({
@@ -343,28 +366,93 @@ export default function NewInspectionPage() {
         return;
       }
       propertyId = prop.id;
+      }
     }
 
+    // 1. Check for overlap warning (tenancy without completed check-out)
+    try {
+      const warning = await hasOverlapWarning(
+        propertyId,
+        details.contractFrom ?? "",
+        supabase
+      );
+      if (warning) {
+        const confirmed = window.confirm(
+          `⚠️ ${warning}\n\nDo you want to continue anyway?`
+        );
+        if (!confirmed) {
+          setSaving(false);
+          return;
+        }
+      }
+    } catch {
+      // tenancies table may not exist yet; continue
+    }
+
+    // 2. Resolve tenancy: use URL tenancyId (existing tenancy) or create new
+    let tenancyId: string | null = urlTenancyId ?? null;
+    let tenancyData: { landlord_name?: string; landlord_email?: string; landlord_phone?: string; tenant_name?: string; tenant_email?: string; tenant_phone?: string; ejari_ref?: string; contract_from?: string; contract_to?: string; annual_rent?: number; security_deposit?: number; property_size?: number } | null = null;
+    if (tenancyId) {
+      const { data: existingTenancy } = await supabase
+        .from("tenancies")
+        .select("landlord_name, landlord_email, landlord_phone, tenant_name, tenant_email, tenant_phone, ejari_ref, contract_from, contract_to, annual_rent, security_deposit, property_size")
+        .eq("id", tenancyId)
+        .single();
+      tenancyData = existingTenancy ?? null;
+    }
+    if (!tenancyId) {
+      try {
+        const { data: tenancy, error: tenancyErr } = await supabase
+          .from("tenancies")
+          .insert({
+            property_id: propertyId,
+            agent_id: user.id,
+            tenant_name: (details.tenantName ?? "").trim() || "Unknown Tenant",
+            tenant_email: (details.tenantEmail ?? "").trim() || null,
+            tenant_phone: (details.tenantPhone ?? "").trim() || null,
+            landlord_name: (details.landlordName ?? "").trim() || null,
+            landlord_email: (details.landlordEmail ?? "").trim() || null,
+            landlord_phone: (details.landlordPhone ?? "").trim() || null,
+            ejari_ref: (details.ejariRef ?? "").trim() || null,
+            contract_from: details.contractFrom?.trim() || null,
+            contract_to: details.contractTo?.trim() || null,
+            annual_rent: details.annualRent ? Number(details.annualRent) : null,
+            security_deposit: details.securityDeposit ? Number(details.securityDeposit) : null,
+            property_size: details.propertySize ? Number(details.propertySize) : null,
+            tenancy_type: "standard",
+            status: "active",
+          })
+          .select("id")
+          .single();
+        if (!tenancyErr && tenancy?.id) tenancyId = tenancy.id;
+      } catch {
+        // tenancies table may not exist
+      }
+    }
+
+    // 3. Create inspection (with tenancy_id if we have it; contract fields from tenancy or form)
+    const inspPayload = {
+      property_id: propertyId,
+      ...(tenancyId && { tenancy_id: tenancyId }),
+      agent_id: user.id,
+      type: details.inspectionType,
+      status: "draft",
+      ejari_ref: (tenancyData?.ejari_ref ?? details.ejariRef ?? "").toString().trim() || null,
+      contract_from: (tenancyData?.contract_from ?? details.contractFrom)?.toString().trim() || null,
+      contract_to: (tenancyData?.contract_to ?? details.contractTo)?.toString().trim() || null,
+      annual_rent: tenancyData?.annual_rent ?? (details.annualRent ? Number(details.annualRent) : null),
+      security_deposit: tenancyData?.security_deposit ?? (details.securityDeposit ? Number(details.securityDeposit) : null),
+      property_size: tenancyData?.property_size ?? (details.propertySize ? Number(details.propertySize) : null),
+      landlord_name: (tenancyData?.landlord_name ?? details.landlordName ?? "").toString().trim(),
+      landlord_email: (tenancyData?.landlord_email ?? details.landlordEmail ?? "").toString().trim(),
+      landlord_phone: (tenancyData?.landlord_phone ?? details.landlordPhone ?? "").toString().trim() || null,
+      tenant_name: (tenancyData?.tenant_name ?? details.tenantName ?? "").toString().trim(),
+      tenant_email: (tenancyData?.tenant_email ?? details.tenantEmail ?? "").toString().trim(),
+      tenant_phone: (tenancyData?.tenant_phone ?? details.tenantPhone ?? "").toString().trim() || null,
+    };
     const { data: insp, error: inspErr } = await supabase
       .from("inspections")
-      .insert({
-        property_id: propertyId,
-        agent_id: user.id,
-        type: details.inspectionType,
-        status: "draft",
-        ejari_ref: (details.ejariRef ?? "").trim() || null,
-        contract_from: details.contractFrom?.trim() || null,
-        contract_to: details.contractTo?.trim() || null,
-        annual_rent: details.annualRent ? Number(details.annualRent) : null,
-        security_deposit: details.securityDeposit ? Number(details.securityDeposit) : null,
-        property_size: details.propertySize ? Number(details.propertySize) : null,
-        landlord_name: (details.landlordName ?? "").trim(),
-        landlord_email: (details.landlordEmail ?? "").trim(),
-        landlord_phone: (details.landlordPhone ?? "").trim() || null,
-        tenant_name: (details.tenantName ?? "").trim(),
-        tenant_email: (details.tenantEmail ?? "").trim(),
-        tenant_phone: (details.tenantPhone ?? "").trim() || null,
-      })
+      .insert(inspPayload)
       .select("id")
       .single();
 
@@ -374,6 +462,7 @@ export default function NewInspectionPage() {
       return;
     }
 
+    // 4. Create rooms
     if (selectedRooms.length > 0) {
       const roomRows = selectedRooms.map((name, i) => ({
         inspection_id: insp.id,
