@@ -112,7 +112,11 @@ export async function POST(request: Request) {
   const signUrl = `${appUrl}/sign/${token}`;
   const inspectionType = inspection?.type === "check-in" ? "Check-In" : "Check-Out";
 
-  console.log("Sending WhatsApp to:", whatsappTo);
+  console.log("=== SEND OTP DEBUG ===");
+  console.log("Original phone:", phone);
+  console.log("Formatted phone:", formattedPhone);
+  console.log("WhatsApp to:", whatsappTo);
+  console.log("Signer type:", signerType);
   console.log("Sign URL:", signUrl);
 
   const body = `🏢 *Snagify — Property Inspection Report*
@@ -131,16 +135,24 @@ ${signUrl}
 _Powered by Snagify_`;
 
   try {
-    await client.messages.create({
-      from: whatsappFrom,
+    const message = await client.messages.create({
+      from: process.env.TWILIO_WHATSAPP_FROM,
       to: whatsappTo,
       body,
     });
+    console.log("Message sent successfully:", message.sid);
   } catch (twilioError: unknown) {
-    console.error("Twilio error:", twilioError);
-    const message = twilioError instanceof Error ? twilioError.message : "Unknown error";
+    const err = twilioError as { code?: number; message?: string; moreInfo?: string };
+    console.error("=== TWILIO ERROR ===");
+    console.error("Code:", err.code);
+    console.error("Message:", err.message);
+    console.error("More info:", err.moreInfo);
     return NextResponse.json(
-      { error: `Failed to send WhatsApp message: ${message}` },
+      {
+        error: err.message ?? "Unknown Twilio error",
+        code: err.code,
+        moreInfo: err.moreInfo,
+      },
       { status: 500 }
     );
   }

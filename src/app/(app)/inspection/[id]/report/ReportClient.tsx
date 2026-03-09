@@ -84,7 +84,14 @@ export function ReportClient({
       if (data.success) {
         setSent((prev) => ({ ...prev, [signerType]: true }));
       } else {
-        alert("Error: " + (data.error ?? "Failed to send"));
+        alert(
+          "Twilio Error: " +
+            (data.error ?? "Unknown") +
+            "\nCode: " +
+            (data.code ?? "—") +
+            "\nInfo: " +
+            (data.moreInfo ?? "—")
+        );
       }
     } catch {
       alert("Failed to send OTP");
