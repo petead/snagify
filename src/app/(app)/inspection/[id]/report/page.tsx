@@ -12,90 +12,106 @@ export default async function ReportPage({
 
   const { data: inspection, error } = await supabase
     .from("inspections")
-    .select("id, type, status, report_url, completed_at, property_id, document_hash, tenancy_id")
+    .select(
+      `
+      *,
+      properties (building_name, unit_number, property_type, address),
+      tenancies (
+        tenant_name, tenant_email, tenant_phone,
+        landlord_name, landlord_email, landlord_phone,
+        contract_from, contract_to, annual_rent,
+        ejari_ref, tenancy_type
+      ),
+      rooms (
+        id, name, overall_condition, order_index,
+        room_items (id, name, condition, notes, ai_description)
+      ),
+      signatures (signer_type, otp_verified, signed_at)
+    `
+    )
     .eq("id", id)
     .single();
 
   if (error || !inspection) notFound();
 
-  let ejariRef: string | null = null;
-  let contractFrom: string | null = null;
-  let contractTo: string | null = null;
-  let landlordName: string | null = null;
-  let landlordPhone: string | null = null;
-  let landlordEmail: string | null = null;
-  let tenantName: string | null = null;
-  let tenantPhone: string | null = null;
-  let tenantEmail: string | null = null;
-  if (inspection.tenancy_id) {
-    const { data: tenancy } = await supabase
-      .from("tenancies")
-      .select("ejari_ref, contract_from, contract_to, landlord_name, landlord_phone, landlord_email, tenant_name, tenant_phone, tenant_email")
-      .eq("id", inspection.tenancy_id)
+  let profile: { full_name: string | null; agency_name: string | null } | null = null;
+  if (inspection.agent_id) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("full_name, agency_name")
+      .eq("id", inspection.agent_id)
       .single();
-    if (tenancy) {
-      ejariRef = tenancy.ejari_ref ?? null;
-      contractFrom = tenancy.contract_from ?? null;
-      contractTo = tenancy.contract_to ?? null;
-      landlordName = tenancy.landlord_name ?? null;
-      landlordPhone = tenancy.landlord_phone ?? null;
-      landlordEmail = tenancy.landlord_email ?? null;
-      tenantName = tenancy.tenant_name ?? null;
-      tenantPhone = tenancy.tenant_phone ?? null;
-      tenantEmail = tenancy.tenant_email ?? null;
-    }
+    profile = data;
   }
-
-  const { data: property } = await supabase
-    .from("properties")
-    .select("building_name, unit_number, address, property_type")
-    .eq("id", inspection.property_id)
-    .single();
-
-  const { data: rooms } = await supabase
-    .from("rooms")
-    .select("id, name, overall_condition")
-    .eq("inspection_id", id)
-    .order("order_index", { ascending: true });
-
-  const roomConditions = (rooms ?? []).map((r) => r.overall_condition).filter(Boolean);
-  const poorCount = roomConditions.filter((c) => c === "poor").length;
-  const fairCount = roomConditions.filter((c) => c === "fair").length;
-  const overallCondition =
-    poorCount > 0 ? "Poor" : fairCount > roomConditions.length / 2 ? "Fair" : "Good";
-
-  const propertyTitle =
-    property?.address ?? (property?.building_name && property?.unit_number
-      ? `${property.building_name}, Unit ${property.unit_number}`
-      : "Property");
 
   return (
     <ReportClient
-      inspectionId={id}
-      inspection={{
-        type: inspection.type ?? "check-in",
-        status: inspection.status ?? "completed",
-        completedAt: inspection.completed_at,
-        reportUrl: inspection.report_url,
-        documentHash: inspection.document_hash,
-        ejariRef,
-        contractFrom,
-        contractTo,
-      }}
-      tenancy={{
-        landlordName,
-        landlordPhone,
-        landlordEmail,
-        tenantName,
-        tenantPhone,
-        tenantEmail,
-      }}
-      property={{
-        address: propertyTitle,
-        type: property?.property_type,
-      }}
-      overallCondition={overallCondition}
-      roomCount={rooms?.length ?? 0}
+      inspection={inspection as InspectionWithRelations}
+      profile={profile}
     />
   );
 }
+
+// Type for the nested inspection shape from Supabase
+export type RoomItem = {
+  id: string;
+  name: string | null;
+  condition: string | null;
+  notes: string | null;
+  ai_description: string | null;
+};
+
+export type Room = {
+  id: string;
+  name: string | null;
+  overall_condition: string | null;
+  order_index: number | null;
+  room_items?: RoomItem[] | null;
+};
+
+export type Signature = {
+  signer_type: string | null;
+  otp_verified: boolean | null;
+  signed_at: string | null;
+};
+
+export type PropertyRelation = {
+  building_name: string | null;
+  unit_number: string | null;
+  property_type: string | null;
+  address: string | null;
+};
+
+export type TenancyRelation = {
+  tenant_name: string | null;
+  tenant_email: string | null;
+  tenant_phone: string | null;
+  landlord_name: string | null;
+  landlord_email: string | null;
+  landlord_phone: string | null;
+  contract_from: string | null;
+  contract_to: string | null;
+  annual_rent: number | null;
+  ejari_ref: string | null;
+  tenancy_type: string | null;
+};
+
+export type InspectionWithRelations = {
+  id: string;
+  type: string | null;
+  status: string | null;
+  report_url: string | null;
+  completed_at: string | null;
+  document_hash: string | null;
+  agent_id: string | null;
+  property_id: string | null;
+  tenancy_id: string | null;
+  report_data?: {
+    executive_summary?: string;
+    dispute_risk_score?: number;
+  } | null;
+  properties?: PropertyRelation | PropertyRelation[] | null;
+  tenancies?: TenancyRelation | TenancyRelation[] | null;
+  rooms?: Room[] | null;
+  signatures?: Signature[] | null;
+};
