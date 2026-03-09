@@ -27,24 +27,20 @@ export async function POST(request: Request) {
   const signUrl = `${appUrl}/sign?inspectionId=${inspectionId}&signerType=${signerType}&phone=${encodeURIComponent(formattedPhone)}`;
 
   try {
-    // Twilio Verify sends OTP automatically via WhatsApp then SMS fallback
+    // Twilio Verify sends OTP via SMS
     await client.verify.v2
       .services(process.env.TWILIO_VERIFY_SERVICE_SID!)
       .verifications.create({
         to: formattedPhone,
-        channel: "whatsapp",
+        channel: "sms",
       });
 
-    // Send sign URL separately via WhatsApp (best effort)
-    try {
-      await client.messages.create({
-        from: process.env.TWILIO_WHATSAPP_FROM!,
-        to: `whatsapp:${formattedPhone}`,
-        body: `🏢 Snagify\n\nSign your inspection report here:\n\n${signUrl}`,
-      });
-    } catch (e) {
-      console.log("Sign URL message failed (non-blocking):", e);
-    }
+    // Send sign URL in a follow-up SMS
+    await client.messages.create({
+      from: process.env.TWILIO_SMS_FROM!,
+      to: formattedPhone,
+      body: `Sign your Snagify inspection report here:\n${signUrl}`,
+    });
 
     return Response.json({ success: true, signUrl });
   } catch (error: unknown) {
