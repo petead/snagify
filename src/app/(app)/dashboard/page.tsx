@@ -156,6 +156,33 @@ export default async function DashboardPage() {
     }
   }
 
+  // Recent Activity timeline (last 5 inspections)
+  type RecentInspection = {
+    id: string;
+    type: string | null;
+    status: string | null;
+    created_at: string | null;
+    completed_at: string | null;
+    properties?: unknown;
+    tenancies?: unknown;
+  };
+  let recentInspections: RecentInspection[] = [];
+  if (user) {
+    const { data: recent } = await supabase
+      .from("inspections")
+      .select(
+        `
+        id, type, status, created_at, completed_at,
+        properties (building_name, unit_number),
+        tenancies (tenant_name)
+      `
+      )
+      .eq("agent_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    recentInspections = (recent ?? []) as RecentInspection[];
+  }
+
   return (
     <main className="min-h-screen bg-[#fcfcfc]">
       <header className="bg-white border-b border-gray-100 px-4 h-16 flex items-center justify-between sticky top-0 z-50">
@@ -165,6 +192,7 @@ export default async function DashboardPage() {
         displayName={displayName}
         properties={propertiesData}
         alerts={alerts}
+        recentInspections={recentInspections}
       />
     </main>
   );

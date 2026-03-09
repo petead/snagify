@@ -3,16 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Building2,
-  ClipboardList,
-  PenLine,
-  Calendar,
-  Search,
-  ChevronRight,
-  Loader2,
-} from "lucide-react";
-import { getTenancyStatus, getTenancyDaysLeft } from "@/lib/tenancy";
+import { Loader2 } from "lucide-react";
 
 type InspectionRow = {
   id: string;
@@ -41,46 +32,6 @@ type PropertyRow = {
   inspections?: InspectionRow[] | null;
 };
 
-function getPropertyTenancyStatus(prop: PropertyRow): {
-  label: string;
-  emoji: string;
-  sub?: string;
- } {
-  const tenancies = prop.tenancies ?? [];
-  if (!tenancies.length) {
-    return { label: "Vacant", emoji: "⬜" };
-  }
-  const statusOrder = ["active", "expiring_soon", "upcoming", "expired", "terminated_early"];
-  const sorted = [...tenancies].sort((a, b) => {
-    const sa = getTenancyStatus(a);
-    const sb = getTenancyStatus(b);
-    return statusOrder.indexOf(sa) - statusOrder.indexOf(sb);
-  });
-  const t = sorted[0];
-  const status = getTenancyStatus(t);
-  const name = t.tenant_name?.trim().split(/\s+/)[0] ?? "Tenant";
-  if (status === "active") {
-    return { label: `Active — ${name}`, emoji: "🟢" };
-  }
-  if (status === "expiring_soon") {
-    const days = getTenancyDaysLeft(t);
-    return {
-      label: days != null && days >= 0 ? `Expiring in ${days} days` : "Expiring Soon",
-      emoji: "⚠️",
-    };
-  }
-  if (status === "terminated_early") {
-    return { label: "Terminated", emoji: "🔴" };
-  }
-  if (status === "expired") {
-    return { label: "Expired", emoji: "⬜" };
-  }
-  if (status === "upcoming") {
-    return { label: `Upcoming — ${name}`, emoji: "⬜" };
-  }
-  return { label: "Vacant", emoji: "⬜" };
-}
-
 export type AlertItem = {
   type: string;
   color: string;
@@ -91,10 +42,100 @@ export type AlertItem = {
   actionLabel: string;
 };
 
+type RecentInspectionRow = {
+  id: string;
+  type: string | null;
+  status: string | null;
+  created_at: string | null;
+  completed_at: string | null;
+  properties?: unknown;
+  tenancies?: unknown;
+};
+
+type ActivityItem = {
+  icon: string;
+  color: string;
+  title: string;
+  subtitle: string;
+  time: string | null;
+  href: string;
+};
+
+function first<T>(x: T | T[] | null | undefined): T | null {
+  if (x == null) return null;
+  return Array.isArray(x) ? (x[0] ?? null) : x;
+}
+
+function getActivityItem(inspection: RecentInspectionRow): ActivityItem {
+  const prop = first(inspection.properties) as { building_name?: string | null; unit_number?: string | null } | null;
+  const ten = first(inspection.tenancies) as { tenant_name?: string | null } | null;
+  const property = prop?.building_name != null && prop?.unit_number != null
+    ? `${prop.building_name}, Unit ${prop.unit_number}`
+    : (prop?.building_name ?? prop?.unit_number ?? "Property");
+  const tenant = ten?.tenant_name?.split(" ")[0] ?? "";
+  const type = inspection.type === "check-in" ? "Check-in" : "Check-out";
+
+  if (inspection.status === "signed") {
+    return {
+      icon: "✅",
+      color: "#cafe87",
+      title: `${type} signed`,
+      subtitle: property,
+      time: inspection.completed_at || inspection.created_at,
+      href: `/inspection/${inspection.id}/report`,
+    };
+  }
+  if (inspection.status === "completed") {
+    return {
+      icon: "📄",
+      color: "#9A88FD",
+      title: `${type} report generated`,
+      subtitle: property,
+      time: inspection.completed_at || inspection.created_at,
+      href: `/inspection/${inspection.id}/report`,
+    };
+  }
+  if (inspection.status === "in_progress") {
+    return {
+      icon: "🔍",
+      color: "#FEDE80",
+      title: `${type} in progress`,
+      subtitle: tenant ? `${property} — ${tenant}` : property,
+      time: inspection.created_at,
+      href: `/inspection/${inspection.id}`,
+    };
+  }
+  return {
+    icon: "📝",
+    color: "#E5E7EB",
+    title: `${type} started`,
+    subtitle: property,
+    time: inspection.created_at,
+    href: `/inspection/${inspection.id}`,
+  };
+}
+
+function timeAgo(dateStr: string | null): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 2) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+}
+
 interface DashboardClientProps {
   displayName: string;
   properties: PropertyRow[];
   alerts?: AlertItem[];
+  recentInspections?: RecentInspectionRow[];
 }
 
 function getGreeting(): string {
@@ -102,27 +143,6 @@ function getGreeting(): string {
   if (h >= 5 && h < 12) return "Good morning";
   if (h >= 12 && h < 18) return "Good afternoon";
   return "Good evening";
-}
-
-function propertyEmoji(type: string | null): string {
-  if (!type) return "🏢";
-  const t = type.toLowerCase();
-  if (t.includes("villa")) return "🏠";
-  if (t.includes("studio")) return "🛏️";
-  if (t.includes("townhouse")) return "🏬";
-  return "🏢";
-}
-
-function formatDateShort(dateStr: string | null): string {
-  if (!dateStr) return "";
-  try {
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-    });
-  } catch {
-    return "";
-  }
 }
 
 function normalizeProperties(rows: PropertyRow[]): PropertyRow[] {
@@ -136,42 +156,27 @@ export function DashboardClient({
   displayName,
   properties: initialProperties,
   alerts = [],
+  recentInspections = [],
 }: DashboardClientProps) {
   const [properties] = useState(() => normalizeProperties(initialProperties));
-  const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
 
   const touchStartY = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Flatten all inspections for stats
   const allInspections = properties?.flatMap((p) => p.inspections ?? []) ?? [];
   const totalProperties = properties.length;
   const totalInspections = allInspections?.length ?? 0;
-  const pendingSigCount = allInspections?.filter(
-    (i) => i?.status === "completed"
-  )?.length ?? 0;
+  const pendingSigCount = allInspections?.filter((i) => i?.status === "completed")?.length ?? 0;
   const now = new Date();
-  const thisMonthCount = allInspections?.filter((i) => {
-    if (!i?.created_at) return false;
-    const d = new Date(i.created_at);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  })?.length ?? 0;
+  const thisMonthCount =
+    allInspections?.filter((i) => {
+      if (!i?.created_at) return false;
+      const d = new Date(i.created_at);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    })?.length ?? 0;
 
-  // Search filter
-  const filtered = search.trim()
-    ? properties.filter((p) => {
-        const q = search.toLowerCase();
-        const building = (p.building_name ?? "").toLowerCase();
-        const unit = (p.unit_number ?? "").toLowerCase();
-        const addr = (p.address ?? "").toLowerCase();
-        const tenant = (p.tenancies?.[0]?.tenant_name ?? "").toLowerCase();
-        return building.includes(q) || unit.includes(q) || addr.includes(q) || tenant.includes(q);
-      })
-    : properties;
-
-  // Pull to refresh
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     router.refresh();
@@ -199,46 +204,12 @@ export function DashboardClient({
     setGreetingText(getGreeting());
   }, []);
 
-  const renderChip = (insp: InspectionRow | undefined, emptyLabel: string) => {
-    if (!insp) {
-      return (
-        <span
-          className="rounded-full text-xs px-2.5 py-1 border border-dashed font-body"
-          style={{ borderColor: "#d1d5db", color: "#9ca3af" }}
-        >
-          {emptyLabel}
-        </span>
-      );
-    }
-    if (insp.status === "signed") {
-      return (
-        <span
-          className="rounded-full text-xs px-2.5 py-1 font-heading font-medium"
-          style={{ backgroundColor: "#9A88FD", color: "white" }}
-        >
-          {(insp.type ?? "check-in").toUpperCase().replace("-", "‑")}
-        </span>
-      );
-    }
-    if (insp.status === "completed") {
-      return (
-        <span
-          className="rounded-full text-xs px-2.5 py-1 font-heading font-medium"
-          style={{ backgroundColor: "#cafe87", color: "#111827" }}
-        >
-          {(insp.type ?? "check-in").toUpperCase().replace("-", "‑")}
-        </span>
-      );
-    }
-    return (
-      <span
-        className="rounded-full text-xs px-2.5 py-1 font-heading font-medium"
-        style={{ backgroundColor: "#f3f4f6", color: "#4b5563" }}
-      >
-        {(insp.type ?? "check-in").toUpperCase().replace("-", "‑")}
-      </span>
-    );
-  };
+  const stats = [
+    { value: totalProperties, label: "Properties", icon: "🏢", href: "/properties" as string | null },
+    { value: totalInspections, label: "Inspections", icon: "📋", href: "/reports" as string | null },
+    { value: thisMonthCount, label: "This Month", icon: "📅", href: null },
+    { value: pendingSigCount, label: "Pending Sign", icon: "✍️", href: "/reports" as string | null },
+  ];
 
   return (
     <>
@@ -313,156 +284,73 @@ export function DashboardClient({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 mx-4 mb-4">
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-            <div style={{ color: "#7B65FC" }}>
-              <Building2 size={22} strokeWidth={2} />
-            </div>
-            <p className="font-body text-2xl font-semibold mt-2 mb-0" style={{ color: "#111827" }}>
-              {totalProperties}
-            </p>
-            <p className="font-body text-sm mt-0.5 mb-0" style={{ color: "#6b7280" }}>
-              Total Properties
-            </p>
-          </div>
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-            <div style={{ color: "#22c55e" }}>
-              <ClipboardList size={22} strokeWidth={2} />
-            </div>
-            <p className="font-body text-2xl font-semibold mt-2 mb-0" style={{ color: "#111827" }}>
-              {totalInspections}
-            </p>
-            <p className="font-body text-sm mt-0.5 mb-0" style={{ color: "#6b7280" }}>
-              Total Inspections
-            </p>
-          </div>
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-            <div style={{ color: "#facc15" }}>
-              <PenLine size={22} strokeWidth={2} />
-            </div>
-            <p className="font-body text-2xl font-semibold mt-2 mb-0" style={{ color: "#111827" }}>
-              {pendingSigCount}
-            </p>
-            <p className="font-body text-sm mt-0.5 mb-0" style={{ color: "#6b7280" }}>
-              Pending Signature
-            </p>
-          </div>
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-            <div style={{ color: "#7B65FC" }}>
-              <Calendar size={22} strokeWidth={2} />
-            </div>
-            <p className="font-body text-2xl font-semibold mt-2 mb-0" style={{ color: "#111827" }}>
-              {thisMonthCount}
-            </p>
-            <p className="font-body text-sm mt-0.5 mb-0" style={{ color: "#6b7280" }}>
-              This Month
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between mt-8 mb-3 px-4">
-          <h2 className="font-heading font-bold text-lg m-0" style={{ color: "#111827" }}>
-            Recent Activity
-          </h2>
-          {properties.length > 0 && (
-            <Link
-              href="/properties"
-              className="text-sm font-semibold"
-              style={{ color: "#9A88FD" }}
+        <div className="flex gap-3 mx-4 mb-4 overflow-x-auto pb-1 no-scrollbar -mx-0">
+          {stats.map((stat) => (
+            <div
+              key={stat.label}
+              role={stat.href ? "button" : undefined}
+              tabIndex={stat.href ? 0 : undefined}
+              onClick={() => stat.href && router.push(stat.href)}
+              onKeyDown={(e) => stat.href && e.key === "Enter" && router.push(stat.href)}
+              className={`bg-white rounded-2xl p-3 shadow-sm border border-gray-100 flex-shrink-0 flex items-center gap-2 min-w-fit ${
+                stat.href ? "cursor-pointer active:scale-[0.98] transition-transform" : ""
+              }`}
             >
-              View all →
-            </Link>
-          )}
-        </div>
-
-        {filtered.length > 0 ? (
-          <div className="px-0">
-            {filtered.slice(0, 3).map((prop) => {
-              const inspections = prop.inspections ?? [];
-              const inspCount = inspections.length;
-              const sorted = [...inspections].sort(
-                (a, b) =>
-                  new Date(b.created_at ?? 0).getTime() -
-                  new Date(a.created_at ?? 0).getTime()
-              );
-              const latest = sorted[0] ?? null;
-              const checkIn = sorted.find(
-                (i) =>
-                  (i.type ?? "").toLowerCase().includes("check-in") ||
-                  (i.type ?? "").toLowerCase() === "check_in"
-              );
-              const checkOut = sorted.find(
-                (i) =>
-                  (i.type ?? "").toLowerCase().includes("check-out") ||
-                  (i.type ?? "").toLowerCase() === "check_out"
-              );
-
-              return (
-                <Link
-                  key={prop.id}
-                  href={`/property/${prop.id}`}
-                  className="bg-white mx-4 mb-3 rounded-2xl p-4 shadow-sm border border-gray-100 block"
+              <span className="text-lg">{stat.icon}</span>
+              <div>
+                <p
+                  className="text-lg font-bold text-gray-900 leading-none"
+                  style={{ fontFamily: "Poppins, sans-serif" }}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div
-                        className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-                        style={{ backgroundColor: "#f3e8ff" }}
-                      >
-                        {propertyEmoji(prop.property_type)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-heading font-bold text-sm truncate mt-0 mb-0" style={{ color: "#111827" }}>
-                          {prop.address ?? (prop.building_name && prop.unit_number
-                            ? `${prop.building_name}, Unit ${prop.unit_number}`
-                            : "Untitled Property")}
-                        </p>
-                        <p className="font-body text-xs mt-0.5 truncate" style={{ color: "#6b7280" }}>
-                          {getPropertyTenancyStatus(prop).emoji} {getPropertyTenancyStatus(prop).label}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span
-                        className="rounded-full px-2.5 py-0.5 font-heading font-medium text-xs"
-                        style={{ backgroundColor: "#f3e8ff", color: "#7B65FC" }}
-                      >
-                        {inspCount} inspection{inspCount !== 1 ? "s" : ""}
-                      </span>
-                      {latest && (
-                        <span className="font-body text-xs" style={{ color: "#9ca3af" }}>
-                          Last: {formatDateShort(latest.created_at)}
-                        </span>
-                      )}
-                      <ChevronRight size={16} className="flex-shrink-0" style={{ color: "#9ca3af" }} />
-                    </div>
-                  </div>
-                  <div className="border-t border-gray-100 mt-3 pt-2.5 flex gap-2 flex-wrap" style={{ borderTopWidth: "1px" }}>
-                    {renderChip(checkIn ?? undefined, "No check‑in yet")}
-                    {renderChip(checkOut ?? undefined, "No check‑out yet")}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="mx-4 rounded-2xl border border-gray-100 bg-white shadow-sm p-8 flex flex-col items-center justify-center gap-4 min-h-[200px]">
-            <span className="text-5xl" role="img" aria-hidden>
-              🏙️
-            </span>
-            <p className="font-heading font-semibold mt-0 mb-0" style={{ color: "#111827" }}>
-              No properties yet
+                  {stat.value ?? 0}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">{stat.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {recentInspections.length > 0 && (
+          <div className="mx-4 mb-6">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
+              Recent Activity
             </p>
-            <p className="font-body text-sm text-center mt-0 mb-0" style={{ color: "#6b7280" }}>
-              Start your first inspection to add a property
-            </p>
-            <Link
-              href="/inspection/new"
-              className="font-heading font-bold px-6 py-3 rounded-xl inline-block"
-              style={{ backgroundColor: "#9A88FD", color: "white" }}
-            >
-              + New Inspection
-            </Link>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              {recentInspections.map((inspection, index) => {
+                const item = getActivityItem(inspection);
+                return (
+                  <div
+                    key={inspection.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => router.push(item.href)}
+                    onKeyDown={(e) => e.key === "Enter" && router.push(item.href)}
+                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer active:bg-gray-50 transition-colors ${
+                      index < recentInspections.length - 1 ? "border-b border-gray-50" : ""
+                    }`}
+                  >
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base"
+                      style={{ backgroundColor: item.color + "33" }}
+                    >
+                      {item.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="text-sm font-semibold text-gray-800 truncate"
+                        style={{ fontFamily: "Poppins, sans-serif" }}
+                      >
+                        {item.title}
+                      </p>
+                      <p className="text-xs text-gray-400 truncate mt-0.5">{item.subtitle}</p>
+                    </div>
+                    <span className="text-xs text-gray-300 flex-shrink-0 ml-2">
+                      {timeAgo(item.time)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
