@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import {
-  generateInspectionPDFBuffer,
-  type ReportData,
-  type InspectionMeta,
-} from "@/lib/generatePDF";
+import type { ReportData } from "@/lib/generatePDF";
 
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 const REPORT_PROMPT = `You are a professional property inspector in Dubai.
 Generate a formal property inspection report based on this data.
@@ -94,7 +90,6 @@ export async function POST(request: Request) {
       .order("order_index", { ascending: true });
 
     const roomIds = (rooms ?? []).map((r) => r.id);
-
     const roomItems: Record<string, { room_id: string; name: string; condition: string | null; notes: string | null }[]> = {};
     const roomPhotos: Record<string, { room_id: string; url: string; ai_analysis: string | null }[]> = {};
 
@@ -162,7 +157,6 @@ export async function POST(request: Request) {
     };
 
     const anthropic = new Anthropic({ apiKey, timeout: 120000 });
-
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 4096,
@@ -186,8 +180,6 @@ export async function POST(request: Request) {
     }
 
     const report = JSON.parse(jsonMatch[0]) as Partial<ReportData>;
-
-    // Ensure ReportData shape
     const reportData: ReportData = {
       executive_summary: report.executive_summary ?? "",
       overall_condition: report.overall_condition ?? "Good",
@@ -208,80 +200,16 @@ export async function POST(request: Request) {
       recommendations: report.recommendations ?? [],
     };
 
-    const meta: InspectionMeta = {
-      inspection: {
-        id: inspection.id,
-        type: inspection.type ?? undefined,
-        created_at: inspection.created_at ?? undefined,
-        landlord_name: tenancy?.landlord_name ?? undefined,
-        landlord_email: tenancy?.landlord_email ?? undefined,
-        tenant_name: tenancy?.tenant_name ?? undefined,
-        tenant_email: tenancy?.tenant_email ?? undefined,
-        ejari_ref: tenancy?.ejari_ref ?? undefined,
-        contract_from: tenancy?.contract_from ?? undefined,
-        contract_to: tenancy?.contract_to ?? undefined,
-      },
-      property: property
-        ? {
-            building_name: property.building_name ?? undefined,
-            unit_number: property.unit_number ?? undefined,
-            address: property.address ?? undefined,
-            property_type: property.property_type ?? undefined,
-          }
-        : null,
-      agent: agent
-        ? {
-            full_name: agent.full_name ?? undefined,
-            agency_name: agent.agency_name ?? undefined,
-          }
-        : null,
-      rooms: (rooms ?? []).map((r) => ({
-        name: r.name,
-        photos: (roomPhotos[r.id] ?? []).map((p) => ({
-          url: p.url,
-          ai_analysis: p.ai_analysis ?? undefined,
-        })),
-      })),
-    };
-
-    let publicUrl: string | null = null;
-
-    try {
-      const pdfBuffer = await generateInspectionPDFBuffer(reportData, meta);
-      const fileName = `${inspectionId}.pdf`;
-
-      const { error: uploadErr } = await supabase.storage
-        .from("reports")
-        .upload(fileName, pdfBuffer, {
-          contentType: "application/pdf",
-          upsert: true,
-        });
-
-      if (!uploadErr) {
-        const { data: urlData } = supabase.storage
-          .from("reports")
-          .getPublicUrl(fileName);
-        publicUrl = urlData.publicUrl;
-      }
-    } catch (pdfErr) {
-      console.error("PDF generation/upload error:", pdfErr);
-    }
-
     await supabase
       .from("inspections")
       .update({
         report_data: reportData,
-        report_url: publicUrl,
         status: "completed",
         completed_at: new Date().toISOString(),
       })
       .eq("id", inspectionId);
 
-    return NextResponse.json({
-      success: true,
-      url: publicUrl,
-      report: reportData,
-    });
+    return NextResponse.json({ success: true });
   } catch (err) {
     console.error("generate-report error:", err);
     return NextResponse.json(

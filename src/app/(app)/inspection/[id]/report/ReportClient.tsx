@@ -166,59 +166,26 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
     setDownloadLoading(true);
     const downloadName = `Snagify_${inspection.type ?? "check-in"}_${safeFilename(prop?.building_name)}_Unit${safeFilename(prop?.unit_number)}.pdf`;
     try {
-      if (inspection.report_url) {
-        const response = await fetch(inspection.report_url);
-        if (response.ok) {
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = downloadName;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          return;
-        }
-      }
-
-      const res = await fetch("/api/generate-report", {
+      const res = await fetch("/api/generate-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ inspectionId: inspection.id }),
       });
 
-      if (!res.ok) throw new Error("Failed to generate PDF");
+      if (!res.ok) throw new Error("PDF generation failed");
 
-      const contentType = res.headers.get("content-type") || "";
-
-      if (contentType.includes("application/pdf")) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = downloadName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } else {
-        const data = await res.json();
-        if (data.url) {
-          const a = document.createElement("a");
-          a.href = data.url;
-          a.download = downloadName;
-          a.target = "_blank";
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-        } else {
-          window.location.reload();
-        }
-      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = downloadName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("PDF download error:", err);
-      alert("Could not download PDF. Please try again.");
+      console.error("PDF error:", err);
+      alert("Could not generate PDF. Please try again.");
     } finally {
       setDownloadLoading(false);
     }
@@ -646,7 +613,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
             cursor: downloadLoading ? "default" : "pointer",
           }}
         >
-          {downloadLoading ? "Generating PDF..." : "⬇️ Download PDF"}
+          {downloadLoading ? "⏳ Generating PDF..." : "⬇️ Download PDF"}
         </button>
 
         {/* Row 2 — Sign + Share */}
