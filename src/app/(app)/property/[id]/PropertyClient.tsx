@@ -1,11 +1,19 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, Plus } from "lucide-react";
 import {
   TENANCY_STATUS_CONFIG,
   getTenancyDaysLeft,
 } from "@/lib/tenancy";
+import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
+
+type InspectionSignature = {
+  signer_type: string;
+  otp_verified: boolean;
+  signed_at: string | null;
+};
 
 type InspectionInGroup = {
   id: string;
@@ -14,6 +22,7 @@ type InspectionInGroup = {
   created_at: string | null;
   completed_at: string | null;
   room_count: number;
+  signatures: InspectionSignature[];
 };
 
 type TenancyGroup = {
@@ -126,6 +135,14 @@ export function PropertyClient({
   tenancyGroups,
   totalInspections,
 }: PropertyClientProps) {
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+
+  useEffect(() => {
+    const close = () => setOpenMenu(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, []);
+
   const title =
     property.address ??
     (property.building_name && property.unit_number
@@ -299,42 +316,97 @@ export function PropertyClient({
                     <div className="p-4">
                       {/* CHECK-IN row */}
                       {checkIn ? (
-                        <Link
-                          href={
-                            checkIn.status === "completed" || checkIn.status === "signed"
-                              ? `/inspection/${checkIn.id}/report`
-                              : `/inspection/${checkIn.id}`
-                          }
-                          className="flex items-center justify-between py-2 border-b border-gray-50 active:bg-gray-50/50 transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="bg-[#F0EDFF] text-[#9A88FD] text-xs font-semibold px-3 py-1 rounded-full">
-                              CHECK-IN
-                            </span>
-                            <div>
-                              <p className="font-body text-sm font-medium text-gray-800">
-                                {formatDate(checkIn.created_at)}
-                              </p>
-                              <p className="font-body text-xs text-gray-400">
-                                {checkIn.room_count} room
-                                {checkIn.room_count !== 1 ? "s" : ""} inspected
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`rounded-full px-2.5 py-0.5 ${statusBadge(checkIn.status).className}`}
-                            >
-                              {statusBadge(checkIn.status).label}
-                            </span>
-                            {(checkIn.status === "completed" ||
-                              checkIn.status === "signed") && (
-                              <span className="font-body text-xs text-[#9A88FD] font-medium">
-                                View →
+                        <div style={{ position: "relative" }}>
+                          <Link
+                            href={
+                              checkIn.status === "completed" || checkIn.status === "signed"
+                                ? `/inspection/${checkIn.id}/report`
+                                : `/inspection/${checkIn.id}`
+                            }
+                            className="flex items-center justify-between py-2 border-b border-gray-50 active:bg-gray-50/50 transition-colors pr-10"
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="bg-[#F0EDFF] text-[#9A88FD] text-xs font-semibold px-3 py-1 rounded-full">
+                                CHECK-IN
                               </span>
-                            )}
-                          </div>
-                        </Link>
+                              <div>
+                                <p className="font-body text-sm font-medium text-gray-800">
+                                  {formatDate(checkIn.created_at)}
+                                </p>
+                                <p className="font-body text-xs text-gray-400">
+                                  {checkIn.room_count} room
+                                  {checkIn.room_count !== 1 ? "s" : ""} inspected
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`rounded-full px-2.5 py-0.5 ${statusBadge(checkIn.status).className}`}
+                              >
+                                {statusBadge(checkIn.status).label}
+                              </span>
+                              {(checkIn.status === "completed" ||
+                                checkIn.status === "signed") && (
+                                <span className="font-body text-xs text-[#9A88FD] font-medium">
+                                  View →
+                                </span>
+                              )}
+                            </div>
+                          </Link>
+                          {/* ••• menu button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenu(openMenu === checkIn.id ? null : checkIn.id);
+                            }}
+                            style={{
+                              position: "absolute",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              right: 0,
+                              width: 28,
+                              height: 28,
+                              borderRadius: 8,
+                              background: "#f5f5f5",
+                              border: "none",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              fontSize: 14,
+                              color: "#9ca3af",
+                              letterSpacing: 1,
+                            }}
+                          >
+                            •••
+                          </button>
+                          {openMenu === checkIn.id && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: 44,
+                                right: 0,
+                                zIndex: 50,
+                                background: "white",
+                                borderRadius: 12,
+                                border: "1px solid #f0f0f0",
+                                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                                overflow: "hidden",
+                                minWidth: 200,
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <DeleteInspectionButton
+                                inspectionId={checkIn.id}
+                                inspectionType="check-in"
+                                status={checkIn.status}
+                                signatures={checkIn.signatures}
+                                redirectTo={`/property/${property.id}`}
+                                variant="menuitem"
+                              />
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <div className="flex items-center justify-between py-2 border-b border-gray-50">
                           <span className="bg-gray-100 text-gray-400 text-xs px-3 py-1 rounded-full font-body">
@@ -366,42 +438,97 @@ export function PropertyClient({
 
                       {/* CHECK-OUT row */}
                       {checkOut ? (
-                        <Link
-                          href={
-                            checkOut.status === "completed" || checkOut.status === "signed"
-                              ? `/inspection/${checkOut.id}/report`
-                              : `/inspection/${checkOut.id}`
-                          }
-                          className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0 active:bg-gray-50/50 transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="bg-[#FEDE80]/80 text-[#1A1A1A] text-xs font-semibold px-3 py-1 rounded-full">
-                              CHECK-OUT
-                            </span>
-                            <div>
-                              <p className="font-body text-sm font-medium text-gray-800">
-                                {formatDate(checkOut.created_at)}
-                              </p>
-                              <p className="font-body text-xs text-gray-400">
-                                {checkOut.room_count} room
-                                {checkOut.room_count !== 1 ? "s" : ""} inspected
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`rounded-full px-2.5 py-0.5 ${statusBadge(checkOut.status).className}`}
-                            >
-                              {statusBadge(checkOut.status).label}
-                            </span>
-                            {(checkOut.status === "completed" ||
-                              checkOut.status === "signed") && (
-                              <span className="font-body text-xs text-[#9A88FD] font-medium">
-                                View →
+                        <div style={{ position: "relative" }}>
+                          <Link
+                            href={
+                              checkOut.status === "completed" || checkOut.status === "signed"
+                                ? `/inspection/${checkOut.id}/report`
+                                : `/inspection/${checkOut.id}`
+                            }
+                            className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0 active:bg-gray-50/50 transition-colors pr-10"
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="bg-[#FEDE80]/80 text-[#1A1A1A] text-xs font-semibold px-3 py-1 rounded-full">
+                                CHECK-OUT
                               </span>
-                            )}
-                          </div>
-                        </Link>
+                              <div>
+                                <p className="font-body text-sm font-medium text-gray-800">
+                                  {formatDate(checkOut.created_at)}
+                                </p>
+                                <p className="font-body text-xs text-gray-400">
+                                  {checkOut.room_count} room
+                                  {checkOut.room_count !== 1 ? "s" : ""} inspected
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`rounded-full px-2.5 py-0.5 ${statusBadge(checkOut.status).className}`}
+                              >
+                                {statusBadge(checkOut.status).label}
+                              </span>
+                              {(checkOut.status === "completed" ||
+                                checkOut.status === "signed") && (
+                                <span className="font-body text-xs text-[#9A88FD] font-medium">
+                                  View →
+                                </span>
+                              )}
+                            </div>
+                          </Link>
+                          {/* ••• menu button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenu(openMenu === checkOut.id ? null : checkOut.id);
+                            }}
+                            style={{
+                              position: "absolute",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              right: 0,
+                              width: 28,
+                              height: 28,
+                              borderRadius: 8,
+                              background: "#f5f5f5",
+                              border: "none",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              fontSize: 14,
+                              color: "#9ca3af",
+                              letterSpacing: 1,
+                            }}
+                          >
+                            •••
+                          </button>
+                          {openMenu === checkOut.id && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: 44,
+                                right: 0,
+                                zIndex: 50,
+                                background: "white",
+                                borderRadius: 12,
+                                border: "1px solid #f0f0f0",
+                                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                                overflow: "hidden",
+                                minWidth: 200,
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <DeleteInspectionButton
+                                inspectionId={checkOut.id}
+                                inspectionType="check-out"
+                                status={checkOut.status}
+                                signatures={checkOut.signatures}
+                                redirectTo={`/property/${property.id}`}
+                                variant="menuitem"
+                              />
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                           <span className="bg-gray-100 text-gray-400 text-xs px-3 py-1 rounded-full font-body">
