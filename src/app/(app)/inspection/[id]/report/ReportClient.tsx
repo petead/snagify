@@ -172,7 +172,18 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
         body: JSON.stringify({ inspectionId: inspection.id }),
       });
 
-      if (!res.ok) throw new Error("PDF generation failed");
+      if (!res.ok) {
+        let errorMessage = "PDF generation failed";
+        const contentType = res.headers.get("content-type") ?? "";
+        if (contentType.includes("application/json")) {
+          const data = (await res.json()) as { error?: string };
+          if (data?.error) errorMessage = data.error;
+        } else {
+          const text = await res.text();
+          if (text?.trim()) errorMessage = text.trim();
+        }
+        throw new Error(errorMessage);
+      }
 
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -185,7 +196,11 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("PDF error:", err);
-      alert("Could not generate PDF. Please try again.");
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Could not generate PDF. Please try again.";
+      alert(`Could not generate PDF: ${message}`);
     } finally {
       setDownloadLoading(false);
     }

@@ -5,6 +5,7 @@ import {
   type ReportData,
   type InspectionMeta,
 } from "@/lib/generatePDF";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 type RoomItemRow = {
   room_id: string;
@@ -18,6 +19,48 @@ type RoomPhotoRow = { url: string; ai_analysis?: string | null };
 
 export const maxDuration = 60;
 
+function toReportData(raw: unknown): ReportData {
+  const src = (raw ?? {}) as Partial<ReportData> & {
+    rooms?: Array<{
+      name?: string;
+      condition?: string;
+      summary?: string;
+      items?: Array<{ name?: string; condition?: string; notes?: string }>;
+      recommendations?: string[];
+    }>;
+  };
+
+  return {
+    executive_summary: src.executive_summary ?? "",
+    overall_condition: src.overall_condition ?? "Good",
+    dispute_risk_score: Number(src.dispute_risk_score ?? 0),
+    dispute_risk_reasons: Array.isArray(src.dispute_risk_reasons)
+      ? src.dispute_risk_reasons.filter((x): x is string => typeof x === "string")
+      : [],
+    rooms: Array.isArray(src.rooms)
+      ? src.rooms.map((room) => ({
+          name: room?.name ?? "Room",
+          condition: room?.condition ?? "Good",
+          summary: room?.summary ?? "",
+          items: Array.isArray(room?.items)
+            ? room.items.map((i) => ({
+                name: i?.name ?? "",
+                condition: i?.condition ?? "Good",
+                notes: i?.notes ?? "",
+              }))
+            : [],
+          recommendations: Array.isArray(room?.recommendations)
+            ? room.recommendations.filter((x): x is string => typeof x === "string")
+            : [],
+        }))
+      : [],
+    legal_notes: src.legal_notes ?? "",
+    recommendations: Array.isArray(src.recommendations)
+      ? src.recommendations.filter((x): x is string => typeof x === "string")
+      : [],
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { inspectionId } = (await request.json()) as { inspectionId?: string };
@@ -25,16 +68,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing inspectionId" }, { status: 400 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { error: "Supabase service role is not configured" },
-        { status: 500 }
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = await createServerClient();
 
     const { data: inspection, error: inspErr } = await supabase
       .from("inspections")
@@ -54,10 +88,13 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (inspErr || !inspection) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: inspErr?.message || "Not found" },
+        { status: 404 }
+      );
     }
 
-    const reportData = inspection.report_data as ReportData | null;
+    const reportData = toReportData(inspection.report_data);
     if (!reportData) {
       return NextResponse.json(
         { error: "Missing report_data. Generate report content first." },
@@ -133,7 +170,11 @@ export async function POST(request: NextRequest) {
           const reportRoom = reportData.rooms.find(
             (r: { name: string }) => r.name.toLowerCase() === room.name.toLowerCase()
           );
-          if (reportRoom && reportRoom.items.length === 0 && mergedItems.length > 0) {
+          if (
+            reportRoom &&
+            (!Array.isArray(reportRoom.items) || reportRoom.items.length === 0) &&
+            mergedItems.length > 0
+          ) {
             reportRoom.items = mergedItems;
           }
           return {
@@ -149,7 +190,14 @@ export async function POST(request: NextRequest) {
     const pdfBuffer = await generateInspectionPDFBuffer(reportData, meta);
 
     const fileName = `report_${inspectionId}_${Date.now()}.pdf`;
-    const { error: uploadError } = await supabase.storage
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const storageClient =
+      supabaseUrl && serviceRoleKey
+        ? createClient(supabaseUrl, serviceRoleKey)
+        : supabase;
+
+    const { error: uploadError } = await storageClient.storage
       .from("reports")
       .upload(fileName, pdfBuffer, {
         contentType: "application/pdf",
@@ -159,8 +207,8 @@ export async function POST(request: NextRequest) {
     if (!uploadError) {
       const {
         data: { publicUrl },
-      } = supabase.storage.from("reports").getPublicUrl(fileName);
-      await supabase
+      } = storageClient.storage.from("reports").getPublicUrl(fileName);
+      await storageClient
         .from("inspections")
         .update({ report_url: publicUrl })
         .eq("id", inspectionId);
