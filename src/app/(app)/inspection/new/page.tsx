@@ -32,6 +32,14 @@ interface FormData {
   tenant_phone: string;
 }
 
+type ExistingProperty = {
+  id: string;
+  building_name: string | null;
+  unit_number: string | null;
+  property_type: string | null;
+  address: string | null;
+};
+
 const emptyForm: FormData = {
   inspectionType: "check-in",
   building_name: "",
@@ -232,7 +240,7 @@ function BottomBar({ children }: { children: React.ReactNode }) {
 // ─────────────────────────────────────────
 function NewInspectionContent() {
   const searchParams = useSearchParams();
-  const urlPropertyId = searchParams.get("propertyId");
+  const existingPropertyId = searchParams.get("propertyId");
   const urlTenancyId = searchParams.get("tenancyId");
   const urlType = searchParams.get("type");
 
@@ -248,6 +256,8 @@ function NewInspectionContent() {
   const [formData, setFormData] = useState<FormData>({ ...emptyForm });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [existingProperty, setExistingProperty] = useState<ExistingProperty | null>(null);
+  const [propertyMismatch, setPropertyMismatch] = useState(false);
 
   // Room selector state (used in recap step)
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -265,6 +275,32 @@ function NewInspectionContent() {
       setFormData((d) => ({ ...d, inspectionType: urlType }));
     }
   }, [urlType]);
+
+  useEffect(() => {
+    if (!existingPropertyId) return;
+    const fetchProperty = async () => {
+      const client = createClient();
+      const { data } = await client
+        .from("properties")
+        .select("*")
+        .eq("id", existingPropertyId)
+        .single();
+      if (data) {
+        const property = data as ExistingProperty;
+        setExistingProperty(property);
+        setFormData((prev) => ({
+          ...prev,
+          building_name: property.building_name ?? "",
+          unit_number: property.unit_number ?? "",
+          property_type: property.property_type ?? "",
+          address: property.address ?? "",
+        }));
+        setEntryMode("upload");
+        setStep(1);
+      }
+    };
+    void fetchProperty();
+  }, [existingPropertyId]);
 
   // Skip step 1 when manual mode selected (go straight to form)
   useEffect(() => {
@@ -303,7 +339,45 @@ function NewInspectionContent() {
       // PRE-FILL form state with extracted data; user can override before submitting
       const mapped = mapExtracted(extracted);
       setFormData((d) => {
-        const next = { ...d, ...mapped };
+        const next = {
+          ...d,
+          ...mapped,
+          ...(existingProperty
+            ? {}
+            : {
+                building_name: mapped.building_name || d.building_name || "",
+                unit_number: mapped.unit_number || d.unit_number || "",
+                property_type: mapped.property_type || d.property_type || "",
+                address: mapped.address || d.address || "",
+              }),
+          ejari_ref: mapped.ejari_ref || d.ejari_ref || "",
+          contract_from: mapped.contract_from || d.contract_from || "",
+          contract_to: mapped.contract_to || d.contract_to || "",
+          annual_rent: mapped.annual_rent || d.annual_rent || "",
+          security_deposit: mapped.security_deposit || d.security_deposit || "",
+          tenant_name: mapped.tenant_name || d.tenant_name || "",
+          tenant_email: mapped.tenant_email || d.tenant_email || "",
+          tenant_phone: mapped.tenant_phone || d.tenant_phone || "",
+          landlord_name: mapped.landlord_name || d.landlord_name || "",
+          landlord_email: mapped.landlord_email || d.landlord_email || "",
+          landlord_phone: mapped.landlord_phone || d.landlord_phone || "",
+        };
+        if (
+          existingProperty &&
+          typeof mapped.unit_number === "string" &&
+          mapped.unit_number.trim() &&
+          mapped.unit_number.trim() !== (existingProperty.unit_number ?? "")
+        ) {
+          setPropertyMismatch(true);
+          console.warn(
+            "PDF unit mismatch:",
+            mapped.unit_number,
+            "vs",
+            existingProperty.unit_number
+          );
+        } else {
+          setPropertyMismatch(false);
+        }
         return {
           ...next,
           tenant_phone: normalizePhone(next.tenant_phone || ""),
@@ -321,7 +395,7 @@ function NewInspectionContent() {
     } finally {
       setExtracting(false);
     }
-  }, []);
+  }, [existingProperty]);
 
   // ── Form validation
   const formValid =
@@ -416,29 +490,33 @@ function NewInspectionContent() {
           .replace("villa", "villa")
           .replace("townhouse", "townhouse") || "apartment";
 
-      // Property: insert from formData only
-      const { data: property, error: propError } = await supabase
-        .from("properties")
-        .insert({
-          agent_id: user.id,
-          building_name: formData.building_name,
-          unit_number: formData.unit_number,
-          property_type: propertyType,
-          address: `${formData.building_name}, Unit ${formData.unit_number}`,
-        })
-        .select()
-        .single();
+      let propertyId = existingPropertyId;
+      if (!propertyId) {
+        // Property: insert from formData only
+        const { data: property, error: propError } = await supabase
+          .from("properties")
+          .insert({
+            agent_id: user.id,
+            building_name: formData.building_name,
+            unit_number: formData.unit_number,
+            property_type: propertyType,
+            address: `${formData.building_name}, Unit ${formData.unit_number}`,
+          })
+          .select()
+          .single();
 
-      if (propError) {
-        console.error("Property insert error:", propError);
-        throw propError;
+        if (propError) {
+          console.error("Property insert error:", propError);
+          throw propError;
+        }
+        propertyId = property.id;
       }
 
       // Tenancy: insert from formData only
       const { data: tenancy, error: tenError } = await supabase
         .from("tenancies")
         .insert({
-          property_id: property.id,
+          property_id: propertyId,
           agent_id: user.id,
           tenant_name: formData.tenant_name,
           tenant_email: formData.tenant_email || "",
@@ -466,7 +544,7 @@ function NewInspectionContent() {
       const { data: inspection, error: inspError } = await supabase
         .from("inspections")
         .insert({
-          property_id: property.id,
+          property_id: propertyId,
           tenancy_id: tenancy.id,
           agent_id: user.id,
           type: formData.inspectionType,
@@ -762,6 +840,11 @@ function NewInspectionContent() {
               </p>
             </div>
           )}
+          {propertyMismatch && (
+            <div className="bg-amber-50 text-amber-700 text-sm rounded-xl p-3 mb-4">
+              Warning: contract unit number differs from the locked property.
+            </div>
+          )}
 
           {saveError && (
             <div className="bg-red-50 text-red-500 text-sm rounded-xl p-3 mb-4">
@@ -790,46 +873,112 @@ function NewInspectionContent() {
 
           {/* Property */}
           <SectionHeader title="Property" />
-          <Field label="Building / Community Name" required>
-            <input
-              value={formData.building_name}
-              onChange={(e) => set("building_name", e.target.value)}
-              placeholder="e.g. Marina Gate Tower 1"
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Unit Number" required>
-            <input
-              value={formData.unit_number}
-              onChange={(e) => set("unit_number", e.target.value)}
-              placeholder="e.g. 2203"
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Property Type" required>
-            <select
-              value={formData.property_type}
-              onChange={(e) => set("property_type", e.target.value)}
-              className={inputCls}
+          {existingProperty ? (
+            <div
+              style={{
+                background: "#f9fafb",
+                border: "1.5px solid #e5e7eb",
+                borderRadius: 14,
+                padding: 16,
+                marginBottom: 20,
+              }}
             >
-              <option value="">Select type</option>
-              {["Studio", "Apartment", "Villa", "Townhouse", "Penthouse"].map(
-                (t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                )
-              )}
-            </select>
-          </Field>
-          <Field label="Area / District">
-            <input
-              value={formData.address}
-              onChange={(e) => set("address", e.target.value)}
-              placeholder="e.g. JBR, Dubai Marina"
-              className={inputCls}
-            />
-          </Field>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#9ca3af",
+                  textTransform: "uppercase",
+                  letterSpacing: 1,
+                  marginBottom: 10,
+                }}
+              >
+                Property (locked)
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: "#e5e7eb",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 20,
+                  }}
+                >
+                  🏢
+                </div>
+                <div>
+                  <p
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 15,
+                      margin: 0,
+                      color: "#1a1a1a",
+                    }}
+                  >
+                    {existingProperty.building_name}, Unit {existingProperty.unit_number}
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: "#9ca3af",
+                      margin: "2px 0 0",
+                      textTransform: "capitalize",
+                    }}
+                  >
+                    {existingProperty.property_type}
+                  </p>
+                </div>
+                <span style={{ marginLeft: "auto", fontSize: 16 }}>🔒</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <Field label="Building / Community Name" required>
+                <input
+                  value={formData.building_name}
+                  onChange={(e) => set("building_name", e.target.value)}
+                  placeholder="e.g. Marina Gate Tower 1"
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Unit Number" required>
+                <input
+                  value={formData.unit_number}
+                  onChange={(e) => set("unit_number", e.target.value)}
+                  placeholder="e.g. 2203"
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Property Type" required>
+                <select
+                  value={formData.property_type}
+                  onChange={(e) => set("property_type", e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">Select type</option>
+                  {["Studio", "Apartment", "Villa", "Townhouse", "Penthouse"].map(
+                    (t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    )
+                  )}
+                </select>
+              </Field>
+              <Field label="Area / District">
+                <input
+                  value={formData.address}
+                  onChange={(e) => set("address", e.target.value)}
+                  placeholder="e.g. JBR, Dubai Marina"
+                  className={inputCls}
+                />
+              </Field>
+            </>
+          )}
 
           {/* Tenancy */}
           <SectionHeader title="Tenancy Details" />
