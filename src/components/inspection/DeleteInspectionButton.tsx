@@ -35,7 +35,7 @@ const sheetStyle: React.CSSProperties = {
   background: "white",
   borderRadius: "20px 20px 0 0",
   padding: "24px 20px",
-  paddingBottom: "max(24px, env(safe-area-inset-bottom))",
+  paddingBottom: "max(80px, calc(64px + env(safe-area-inset-bottom)))",
   boxShadow: "0 -4px 32px rgba(0,0,0,0.15)",
   maxWidth: "100vw",
 };

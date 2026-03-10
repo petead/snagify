@@ -3,6 +3,7 @@ import {
   Page,
   Text,
   View,
+  Image,
   StyleSheet,
   pdf,
   renderToBuffer,
@@ -230,7 +231,13 @@ interface InspectionMeta {
   } | null;
   rooms: {
     name: string;
-    photos: { url?: string; ai_analysis?: string }[];
+    photos: {
+      id: string;
+      url?: string;
+      notes?: string;
+      damage_tags?: string[];
+      taken_at?: string;
+    }[];
   }[];
 }
 
@@ -407,19 +414,54 @@ function InspectionReport({
             {photos.length > 0 && (
               <View style={{ marginTop: 14 }}>
                 <Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", marginBottom: 6 }}>Photos</Text>
-                {chunkArray(photos, 2).map((pair, pi) => (
-                  <View key={pi} style={s.photoRow}>
-                    {pair.map((photo, pii) => (
-                      <View key={pii} style={s.photoBlock}>
-                        <View style={s.photoPlaceholder}>
-                          <Text style={{ fontSize: 8, color: "#999" }}>[Photo]</Text>
-                        </View>
-                        {photo.ai_analysis && (
-                          <Text style={s.photoCaption}>{photo.ai_analysis}</Text>
+                {photos.map((photo) => (
+                  <View key={photo.id} style={{ marginBottom: 12 }}>
+                    <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+                      <Image
+                        src={photo.url}
+                        style={{
+                          width: 160,
+                          height: 120,
+                          objectFit: "cover",
+                          borderRadius: 6,
+                        }}
+                      />
+                      <View style={{ flex: 1 }}>
+                        {photo.damage_tags && photo.damage_tags.length > 0 && (
+                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+                            {photo.damage_tags.map((tag) => (
+                              <View
+                                key={tag}
+                                style={{
+                                  backgroundColor: "#fff0f0",
+                                  borderRadius: 4,
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 2,
+                                }}
+                              >
+                                <Text style={{ fontSize: 8, color: "#ef4444", fontWeight: "bold" }}>
+                                  {tag.toUpperCase()}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                        {photo.notes ? (
+                          <Text style={{ fontSize: 9, color: "#555", lineHeight: 1.4 }}>
+                            {photo.notes}
+                          </Text>
+                        ) : (
+                          <Text style={{ fontSize: 9, color: "#9ca3af", fontStyle: "italic" }}>
+                            General view
+                          </Text>
+                        )}
+                        {photo.taken_at && (
+                          <Text style={{ fontSize: 8, color: "#9ca3af", marginTop: 4 }}>
+                            {new Date(photo.taken_at).toLocaleDateString("en-GB")}
+                          </Text>
                         )}
                       </View>
-                    ))}
-                    {pair.length === 1 && <View style={s.photoBlock} />}
+                    </View>
                   </View>
                 ))}
               </View>

@@ -212,13 +212,21 @@ export async function POST(request: NextRequest) {
         : null,
       rooms: (row.rooms ?? [])
         .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-        .map((room) => ({
-          name: room.name,
-          photos: (room.photos ?? []).map((p) => ({
-            url: p.url,
-            ai_analysis: p.ai_analysis ?? undefined,
-          })),
-        })),
+        .map((room) => {
+          const sortedPhotos = [...(room.photos ?? [])].sort(
+            (a, b) => (a.damage_tags?.length ?? 0) - (b.damage_tags?.length ?? 0)
+          );
+          return {
+            name: room.name,
+            photos: sortedPhotos.map((p) => ({
+              id: p.id,
+              url: p.url,
+              notes: p.notes ?? undefined,
+              damage_tags: p.damage_tags ?? [],
+              taken_at: p.taken_at ?? undefined,
+            })),
+          };
+        }),
     };
 
     const pdfBuffer = await generateInspectionPDFBuffer(reportData, meta);

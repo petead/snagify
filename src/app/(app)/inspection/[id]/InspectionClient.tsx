@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
@@ -208,6 +208,8 @@ export function InspectionClient({
   // Report generation (review screen)
   const [generating, setGenerating] = useState(false);
 
+  const notesDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
   // Lock body scroll
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -336,51 +338,86 @@ export function InspectionClient({
     setScreen("inspect");
   };
 
-  // ── Photo capture + upload + AI analysis
+  // ── Analyze photo in background (non-blocking); updates DB and local state when done
+  const analyzePhotoInBackground = async (
+    photoId: string,
+    rawBase64: string,
+    roomName: string,
+    roomIdx: number
+  ) => {
+    try {
+      const res = await fetch("/api/analyze-photo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: rawBase64,
+          mimeType: "image/jpeg",
+          photoId,
+          roomName,
+        }),
+      });
+      const data = await res.json();
+      setPhotos((prev) => ({
+        ...prev,
+        [roomIdx]: (prev[roomIdx] || []).map((p) =>
+          p.id === photoId
+            ? {
+                ...p,
+                notes: data.ai_analysis ?? p.notes ?? "",
+                aiAnalysis: data.ai_analysis ?? p.aiAnalysis,
+                damageTags: Array.isArray(data.damage_tags) ? data.damage_tags : p.damageTags ?? [],
+              }
+            : p
+        ),
+      }));
+    } catch (err) {
+      console.error("AI analysis failed (non-blocking):", err);
+    }
+  };
+
+  // ── Photo capture: insert immediately, then AI in background
   const handlePhotoCapture = async (files: FileList | null) => {
     if (!files) return;
     const room = liveRooms[activeRoom];
     if (!room) return;
+    const roomIdx = activeRoom;
 
     for (const file of Array.from(files)) {
-      const tempId = Math.random().toString(36).slice(2);
-      const coordsPromise = getGeoCoords(); // start geoloc in parallel with upload
+      const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const coordsPromise = getGeoCoords();
       const base64: string = await new Promise((res) => {
         const reader = new FileReader();
         reader.onload = () => res(reader.result as string);
         reader.readAsDataURL(file);
       });
+      const rawBase64 = base64.split(",")[1] ?? "";
 
       setPhotos((prev) => ({
         ...prev,
-        [activeRoom]: [
-          ...(prev[activeRoom] || []),
-          { id: tempId, src: base64, damageTags: [], uploading: true },
+        [roomIdx]: [
+          ...(prev[roomIdx] || []),
+          { id: tempId, src: base64, damageTags: [], uploading: true, notes: undefined, aiAnalysis: undefined },
         ],
       }));
 
-      const fileName = `inspections/${inspectionId}/${room.id}/${tempId}.jpg`;
-      let storedPath: string | null = null;
-      let publicUrl = "";
       try {
-        const { data, error } = await supabase.storage
+        const fileName = `inspections/${inspectionId}/${room.id}/${tempId}.jpg`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
           .from("inspection-photos")
-          .upload(fileName, file, { contentType: file.type, upsert: false });
-        if (!error && data) {
-          storedPath = data.path;
-          publicUrl = supabase.storage.from("inspection-photos").getPublicUrl(fileName).data.publicUrl;
-        }
-      } catch { /* continue */ }
+          .upload(fileName, file, { contentType: file.type || "image/jpeg", upsert: false });
 
-      let photoRecordId: string | null = null;
-      const coords = await coordsPromise;
-      if (storedPath) {
-        const { data: photoRecord } = await supabase
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from("inspection-photos")
+          .getPublicUrl(fileName);
+
+        const coords = await coordsPromise;
+        const { data: photo, error: insertError } = await supabase
           .from("photos")
           .insert({
             room_id: room.id,
             url: publicUrl,
-            ai_analysis: null,
             damage_tags: [],
             notes: "",
             taken_at: new Date().toISOString(),
@@ -389,55 +426,39 @@ export function InspectionClient({
           })
           .select("id")
           .single();
-        if (photoRecord) photoRecordId = photoRecord.id;
+
+        if (insertError) throw insertError;
+
+        let displayUrl = publicUrl;
+        try {
+          const { data: signed } = await supabase.storage
+            .from("inspection-photos")
+            .createSignedUrl(uploadData.path, 60 * 60 * 24 * 7);
+          if (signed?.signedUrl) displayUrl = signed.signedUrl;
+        } catch { /* use publicUrl */ }
+
+        setPhotos((prev) => ({
+          ...prev,
+          [roomIdx]: (prev[roomIdx] || []).map((p) =>
+            p.id === tempId
+              ? {
+                  ...p,
+                  id: photo.id,
+                  src: displayUrl,
+                  uploading: false,
+                }
+              : p
+          ),
+        }));
+
+        analyzePhotoInBackground(photo.id, rawBase64, room.name, roomIdx);
+      } catch (err) {
+        console.error("Photo capture error:", err);
+        setPhotos((prev) => ({
+          ...prev,
+          [roomIdx]: (prev[roomIdx] || []).filter((p) => p.id !== tempId),
+        }));
       }
-
-      const rawBase64 = base64.split(",")[1] ?? "";
-      let aiText = "";
-      let suggestedTags: string[] = [];
-      try {
-        const aiRes = await fetch("/api/analyze-photo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            image: rawBase64,
-            mimeType: file.type,
-            photoId: photoRecordId ?? undefined,
-            roomName: room.name,
-          }),
-        });
-        if (aiRes.ok) {
-          const a = await aiRes.json();
-          aiText = a.ai_analysis ?? "";
-          suggestedTags = Array.isArray(a.damage_tags) ? a.damage_tags : [];
-          // DB is updated by the API when photoId is sent
-        }
-      } catch { /* continue */ }
-
-      let displayUrl = base64;
-      if (storedPath) {
-        const { data: signed } = await supabase.storage
-          .from("inspection-photos")
-          .createSignedUrl(storedPath, 60 * 60 * 24 * 7);
-        if (signed?.signedUrl) displayUrl = signed.signedUrl;
-      }
-
-      setPhotos((prev) => ({
-        ...prev,
-        [activeRoom]: (prev[activeRoom] || []).map((p) =>
-          p.id === tempId
-            ? {
-                ...p,
-                id: photoRecordId ?? p.id,
-                src: displayUrl,
-                uploading: false,
-                aiAnalysis: aiText || undefined,
-                notes: aiText || undefined,
-                damageTags: suggestedTags,
-              }
-            : p
-        ),
-      }));
     }
   };
 
@@ -850,7 +871,7 @@ export function InspectionClient({
               </div>
             </div>
 
-            {/* Room cards */}
+            {/* Room cards with editable notes */}
             <div className="px-4">
               {liveRooms.map((room, i) => {
                 const rp = photos[i] || [];
@@ -875,17 +896,78 @@ export function InspectionClient({
                       </span>
                     </div>
                     {rp.length > 0 ? (
-                      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                         {rp.map((photo) => (
-                          <div key={photo.id} className="relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden"
-                            style={{ border: (photo.damageTags?.length ?? 0) > 0 ? "2px solid #FF6E40" : "1px solid #eee" }}>
+                          <div key={photo.id} style={{ marginBottom: 0 }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={photo.src} alt="" className="w-full h-full object-cover" />
-                            {(photo.damageTags?.length ?? 0) > 0 && (
-                              <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
-                                <span className="text-[7px] text-white">{photo.damageTags.join(", ")}</span>
+                            <img
+                              src={photo.src}
+                              alt=""
+                              style={{
+                                width: "100%",
+                                aspectRatio: "4/3",
+                                objectFit: "cover",
+                                borderRadius: 12,
+                                marginBottom: 8,
+                              }}
+                            />
+                            {photo.damageTags?.length > 0 && (
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
+                                {photo.damageTags.map((tag) => (
+                                  <span
+                                    key={tag}
+                                    style={{
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                      padding: "3px 8px",
+                                      borderRadius: 100,
+                                      background: "#fff0f0",
+                                      color: "#ef4444",
+                                      textTransform: "uppercase",
+                                      letterSpacing: 0.5,
+                                    }}
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
                               </div>
                             )}
+                            <textarea
+                              value={photo.notes ?? ""}
+                              onChange={async (e) => {
+                                const newNotes = e.target.value;
+                                setPhotos((prev) => ({
+                                  ...prev,
+                                  [i]: (prev[i] || []).map((p) =>
+                                    p.id === photo.id ? { ...p, notes: newNotes } : p
+                                  ),
+                                }));
+                                const prevTimer = notesDebounceRef.current[photo.id];
+                                if (prevTimer) clearTimeout(prevTimer);
+                                notesDebounceRef.current[photo.id] = setTimeout(async () => {
+                                  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(photo.id);
+                                  if (isUuid) {
+                                    await supabase.from("photos").update({ notes: newNotes }).eq("id", photo.id);
+                                  }
+                                }, 800);
+                              }}
+                              placeholder="AI description — tap to edit..."
+                              rows={2}
+                              style={{
+                                width: "100%",
+                                padding: "10px 12px",
+                                borderRadius: 10,
+                                border: "1.5px solid #e5e7eb",
+                                fontSize: 13,
+                                color: "#374151",
+                                fontFamily: "DM Sans, sans-serif",
+                                lineHeight: 1.5,
+                                resize: "none",
+                                outline: "none",
+                                boxSizing: "border-box",
+                                background: photo.notes ? "white" : "#fafafa",
+                              }}
+                            />
                           </div>
                         ))}
                       </div>
