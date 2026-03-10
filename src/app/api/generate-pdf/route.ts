@@ -9,23 +9,33 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
 
-/** Build ReportData purely from relational data (rooms, room_items, photos) — no report_data column */
+/** Build ReportData from rooms + photos (damage_tags → items) */
 function buildReportDataFromInspection(inspection: InspectionRow): ReportData {
   const rooms = (inspection.rooms ?? [])
     .sort(
       (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
     )
-    .map((room) => ({
-      name: room.name ?? "Room",
-      condition: (room.overall_condition ?? "Good").trim() || "Good",
-      summary: "",
-      items: (room.room_items ?? []).map((i) => ({
-        name: i.name ?? "",
-        condition: i.condition ?? "Good",
-        notes: i.notes ?? "",
-      })),
-      recommendations: [] as string[],
-    }));
+    .map((room) => {
+      const photos = room.photos ?? [];
+      const items: { name: string; condition: string; notes: string }[] = [];
+      for (const p of photos) {
+        const tags = Array.isArray(p.damage_tags) ? p.damage_tags : [];
+        for (const tag of tags) {
+          items.push({
+            name: tag,
+            condition: "Poor",
+            notes: (p.notes ?? p.ai_analysis ?? "").trim(),
+          });
+        }
+      }
+      return {
+        name: room.name ?? "Room",
+        condition: (room.overall_condition ?? "Good").trim() || "Good",
+        summary: "",
+        items,
+        recommendations: [] as string[],
+      };
+    });
 
   const overallCondition =
     rooms.length > 0 ? rooms[0].condition : "Good";
@@ -81,8 +91,7 @@ type RoomRow = {
   name: string;
   order_index?: number | null;
   overall_condition?: string | null;
-  room_items?: { id: string; name: string; condition?: string | null; notes?: string | null; ai_description?: string | null }[];
-  photos?: { id: string; url: string; ai_analysis?: string | null; taken_at?: string | null }[];
+  photos?: { id: string; url: string; ai_analysis?: string | null; damage_tags?: string[]; notes?: string | null; taken_at?: string | null }[];
 };
 
 export async function POST(request: NextRequest) {
@@ -131,17 +140,12 @@ export async function POST(request: NextRequest) {
           name,
           order_index,
           overall_condition,
-          room_items (
-            id,
-            name,
-            condition,
-            notes,
-            ai_description
-          ),
           photos (
             id,
             url,
             ai_analysis,
+            damage_tags,
+            notes,
             taken_at
           )
         ),

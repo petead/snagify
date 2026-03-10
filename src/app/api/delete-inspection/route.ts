@@ -82,7 +82,6 @@ export async function DELETE(request: Request) {
   const roomIds = rooms.map((r) => r.id);
 
   if (roomIds.length > 0) {
-    await supabase.from("room_items").delete().in("room_id", roomIds);
     await supabase.from("photos").delete().in("room_id", roomIds);
     await supabase.from("rooms").delete().in("id", roomIds);
   }

@@ -19,23 +19,13 @@ export async function GET(
   }
 
   const roomIds = (rooms ?? []).map((r) => r.id);
-  const [itemsRes, photosRes] = await Promise.all([
-    roomIds.length
-      ? supabase.from("room_items").select("room_id").in("room_id", roomIds)
-      : { data: [] as { room_id: string }[] },
-    roomIds.length
-      ? supabase.from("photos").select("room_id").in("room_id", roomIds)
-      : { data: [] as { room_id: string }[] },
-  ]);
+  const photosRes = await (roomIds.length
+    ? supabase.from("photos").select("room_id").in("room_id", roomIds)
+    : { data: [] as { room_id: string }[] });
 
-  const itemCountByRoom: Record<string, number> = {};
   const photoCountByRoom: Record<string, number> = {};
   roomIds.forEach((rid) => {
-    itemCountByRoom[rid] = 0;
     photoCountByRoom[rid] = 0;
-  });
-  (itemsRes.data ?? []).forEach((r) => {
-    itemCountByRoom[r.room_id] = (itemCountByRoom[r.room_id] ?? 0) + 1;
   });
   (photosRes.data ?? []).forEach((r) => {
     photoCountByRoom[r.room_id] = (photoCountByRoom[r.room_id] ?? 0) + 1;
@@ -43,7 +33,6 @@ export async function GET(
 
   const roomsWithMeta = (rooms ?? []).map((r) => ({
     ...r,
-    item_count: itemCountByRoom[r.id] ?? 0,
     photo_count: photoCountByRoom[r.id] ?? 0,
   }));
 

@@ -24,7 +24,7 @@ export default async function ReportPage({
       ),
       rooms (
         id, name, overall_condition, order_index,
-        room_items (id, name, condition, notes, ai_description)
+        photos (id, url, ai_analysis, damage_tags, notes)
       ),
       signatures (signer_type, otp_verified, signed_at)
     `
@@ -53,12 +53,12 @@ export default async function ReportPage({
 }
 
 // Type for the nested inspection shape from Supabase
-export type RoomItem = {
+export type RoomPhoto = {
   id: string;
-  name: string | null;
-  condition: string | null;
+  url: string | null;
+  ai_analysis: string | null;
+  damage_tags: string[];
   notes: string | null;
-  ai_description: string | null;
 };
 
 export type Room = {
@@ -66,7 +66,7 @@ export type Room = {
   name: string | null;
   overall_condition: string | null;
   order_index: number | null;
-  room_items?: RoomItem[] | null;
+  photos?: RoomPhoto[] | null;
 };
 
 export type Signature = {

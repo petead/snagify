@@ -15,16 +15,16 @@ type RoomData = {
   id: string;
   name: string;
   order_index: number | null;
-  existingPhotos: { id: string; url: string; ai_analysis: string | null }[];
+  existingPhotos: { id: string; url: string; ai_analysis: string | null; damage_tags: string[]; notes: string | null }[];
 };
 
 type PhotoItem = {
   id: string;
   src: string;
-  flagged: boolean;
-  tags: string[];
+  damageTags: string[];
   uploading: boolean;
   aiAnalysis?: string;
+  notes?: string;
 };
 
 interface Props {
@@ -65,14 +65,13 @@ const DAMAGE_TAGS = [
 // ─── PhotoCard ───────────────────────────────────
 function PhotoCard({
   photo,
-  onToggleFlag,
   onTagAdd,
 }: {
   photo: PhotoItem;
-  onToggleFlag: () => void;
   onTagAdd: (tag: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const hasDamage = photo.damageTags.length > 0;
 
   return (
     <div>
@@ -80,16 +79,16 @@ function PhotoCard({
         onClick={() => setExpanded(!expanded)}
         className="relative rounded-xl overflow-hidden cursor-pointer"
         style={{
-          border: photo.flagged
+          border: hasDamage
             ? "2px solid #FF6E40"
             : "2px solid rgba(202,254,135,0.25)",
-          boxShadow: photo.flagged ? "0 0 12px rgba(255,110,64,0.25)" : "none",
+          boxShadow: hasDamage ? "0 0 12px rgba(255,110,64,0.25)" : "none",
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={photo.src} alt="" className="w-full aspect-square object-cover" />
         <div className="absolute top-1.5 right-1.5">
-          {photo.flagged ? (
+          {hasDamage ? (
             <span className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
               <AlertTriangle size={10} className="text-white" />
             </span>
@@ -103,14 +102,14 @@ function PhotoCard({
             </span>
           )}
         </div>
-        {photo.tags.length > 0 && !expanded && (
+        {photo.damageTags.length > 0 && !expanded && (
           <div className="absolute bottom-1 left-1 right-1 flex flex-wrap gap-0.5">
-            {photo.tags.map((t) => (
+            {photo.damageTags.map((t) => (
               <span key={t} className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-black/60 text-white">{t}</span>
             ))}
           </div>
         )}
-        {photo.aiAnalysis && !expanded && photo.tags.length === 0 && (
+        {photo.aiAnalysis && !expanded && photo.damageTags.length === 0 && (
           <div className="absolute bottom-1 left-1 right-1 bg-black/60 rounded px-1.5 py-0.5">
             <p className="text-[8px] text-white/80 line-clamp-1">{photo.aiAnalysis}</p>
           </div>
@@ -121,35 +120,23 @@ function PhotoCard({
           {photo.aiAnalysis && (
             <p className="text-[10px] text-white/60 mb-2 line-clamp-3">{photo.aiAnalysis}</p>
           )}
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onToggleFlag(); }}
-            className="w-full py-2 rounded-lg text-xs font-semibold mb-2"
-            style={{
-              background: photo.flagged ? "rgba(255,110,64,0.2)" : "rgba(255,255,255,0.08)",
-              color: photo.flagged ? "#FF6E40" : "rgba(255,255,255,0.5)",
-            }}
-          >
-            {photo.flagged ? "Flagged — tap to unflag" : "Flag as damaged"}
-          </button>
-          {photo.flagged && (
-            <div className="flex flex-wrap gap-1">
-              {DAMAGE_TAGS.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onTagAdd(tag); }}
-                  className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold"
-                  style={{
-                    background: photo.tags.includes(tag) ? "#FEDE80" : "rgba(255,255,255,0.08)",
-                    color: photo.tags.includes(tag) ? "#1a1a2e" : "rgba(255,255,255,0.5)",
-                  }}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          )}
+          <p className="text-[10px] text-white/50 mb-1.5">Damage tags</p>
+          <div className="flex flex-wrap gap-1">
+            {DAMAGE_TAGS.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onTagAdd(tag); }}
+                className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold"
+                style={{
+                  background: photo.damageTags.includes(tag) ? "#FEDE80" : "rgba(255,255,255,0.08)",
+                  color: photo.damageTags.includes(tag) ? "#1a1a2e" : "rgba(255,255,255,0.5)",
+                }}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -237,7 +224,14 @@ export function InspectionClient({
                   .createSignedUrl(path, 60 * 60 * 24 * 7);
                 if (signed?.signedUrl) src = signed.signedUrl;
               }
-              return { id: p.id, src, flagged: false, tags: [], uploading: false, aiAnalysis: p.ai_analysis ?? undefined };
+              return {
+                id: p.id,
+                src,
+                damageTags: Array.isArray(p.damage_tags) ? p.damage_tags : [],
+                uploading: false,
+                aiAnalysis: p.ai_analysis ?? undefined,
+                notes: p.notes ?? undefined,
+              };
             })
           );
           initial[i] = loaded;
@@ -261,8 +255,9 @@ export function InspectionClient({
 
   // ── Derived
   const roomCurrentPhotos = photos[activeRoom] || [];
-  const totalPhotos = Object.values(photos).flat().length;
-  const totalFlags = Object.values(photos).flat().filter((p) => p.flagged).length;
+  const allPhotosFlat = Object.values(photos).flat();
+  const totalPhotos = allPhotosFlat.length;
+  const damagedPhotos = allPhotosFlat.filter((p) => p.damageTags?.length > 0).length;
   const roomsWithPhotos = Object.keys(photos).filter((k) => (photos[Number(k)] || []).length > 0).length;
   const progressPct = liveRooms.length > 0 ? (roomsWithPhotos / liveRooms.length) * 100 : 0;
 
@@ -322,7 +317,7 @@ export function InspectionClient({
         ...prev,
         [activeRoom]: [
           ...(prev[activeRoom] || []),
-          { id: tempId, src: base64, flagged: false, tags: [], uploading: true },
+          { id: tempId, src: base64, damageTags: [], uploading: true },
         ],
       }));
 
@@ -340,10 +335,20 @@ export function InspectionClient({
       } catch { /* continue */ }
 
       let photoRecordId: string | null = null;
+      const coords: { lat: number; lng: number } | null = null; // TODO: from geolocation if needed
       if (storedPath) {
         const { data: photoRecord } = await supabase
           .from("photos")
-          .insert({ room_id: room.id, url: publicUrl, taken_at: new Date().toISOString() })
+          .insert({
+            room_id: room.id,
+            url: publicUrl,
+            ai_analysis: null,
+            damage_tags: [],
+            notes: "",
+            taken_at: new Date().toISOString(),
+            gps_lat: coords?.lat ?? null,
+            gps_lng: coords?.lng ?? null,
+          })
           .select("id")
           .single();
         if (photoRecord) photoRecordId = photoRecord.id;
@@ -351,17 +356,26 @@ export function InspectionClient({
 
       const rawBase64 = base64.split(",")[1] ?? "";
       let aiText = "";
+      let suggestedTags: string[] = [];
       try {
         const aiRes = await fetch("/api/analyze-photo", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: rawBase64, mimeType: file.type }),
+          body: JSON.stringify({
+            image: rawBase64,
+            mimeType: file.type,
+            photoId: photoRecordId ?? undefined,
+          }),
         });
         if (aiRes.ok) {
           const a = await aiRes.json();
-          aiText = a.description ?? "";
+          aiText = a.ai_analysis ?? a.description ?? "";
+          suggestedTags = Array.isArray(a.suggested_tags) ? a.suggested_tags : [];
           if (photoRecordId) {
-            await supabase.from("photos").update({ ai_analysis: aiText }).eq("id", photoRecordId);
+            await supabase
+              .from("photos")
+              .update({ ai_analysis: aiText, damage_tags: suggestedTags })
+              .eq("id", photoRecordId);
           }
         }
       } catch { /* continue */ }
@@ -378,60 +392,52 @@ export function InspectionClient({
         ...prev,
         [activeRoom]: (prev[activeRoom] || []).map((p) =>
           p.id === tempId
-            ? { ...p, src: displayUrl, uploading: false, aiAnalysis: aiText || undefined }
+            ? {
+                ...p,
+                id: photoRecordId ?? p.id,
+                src: displayUrl,
+                uploading: false,
+                aiAnalysis: aiText || undefined,
+                damageTags: suggestedTags,
+              }
             : p
         ),
       }));
     }
   };
 
-  // ── Toggle flag / add tag
-  const toggleFlag = (photoId: string) => {
+  // ── Add/remove damage tag (persist to DB when photo has real id)
+  const addTag = async (photoId: string, tag: string) => {
+    const roomPhotos = photos[activeRoom] || [];
+    const photo = roomPhotos.find((p) => p.id === photoId);
+    if (!photo) return;
+    const newTags = photo.damageTags.includes(tag)
+      ? photo.damageTags.filter((t) => t !== tag)
+      : [...photo.damageTags, tag];
     setPhotos((prev) => ({
       ...prev,
       [activeRoom]: (prev[activeRoom] || []).map((p) =>
-        p.id === photoId ? { ...p, flagged: !p.flagged, tags: !p.flagged ? p.tags : [] } : p
+        p.id === photoId ? { ...p, damageTags: newTags } : p
       ),
     }));
-  };
-
-  const addTag = (photoId: string, tag: string) => {
-    setPhotos((prev) => ({
-      ...prev,
-      [activeRoom]: (prev[activeRoom] || []).map((p) =>
-        p.id === photoId
-          ? { ...p, tags: p.tags.includes(tag) ? p.tags.filter((t) => t !== tag) : [...p.tags, tag] }
-          : p
-      ),
-    }));
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(photoId);
+    if (isUuid) {
+      await supabase.from("photos").update({ damage_tags: newTags }).eq("id", photoId);
+    }
   };
 
   // ── Generate report (from review screen)
   const handleGenerateReport = async () => {
     setGenerating(true);
     try {
-      // Save flags/conditions to DB
       for (const [roomIdx, roomPhotos] of Object.entries(photos)) {
         const room = liveRooms[Number(roomIdx)];
         if (!room) continue;
-        const flagged = roomPhotos.filter((p) => p.flagged);
-        if (flagged.length > 0) {
-          await supabase.from("rooms").update({ overall_condition: "poor" }).eq("id", room.id);
-          for (const photo of flagged) {
-            if (photo.tags.length > 0) {
-              await supabase.from("room_items").insert(
-                photo.tags.map((tag) => ({
-                  room_id: room.id,
-                  name: tag,
-                  condition: "poor",
-                  notes: photo.aiAnalysis || null,
-                }))
-              );
-            }
-          }
-        } else if (roomPhotos.length > 0) {
-          await supabase.from("rooms").update({ overall_condition: "good" }).eq("id", room.id);
-        }
+        const hasDamages = roomPhotos.some((p) => p.damageTags?.length > 0);
+        await supabase
+          .from("rooms")
+          .update({ overall_condition: hasDamages ? "poor" : "good" })
+          .eq("id", room.id);
       }
 
       await supabase
@@ -712,7 +718,7 @@ export function InspectionClient({
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
               {liveRooms.map((room, i) => {
                 const rp = photos[i] || [];
-                const hasFlagged = rp.some((p) => p.flagged);
+                const hasDamages = rp.some((p) => p.damageTags?.length > 0);
                 const isActive = i === activeRoom;
                 return (
                   <button key={room.id} type="button" onClick={() => setActiveRoom(i)}
@@ -724,7 +730,7 @@ export function InspectionClient({
                     }}>
                     {room.name}
                     {rp.length > 0 && <span className="ml-1 opacity-60">({rp.length})</span>}
-                    {hasFlagged && !isActive && (
+                    {hasDamages && !isActive && (
                       <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-orange-400" />
                     )}
                   </button>
@@ -765,7 +771,6 @@ export function InspectionClient({
               <div className="grid grid-cols-3 gap-2">
                 {roomCurrentPhotos.map((photo) => (
                   <PhotoCard key={photo.id} photo={photo}
-                    onToggleFlag={() => toggleFlag(photo.id)}
                     onTagAdd={(tag) => addTag(photo.id, tag)} />
                 ))}
               </div>
@@ -797,7 +802,7 @@ export function InspectionClient({
                 {[
                   { label: "Rooms", value: liveRooms.length, color: "#9A88FD" },
                   { label: "Photos", value: totalPhotos, color: "#cafe87" },
-                  { label: "Flags", value: totalFlags, color: totalFlags > 0 ? "#FF6E40" : "#cafe87" },
+                  { label: "Damages", value: damagedPhotos, color: damagedPhotos > 0 ? "#FF6E40" : "#cafe87" },
                 ].map((s) => (
                   <div key={s.label} style={{
                     flex: 1, padding: "12px 8px", borderRadius: 14, textAlign: "center",
@@ -814,36 +819,36 @@ export function InspectionClient({
             <div className="px-4">
               {liveRooms.map((room, i) => {
                 const rp = photos[i] || [];
-                const flags = rp.filter((p) => p.flagged);
+                const damagesCount = rp.filter((p) => p.damageTags?.length > 0).length;
                 return (
                   <div key={room.id} className="mb-4 rounded-2xl p-4"
                     style={{
                       background: "white",
-                      border: `1px solid ${flags.length > 0 ? "rgba(255,110,64,0.3)" : "#eee"}`,
+                      border: `1px solid ${damagesCount > 0 ? "rgba(255,110,64,0.3)" : "#eee"}`,
                       boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
                     }}>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full" style={{
-                          background: rp.length > 0 ? (flags.length > 0 ? "#FF6E40" : "#cafe87") : "#ddd",
+                          background: rp.length > 0 ? (damagesCount > 0 ? "#FF6E40" : "#cafe87") : "#ddd",
                         }} />
                         <span className="text-sm font-semibold text-gray-900">{room.name}</span>
                       </div>
                       <span className="text-xs text-gray-400">
                         {rp.length} photo{rp.length !== 1 ? "s" : ""}
-                        {flags.length > 0 ? ` · ${flags.length} flag${flags.length !== 1 ? "s" : ""}` : ""}
+                        {damagesCount > 0 ? ` · ${damagesCount} damage${damagesCount !== 1 ? "s" : ""}` : ""}
                       </span>
                     </div>
                     {rp.length > 0 ? (
                       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                         {rp.map((photo) => (
                           <div key={photo.id} className="relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden"
-                            style={{ border: photo.flagged ? "2px solid #FF6E40" : "1px solid #eee" }}>
+                            style={{ border: (photo.damageTags?.length ?? 0) > 0 ? "2px solid #FF6E40" : "1px solid #eee" }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={photo.src} alt="" className="w-full h-full object-cover" />
-                            {photo.tags.length > 0 && (
+                            {(photo.damageTags?.length ?? 0) > 0 && (
                               <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
-                                <span className="text-[7px] text-white">{photo.tags.join(", ")}</span>
+                                <span className="text-[7px] text-white">{photo.damageTags.join(", ")}</span>
                               </div>
                             )}
                           </div>

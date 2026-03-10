@@ -47,27 +47,17 @@ create table rooms (
   overall_condition text -- good / fair / poor
 );
 
--- Room Items
-create table room_items (
-  id uuid default gen_random_uuid() primary key,
-  room_id uuid references rooms(id),
-  name text not null,
-  condition text,
-  ai_description text,
-  notes text,
-  created_at timestamp default now()
-);
-
--- Photos
+-- Photos (damage_tags: [] = general view, non-empty = damage reported)
 create table photos (
   id uuid default gen_random_uuid() primary key,
-  room_item_id uuid references room_items(id),
   room_id uuid references rooms(id),
   url text not null,
   gps_lat numeric,
   gps_lng numeric,
   taken_at timestamp,
-  ai_analysis text
+  ai_analysis text,
+  damage_tags text[] default '{}',
+  notes text
 );
 
 -- Signatures
@@ -99,7 +89,6 @@ alter table profiles enable row level security;
 alter table properties enable row level security;
 alter table inspections enable row level security;
 alter table rooms enable row level security;
-alter table room_items enable row level security;
 alter table photos enable row level security;
 alter table signatures enable row level security;
 alter table audit_logs enable row level security;

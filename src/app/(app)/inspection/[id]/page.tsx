@@ -19,8 +19,7 @@ export default async function InspectionPage({
       tenancies (tenant_name, landlord_name),
       rooms (
         id, name, order_index,
-        room_items (id, name, condition, notes, ai_description),
-        photos (id, url, ai_analysis)
+        photos (id, url, ai_analysis, damage_tags, notes)
       )
     `
     )
@@ -37,8 +36,7 @@ export default async function InspectionPage({
     id: string;
     name: string;
     order_index: number | null;
-    room_items: { id: string; name: string; condition: string; notes: string; ai_description: string }[] | null;
-    photos: { id: string; url: string; ai_analysis: string | null }[] | null;
+    photos: { id: string; url: string; ai_analysis: string | null; damage_tags: string[]; notes: string | null }[] | null;
   }[];
 
   const rooms = rawRooms
@@ -47,7 +45,13 @@ export default async function InspectionPage({
       id: r.id,
       name: r.name,
       order_index: r.order_index,
-      existingPhotos: r.photos ?? [],
+      existingPhotos: (r.photos ?? []).map((p) => ({
+        id: p.id,
+        url: p.url,
+        ai_analysis: p.ai_analysis,
+        damage_tags: Array.isArray(p.damage_tags) ? p.damage_tags : [],
+        notes: p.notes,
+      })),
     }));
 
   return (

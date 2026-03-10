@@ -81,47 +81,6 @@ create policy "Agents can delete rooms of own inspections"
     )
   );
 
--- Room items: via room -> inspection -> agent
-create policy "Agents can view room_items of own inspections"
-  on room_items for select
-  using (
-    room_id in (
-      select r.id from rooms r
-      join inspections i on i.id = r.inspection_id
-      where i.agent_id = auth.uid()
-    )
-  );
-
-create policy "Agents can insert room_items in own inspections"
-  on room_items for insert
-  with check (
-    room_id in (
-      select r.id from rooms r
-      join inspections i on i.id = r.inspection_id
-      where i.agent_id = auth.uid()
-    )
-  );
-
-create policy "Agents can update room_items of own inspections"
-  on room_items for update
-  using (
-    room_id in (
-      select r.id from rooms r
-      join inspections i on i.id = r.inspection_id
-      where i.agent_id = auth.uid()
-    )
-  );
-
-create policy "Agents can delete room_items of own inspections"
-  on room_items for delete
-  using (
-    room_id in (
-      select r.id from rooms r
-      join inspections i on i.id = r.inspection_id
-      where i.agent_id = auth.uid()
-    )
-  );
-
 -- Photos: via inspection
 create policy "Agents can view photos of own inspections"
   on photos for select

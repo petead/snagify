@@ -484,34 +484,47 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                   {room.overall_condition ?? "Not set"}
                 </span>
               </div>
-              {(room.room_items ?? []).length > 0 && (
-                <div className="divide-y divide-gray-50">
-                  {(room.room_items ?? []).map((item) => (
-                    <div key={item.id} className="px-4 py-2.5">
-                      <div className="flex items-start gap-2">
-                        <span className="text-sm mt-0.5 flex-shrink-0" style={{ color: conditionDotColor(item.condition) }}>
-                          •
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800">
-                            {item.name ?? "—"}
-                          </p>
-                          {item.ai_description && (
-                            <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">
-                              {item.ai_description}
+              {(() => {
+                const damageEntries: { tag: string; notes: string | null; ai_analysis: string | null }[] = [];
+                for (const photo of room.photos ?? []) {
+                  const tags = Array.isArray(photo.damage_tags) ? photo.damage_tags : [];
+                  for (const tag of tags) {
+                    damageEntries.push({
+                      tag,
+                      notes: photo.notes ?? null,
+                      ai_analysis: photo.ai_analysis ?? null,
+                    });
+                  }
+                }
+                return damageEntries.length > 0 ? (
+                  <div className="divide-y divide-gray-50">
+                    {damageEntries.map((entry, idx) => (
+                      <div key={`${entry.tag}-${idx}`} className="px-4 py-2.5">
+                        <div className="flex items-start gap-2">
+                          <span className="text-sm mt-0.5 flex-shrink-0" style={{ color: conditionDotColor("poor") }}>
+                            •
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-800 capitalize">
+                              {entry.tag}
                             </p>
-                          )}
-                          {item.notes && (
-                            <p className="text-xs text-[#9A88FD] mt-0.5">
-                              {item.notes}
-                            </p>
-                          )}
+                            {entry.ai_analysis && (
+                              <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">
+                                {entry.ai_analysis}
+                              </p>
+                            )}
+                            {entry.notes && (
+                              <p className="text-xs text-[#9A88FD] mt-0.5">
+                                {entry.notes}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                ) : null;
+              })()}
             </div>
           ))}
       </div>

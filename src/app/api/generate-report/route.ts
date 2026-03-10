@@ -85,25 +85,46 @@ export async function POST(request: Request) {
 
     const { data: rooms } = await supabase
       .from("rooms")
-      .select("*")
+      .select("id, name, order_index, overall_condition")
       .eq("inspection_id", inspectionId)
       .order("order_index", { ascending: true });
 
     const roomIds = (rooms ?? []).map((r) => r.id);
-    const roomItems: Record<string, { room_id: string; name: string; condition: string | null; notes: string | null }[]> = {};
-    const roomPhotos: Record<string, { room_id: string; url: string; ai_analysis: string | null }[]> = {};
+    const roomPhotos: Record<string, { url: string; ai_analysis: string | null; damage_tags: string[]; notes: string | null }[]> = {};
 
     if (roomIds.length > 0) {
-      const [itemsRes, photosRes] = await Promise.all([
-        supabase.from("room_items").select("*").in("room_id", roomIds),
-        supabase.from("photos").select("*").in("room_id", roomIds),
-      ]);
-      for (const item of itemsRes.data ?? []) {
-        (roomItems[item.room_id] ??= []).push(item);
+      const { data: photosData } = await supabase
+        .from("photos")
+        .select("room_id, url, ai_analysis, damage_tags, notes")
+        .in("room_id", roomIds);
+      for (const photo of photosData ?? []) {
+        const tags = Array.isArray(photo.damage_tags) ? photo.damage_tags : [];
+        (roomPhotos[photo.room_id] ??= []).push({
+          url: photo.url,
+          ai_analysis: photo.ai_analysis,
+          damage_tags: tags,
+          notes: photo.notes,
+        });
       }
-      for (const photo of photosRes.data ?? []) {
-        (roomPhotos[photo.room_id] ??= []).push(photo);
+    }
+
+    // Build items per room from photos with damage_tags (for AI report structure)
+    const roomItemsFromPhotos: Record<string, { name: string; condition: string; notes: string }[]> = {};
+    for (const r of rooms ?? []) {
+      const photosInRoom = roomPhotos[r.id] ?? [];
+      const items: { name: string; condition: string; notes: string }[] = [];
+      for (const p of photosInRoom) {
+        if (p.damage_tags.length > 0) {
+          for (const tag of p.damage_tags) {
+            items.push({
+              name: tag,
+              condition: "Poor",
+              notes: (p.notes || p.ai_analysis || "").trim(),
+            });
+          }
+        }
       }
+      roomItemsFromPhotos[r.id] = items;
     }
 
     const { data: signatures } = await supabase
@@ -143,7 +164,7 @@ export async function POST(request: Request) {
       rooms: (rooms ?? []).map((r) => ({
         name: r.name,
         overall_condition: r.overall_condition,
-        items: (roomItems[r.id] ?? []).map((i) => ({
+        items: (roomItemsFromPhotos[r.id] ?? []).map((i) => ({
           name: i.name,
           condition: i.condition,
           notes: i.notes,
@@ -151,6 +172,8 @@ export async function POST(request: Request) {
         photos: (roomPhotos[r.id] ?? []).map((p) => ({
           url: p.url,
           ai_analysis: p.ai_analysis,
+          damage_tags: p.damage_tags,
+          notes: p.notes,
         })),
       })),
       signatures: signatures ?? [],
