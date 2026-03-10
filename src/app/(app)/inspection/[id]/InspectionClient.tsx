@@ -202,7 +202,6 @@ export function InspectionClient({
 
   // Report generation (review screen)
   const [generating, setGenerating] = useState(false);
-  const [generated, setGenerated] = useState(false);
 
   // Lock body scroll
   useEffect(() => {
@@ -466,8 +465,8 @@ export function InspectionClient({
       });
       if (!res.ok) throw new Error("Generation failed");
 
-      setGenerated(true);
-      showToast("✅ Report generated!");
+      router.push(`/inspection/${inspectionId}/report`);
+      return;
     } catch {
       showToast("❌ Error generating report");
     } finally {
@@ -830,24 +829,6 @@ export function InspectionClient({
               </div>
             </div>
 
-            {/* Generated banner */}
-            {generated && (
-              <div style={{
-                margin: "0 16px 16px", background: "#cafe87", borderRadius: 16, padding: "14px 16px",
-                display: "flex", alignItems: "center", gap: 12,
-              }}>
-                <span style={{ fontSize: 28 }}>✅</span>
-                <div>
-                  <p style={{ fontFamily: "Poppins,sans-serif", fontWeight: 800, fontSize: 15, margin: 0, color: "#3a5a1c" }}>
-                    Report ready!
-                  </p>
-                  <p style={{ fontSize: 12, margin: "2px 0 0", color: "#5a7a2e" }}>
-                    Tap &quot;View Report&quot; or send for signature
-                  </p>
-                </div>
-              </div>
-            )}
-
             {/* Room cards */}
             <div className="px-4">
               {liveRooms.map((room, i) => {
@@ -903,51 +884,28 @@ export function InspectionClient({
               borderTop: "1px solid #f0f0f0", padding: "12px 16px",
               paddingBottom: "max(12px, env(safe-area-inset-bottom))",
             }}>
-            {!generated ? (
-              <button type="button" onClick={handleGenerateReport} disabled={generating}
-                style={{
-                  width: "100%", height: 56, borderRadius: 16, border: "none",
-                  background: generating ? "#e5e7eb" : "linear-gradient(135deg, #9A88FD, #7B65FC)",
-                  color: generating ? "#9ca3af" : "white",
-                  fontWeight: 800, fontSize: 16,
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  cursor: generating ? "default" : "pointer",
-                }}>
-                {generating ? (
-                  <>
-                    <div style={{
-                      width: 18, height: 18, borderRadius: "50%",
-                      border: "2px solid #9ca3af", borderTopColor: "transparent",
-                      animation: "spin 0.8s linear infinite",
-                    }} />
-                    Generating report...
-                  </>
-                ) : (
-                  <>✨ Generate Report</>
-                )}
-              </button>
-            ) : (
-              <div style={{ display: "flex", gap: 10 }}>
-                <button type="button"
-                  onClick={() => router.push(`/inspection/${inspectionId}/report`)}
-                  style={{
-                    flex: 1, height: 52, borderRadius: 14, border: "none",
-                    background: "linear-gradient(135deg,#9A88FD,#7B65FC)",
-                    color: "white", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                  }}>
-                  📄 View Report
-                </button>
-                <button type="button"
-                  onClick={() => router.push(`/inspection/${inspectionId}/report`)}
-                  style={{
-                    flex: 1, height: 52, borderRadius: 14, border: "none",
-                    background: "#cafe87", color: "#3a5a1c",
-                    fontWeight: 700, fontSize: 14, cursor: "pointer",
-                  }}>
-                  ✍️ Send for Signature
-                </button>
-              </div>
-            )}
+            <button type="button" onClick={handleGenerateReport} disabled={generating}
+              style={{
+                width: "100%", height: 56, borderRadius: 16, border: "none",
+                background: generating ? "#e5e7eb" : "linear-gradient(135deg, #9A88FD, #7B65FC)",
+                color: generating ? "#9ca3af" : "white",
+                fontWeight: 800, fontSize: 16,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                cursor: generating ? "default" : "pointer",
+              }}>
+              {generating ? (
+                <>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: "50%",
+                    border: "2px solid #9ca3af", borderTopColor: "transparent",
+                    animation: "spin 0.8s linear infinite",
+                  }} />
+                  Generating report...
+                </>
+              ) : (
+                <>✨ Generate Report</>
+              )}
+            </button>
           </div>
         </div>
       )}

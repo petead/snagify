@@ -58,6 +58,13 @@ const initials = (name: string | null | undefined) =>
     .slice(0, 2)
     .toUpperCase() || "?";
 
+function safeFilename(str: string | null | undefined): string {
+  return (str ?? "")
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    || "report";
+}
+
 export function ReportClient({ inspection, profile }: ReportClientProps) {
   const [showSignModal, setShowSignModal] = useState(false);
   const [sending, setSending] = useState(false);
@@ -66,6 +73,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
     landlord?: string;
     tenant?: string;
   }>({});
+  const [downloadLoading, setDownloadLoading] = useState(false);
 
   const prop = normalizeOne(inspection.properties) as PropertyRelation | null;
   const tenancy = normalizeOne(inspection.tenancies) as TenancyRelation | null;
@@ -155,15 +163,64 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   ];
 
   const handleDownloadPDF = async () => {
-    if (inspection.report_url) {
-      window.open(inspection.report_url, "_blank");
-    } else {
-      await fetch("/api/generate-report", {
+    setDownloadLoading(true);
+    const downloadName = `Snagify_${inspection.type ?? "check-in"}_${safeFilename(prop?.building_name)}_Unit${safeFilename(prop?.unit_number)}.pdf`;
+    try {
+      if (inspection.report_url) {
+        const response = await fetch(inspection.report_url);
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = downloadName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          return;
+        }
+      }
+
+      const res = await fetch("/api/generate-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ inspectionId: inspection.id }),
       });
-      window.location.reload();
+
+      if (!res.ok) throw new Error("Failed to generate PDF");
+
+      const contentType = res.headers.get("content-type") || "";
+
+      if (contentType.includes("application/pdf")) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = downloadName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        const data = await res.json();
+        if (data.url) {
+          const a = document.createElement("a");
+          a.href = data.url;
+          a.download = downloadName;
+          a.target = "_blank";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        } else {
+          window.location.reload();
+        }
+      }
+    } catch (err) {
+      console.error("PDF download error:", err);
+      alert("Could not download PDF. Please try again.");
+    } finally {
+      setDownloadLoading(false);
     }
   };
 
@@ -580,15 +637,16 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
         <button
           type="button"
           onClick={handleDownloadPDF}
-          className="w-full h-12 rounded-2xl font-semibold text-white flex items-center justify-center gap-2 mb-3"
+          disabled={downloadLoading}
+          className="w-full h-12 rounded-2xl font-semibold text-white flex items-center justify-center gap-2 mb-3 disabled:opacity-70"
           style={{
             background: "linear-gradient(135deg, #9A88FD, #7B65FC)",
             fontFamily: "Poppins, sans-serif",
             opacity: 1,
-            cursor: "pointer",
+            cursor: downloadLoading ? "default" : "pointer",
           }}
         >
-          ⬇️ Download PDF
+          {downloadLoading ? "Generating PDF..." : "⬇️ Download PDF"}
         </button>
 
         {/* Row 2 — Sign + Share */}

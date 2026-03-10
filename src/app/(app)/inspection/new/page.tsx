@@ -4,7 +4,6 @@ import { useState, useRef, useCallback, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { hasOverlapWarning } from "@/lib/tenancy";
 
 // ─────────────────────────────────────────
 // Types
@@ -330,6 +329,43 @@ function NewInspectionContent() {
     setStep(3);
   };
 
+  const checkTenancyConflict = async (): Promise<boolean> => {
+    const tenantEmail = formData.tenant_email?.trim().toLowerCase();
+    if (!tenantEmail) return false;
+
+    const { data: existingTenancies } = await supabase
+      .from("tenancies")
+      .select("id")
+      .eq("tenant_email", tenantEmail)
+      .eq("status", "active");
+
+    if (!existingTenancies || existingTenancies.length === 0) return false;
+
+    const tenancyIds = existingTenancies.map((t) => t.id);
+
+    const { data: checkIns } = await supabase
+      .from("inspections")
+      .select("id, tenancy_id, type, status")
+      .in("tenancy_id", tenancyIds)
+      .eq("type", "check-in")
+      .in("status", ["completed", "signed"]);
+
+    if (!checkIns || checkIns.length === 0) return false;
+
+    for (const checkIn of checkIns) {
+      const { data: checkOut } = await supabase
+        .from("inspections")
+        .select("id, status")
+        .eq("tenancy_id", checkIn.tenancy_id)
+        .eq("type", "check-out")
+        .in("status", ["completed", "signed"])
+        .maybeSingle();
+
+      if (!checkOut) return true;
+    }
+    return false;
+  };
+
   // ── Start inspection (existing logic, mapped from formData)
   const handleStartInspection = async () => {
     setSaveError(null);
@@ -389,16 +425,12 @@ function NewInspectionContent() {
       }
     }
 
-    // Overlap check
+    // Tenancy conflict check: warn only if tenant has completed check-in without check-out
     try {
-      const warning = await hasOverlapWarning(
-        propertyId,
-        formData.contract_from,
-        supabase
-      );
-      if (warning) {
+      const hasConflict = await checkTenancyConflict();
+      if (hasConflict) {
         const confirmed = window.confirm(
-          `⚠️ ${warning}\n\nDo you want to continue anyway?`
+          `⚠️ ${formData.tenant_name} has an active tenancy without a completed check-out.\n\nDo you want to continue anyway?`
         );
         if (!confirmed) {
           setSaving(false);
@@ -406,7 +438,7 @@ function NewInspectionContent() {
         }
       }
     } catch {
-      // tenancies table may not exist; continue
+      // tenancies/inspections tables may not exist; continue
     }
 
     // Tenancy

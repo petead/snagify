@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import {
+  generateInspectionPDFBuffer,
+  type ReportData,
+  type InspectionMeta,
+} from "@/lib/generatePDF";
 
 export const maxDuration = 120;
 
@@ -180,11 +185,102 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to parse report from AI" }, { status: 500 });
     }
 
-    const report = JSON.parse(jsonMatch[0]);
+    const report = JSON.parse(jsonMatch[0]) as Partial<ReportData>;
+
+    // Ensure ReportData shape
+    const reportData: ReportData = {
+      executive_summary: report.executive_summary ?? "",
+      overall_condition: report.overall_condition ?? "Good",
+      dispute_risk_score: report.dispute_risk_score ?? 0,
+      dispute_risk_reasons: report.dispute_risk_reasons ?? [],
+      rooms: (report.rooms ?? []).map((r) => ({
+        name: r.name ?? "Room",
+        condition: r.condition ?? "Good",
+        summary: r.summary ?? "",
+        items: (r.items ?? []).map((i) => ({
+          name: i.name ?? "",
+          condition: i.condition ?? "Good",
+          notes: i.notes ?? "",
+        })),
+        recommendations: r.recommendations ?? [],
+      })),
+      legal_notes: report.legal_notes ?? "",
+      recommendations: report.recommendations ?? [],
+    };
+
+    const meta: InspectionMeta = {
+      inspection: {
+        id: inspection.id,
+        type: inspection.type ?? undefined,
+        created_at: inspection.created_at ?? undefined,
+        landlord_name: tenancy?.landlord_name ?? undefined,
+        landlord_email: tenancy?.landlord_email ?? undefined,
+        tenant_name: tenancy?.tenant_name ?? undefined,
+        tenant_email: tenancy?.tenant_email ?? undefined,
+        ejari_ref: tenancy?.ejari_ref ?? undefined,
+        contract_from: tenancy?.contract_from ?? undefined,
+        contract_to: tenancy?.contract_to ?? undefined,
+      },
+      property: property
+        ? {
+            building_name: property.building_name ?? undefined,
+            unit_number: property.unit_number ?? undefined,
+            address: property.address ?? undefined,
+            property_type: property.property_type ?? undefined,
+          }
+        : null,
+      agent: agent
+        ? {
+            full_name: agent.full_name ?? undefined,
+            agency_name: agent.agency_name ?? undefined,
+          }
+        : null,
+      rooms: (rooms ?? []).map((r) => ({
+        name: r.name,
+        photos: (roomPhotos[r.id] ?? []).map((p) => ({
+          url: p.url,
+          ai_analysis: p.ai_analysis ?? undefined,
+        })),
+      })),
+    };
+
+    let publicUrl: string | null = null;
+
+    try {
+      const pdfBuffer = await generateInspectionPDFBuffer(reportData, meta);
+      const fileName = `${inspectionId}.pdf`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from("reports")
+        .upload(fileName, pdfBuffer, {
+          contentType: "application/pdf",
+          upsert: true,
+        });
+
+      if (!uploadErr) {
+        const { data: urlData } = supabase.storage
+          .from("reports")
+          .getPublicUrl(fileName);
+        publicUrl = urlData.publicUrl;
+      }
+    } catch (pdfErr) {
+      console.error("PDF generation/upload error:", pdfErr);
+    }
+
+    await supabase
+      .from("inspections")
+      .update({
+        report_data: reportData,
+        report_url: publicUrl,
+        status: "completed",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", inspectionId);
 
     return NextResponse.json({
-      report,
-      inspectionData,
+      success: true,
+      url: publicUrl,
+      report: reportData,
     });
   } catch (err) {
     console.error("generate-report error:", err);

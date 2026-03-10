@@ -5,6 +5,7 @@ import {
   View,
   StyleSheet,
   pdf,
+  renderToBuffer,
 } from "@react-pdf/renderer";
 
 const PURPLE = "#9A88FD";
@@ -526,6 +527,16 @@ export async function generateInspectionPDF(
   const doc = <InspectionReport report={report} meta={meta} documentHash={documentHash} />;
   const blob = await pdf(doc).toBlob();
   return blob;
+}
+
+/** Server-side: render PDF to Buffer for upload/storage */
+export async function generateInspectionPDFBuffer(
+  report: ReportData,
+  meta: InspectionMeta
+): Promise<Buffer> {
+  const documentHash = await computeHash(JSON.stringify({ report, meta }));
+  const doc = <InspectionReport report={report} meta={meta} documentHash={documentHash} />;
+  return renderToBuffer(doc);
 }
 
 export type { ReportData, InspectionMeta };
