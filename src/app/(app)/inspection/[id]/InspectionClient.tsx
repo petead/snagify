@@ -109,16 +109,30 @@ function PhotoCard({
             ))}
           </div>
         )}
-        {photo.aiAnalysis && !expanded && photo.damageTags.length === 0 && (
+        {photo.notes && !expanded && photo.damageTags.length === 0 && (
           <div className="absolute bottom-1 left-1 right-1 bg-black/60 rounded px-1.5 py-0.5">
-            <p className="text-[8px] text-white/80 line-clamp-1">{photo.aiAnalysis}</p>
+            <p className="text-[8px] text-white/80 line-clamp-1">{photo.notes}</p>
           </div>
         )}
       </div>
+      {photo.notes && (
+        <p
+          style={{
+            fontSize: 12,
+            color: "#555",
+            fontFamily: "DM Sans, sans-serif",
+            lineHeight: 1.5,
+            margin: "8px 0 0",
+            padding: "0 4px",
+          }}
+        >
+          {photo.notes}
+        </p>
+      )}
       {expanded && (
         <div className="mt-1.5 p-2 rounded-xl" style={{ background: "rgba(255,255,255,0.06)" }}>
-          {photo.aiAnalysis && (
-            <p className="text-[10px] text-white/60 mb-2 line-clamp-3">{photo.aiAnalysis}</p>
+          {photo.notes && (
+            <p className="text-[10px] text-white/60 mb-2 line-clamp-3">{photo.notes}</p>
           )}
           <p className="text-[10px] text-white/50 mb-1.5">Damage tags</p>
           <div className="flex flex-wrap gap-1">
@@ -365,18 +379,14 @@ export function InspectionClient({
             image: rawBase64,
             mimeType: file.type,
             photoId: photoRecordId ?? undefined,
+            roomName: room.name,
           }),
         });
         if (aiRes.ok) {
           const a = await aiRes.json();
-          aiText = a.ai_analysis ?? a.description ?? "";
-          suggestedTags = Array.isArray(a.suggested_tags) ? a.suggested_tags : [];
-          if (photoRecordId) {
-            await supabase
-              .from("photos")
-              .update({ ai_analysis: aiText, damage_tags: suggestedTags })
-              .eq("id", photoRecordId);
-          }
+          aiText = a.ai_analysis ?? "";
+          suggestedTags = Array.isArray(a.damage_tags) ? a.damage_tags : [];
+          // DB is updated by the API when photoId is sent
         }
       } catch { /* continue */ }
 
@@ -398,6 +408,7 @@ export function InspectionClient({
                 src: displayUrl,
                 uploading: false,
                 aiAnalysis: aiText || undefined,
+                notes: aiText || undefined,
                 damageTags: suggestedTags,
               }
             : p
