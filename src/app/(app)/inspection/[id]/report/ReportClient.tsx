@@ -731,11 +731,6 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
               >
                 {sent.landlord ? "✓ Email Sent" : "📧 Send via Email"}
               </button>
-              {sent.landlord && sentSignUrl.landlord && (
-                <p className="text-xs text-gray-400 mt-2 break-all">
-                  🔗 {sentSignUrl.landlord}
-                </p>
-              )}
             </div>
 
             <div className="bg-gray-50 rounded-2xl p-4 mb-6">
@@ -774,11 +769,6 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
               >
                 {sent.tenant ? "✓ Email Sent" : "📧 Send via Email"}
               </button>
-              {sent.tenant && sentSignUrl.tenant && (
-                <p className="text-xs text-gray-400 mt-2 break-all">
-                  🔗 {sentSignUrl.tenant}
-                </p>
-              )}
             </div>
 
             {sent.landlord && sent.tenant && (
