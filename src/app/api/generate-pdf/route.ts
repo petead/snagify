@@ -6,6 +6,16 @@ import {
   type InspectionMeta,
 } from "@/lib/generatePDF";
 
+type RoomItemRow = {
+  room_id: string;
+  name: string;
+  condition?: string | null;
+  notes?: string | null;
+  ai_description?: string | null;
+};
+
+type RoomPhotoRow = { url: string; ai_analysis?: string | null };
+
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
@@ -72,14 +82,14 @@ export async function POST(request: NextRequest) {
     const { data: roomItems } =
       roomIds.length > 0
         ? await supabase.from("room_items").select("*").in("room_id", roomIds)
-        : { data: [] as Array<{ room_id: string; name: string; condition: string | null; notes: string | null }> };
+        : { data: [] as RoomItemRow[] };
 
     const roomItemsByRoom = (roomItems ?? []).reduce(
-      (acc, item) => {
+      (acc: Record<string, RoomItemRow[]>, item: RoomItemRow) => {
         (acc[item.room_id] ??= []).push(item);
         return acc;
       },
-      {} as Record<string, Array<{ name: string; condition: string | null; notes: string | null }>>
+      {} as Record<string, RoomItemRow[]>
     );
 
     const meta: InspectionMeta = {
@@ -114,21 +124,21 @@ export async function POST(request: NextRequest) {
           (a: { order_index: number | null }, b: { order_index: number | null }) =>
             (a.order_index ?? 0) - (b.order_index ?? 0)
         )
-        .map((room: { id: string; name: string; photos?: Array<{ url: string; ai_analysis?: string | null }> }) => {
-          const mergedItems = (roomItemsByRoom[room.id] ?? []).map((i) => ({
+        .map((room: { id: string; name: string; photos?: RoomPhotoRow[] }) => {
+          const mergedItems = (roomItemsByRoom[room.id] ?? []).map((i: RoomItemRow) => ({
             name: i.name,
             condition: i.condition ?? "Good",
             notes: i.notes ?? "",
           }));
           const reportRoom = reportData.rooms.find(
-            (r) => r.name.toLowerCase() === room.name.toLowerCase()
+            (r: { name: string }) => r.name.toLowerCase() === room.name.toLowerCase()
           );
           if (reportRoom && reportRoom.items.length === 0 && mergedItems.length > 0) {
             reportRoom.items = mergedItems;
           }
           return {
             name: room.name,
-            photos: (room.photos ?? []).map((p) => ({
+            photos: (room.photos ?? []).map((p: RoomPhotoRow) => ({
               url: p.url,
               ai_analysis: p.ai_analysis ?? undefined,
             })),
@@ -156,7 +166,7 @@ export async function POST(request: NextRequest) {
         .eq("id", inspectionId);
     }
 
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="Snagify_Report_${inspectionId}.pdf"`,
