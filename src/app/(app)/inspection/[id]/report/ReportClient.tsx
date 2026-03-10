@@ -153,13 +153,17 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
     },
   ];
 
-  const handleDownloadPDF = () => {
-    if (!inspection.report_url) return;
-    const a = document.createElement("a");
-    a.href = inspection.report_url;
-    a.download = `snagify-report-${inspection.id.slice(0, 8)}.pdf`;
-    a.target = "_blank";
-    a.click();
+  const handleDownloadPDF = async () => {
+    if (inspection.report_url) {
+      window.open(inspection.report_url, "_blank");
+    } else {
+      await fetch("/api/generate-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inspectionId: inspection.id }),
+      });
+      window.location.reload();
+    }
   };
 
   const handleSendOTP = async (
@@ -537,11 +541,12 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
         <button
           type="button"
           onClick={handleDownloadPDF}
-          disabled={!inspection.report_url}
-          className="w-full h-12 rounded-2xl font-semibold text-white flex items-center justify-center gap-2 mb-3 disabled:opacity-50"
+          className="w-full h-12 rounded-2xl font-semibold text-white flex items-center justify-center gap-2 mb-3"
           style={{
             background: "linear-gradient(135deg, #9A88FD, #7B65FC)",
             fontFamily: "Poppins, sans-serif",
+            opacity: 1,
+            cursor: "pointer",
           }}
         >
           ⬇️ Download PDF

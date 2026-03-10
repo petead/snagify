@@ -37,15 +37,15 @@ interface Props {
 
 // ─── Constants ───────────────────────────────────
 const ROOM_TEMPLATES: Record<string, string[]> = {
-  Studio: ["Entrance", "Living / Bedroom", "Kitchen", "Bathroom", "Balcony"],
-  "1 BR": ["Entrance", "Living Room", "Kitchen", "Bedroom 1", "Bathroom 1", "Balcony"],
-  "2 BR": ["Entrance", "Living Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bathroom 1", "Bathroom 2", "Balcony"],
-  "3 BR": ["Entrance", "Living Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Balcony"],
-  "4 BR": ["Entrance", "Living Room", "Dining Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Bathroom 4", "Balcony", "Maid's Room"],
-  "5 BR": ["Entrance", "Living Room", "Dining Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Bedroom 5", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Bathroom 4", "Bathroom 5", "Balcony", "Maid's Room", "Laundry"],
-  "6 BR": ["Entrance", "Living Room", "Dining Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Bedroom 5", "Bedroom 6", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Bathroom 4", "Bathroom 5", "Bathroom 6", "Balcony", "Maid's Room", "Laundry", "Storage"],
-  Villa: ["Entrance", "Living Room", "Dining Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Bathroom 4", "Garden", "Garage", "Maid's Room", "Laundry", "Storage"],
-  Townhouse: ["Entrance", "Living Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Terrace", "Garage"],
+  "Studio":    ["Entrance", "Living / Bedroom", "Kitchen", "Bathroom 1", "Balcony"],
+  "1 BR":      ["Entrance", "Living Room", "Kitchen", "Bedroom 1", "Bathroom 1", "Balcony"],
+  "2 BR":      ["Entrance", "Living Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bathroom 1", "Bathroom 2", "Balcony"],
+  "3 BR":      ["Entrance", "Living Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Balcony"],
+  "4 BR":      ["Entrance", "Living Room", "Dining Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Bathroom 4", "Balcony", "Maid's Room"],
+  "5 BR":      ["Entrance", "Living Room", "Dining Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Bedroom 5", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Bathroom 4", "Bathroom 5", "Balcony", "Maid's Room", "Laundry"],
+  "6 BR":      ["Entrance", "Living Room", "Dining Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Bedroom 5", "Bedroom 6", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Bathroom 4", "Bathroom 5", "Bathroom 6", "Balcony", "Maid's Room", "Laundry", "Storage"],
+  "Villa":     ["Entrance", "Living Room", "Dining Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Bathroom 4", "Garden", "Garage", "Maid's Room", "Laundry", "Storage"],
+  "Townhouse": ["Entrance", "Living Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Terrace", "Garage"],
 };
 
 const ALL_ROOMS = [
@@ -189,8 +189,8 @@ export function InspectionClient({
   const [liveRooms, setLiveRooms] = useState<RoomData[]>(initialRooms);
   const [activeRoom, setActiveRoom] = useState(0);
   const [photos, setPhotos] = useState<Record<number, PhotoItem[]>>({});
-  const [screen, setScreen] = useState<"setup" | "inspect" | "review">(
-    initialRooms.length > 0 ? "inspect" : "setup"
+  const [screen, setScreen] = useState<"rooms" | "inspect" | "review">(
+    initialRooms.length > 0 ? "inspect" : "rooms"
   );
   const [toast, setToast] = useState<string | null>(null);
 
@@ -495,7 +495,7 @@ export function InspectionClient({
       )}
 
       {/* ═══ SETUP SCREEN ═══ */}
-      {screen === "setup" && (
+      {screen === "rooms" && (
         <div className="fixed inset-0 z-40 flex flex-col" style={{ background: "white" }}>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 flex-shrink-0">
@@ -522,13 +522,35 @@ export function InspectionClient({
             <p className="text-sm text-gray-400 mb-5">Select type to pre-fill rooms, then customize</p>
 
             {/* Type pills */}
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 mb-5 -mx-4 px-4">
+            <div
+              className="no-scrollbar mb-5"
+              style={{
+                display: "flex",
+                gap: 8,
+                overflowX: "auto",
+                paddingBottom: 4,
+                marginLeft: -16,
+                marginRight: -16,
+                paddingLeft: 16,
+                paddingRight: 16,
+                WebkitOverflowScrolling: "touch",
+              }}
+            >
               {Object.keys(ROOM_TEMPLATES).map((type) => (
                 <button key={type} type="button" onClick={() => handleTypeSelect(type)}
-                  className="flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 whitespace-nowrap"
                   style={{
-                    background: selectedType === type ? "linear-gradient(135deg, #9A88FD, #7B65FC)" : "#f5f5f5",
+                    flexShrink: 0,
+                    padding: "8px 16px",
+                    borderRadius: 10,
+                    border: "none",
+                    background: selectedType === type
+                      ? "linear-gradient(135deg, #9A88FD, #7B65FC)"
+                      : "#f0f0f5",
                     color: selectedType === type ? "white" : "#666",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
                     boxShadow: selectedType === type ? "0 4px 12px rgba(154,136,253,0.3)" : "none",
                   }}>
                   {type}
@@ -649,7 +671,7 @@ export function InspectionClient({
           {/* Top bar */}
           <div style={{ background: "#0e0e14", padding: "16px 16px 8px", flexShrink: 0 }}>
             <div className="flex items-center justify-between mb-3">
-              <button type="button" onClick={() => setScreen("setup")} className="text-white/60">
+              <button type="button" onClick={() => setScreen("rooms")} className="text-white/60">
                 <ChevronLeft size={22} />
               </button>
               <div className="text-center">

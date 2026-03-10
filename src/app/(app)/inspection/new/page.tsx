@@ -9,7 +9,7 @@ import { hasOverlapWarning } from "@/lib/tenancy";
 // ─────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────
-type Step = 0 | 1 | 2 | 3 | 4;
+type Step = 0 | 1 | 2 | 3;
 type EntryMode = "upload" | "manual" | null;
 
 interface FormData {
@@ -113,74 +113,9 @@ const stepTitles: Record<Step, string> = {
   0: "Start",
   1: "Contract Details",
   2: "Verify Info",
-  3: "Rooms",
-  4: "Ready to Start",
+  3: "Ready to Start",
 };
 
-const ROOM_TEMPLATES: Record<string, string[]> = {
-  Studio: ["Living/Bedroom", "Bathroom", "Kitchen"],
-  "1 BR": ["Living Room", "Bedroom", "Bathroom", "Kitchen"],
-  "2 BR": [
-    "Living Room",
-    "Master Bedroom",
-    "Bedroom 2",
-    "Bathroom 1",
-    "Bathroom 2",
-    "Kitchen",
-  ],
-  "3 BR": [
-    "Living Room",
-    "Master Bedroom",
-    "Bedroom 2",
-    "Bedroom 3",
-    "Master Bathroom",
-    "Bathroom 2",
-    "Kitchen",
-    "Laundry",
-  ],
-  Villa: [
-    "Living Room",
-    "Dining Room",
-    "Master Bedroom",
-    "Bedroom 2",
-    "Bedroom 3",
-    "Master Bathroom",
-    "Bathroom 2",
-    "Kitchen",
-    "Garden",
-    "Garage",
-  ],
-  Townhouse: [
-    "Living Room",
-    "Master Bedroom",
-    "Bedroom 2",
-    "Master Bathroom",
-    "Bathroom 2",
-    "Kitchen",
-    "Terrace",
-  ],
-};
-
-const ALL_ROOMS = [
-  "Living Room",
-  "Dining Room",
-  "Master Bedroom",
-  "Bedroom 2",
-  "Bedroom 3",
-  "Master Bathroom",
-  "Bathroom 2",
-  "Kitchen",
-  "Laundry",
-  "Hallway",
-  "Balcony",
-  "Terrace",
-  "Garden",
-  "Garage",
-  "Storage",
-  "Maid's Room",
-  "Living/Bedroom",
-  "Study/Office",
-];
 
 const inputCls =
   "w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:border-[#9A88FD] focus:outline-none transition-colors bg-white";
@@ -249,8 +184,6 @@ function NewInspectionContent() {
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>({ ...emptyForm });
-  const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
-  const [customRoom, setCustomRoom] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -337,20 +270,8 @@ function NewInspectionContent() {
     formData.landlord_name.trim() !== "" &&
     formData.landlord_email.trim() !== "";
 
-  // ── Continue from step 2 → pre-fill rooms by property type
   const handleContinueStep2 = () => {
     if (!formValid) return;
-    if (selectedRooms.length === 0) {
-      const pt = formData.property_type;
-      const suggested =
-        ROOM_TEMPLATES[pt] ||
-        (pt === "Apartment"
-          ? ROOM_TEMPLATES["2 BR"]
-          : pt === "Studio"
-            ? ROOM_TEMPLATES["Studio"]
-            : []);
-      if (suggested.length) setSelectedRooms(suggested);
-    }
     setStep(3);
   };
 
@@ -488,22 +409,6 @@ function NewInspectionContent() {
       return;
     }
 
-    // Rooms
-    if (selectedRooms.length > 0) {
-      const { error: roomsErr } = await supabase.from("rooms").insert(
-        selectedRooms.map((name, i) => ({
-          inspection_id: insp.id,
-          name,
-          order_index: i,
-        }))
-      );
-      if (roomsErr) {
-        setSaveError(roomsErr.message);
-        setSaving(false);
-        return;
-      }
-    }
-
     setSaving(false);
     router.push(`/inspection/${insp.id}`);
     router.refresh();
@@ -537,7 +442,7 @@ function NewInspectionContent() {
           </div>
           {/* Step dots */}
           <div className="flex gap-1 items-center">
-            {([0, 1, 2, 3, 4] as Step[]).map((i) => (
+            {([0, 1, 2, 3] as Step[]).map((i) => (
               <div
                 key={i}
                 className={`h-1.5 rounded-full transition-all ${
@@ -947,108 +852,8 @@ function NewInspectionContent() {
         </div>
       )}
 
-      {/* STEP 3 — Rooms */}
+      {/* STEP 3 — Recap */}
       {step === 3 && (
-        <div className="pb-44">
-          {/* Templates */}
-          <div className="px-4 pt-5">
-            <p className="text-xs text-gray-400 mb-2 uppercase tracking-wider font-semibold">
-              Quick templates
-            </p>
-            <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4">
-              {Object.entries(ROOM_TEMPLATES).map(([name, rooms]) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => setSelectedRooms(rooms)}
-                  className="text-xs px-4 py-2 rounded-full border border-[#9A88FD] text-[#9A88FD] font-semibold whitespace-nowrap hover:bg-[#F0EDFF] transition-colors flex-shrink-0"
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Room chips */}
-          <div className="px-4 mt-4">
-            <p className="text-xs text-gray-400 mb-3 uppercase tracking-wider font-semibold">
-              Select rooms ({selectedRooms.length} selected)
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {/* Standard options */}
-              {ALL_ROOMS.map((room) => {
-                const selected = selectedRooms.includes(room);
-                return (
-                  <button
-                    key={room}
-                    type="button"
-                    onClick={() =>
-                      setSelectedRooms((prev) =>
-                        selected
-                          ? prev.filter((r) => r !== room)
-                          : [...prev, room]
-                      )
-                    }
-                    className={`text-sm px-4 py-2 rounded-xl font-medium transition-all ${
-                      selected
-                        ? "bg-[#9A88FD] text-white shadow-sm"
-                        : "bg-white border border-gray-200 text-gray-600 hover:border-[#9A88FD]"
-                    }`}
-                  >
-                    {room}
-                  </button>
-                );
-              })}
-              {/* Custom rooms not in the standard list */}
-              {selectedRooms
-                .filter((r) => !ALL_ROOMS.includes(r))
-                .map((room) => (
-                  <button
-                    key={room}
-                    type="button"
-                    onClick={() =>
-                      setSelectedRooms((prev) => prev.filter((r) => r !== room))
-                    }
-                    className="text-sm px-4 py-2 rounded-xl font-medium bg-[#9A88FD] text-white shadow-sm"
-                  >
-                    {room} ✕
-                  </button>
-                ))}
-            </div>
-
-            {/* Add custom */}
-            <div className="mt-4 flex gap-2">
-              <input
-                value={customRoom}
-                onChange={(e) => setCustomRoom(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && customRoom.trim()) {
-                    setSelectedRooms((prev) => [...prev, customRoom.trim()]);
-                    setCustomRoom("");
-                  }
-                }}
-                placeholder="+ Add custom room..."
-                className="flex-1 h-11 px-4 rounded-xl border border-dashed border-gray-300 text-sm focus:border-[#9A88FD] focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (customRoom.trim()) {
-                    setSelectedRooms((prev) => [...prev, customRoom.trim()]);
-                    setCustomRoom("");
-                  }
-                }}
-                className="w-11 h-11 rounded-xl bg-[#9A88FD] text-white font-bold text-lg"
-              >
-                +
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 4 — Recap */}
-      {step === 4 && (
         <div className="px-4 pt-5 pb-48">
           <h2
             className="text-xl font-bold mb-1"
@@ -1138,33 +943,15 @@ function NewInspectionContent() {
             </div>
           </div>
 
-          {/* Rooms */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-3">
-            <p className="text-xs font-bold text-[#9A88FD] uppercase tracking-wider mb-3">
-              Rooms ({selectedRooms.length})
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {selectedRooms.map((room) => (
-                <span
-                  key={room}
-                  className="text-xs px-3 py-1 rounded-full bg-[#F0EDFF] text-[#7B65FC] font-medium"
-                >
-                  {room}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Estimated time */}
-          <div className="bg-[#FEDE80]/30 rounded-xl p-3 flex items-center gap-3">
-            <span className="text-xl">⏱️</span>
+          {/* Rooms note */}
+          <div className="bg-[#F0EDFF] rounded-xl p-3 flex items-center gap-3">
+            <span className="text-xl">🏠</span>
             <div>
-              <p className="text-sm font-semibold text-gray-800">
-                Estimated time: ~{Math.max(5, selectedRooms.length * 3)}{" "}
-                minutes
+              <p className="text-sm font-semibold text-[#7B65FC]">
+                Rooms selected on next screen
               </p>
-              <p className="text-xs text-gray-500">
-                Based on {selectedRooms.length} rooms • 2-3 photos per room
+              <p className="text-xs text-[#9A88FD]">
+                You&apos;ll choose and customize rooms when the inspection starts
               </p>
             </div>
           </div>
@@ -1181,27 +968,12 @@ function NewInspectionContent() {
             className="w-full h-12 rounded-xl font-semibold text-white disabled:opacity-50 transition-all"
             style={{ background: "linear-gradient(135deg,#9A88FD,#7B65FC)", fontFamily: "Poppins,sans-serif" }}
           >
-            Continue → Choose Rooms
+            Continue → Review
           </button>
         </BottomBar>
       )}
 
       {step === 3 && (
-        <BottomBar>
-          <button
-            type="button"
-            onClick={() => setStep(4)}
-            disabled={selectedRooms.length === 0}
-            className="w-full h-12 rounded-xl font-semibold text-white disabled:opacity-50"
-            style={{ background: "linear-gradient(135deg,#9A88FD,#7B65FC)", fontFamily: "Poppins,sans-serif" }}
-          >
-            Continue → {selectedRooms.length} room
-            {selectedRooms.length !== 1 ? "s" : ""} selected
-          </button>
-        </BottomBar>
-      )}
-
-      {step === 4 && (
         <BottomBar>
           <button
             type="button"
