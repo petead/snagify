@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 
 type ReportRow = {
   id: string;
@@ -14,6 +15,7 @@ type ReportRow = {
   properties?: unknown;
   tenancy?: unknown;
   tenancies?: unknown;
+  signatures?: { signer_type: string; otp_verified: boolean; signed_at?: string | null }[];
 };
 
 function first<T>(x: T | T[] | null | undefined): T | null {
@@ -45,7 +47,8 @@ export default function ReportsPage() {
           `
           id, type, status, signed_at, created_at,
           properties (building_name, unit_number, property_type),
-          tenancies (tenant_name, ejari_ref, contract_from, contract_to)
+          tenancies (tenant_name, ejari_ref, contract_from, contract_to),
+          signatures (signer_type, otp_verified, signed_at)
         `
         )
         .eq("agent_id", user.id)
@@ -128,82 +131,93 @@ export default function ReportsPage() {
             const tenantName = t?.tenant_name ?? "";
 
             return (
-              <div
-                key={report.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => router.push(`/inspection/${report.id}/report`)}
-                onKeyDown={(e) => e.key === "Enter" && router.push(`/inspection/${report.id}/report`)}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-3 cursor-pointer active:scale-[0.98] transition-transform"
-                style={{
-                  borderLeft: `4px solid ${
-                    report.status === "signed" || isSigned
-                      ? "#cafe87"
-                      : report.type === "check-in"
-                        ? "#9A88FD"
-                        : "#FEDE80"
-                  }`,
-                }}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className="font-bold text-sm text-gray-900 truncate"
-                      style={{ fontFamily: "Poppins, sans-serif" }}
-                    >
-                      {buildingName && unitNumber
-                        ? `${buildingName}, Unit ${unitNumber}`
-                        : buildingName || unitNumber || "Property"}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5 truncate">
-                      👤 {tenantName ? tenantName.split(" ").slice(0, 2).join(" ") : "Unknown"}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
-                    <span
-                      className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                        report.type === "check-in"
-                          ? "bg-[#F0EDFF] text-[#9A88FD]"
-                          : "bg-[#FEDE80] text-gray-700"
-                      }`}
-                    >
-                      {report.type === "check-in" ? "CHECK-IN" : "CHECK-OUT"}
-                    </span>
-                    <span
-                      className={`text-xs font-medium px-2 py-1 rounded-full ${
-                        report.status === "signed" || isSigned
-                          ? "bg-[#cafe87] text-gray-800"
-                          : report.status === "completed"
+              <div key={report.id} style={{ position: "relative" }}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => router.push(`/inspection/${report.id}/report`)}
+                  onKeyDown={(e) => e.key === "Enter" && router.push(`/inspection/${report.id}/report`)}
+                  className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-3 cursor-pointer active:scale-[0.98] transition-transform pr-12"
+                  style={{
+                    borderLeft: `4px solid ${
+                      report.status === "signed" || isSigned
+                        ? "#cafe87"
+                        : report.type === "check-in"
+                          ? "#9A88FD"
+                          : "#FEDE80"
+                    }`,
+                  }}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="font-bold text-sm text-gray-900 truncate"
+                        style={{ fontFamily: "Poppins, sans-serif" }}
+                      >
+                        {buildingName && unitNumber
+                          ? `${buildingName}, Unit ${unitNumber}`
+                          : buildingName || unitNumber || "Property"}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5 truncate">
+                        👤 {tenantName ? tenantName.split(" ").slice(0, 2).join(" ") : "Unknown"}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
+                      <span
+                        className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                          report.type === "check-in"
                             ? "bg-[#F0EDFF] text-[#9A88FD]"
-                            : "bg-gray-100 text-gray-500"
-                      }`}
-                    >
-                      {report.status === "signed" || isSigned
-                        ? "✓ Signed"
-                        : report.status === "completed"
-                          ? "Completed"
-                          : "Draft"}
+                            : "bg-[#FEDE80] text-gray-700"
+                        }`}
+                      >
+                        {report.type === "check-in" ? "CHECK-IN" : "CHECK-OUT"}
+                      </span>
+                      <span
+                        className={`text-xs font-medium px-2 py-1 rounded-full ${
+                          report.status === "signed" || isSigned
+                            ? "bg-[#cafe87] text-gray-800"
+                            : report.status === "completed"
+                              ? "bg-[#F0EDFF] text-[#9A88FD]"
+                              : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {report.status === "signed" || isSigned
+                          ? "✓ Signed"
+                          : report.status === "completed"
+                            ? "Completed"
+                            : "Draft"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
+                    <span className="text-xs text-gray-400">
+                      🗓{" "}
+                      {new Date(report.created_at).toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </span>
+                    {report.status === "completed" && !isSigned && (
+                      <span className="text-xs font-semibold text-[#9A88FD]">
+                        Send for signature →
+                      </span>
+                    )}
+                    {(report.status === "signed" || isSigned) && (
+                      <span className="text-xs font-semibold text-green-600">View report →</span>
+                    )}
                   </div>
                 </div>
-
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
-                  <span className="text-xs text-gray-400">
-                    🗓{" "}
-                    {new Date(report.created_at).toLocaleDateString("en-GB", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </span>
-                  {report.status === "completed" && !isSigned && (
-                    <span className="text-xs font-semibold text-[#9A88FD]">
-                      Send for signature →
-                    </span>
-                  )}
-                  {(report.status === "signed" || isSigned) && (
-                    <span className="text-xs font-semibold text-green-600">View report →</span>
-                  )}
+                <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10 }}>
+                  <DeleteInspectionButton
+                    inspectionId={report.id}
+                    inspectionType={(report.type ?? "check-in") as "check-in" | "check-out"}
+                    status={report.status}
+                    signatures={report.signatures ?? []}
+                    redirectTo="/reports"
+                    variant="icon"
+                  />
                 </div>
               </div>
             );

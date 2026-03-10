@@ -165,6 +165,7 @@ export default async function DashboardPage() {
     completed_at: string | null;
     properties?: unknown;
     tenancies?: unknown;
+    signatures?: { signer_type: string; otp_verified: boolean; signed_at: string | null }[];
   };
   let recentInspections: RecentInspection[] = [];
   if (user) {
@@ -174,7 +175,8 @@ export default async function DashboardPage() {
         `
         id, type, status, created_at, completed_at,
         properties (building_name, unit_number),
-        tenancies (tenant_name)
+        tenancies (tenant_name),
+        signatures (signer_type, otp_verified, signed_at)
       `
       )
       .eq("agent_id", user.id)

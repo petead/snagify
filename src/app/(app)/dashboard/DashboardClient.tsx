@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 
 type InspectionRow = {
   id: string;
@@ -50,6 +51,7 @@ type RecentInspectionRow = {
   completed_at: string | null;
   properties?: unknown;
   tenancies?: unknown;
+  signatures?: { signer_type: string; otp_verified: boolean; signed_at?: string | null }[];
 };
 
 type ActivityItem = {
@@ -321,32 +323,45 @@ export function DashboardClient({
                 return (
                   <div
                     key={inspection.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => router.push(item.href)}
-                    onKeyDown={(e) => e.key === "Enter" && router.push(item.href)}
-                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer active:bg-gray-50 transition-colors ${
-                      index < recentInspections.length - 1 ? "border-b border-gray-50" : ""
-                    }`}
+                    style={{ position: "relative" }}
+                    className={index < recentInspections.length - 1 ? "border-b border-gray-50" : ""}
                   >
                     <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base"
-                      style={{ backgroundColor: item.color + "33" }}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => router.push(item.href)}
+                      onKeyDown={(e) => e.key === "Enter" && router.push(item.href)}
+                      className="flex items-center gap-3 px-4 py-3 cursor-pointer active:bg-gray-50 transition-colors pr-12"
                     >
-                      {item.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className="text-sm font-semibold text-gray-800 truncate"
-                        style={{ fontFamily: "Poppins, sans-serif" }}
+                      <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base"
+                        style={{ backgroundColor: item.color + "33" }}
                       >
-                        {item.title}
-                      </p>
-                      <p className="text-xs text-gray-400 truncate mt-0.5">{item.subtitle}</p>
+                        {item.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="text-sm font-semibold text-gray-800 truncate"
+                          style={{ fontFamily: "Poppins, sans-serif" }}
+                        >
+                          {item.title}
+                        </p>
+                        <p className="text-xs text-gray-400 truncate mt-0.5">{item.subtitle}</p>
+                      </div>
+                      <span className="text-xs text-gray-300 flex-shrink-0 ml-2">
+                        {timeAgo(item.time)}
+                      </span>
                     </div>
-                    <span className="text-xs text-gray-300 flex-shrink-0 ml-2">
-                      {timeAgo(item.time)}
-                    </span>
+                    <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10 }}>
+                      <DeleteInspectionButton
+                        inspectionId={inspection.id}
+                        inspectionType={(inspection.type ?? "check-in") as "check-in" | "check-out"}
+                        status={inspection.status}
+                        signatures={inspection.signatures ?? []}
+                        redirectTo="/dashboard"
+                        variant="icon"
+                      />
+                    </div>
                   </div>
                 );
               })}

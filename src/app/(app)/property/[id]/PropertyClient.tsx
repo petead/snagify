@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, Plus } from "lucide-react";
 import {
@@ -135,14 +134,6 @@ export function PropertyClient({
   tenancyGroups,
   totalInspections,
 }: PropertyClientProps) {
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
-
-  useEffect(() => {
-    const close = () => setOpenMenu(null);
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
-  }, []);
-
   const title =
     property.address ??
     (property.building_name && property.unit_number
@@ -353,59 +344,16 @@ export function PropertyClient({
                               )}
                             </div>
                           </Link>
-                          {/* ••• menu button */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenMenu(openMenu === checkIn.id ? null : checkIn.id);
-                            }}
-                            style={{
-                              position: "absolute",
-                              top: "50%",
-                              transform: "translateY(-50%)",
-                              right: 0,
-                              width: 28,
-                              height: 28,
-                              borderRadius: 8,
-                              background: "#f5f5f5",
-                              border: "none",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              cursor: "pointer",
-                              fontSize: 14,
-                              color: "#9ca3af",
-                              letterSpacing: 1,
-                            }}
-                          >
-                            •••
-                          </button>
-                          {openMenu === checkIn.id && (
-                            <div
-                              style={{
-                                position: "absolute",
-                                top: 44,
-                                right: 0,
-                                zIndex: 50,
-                                background: "white",
-                                borderRadius: 12,
-                                border: "1px solid #f0f0f0",
-                                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                                overflow: "hidden",
-                                minWidth: 200,
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <DeleteInspectionButton
-                                inspectionId={checkIn.id}
-                                inspectionType="check-in"
-                                status={checkIn.status}
-                                signatures={checkIn.signatures}
-                                redirectTo={`/property/${property.id}`}
-                                variant="menuitem"
-                              />
-                            </div>
-                          )}
+                          <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10 }}>
+                            <DeleteInspectionButton
+                              inspectionId={checkIn.id}
+                              inspectionType="check-in"
+                              status={checkIn.status}
+                              signatures={checkIn.signatures}
+                              redirectTo={`/property/${property.id}`}
+                              variant="icon"
+                            />
+                          </div>
                         </div>
                       ) : (
                         <div className="flex items-center justify-between py-2 border-b border-gray-50">
@@ -475,59 +423,16 @@ export function PropertyClient({
                               )}
                             </div>
                           </Link>
-                          {/* ••• menu button */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenMenu(openMenu === checkOut.id ? null : checkOut.id);
-                            }}
-                            style={{
-                              position: "absolute",
-                              top: "50%",
-                              transform: "translateY(-50%)",
-                              right: 0,
-                              width: 28,
-                              height: 28,
-                              borderRadius: 8,
-                              background: "#f5f5f5",
-                              border: "none",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              cursor: "pointer",
-                              fontSize: 14,
-                              color: "#9ca3af",
-                              letterSpacing: 1,
-                            }}
-                          >
-                            •••
-                          </button>
-                          {openMenu === checkOut.id && (
-                            <div
-                              style={{
-                                position: "absolute",
-                                top: 44,
-                                right: 0,
-                                zIndex: 50,
-                                background: "white",
-                                borderRadius: 12,
-                                border: "1px solid #f0f0f0",
-                                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                                overflow: "hidden",
-                                minWidth: 200,
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <DeleteInspectionButton
-                                inspectionId={checkOut.id}
-                                inspectionType="check-out"
-                                status={checkOut.status}
-                                signatures={checkOut.signatures}
-                                redirectTo={`/property/${property.id}`}
-                                variant="menuitem"
-                              />
-                            </div>
-                          )}
+                          <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10 }}>
+                            <DeleteInspectionButton
+                              inspectionId={checkOut.id}
+                              inspectionType="check-out"
+                              status={checkOut.status}
+                              signatures={checkOut.signatures}
+                              redirectTo={`/property/${property.id}`}
+                              variant="icon"
+                            />
+                          </div>
                         </div>
                       ) : (
                         <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">

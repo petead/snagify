@@ -54,7 +54,7 @@ const ALL_ROOMS = [
   "Bathroom 1", "Bathroom 2", "Bathroom 3", "Bathroom 4", "Bathroom 5", "Bathroom 6",
   "Kitchen", "Laundry", "Storage", "Maid's Room",
   "Balcony", "Terrace", "Garden", "Garage",
-  "Living / Bedroom",
+  "Living / Bedroom", "Study / Office",
 ];
 
 const DAMAGE_TAGS = [
@@ -494,111 +494,116 @@ export function InspectionClient({
         </div>
       )}
 
-      {/* ═══ SETUP SCREEN ═══ */}
+      {/* ═══ ROOMS SCREEN ═══ */}
       {screen === "rooms" && (
-        <div className="fixed inset-0 z-40 flex flex-col" style={{ background: "white" }}>
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 flex-shrink-0">
-            <button type="button" onClick={() => router.back()}
-              className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center">
-              <ChevronLeft size={18} className="text-gray-600" />
-            </button>
-            <div className="text-center">
-              <p className="font-bold text-sm" style={{ fontFamily: "Poppins,sans-serif" }}>
-                {buildingName}, Unit {unitNumber}
-              </p>
-              <p className="text-xs font-semibold" style={{ color: accentColor }}>
-                {inspectionType === "check-in" ? "🟢 Check-in" : "🟡 Check-out"}
-              </p>
+        <div style={{ minHeight: "100vh", background: "white", display: "flex", flexDirection: "column" }}>
+
+          {/* Sticky header */}
+          <div style={{
+            position: "sticky", top: 0, zIndex: 10,
+            background: "white", borderBottom: "1px solid #f0f0f0",
+            padding: "14px 16px 12px",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <button type="button" onClick={() => router.back()} style={{
+                width: 34, height: 34, borderRadius: "50%", border: "none",
+                background: "#f5f5f5", cursor: "pointer", display: "flex",
+                alignItems: "center", justifyContent: "center",
+              }}>
+                <ChevronLeft size={18} color="#555" />
+              </button>
+              <div style={{ textAlign: "center" }}>
+                <p style={{
+                  fontFamily: "Poppins, sans-serif", fontWeight: 700,
+                  fontSize: 14, margin: 0, color: "#1a1a1a",
+                }}>
+                  {buildingName}, Unit {unitNumber}
+                </p>
+                <p style={{
+                  fontSize: 12, fontWeight: 600, margin: "2px 0 0",
+                  color: inspectionType === "check-in" ? "#9A88FD" : "#FF8A65",
+                }}>
+                  {inspectionType === "check-in" ? "● Check-in" : "● Check-out"}
+                </p>
+              </div>
+              <div style={{ width: 34 }} />
             </div>
-            <div className="w-9" />
           </div>
 
           {/* Scrollable content */}
-          <div className="flex-1 overflow-y-auto no-scrollbar px-4 pt-5 pb-44">
-            <p className="text-xl font-bold mb-1" style={{ fontFamily: "Poppins,sans-serif" }}>
-              What type of property?
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px 180px" }}>
+
+            {/* Quick templates label */}
+            <p style={{
+              fontSize: 11, fontWeight: 700, color: "#9ca3af",
+              textTransform: "uppercase", letterSpacing: 1, marginBottom: 10,
+            }}>
+              Quick templates
             </p>
-            <p className="text-sm text-gray-400 mb-5">Select type to pre-fill rooms, then customize</p>
 
             {/* Type pills */}
-            <div
-              className="no-scrollbar mb-5"
-              style={{
-                display: "flex",
-                gap: 8,
-                overflowX: "auto",
-                paddingBottom: 4,
-                marginLeft: -16,
-                marginRight: -16,
-                paddingLeft: 16,
-                paddingRight: 16,
-                WebkitOverflowScrolling: "touch",
-              }}
-            >
+            <div style={{
+              display: "flex", gap: 8, overflowX: "auto",
+              marginLeft: -16, marginRight: -16,
+              paddingLeft: 16, paddingRight: 16,
+              paddingBottom: 4, marginBottom: 20,
+              scrollbarWidth: "none",
+              WebkitOverflowScrolling: "touch",
+            } as React.CSSProperties}>
               {Object.keys(ROOM_TEMPLATES).map((type) => (
-                <button key={type} type="button" onClick={() => handleTypeSelect(type)}
+                <button key={type} type="button"
+                  onClick={() => { setSelectedType(type); setSelectedRooms(ROOM_TEMPLATES[type]); }}
                   style={{
                     flexShrink: 0,
-                    padding: "8px 16px",
-                    borderRadius: 10,
-                    border: "none",
-                    background: selectedType === type
-                      ? "linear-gradient(135deg, #9A88FD, #7B65FC)"
-                      : "#f0f0f5",
-                    color: selectedType === type ? "white" : "#666",
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    boxShadow: selectedType === type ? "0 4px 12px rgba(154,136,253,0.3)" : "none",
+                    padding: "8px 18px",
+                    borderRadius: 100,
+                    border: `2px solid ${selectedType === type ? "#9A88FD" : "#e5e7eb"}`,
+                    background: selectedType === type ? "#9A88FD" : "white",
+                    color: selectedType === type ? "white" : "#555",
+                    fontWeight: 700, fontSize: 13,
+                    cursor: "pointer", whiteSpace: "nowrap",
+                    transition: "all 0.15s",
                   }}>
                   {type}
                 </button>
               ))}
             </div>
 
-            {/* Divider */}
-            <div className="flex items-center gap-3 mb-5">
-              <div className="flex-1 h-px bg-gray-100" />
-              <p className="text-xs text-gray-400 font-medium">{selectedRooms.length} rooms selected</p>
-              <div className="flex-1 h-px bg-gray-100" />
-            </div>
+            {/* Rooms count label */}
+            <p style={{
+              fontSize: 11, fontWeight: 700, color: "#9ca3af",
+              textTransform: "uppercase", letterSpacing: 1, marginBottom: 10,
+            }}>
+              Select rooms ({selectedRooms.length} selected)
+            </p>
 
-            {/* Room chips */}
-            <div className="flex flex-wrap gap-2 mb-6">
-              {ALL_ROOMS.map((room) => {
+            {/* Room chips grid */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+              {[...ALL_ROOMS, ...selectedRooms.filter((r) => !ALL_ROOMS.includes(r))].map((room) => {
                 const isSelected = selectedRooms.includes(room);
                 return (
                   <button key={room} type="button" onClick={() => toggleRoom(room)}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95"
                     style={{
-                      background: isSelected ? "#9A88FD" : "#f5f5f5",
-                      color: isSelected ? "white" : "#666",
+                      padding: "9px 16px",
+                      borderRadius: 10,
+                      border: `1.5px solid ${isSelected ? "#9A88FD" : "#e5e7eb"}`,
+                      background: isSelected ? "#9A88FD" : "white",
+                      color: isSelected ? "white" : "#374151",
+                      fontWeight: 600, fontSize: 13,
+                      cursor: "pointer", transition: "all 0.15s",
                       boxShadow: isSelected ? "0 2px 8px rgba(154,136,253,0.25)" : "none",
                     }}>
-                    <span style={{ fontSize: 16 }}>{getRoomEmoji(room)}</span>
                     {room}
-                    {isSelected && (
-                      <span className="w-4 h-4 rounded-full bg-white/30 flex items-center justify-center text-white text-xs">✓</span>
-                    )}
                   </button>
                 );
               })}
-              {selectedRooms.filter((r) => !ALL_ROOMS.includes(r)).map((room) => (
-                <button key={room} type="button" onClick={() => toggleRoom(room)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95"
-                  style={{ background: "#9A88FD", color: "white", boxShadow: "0 2px 8px rgba(154,136,253,0.25)" }}>
-                  <span style={{ fontSize: 16 }}>{getRoomEmoji(room)}</span>
-                  {room}
-                  <span className="w-4 h-4 rounded-full bg-white/30 flex items-center justify-center text-white text-xs">✓</span>
-                </button>
-              ))}
             </div>
 
             {/* Custom room input */}
-            <div className="flex gap-2">
-              <input value={customRoom} onChange={(e) => setCustomRoom(e.target.value)}
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                value={customRoom}
+                onChange={(e) => setCustomRoom(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && customRoom.trim()) {
                     setSelectedRooms((prev) => [...prev, customRoom.trim()]);
@@ -606,35 +611,54 @@ export function InspectionClient({
                   }
                 }}
                 placeholder="+ Add a custom room..."
-                className="flex-1 h-11 px-4 rounded-xl text-sm border-2 border-dashed border-gray-200 focus:border-[#9A88FD] focus:outline-none"
-                style={{ color: "#1a1a1a" }}
+                style={{
+                  flex: 1, height: 44, padding: "0 16px",
+                  borderRadius: 10, fontSize: 13, color: "#374151",
+                  border: "1.5px dashed #d1d5db",
+                  outline: "none", background: "white",
+                  fontFamily: "DM Sans, sans-serif",
+                }}
               />
-              <button type="button" onClick={() => {
+              <button type="button"
+                onClick={() => {
                   if (customRoom.trim()) {
                     setSelectedRooms((prev) => [...prev, customRoom.trim()]);
                     setCustomRoom("");
                   }
                 }}
-                className="w-11 h-11 rounded-xl font-bold text-lg text-white flex-shrink-0 flex items-center justify-center"
-                style={{ background: "#9A88FD" }}>
+                style={{
+                  width: 44, height: 44, borderRadius: 10, border: "none",
+                  background: "#9A88FD", color: "white",
+                  fontWeight: 700, fontSize: 20, cursor: "pointer",
+                }}>
                 +
               </button>
             </div>
           </div>
 
-          {/* Bottom CTA */}
-          <div className="fixed bottom-16 left-0 right-0 z-20"
-            style={{
-              background: "rgba(255,255,255,0.97)", backdropFilter: "blur(12px)",
-              borderTop: "1px solid #f0f0f0", padding: "12px 16px",
-              paddingBottom: "max(12px, env(safe-area-inset-bottom))",
-            }}>
+          {/* Fixed bottom bar */}
+          <div style={{
+            position: "fixed", bottom: 64, left: 0, right: 0,
+            background: "rgba(255,255,255,0.97)",
+            borderTop: "1px solid #f0f0f0",
+            padding: "12px 16px",
+            paddingBottom: "max(12px, env(safe-area-inset-bottom))",
+            zIndex: 20,
+          }}>
             {selectedRooms.length > 0 && (
-              <div className="flex gap-1.5 overflow-x-auto no-scrollbar mb-2.5">
+              <div style={{
+                display: "flex", gap: 6, overflowX: "auto",
+                marginBottom: 10, paddingBottom: 2,
+                scrollbarWidth: "none",
+              } as React.CSSProperties}>
                 {selectedRooms.map((room) => (
-                  <span key={room} className="flex-shrink-0 text-xs px-2.5 py-1 rounded-full font-medium"
-                    style={{ background: "#F0EDFF", color: "#7B65FC" }}>
-                    {getRoomEmoji(room)} {room}
+                  <span key={room} style={{
+                    flexShrink: 0, fontSize: 11, fontWeight: 600,
+                    padding: "4px 10px", borderRadius: 100,
+                    background: "#F0EDFF", color: "#7B65FC",
+                    whiteSpace: "nowrap",
+                  }}>
+                    {room}
                   </span>
                 ))}
               </div>
@@ -645,15 +669,18 @@ export function InspectionClient({
               style={{
                 width: "100%", height: 52, borderRadius: 14, border: "none",
                 background: selectedRooms.length > 0
-                  ? "linear-gradient(135deg,#9A88FD,#7B65FC)" : "#e5e7eb",
+                  ? "linear-gradient(135deg, #9A88FD, #7B65FC)"
+                  : "#e5e7eb",
                 color: selectedRooms.length > 0 ? "white" : "#9ca3af",
+                fontFamily: "Poppins, sans-serif",
                 fontWeight: 700, fontSize: 15,
                 cursor: selectedRooms.length > 0 ? "pointer" : "default",
+                transition: "all 0.2s",
               }}>
               {creatingRooms
                 ? "Creating rooms..."
                 : selectedRooms.length > 0
-                  ? `Start inspection → ${selectedRooms.length} rooms`
+                  ? `Continue → ${selectedRooms.length} rooms selected`
                   : "Select at least 1 room"}
             </button>
           </div>
