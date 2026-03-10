@@ -55,6 +55,24 @@ const emptyForm: FormData = {
 };
 
 // ─────────────────────────────────────────
+// Phone normalization (UAE)
+// ─────────────────────────────────────────
+const normalizePhone = (raw: string): string => {
+  if (!raw) return "";
+
+  let cleaned = raw.replace(/[\s\-\.\(\)]/g, "");
+  cleaned = cleaned.replace(/^0+/, "");
+
+  if (cleaned.startsWith("+")) return cleaned;
+  if (cleaned.startsWith("971")) return "+" + cleaned;
+  if (cleaned.startsWith("00971")) return "+" + cleaned.slice(2);
+  if (cleaned.length === 9 && /^[524679]/.test(cleaned)) return "+971" + cleaned;
+  if (cleaned.length === 10 && cleaned.startsWith("5")) return "+971" + cleaned;
+
+  return cleaned.startsWith("+") ? cleaned : "+" + cleaned;
+};
+
+// ─────────────────────────────────────────
 // AI extraction mapper
 // ─────────────────────────────────────────
 function mapExtracted(raw: Record<string, unknown>): Partial<FormData> {
@@ -276,7 +294,14 @@ function NewInspectionContent() {
         }
         const extracted = (await res.json()) as Record<string, unknown>;
         const mapped = mapExtracted(extracted);
-        setFormData((d) => ({ ...d, ...mapped }));
+        setFormData((d) => {
+          const next = { ...d, ...mapped };
+          return {
+            ...next,
+            tenant_phone: normalizePhone(next.tenant_phone || ""),
+            landlord_phone: normalizePhone(next.landlord_phone || ""),
+          };
+        });
         setTimeout(() => {
           setExtracting(false);
           setStep(2);
@@ -853,13 +878,30 @@ function NewInspectionContent() {
             />
           </Field>
           <Field label="Phone">
-            <input
-              type="tel"
-              value={formData.tenant_phone}
-              onChange={(e) => set("tenant_phone", e.target.value)}
-              placeholder="+971 50 XXX XXXX"
-              className={inputCls}
-            />
+            <div className="relative">
+              <input
+                type="tel"
+                value={formData.tenant_phone}
+                onChange={(e) => set("tenant_phone", e.target.value)}
+                onBlur={(e) => set("tenant_phone", normalizePhone(e.target.value))}
+                placeholder="+971 50 123 4567"
+                className={`${inputCls} ${formData.tenant_phone?.startsWith("+971") ? "pr-9" : ""}`}
+              />
+              {formData.tenant_phone?.startsWith("+971") && (
+                <span
+                  style={{
+                    position: "absolute",
+                    right: 14,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    fontSize: 14,
+                    color: "#cafe87",
+                  }}
+                >
+                  ✓
+                </span>
+              )}
+            </div>
           </Field>
 
           {/* Landlord */}
@@ -882,13 +924,30 @@ function NewInspectionContent() {
             />
           </Field>
           <Field label="Phone">
-            <input
-              type="tel"
-              value={formData.landlord_phone}
-              onChange={(e) => set("landlord_phone", e.target.value)}
-              placeholder="+971 50 XXX XXXX"
-              className={inputCls}
-            />
+            <div className="relative">
+              <input
+                type="tel"
+                value={formData.landlord_phone}
+                onChange={(e) => set("landlord_phone", e.target.value)}
+                onBlur={(e) => set("landlord_phone", normalizePhone(e.target.value))}
+                placeholder="+971 50 123 4567"
+                className={`${inputCls} ${formData.landlord_phone?.startsWith("+971") ? "pr-9" : ""}`}
+              />
+              {formData.landlord_phone?.startsWith("+971") && (
+                <span
+                  style={{
+                    position: "absolute",
+                    right: 14,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    fontSize: 14,
+                    color: "#cafe87",
+                  }}
+                >
+                  ✓
+                </span>
+              )}
+            </div>
           </Field>
         </div>
       )}
