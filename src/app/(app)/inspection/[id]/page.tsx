@@ -10,33 +10,45 @@ export default async function InspectionPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: inspection, error: inspErr } = await supabase
+  const { data: inspection, error } = await supabase
     .from("inspections")
-    .select("id, type, property_id, properties(building_name, unit_number)")
+    .select(
+      `
+      *,
+      properties (building_name, unit_number),
+      tenancies (tenant_name, landlord_name),
+      rooms (
+        id, name, order_index,
+        room_items (id, name, condition, notes, ai_description),
+        photos (id, url, ai_analysis)
+      )
+    `
+    )
     .eq("id", id)
     .single();
 
-  if (inspErr || !inspection) notFound();
+  if (error || !inspection) notFound();
 
   const prop = Array.isArray(inspection.properties)
     ? inspection.properties[0]
     : inspection.properties;
 
-  const { data: rooms } = await supabase
-    .from("rooms")
-    .select(
-      "id, name, order_index, overall_condition, room_items(id)"
-    )
-    .eq("inspection_id", id)
-    .order("order_index", { ascending: true });
+  const rawRooms = (inspection.rooms ?? []) as {
+    id: string;
+    name: string;
+    order_index: number | null;
+    room_items: { id: string; name: string; condition: string; notes: string; ai_description: string }[] | null;
+    photos: { id: string; url: string; ai_analysis: string | null }[] | null;
+  }[];
 
-  const roomsWithMeta = (rooms ?? []).map((r) => ({
-    id: r.id,
-    name: r.name,
-    order_index: r.order_index,
-    overall_condition: r.overall_condition,
-    item_count: (r.room_items as { id: string }[] | null)?.length ?? 0,
-  }));
+  const rooms = rawRooms
+    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      order_index: r.order_index,
+      existingPhotos: r.photos ?? [],
+    }));
 
   return (
     <InspectionClient
@@ -44,7 +56,7 @@ export default async function InspectionPage({
       inspectionType={inspection.type ?? "check-in"}
       buildingName={prop?.building_name ?? "Property"}
       unitNumber={prop?.unit_number ?? ""}
-      rooms={roomsWithMeta}
+      rooms={rooms}
     />
   );
 }
