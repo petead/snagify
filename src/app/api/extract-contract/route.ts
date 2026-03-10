@@ -38,15 +38,32 @@ Return only the JSON, no other text.`;
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { data: base64Data, mediaType = "application/pdf" } = body as {
-      data: string;
-      mediaType?: string;
-    };
+    // Accept FormData (file upload) only — no Supabase, no DB writes; return JSON only
+    const contentType = request.headers.get("content-type") ?? "";
+    let base64Data: string;
+    let mediaType: string;
 
-    if (!base64Data || typeof base64Data !== "string") {
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      const file = formData.get("file");
+      if (!file || !(file instanceof File)) {
+        return NextResponse.json(
+          { error: "Missing or invalid file in form data" },
+          { status: 400 }
+        );
+      }
+      const buf = await file.arrayBuffer();
+      base64Data = Buffer.from(buf).toString("base64");
+      mediaType = file.type || "application/pdf";
+    } else {
+      const body = (await request.json()) as { data?: string; mediaType?: string };
+      base64Data = body.data ?? "";
+      mediaType = body.mediaType ?? "application/pdf";
+    }
+
+    if (!base64Data) {
       return NextResponse.json(
-        { error: "Missing or invalid base64 data" },
+        { error: "Missing or invalid file / base64 data" },
         { status: 400 }
       );
     }

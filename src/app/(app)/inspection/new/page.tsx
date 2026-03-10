@@ -255,65 +255,48 @@ function NewInspectionContent() {
     else setStep(((step - 1) as Step));
   };
 
-  // ── PDF extraction
-  const readBase64 = (file: File): Promise<{ data: string; mediaType: string }> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.includes(",") ? result.split(",")[1] : result;
-        const mediaType =
-          file.type === "application/pdf"
-            ? "application/pdf"
-            : file.type.startsWith("image/")
-              ? file.type
-              : "image/jpeg";
-        resolve({ data: base64, mediaType });
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+  // ── PDF extraction: ONLY pre-fills form state; no DB write until "Start Inspection"
+  const handleExtractContract = useCallback(async (file: File) => {
+    setExtractError(null);
+    setExtracting(true);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append("file", file);
 
-  const handleExtract = useCallback(
-    async (file: File) => {
-      setExtractError(null);
-      setExtracting(true);
-      try {
-        const { data, mediaType } = await readBase64(file);
-        const res = await fetch("/api/extract-contract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data, mediaType }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(
-            (err as { error?: string }).error || res.statusText
-          );
-        }
-        const extracted = (await res.json()) as Record<string, unknown>;
-        const mapped = mapExtracted(extracted);
-        setFormData((d) => {
-          const next = { ...d, ...mapped };
-          return {
-            ...next,
-            tenant_phone: normalizePhone(next.tenant_phone || ""),
-            landlord_phone: normalizePhone(next.landlord_phone || ""),
-          };
-        });
-        setTimeout(() => {
-          setExtracting(false);
-          setStep(2);
-        }, 800);
-      } catch (e) {
-        setExtracting(false);
-        setExtractError(
-          e instanceof Error ? e.message : "Failed to read contract"
+      const res = await fetch("/api/extract-contract", {
+        method: "POST",
+        body: formDataUpload,
+      });
+
+      const extracted = (await res.json()) as Record<string, unknown>;
+      if (!res.ok) {
+        throw new Error(
+          (extracted as { error?: string }).error || res.statusText
         );
       }
-    },
-    []
-  );
+
+      // PRE-FILL form state with extracted data; user can override before submitting
+      const mapped = mapExtracted(extracted);
+      setFormData((d) => {
+        const next = { ...d, ...mapped };
+        return {
+          ...next,
+          tenant_phone: normalizePhone(next.tenant_phone || ""),
+          landlord_phone: normalizePhone(next.landlord_phone || ""),
+        };
+      });
+
+      setStep(2);
+    } catch (e) {
+      console.error("Extraction error:", e);
+      setExtractError(
+        e instanceof Error ? e.message : "Could not extract contract data. Please fill in manually."
+      );
+      setStep(2);
+    } finally {
+      setExtracting(false);
+    }
+  }, []);
 
   // ── Form validation
   const formValid =
@@ -366,150 +349,114 @@ function NewInspectionContent() {
     return false;
   };
 
-  // ── Start inspection (existing logic, mapped from formData)
+  // ── Start inspection: formData (user-validated) is the only source of truth for DB
   const handleStartInspection = async () => {
     setSaveError(null);
     setSaving(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      setSaveError("You must be signed in.");
-      setSaving(false);
-      return;
-    }
-
-    const buildingName = formData.building_name.trim() || null;
-    const unitNumber = formData.unit_number.trim() || null;
-    const address =
-      formData.address.trim() ||
-      (buildingName && unitNumber
-        ? `${buildingName}, Unit ${unitNumber}`
-        : null);
-
-    let propertyId: string;
-
-    if (urlPropertyId) {
-      propertyId = urlPropertyId;
-    } else {
-      let q = supabase.from("properties").select("id").eq("agent_id", user.id);
-      q = buildingName
-        ? q.eq("building_name", buildingName)
-        : q.is("building_name", null);
-      q = unitNumber
-        ? q.eq("unit_number", unitNumber)
-        : q.is("unit_number", null);
-      const { data: existing } = await q.maybeSingle();
-
-      if (existing?.id) {
-        propertyId = existing.id;
-      } else {
-        const { data: prop, error: propErr } = await supabase
-          .from("properties")
-          .insert({
-            agent_id: user.id,
-            building_name: buildingName,
-            unit_number: unitNumber,
-            address,
-            property_type: formData.property_type || null,
-            furnished: false,
-          })
-          .select("id")
-          .single();
-        if (propErr || !prop) {
-          setSaveError(propErr?.message ?? "Failed to create property.");
-          setSaving(false);
-          return;
-        }
-        propertyId = prop.id;
-      }
-    }
-
-    // Tenancy conflict check: warn only if tenant has completed check-in without check-out
     try {
-      const hasConflict = await checkTenancyConflict();
-      if (hasConflict) {
-        const confirmed = window.confirm(
-          `⚠️ ${formData.tenant_name} has an active tenancy without a completed check-out.\n\nDo you want to continue anyway?`
-        );
-        if (!confirmed) {
-          setSaving(false);
-          return;
-        }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setSaveError("You must be signed in.");
+        setSaving(false);
+        return;
       }
-    } catch {
-      // tenancies/inspections tables may not exist; continue
-    }
 
-    // Tenancy
-    let tenancyId: string | null = urlTenancyId ?? null;
-    if (!tenancyId) {
+      // Tenancy conflict check: warn only if tenant has completed check-in without check-out
       try {
-        const { data: tenancy } = await supabase
-          .from("tenancies")
-          .insert({
-            property_id: propertyId,
-            agent_id: user.id,
-            tenant_name: formData.tenant_name.trim() || "Unknown Tenant",
-            tenant_email: formData.tenant_email.trim() || null,
-            tenant_phone: formData.tenant_phone.trim() || null,
-            landlord_name: formData.landlord_name.trim() || null,
-            landlord_email: formData.landlord_email.trim() || null,
-            landlord_phone: formData.landlord_phone.trim() || null,
-            ejari_ref: formData.ejari_ref.trim() || null,
-            tenancy_type: formData.tenancy_type || "standard",
-            contract_from: formData.contract_from || null,
-            contract_to: formData.contract_to || null,
-            annual_rent: formData.annual_rent ? Number(formData.annual_rent) : null,
-            security_deposit: formData.security_deposit
-              ? Number(formData.security_deposit)
-              : null,
-            property_size: formData.property_size
-              ? Number(formData.property_size)
-              : null,
-            status: "active",
-          })
-          .select("id")
-          .single();
-        if (tenancy?.id) tenancyId = tenancy.id;
+        const hasConflict = await checkTenancyConflict();
+        if (hasConflict) {
+          const confirmed = window.confirm(
+            `⚠️ ${formData.tenant_name} has an active tenancy without a completed check-out.\n\nDo you want to continue anyway?`
+          );
+          if (!confirmed) {
+            setSaving(false);
+            return;
+          }
+        }
       } catch {
-        // continue without tenancy
+        // tenancies/inspections tables may not exist; continue
       }
-    }
 
-    // Inspection
-    const { data: insp, error: inspErr } = await supabase
-      .from("inspections")
-      .insert({
-        property_id: propertyId,
-        ...(tenancyId && { tenancy_id: tenancyId }),
-        agent_id: user.id,
-        type: formData.inspectionType,
-        status: "in_progress",
-      })
-      .select("id")
-      .single();
+      // Property: insert from formData only
+      const { data: property, error: propError } = await supabase
+        .from("properties")
+        .insert({
+          agent_id: user.id,
+          building_name: formData.building_name,
+          unit_number: formData.unit_number,
+          property_type: (formData.property_type || "apartment").toLowerCase(),
+          address: `${formData.building_name}, Unit ${formData.unit_number}`,
+        })
+        .select()
+        .single();
 
-    if (inspErr || !insp) {
-      setSaveError(inspErr?.message ?? "Failed to create inspection.");
-      setSaving(false);
-      return;
-    }
+      if (propError) throw propError;
 
-    // Insert rooms selected in the recap step
-    if (selectedRooms.length > 0) {
-      await supabase.from("rooms").insert(
-        selectedRooms.map((name, i) => ({
-          inspection_id: insp.id,
+      // Tenancy: insert from formData only
+      const { data: tenancy, error: tenError } = await supabase
+        .from("tenancies")
+        .insert({
+          property_id: property.id,
+          agent_id: user.id,
+          tenant_name: formData.tenant_name,
+          tenant_email: formData.tenant_email,
+          tenant_phone: formData.tenant_phone,
+          landlord_name: formData.landlord_name,
+          landlord_email: formData.landlord_email,
+          landlord_phone: formData.landlord_phone,
+          ejari_ref: formData.ejari_ref,
+          contract_from: formData.contract_from,
+          contract_to: formData.contract_to,
+          annual_rent: formData.annual_rent
+            ? Number(String(formData.annual_rent).replace(/[^0-9.]/g, ""))
+            : null,
+          security_deposit: formData.security_deposit
+            ? Number(String(formData.security_deposit).replace(/[^0-9.]/g, ""))
+            : null,
+          tenancy_type: "standard",
+          status: "active",
+        })
+        .select()
+        .single();
+
+      if (tenError) throw tenError;
+
+      // Inspection
+      const { data: inspection, error: inspError } = await supabase
+        .from("inspections")
+        .insert({
+          property_id: property.id,
+          tenancy_id: tenancy.id,
+          agent_id: user.id,
+          type: formData.inspectionType,
+          status: "draft",
+        })
+        .select()
+        .single();
+
+      if (inspError) throw inspError;
+
+      // Insert rooms selected by user
+      if (selectedRooms.length > 0) {
+        const roomInserts = selectedRooms.map((name, i) => ({
+          inspection_id: inspection.id,
           name,
           order_index: i,
-        }))
-      );
-    }
+        }));
+        await supabase.from("rooms").insert(roomInserts);
+      }
 
-    setSaving(false);
-    router.push(`/inspection/${insp.id}`);
-    router.refresh();
+      router.push(`/inspection/${inspection.id}`);
+    } catch (err) {
+      console.error("Error creating inspection:", err);
+      setSaveError(
+        err instanceof Error ? err.message : "Error creating inspection. Please try again."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ─────────────────────────────────────
@@ -652,7 +599,7 @@ function NewInspectionContent() {
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) handleExtract(f);
+              if (f) handleExtractContract(f);
               e.target.value = "";
             }}
           />
@@ -670,7 +617,7 @@ function NewInspectionContent() {
                   e.preventDefault();
                   setDragging(false);
                   const f = e.dataTransfer.files[0];
-                  if (f) handleExtract(f);
+                  if (f) handleExtractContract(f);
                 }}
                 className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
                   dragging
