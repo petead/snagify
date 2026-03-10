@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 // Types
 // ─────────────────────────────────────────
 type Step = 0 | 1 | 2 | 3;
-type EntryMode = "upload" | "manual" | null;
+type Mode = "upload" | "manual" | null;
 
 interface FormData {
   inspectionType: "check-in" | "check-out";
@@ -248,8 +248,8 @@ function NewInspectionContent() {
   const supabase = createClient();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [step, setStep] = useState<Step>(0);
-  const [entryMode, setEntryMode] = useState<EntryMode>(null);
+  const [step, setStep] = useState<Step>(existingPropertyId ? 1 : 0);
+  const [mode, setMode] = useState<Mode>(existingPropertyId ? "upload" : null);
   const [dragging, setDragging] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
@@ -295,24 +295,19 @@ function NewInspectionContent() {
           property_type: property.property_type ?? "",
           address: property.address ?? "",
         }));
-        setEntryMode("upload");
+        setMode("upload");
         setStep(1);
       }
     };
     void fetchProperty();
   }, [existingPropertyId]);
 
-  // Skip step 1 when manual mode selected (go straight to form)
-  useEffect(() => {
-    if (step === 1 && entryMode === "manual") setStep(2);
-  }, [step, entryMode]);
-
   const set = (k: keyof FormData, v: string) =>
     setFormData((d) => ({ ...d, [k]: v }));
 
   const handleBack = () => {
     if (step === 0) router.back();
-    else if (step === 2 && entryMode === "manual") setStep(0);
+    else if (step === 2 && mode === "manual") setStep(0);
     else setStep(((step - 1) as Step));
   };
 
@@ -649,7 +644,7 @@ function NewInspectionContent() {
             <button
               type="button"
               onClick={() => {
-                setEntryMode("upload");
+                setMode("upload");
                 setStep(1);
               }}
               className="bg-white rounded-2xl border-2 border-[#9A88FD] p-5 text-left active:scale-[0.98] transition-transform shadow-sm"
@@ -679,8 +674,8 @@ function NewInspectionContent() {
             <button
               type="button"
               onClick={() => {
-                setEntryMode("manual");
-                setStep(1);
+                setMode("manual");
+                setStep(2);
               }}
               className="bg-white rounded-2xl border-2 border-gray-200 p-5 text-left active:scale-[0.98] transition-transform shadow-sm"
             >
@@ -719,7 +714,7 @@ function NewInspectionContent() {
       )}
 
       {/* STEP 1 — Upload PDF */}
-      {step === 1 && entryMode === "upload" && (
+      {step === 1 && mode === "upload" && (
         <div className="px-4 pt-6">
           <input
             ref={fileRef}
@@ -784,7 +779,7 @@ function NewInspectionContent() {
               <button
                 type="button"
                 onClick={() => {
-                  setEntryMode("manual");
+                  setMode("manual");
                   setStep(2);
                 }}
                 className="w-full py-3 rounded-xl border border-gray-200 text-sm text-gray-500 font-medium"
@@ -832,7 +827,7 @@ function NewInspectionContent() {
       {/* STEP 2 — Verify / Fill form */}
       {step === 2 && (
         <div className="px-4 pt-4 pb-44">
-          {entryMode === "upload" && (
+          {mode === "upload" && (
             <div className="bg-[#F0EDFF] rounded-xl p-3 mb-4 flex gap-2">
               <span className="text-sm">🤖</span>
               <p className="text-xs text-[#7B65FC]">

@@ -20,19 +20,23 @@ type BlockedReason =
 const overlayStyle: React.CSSProperties = {
   position: "fixed",
   inset: 0,
-  background: "rgba(0,0,0,0.5)",
-  zIndex: 1000,
-  display: "flex",
-  alignItems: "flex-end",
-  justifyContent: "center",
+  background: "rgba(0,0,0,0.6)",
+  zIndex: 9998,
+  WebkitTapHighlightColor: "transparent",
 };
 
 const sheetStyle: React.CSSProperties = {
+  position: "fixed",
+  bottom: 0,
+  left: 0,
+  right: 0,
+  zIndex: 9999,
   background: "white",
-  borderRadius: "24px 24px 0 0",
-  padding: "24px 24px 40px",
-  width: "100%",
-  maxWidth: 480,
+  borderRadius: "20px 20px 0 0",
+  padding: "24px 20px",
+  paddingBottom: "max(24px, env(safe-area-inset-bottom))",
+  boxShadow: "0 -4px 32px rgba(0,0,0,0.15)",
+  maxWidth: "100vw",
 };
 
 const titleStyle: React.CSSProperties = {
@@ -76,8 +80,9 @@ function ConfirmModal({
   onCancel: () => void;
 }) {
   return (
-    <div style={overlayStyle} onClick={onCancel}>
-      <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
+    <>
+      <div style={overlayStyle} onClick={onCancel} />
+      <div style={sheetStyle}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <span style={{ fontSize: 40 }}>🗑️</span>
         </div>
@@ -123,7 +128,7 @@ function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -135,8 +140,9 @@ function BlockedSignedModal({
   onClose: () => void;
 }) {
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
+    <>
+      <div style={overlayStyle} onClick={onClose} />
+      <div style={sheetStyle}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <span style={{ fontSize: 40 }}>🔒</span>
         </div>
@@ -162,14 +168,15 @@ function BlockedSignedModal({
           OK, understood
         </button>
       </div>
-    </div>
+    </>
   );
 }
 
 function BlockedCheckoutModal({ onClose }: { onClose: () => void }) {
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
+    <>
+      <div style={overlayStyle} onClick={onClose} />
+      <div style={sheetStyle}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <span style={{ fontSize: 40 }}>⚠️</span>
         </div>
@@ -182,7 +189,7 @@ function BlockedCheckoutModal({ onClose }: { onClose: () => void }) {
           OK
         </button>
       </div>
-    </div>
+    </>
   );
 }
 

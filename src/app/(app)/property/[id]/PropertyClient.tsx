@@ -141,28 +141,6 @@ export function PropertyClient({
       : "Property");
   const truncTitle = title.length > 26 ? title.slice(0, 23) + "…" : title;
   const newInspectionHref = getNewInspectionHref(property.id, tenancyGroups);
-  const hasActiveTenancy = tenancyGroups.some((group) => {
-    const checkIn = group.inspections.find(
-      (i) =>
-        (i.type ?? "").toLowerCase().includes("check-in") ||
-        (i.type ?? "").toLowerCase() === "check_in"
-    );
-    const checkOut = group.inspections.find(
-      (i) =>
-        (i.type ?? "").toLowerCase().includes("check-out") ||
-        (i.type ?? "").toLowerCase() === "check_out"
-    );
-    if (!checkIn) return false;
-    const checkInDone =
-      checkIn.status === "completed" ||
-      checkIn.status === "signed" ||
-      checkIn.status === "draft" ||
-      checkIn.status === "in_progress";
-    const checkOutDone =
-      checkOut?.status === "completed" || checkOut?.status === "signed";
-    return checkInDone && !checkOutDone;
-  });
-
   return (
     <div className="min-h-screen bg-[#fcfcfc] max-w-lg mx-auto pb-24">
       <header className="sticky top-0 z-40 bg-white border-b border-gray-100">
@@ -218,29 +196,6 @@ export function PropertyClient({
             </div>
           </div>
         </div>
-
-        <Link
-          href={`/inspection/new?propertyId=${property.id}`}
-          className="block text-center"
-          style={{
-            width: "100%",
-            height: 52,
-            lineHeight: "52px",
-            borderRadius: 14,
-            border: hasActiveTenancy ? "1.5px solid #9A88FD" : "none",
-            background: hasActiveTenancy
-              ? "white"
-              : "linear-gradient(135deg, #9A88FD, #7B65FC)",
-            color: hasActiveTenancy ? "#7B65FC" : "white",
-            fontFamily: "Poppins, sans-serif",
-            fontWeight: 700,
-            fontSize: 15,
-            cursor: "pointer",
-            marginBottom: 16,
-          }}
-        >
-          + New Tenancy Contract
-        </Link>
 
         <div>
           <h2 className="font-heading font-bold text-lg text-[#1A1A1A] mb-4">
