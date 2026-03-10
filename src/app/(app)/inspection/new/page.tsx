@@ -72,6 +72,31 @@ const normalizePhone = (raw: string): string => {
 };
 
 // ─────────────────────────────────────────
+// Date / number normalizers for DB
+// ─────────────────────────────────────────
+const normalizeDate = (raw: string | null | undefined): string | null => {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+    const [d, m, y] = s.split("/");
+    return `${y}-${m}-${d}`;
+  }
+  if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+    const [d, m, y] = s.split("-");
+    return `${y}-${m}-${d}`;
+  }
+  return null;
+};
+
+const cleanNumber = (val: unknown): number | null => {
+  if (val == null) return null;
+  const n = Number(String(val).replace(/[^0-9.]/g, ""));
+  return Number.isNaN(n) ? null : n;
+};
+
+// ─────────────────────────────────────────
 // AI extraction mapper
 // ─────────────────────────────────────────
 function mapExtracted(raw: Record<string, unknown>): Partial<FormData> {
@@ -362,6 +387,11 @@ function NewInspectionContent() {
         setSaving(false);
         return;
       }
+      if (!user.id) {
+        alert("User session expired. Please refresh.");
+        setSaving(false);
+        return;
+      }
 
       // Tenancy conflict check: warn only if tenant has completed check-in without check-out
       try {
@@ -379,6 +409,13 @@ function NewInspectionContent() {
         // tenancies/inspections tables may not exist; continue
       }
 
+      const propertyType =
+        (formData.property_type || "apartment")
+          .toLowerCase()
+          .replace("appartement", "apartment")
+          .replace("villa", "villa")
+          .replace("townhouse", "townhouse") || "apartment";
+
       // Property: insert from formData only
       const { data: property, error: propError } = await supabase
         .from("properties")
@@ -386,13 +423,16 @@ function NewInspectionContent() {
           agent_id: user.id,
           building_name: formData.building_name,
           unit_number: formData.unit_number,
-          property_type: (formData.property_type || "apartment").toLowerCase(),
+          property_type: propertyType,
           address: `${formData.building_name}, Unit ${formData.unit_number}`,
         })
         .select()
         .single();
 
-      if (propError) throw propError;
+      if (propError) {
+        console.error("Property insert error:", propError);
+        throw propError;
+      }
 
       // Tenancy: insert from formData only
       const { data: tenancy, error: tenError } = await supabase
@@ -401,27 +441,26 @@ function NewInspectionContent() {
           property_id: property.id,
           agent_id: user.id,
           tenant_name: formData.tenant_name,
-          tenant_email: formData.tenant_email,
+          tenant_email: formData.tenant_email || "",
           tenant_phone: formData.tenant_phone,
           landlord_name: formData.landlord_name,
-          landlord_email: formData.landlord_email,
+          landlord_email: formData.landlord_email || "",
           landlord_phone: formData.landlord_phone,
           ejari_ref: formData.ejari_ref,
-          contract_from: formData.contract_from,
-          contract_to: formData.contract_to,
-          annual_rent: formData.annual_rent
-            ? Number(String(formData.annual_rent).replace(/[^0-9.]/g, ""))
-            : null,
-          security_deposit: formData.security_deposit
-            ? Number(String(formData.security_deposit).replace(/[^0-9.]/g, ""))
-            : null,
+          contract_from: normalizeDate(formData.contract_from),
+          contract_to: normalizeDate(formData.contract_to),
+          annual_rent: cleanNumber(formData.annual_rent),
+          security_deposit: cleanNumber(formData.security_deposit),
           tenancy_type: "standard",
           status: "active",
         })
         .select()
         .single();
 
-      if (tenError) throw tenError;
+      if (tenError) {
+        console.error("Tenancy insert error:", tenError);
+        throw tenError;
+      }
 
       // Inspection
       const { data: inspection, error: inspError } = await supabase
@@ -436,7 +475,10 @@ function NewInspectionContent() {
         .select()
         .single();
 
-      if (inspError) throw inspError;
+      if (inspError) {
+        console.error("Inspection insert error:", inspError);
+        throw inspError;
+      }
 
       // Insert rooms selected by user
       if (selectedRooms.length > 0) {
@@ -449,11 +491,20 @@ function NewInspectionContent() {
       }
 
       router.push(`/inspection/${inspection.id}`);
-    } catch (err) {
-      console.error("Error creating inspection:", err);
-      setSaveError(
-        err instanceof Error ? err.message : "Error creating inspection. Please try again."
-      );
+    } catch (err: unknown) {
+      const e = err as { message?: string; details?: string; hint?: string; code?: string };
+      console.error("=== INSPECTION CREATION ERROR ===");
+      console.error("Error object:", err);
+      console.error("Error message:", e?.message);
+      console.error("Error details:", e?.details);
+      console.error("Error hint:", e?.hint);
+      console.error("Error code:", e?.code);
+      console.error("formData at time of error:", JSON.stringify(formData, null, 2));
+
+      const displayMessage =
+        e?.message || e?.details || (typeof err === "object" ? JSON.stringify(err) : String(err));
+      setSaveError(displayMessage);
+      alert(`Error: ${displayMessage}`);
     } finally {
       setSaving(false);
     }
