@@ -27,6 +27,29 @@ type PhotoItem = {
   notes?: string;
 };
 
+type GeoCoords = { lat: number; lng: number };
+
+function getGeoCoords(): Promise<GeoCoords | null> {
+  if (typeof navigator === "undefined" || !navigator.geolocation) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => resolve(null), 8000);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        clearTimeout(timeout);
+        resolve({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      () => {
+        clearTimeout(timeout);
+        resolve(null);
+      },
+      { enableHighAccuracy: false, timeout: 6000, maximumAge: 30000 }
+    );
+  });
+}
+
 interface Props {
   inspectionId: string;
   inspectionType: string;
@@ -321,6 +344,7 @@ export function InspectionClient({
 
     for (const file of Array.from(files)) {
       const tempId = Math.random().toString(36).slice(2);
+      const coordsPromise = getGeoCoords(); // start geoloc in parallel with upload
       const base64: string = await new Promise((res) => {
         const reader = new FileReader();
         reader.onload = () => res(reader.result as string);
@@ -349,7 +373,7 @@ export function InspectionClient({
       } catch { /* continue */ }
 
       let photoRecordId: string | null = null;
-      const coords: { lat: number; lng: number } | null = null; // TODO: from geolocation if needed
+      const coords = await coordsPromise;
       if (storedPath) {
         const { data: photoRecord } = await supabase
           .from("photos")
