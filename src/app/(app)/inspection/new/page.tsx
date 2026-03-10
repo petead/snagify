@@ -116,6 +116,26 @@ const stepTitles: Record<Step, string> = {
   3: "Ready to Start",
 };
 
+const ROOM_TEMPLATES: Record<string, string[]> = {
+  "Studio":    ["Entrance", "Living / Bedroom", "Kitchen", "Bathroom 1", "Balcony"],
+  "1 BR":      ["Entrance", "Living Room", "Kitchen", "Bedroom 1", "Bathroom 1", "Balcony"],
+  "2 BR":      ["Entrance", "Living Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bathroom 1", "Bathroom 2", "Balcony"],
+  "3 BR":      ["Entrance", "Living Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Balcony"],
+  "4 BR":      ["Entrance", "Living Room", "Dining Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Bathroom 4", "Balcony", "Maid's Room"],
+  "5 BR":      ["Entrance", "Living Room", "Dining Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Bedroom 5", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Bathroom 4", "Bathroom 5", "Balcony", "Maid's Room", "Laundry"],
+  "6 BR":      ["Entrance", "Living Room", "Dining Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Bedroom 5", "Bedroom 6", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Bathroom 4", "Bathroom 5", "Bathroom 6", "Balcony", "Maid's Room", "Laundry", "Storage"],
+  "Villa":     ["Entrance", "Living Room", "Dining Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Bathroom 4", "Garden", "Garage", "Maid's Room", "Laundry", "Storage"],
+  "Townhouse": ["Entrance", "Living Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Terrace", "Garage"],
+};
+
+const ALL_ROOMS = [
+  "Entrance", "Living Room", "Dining Room",
+  "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Bedroom 5", "Bedroom 6",
+  "Bathroom 1", "Bathroom 2", "Bathroom 3", "Bathroom 4", "Bathroom 5", "Bathroom 6",
+  "Kitchen", "Laundry", "Storage", "Maid's Room",
+  "Balcony", "Terrace", "Garden", "Garage",
+  "Living / Bedroom", "Study / Office",
+];
 
 const inputCls =
   "w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:border-[#9A88FD] focus:outline-none transition-colors bg-white";
@@ -186,6 +206,16 @@ function NewInspectionContent() {
   const [formData, setFormData] = useState<FormData>({ ...emptyForm });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Room selector state (used in recap step)
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
+  const [customRoom, setCustomRoom] = useState("");
+
+  const toggleRoom = (room: string) =>
+    setSelectedRooms((prev) =>
+      prev.includes(room) ? prev.filter((r) => r !== room) : [...prev, room]
+    );
 
   // Pre-fill inspection type from URL
   useEffect(() => {
@@ -407,6 +437,17 @@ function NewInspectionContent() {
       setSaveError(inspErr?.message ?? "Failed to create inspection.");
       setSaving(false);
       return;
+    }
+
+    // Insert rooms selected in the recap step
+    if (selectedRooms.length > 0) {
+      await supabase.from("rooms").insert(
+        selectedRooms.map((name, i) => ({
+          inspection_id: insp.id,
+          name,
+          order_index: i,
+        }))
+      );
     }
 
     setSaving(false);
@@ -872,7 +913,7 @@ function NewInspectionContent() {
           )}
 
           {/* Property */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-3">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
             <p className="text-xs font-bold text-[#9A88FD] uppercase tracking-wider mb-3">
               Property
             </p>
@@ -892,67 +933,118 @@ function NewInspectionContent() {
             </div>
           </div>
 
-          {/* Tenancy */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-3">
-            <p className="text-xs font-bold text-[#9A88FD] uppercase tracking-wider mb-3">
-              Tenancy
+          {/* ROOMS SECTION */}
+          <div style={{ marginTop: 4 }}>
+            <p style={{
+              fontSize: 11, fontWeight: 700, color: "#9ca3af",
+              textTransform: "uppercase", letterSpacing: 1, marginBottom: 10,
+            }}>
+              Quick templates
             </p>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <p className="text-xs text-gray-400">Tenant</p>
-                <p className="font-semibold text-gray-800 truncate">
-                  {formData.tenant_name || "—"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400">Landlord</p>
-                <p className="font-semibold text-gray-800 truncate">
-                  {formData.landlord_name || "—"}
-                </p>
-              </div>
-              {formData.contract_from && (
-                <div>
-                  <p className="text-xs text-gray-400">From</p>
-                  <p className="font-semibold text-gray-800">
-                    {new Date(formData.contract_from).toLocaleDateString(
-                      "en-GB",
-                      { day: "2-digit", month: "short", year: "numeric" }
-                    )}
-                  </p>
-                </div>
-              )}
-              {formData.contract_to && (
-                <div>
-                  <p className="text-xs text-gray-400">To</p>
-                  <p className="font-semibold text-gray-800">
-                    {new Date(formData.contract_to).toLocaleDateString(
-                      "en-GB",
-                      { day: "2-digit", month: "short", year: "numeric" }
-                    )}
-                  </p>
-                </div>
-              )}
-              {formData.annual_rent && (
-                <div className="col-span-2">
-                  <p className="text-xs text-gray-400">Annual Rent</p>
-                  <p className="font-semibold text-gray-800">
-                    AED {Number(formData.annual_rent).toLocaleString()}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
 
-          {/* Rooms note */}
-          <div className="bg-[#F0EDFF] rounded-xl p-3 flex items-center gap-3">
-            <span className="text-xl">🏠</span>
-            <div>
-              <p className="text-sm font-semibold text-[#7B65FC]">
-                Rooms selected on next screen
-              </p>
-              <p className="text-xs text-[#9A88FD]">
-                You&apos;ll choose and customize rooms when the inspection starts
-              </p>
+            {/* Type pills */}
+            <div style={{
+              display: "flex", gap: 8, overflowX: "auto",
+              marginLeft: -16, marginRight: -16,
+              paddingLeft: 16, paddingRight: 16,
+              paddingBottom: 4, marginBottom: 16,
+              scrollbarWidth: "none",
+              WebkitOverflowScrolling: "touch",
+            } as React.CSSProperties}>
+              {Object.keys(ROOM_TEMPLATES).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => {
+                    setSelectedType(type);
+                    setSelectedRooms(ROOM_TEMPLATES[type]);
+                  }}
+                  style={{
+                    flexShrink: 0,
+                    padding: "8px 18px",
+                    borderRadius: 100,
+                    border: `2px solid ${selectedType === type ? "#9A88FD" : "#e5e7eb"}`,
+                    background: selectedType === type ? "#9A88FD" : "white",
+                    color: selectedType === type ? "white" : "#555",
+                    fontWeight: 700, fontSize: 13,
+                    cursor: "pointer", whiteSpace: "nowrap",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+
+            <p style={{
+              fontSize: 11, fontWeight: 700, color: "#9ca3af",
+              textTransform: "uppercase", letterSpacing: 1, marginBottom: 10,
+            }}>
+              Select rooms{selectedRooms.length > 0 ? ` (${selectedRooms.length} selected)` : ""}
+            </p>
+
+            {/* Room chips */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+              {[...ALL_ROOMS, ...selectedRooms.filter((r) => !ALL_ROOMS.includes(r))].map((room) => {
+                const isSelected = selectedRooms.includes(room);
+                return (
+                  <button
+                    key={room}
+                    type="button"
+                    onClick={() => toggleRoom(room)}
+                    style={{
+                      padding: "9px 16px",
+                      borderRadius: 10,
+                      border: `1.5px solid ${isSelected ? "#9A88FD" : "#e5e7eb"}`,
+                      background: isSelected ? "#9A88FD" : "white",
+                      color: isSelected ? "white" : "#374151",
+                      fontWeight: 600, fontSize: 13,
+                      cursor: "pointer", transition: "all 0.15s",
+                      boxShadow: isSelected ? "0 2px 8px rgba(154,136,253,0.25)" : "none",
+                    }}
+                  >
+                    {room}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Custom room input */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                value={customRoom}
+                onChange={(e) => setCustomRoom(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && customRoom.trim()) {
+                    setSelectedRooms((prev) => [...prev, customRoom.trim()]);
+                    setCustomRoom("");
+                  }
+                }}
+                placeholder="+ Add a custom room..."
+                style={{
+                  flex: 1, height: 44, padding: "0 16px",
+                  borderRadius: 10, fontSize: 13, color: "#374151",
+                  border: "1.5px dashed #d1d5db",
+                  outline: "none", background: "white",
+                  fontFamily: "inherit",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (customRoom.trim()) {
+                    setSelectedRooms((prev) => [...prev, customRoom.trim()]);
+                    setCustomRoom("");
+                  }
+                }}
+                style={{
+                  width: 44, height: 44, borderRadius: 10, border: "none",
+                  background: "#9A88FD", color: "white",
+                  fontWeight: 700, fontSize: 20, cursor: "pointer",
+                }}
+              >
+                +
+              </button>
             </div>
           </div>
         </div>
@@ -978,11 +1070,19 @@ function NewInspectionContent() {
           <button
             type="button"
             onClick={handleStartInspection}
-            disabled={saving}
-            className="w-full h-12 rounded-xl font-bold text-gray-900 text-base active:scale-[0.98] transition-transform disabled:opacity-50"
-            style={{ backgroundColor: "#cafe87", fontFamily: "Poppins,sans-serif" }}
+            disabled={selectedRooms.length === 0 || saving}
+            className="w-full h-12 rounded-xl font-bold text-base active:scale-[0.98] transition-transform disabled:opacity-50"
+            style={{
+              backgroundColor: selectedRooms.length > 0 ? "#cafe87" : "#e5e7eb",
+              color: selectedRooms.length > 0 ? "#111827" : "#9ca3af",
+              fontFamily: "Poppins,sans-serif",
+            }}
           >
-            {saving ? "Creating..." : "🚀 Start Inspection"}
+            {saving
+              ? "Creating..."
+              : selectedRooms.length > 0
+              ? `Start Inspection → ${selectedRooms.length} rooms`
+              : "Select rooms to continue"}
           </button>
         </BottomBar>
       )}

@@ -221,11 +221,20 @@ export function InspectionClient({
     return () => { if (nav) nav.style.display = ""; };
   }, [screen]);
 
-  // Pre-select existing room names on mount
+  // Pre-select existing room names on mount + detect matching template
   useEffect(() => {
-    if (initialRooms.length > 0) {
-      setSelectedRooms(initialRooms.map((r) => r.name));
+    if (initialRooms.length > 0 && selectedRooms.length === 0) {
+      const names = initialRooms.map((r) => r.name);
+      setSelectedRooms(names);
+      const matchedType =
+        Object.entries(ROOM_TEMPLATES).find(
+          ([, roomList]) =>
+            roomList.length === names.length &&
+            roomList.every((r) => names.includes(r))
+        )?.[0] ?? null;
+      setSelectedType(matchedType);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialRooms]);
 
   // Load existing photos on mount
