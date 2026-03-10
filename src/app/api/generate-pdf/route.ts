@@ -7,59 +7,83 @@ import {
 } from "@/lib/generatePDF";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
-type RoomItemRow = {
-  room_id: string;
-  name: string;
-  condition?: string | null;
-  notes?: string | null;
-  ai_description?: string | null;
-};
-
-type RoomPhotoRow = { url: string; ai_analysis?: string | null };
-
 export const maxDuration = 60;
 
-function toReportData(raw: unknown): ReportData {
-  const src = (raw ?? {}) as Partial<ReportData> & {
-    rooms?: Array<{
-      name?: string;
-      condition?: string;
-      summary?: string;
-      items?: Array<{ name?: string; condition?: string; notes?: string }>;
-      recommendations?: string[];
-    }>;
-  };
+/** Build ReportData purely from relational data (rooms, room_items, photos) — no report_data column */
+function buildReportDataFromInspection(inspection: InspectionRow): ReportData {
+  const rooms = (inspection.rooms ?? [])
+    .sort(
+      (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+    )
+    .map((room) => ({
+      name: room.name ?? "Room",
+      condition: (room.overall_condition ?? "Good").trim() || "Good",
+      summary: "",
+      items: (room.room_items ?? []).map((i) => ({
+        name: i.name ?? "",
+        condition: i.condition ?? "Good",
+        notes: i.notes ?? "",
+      })),
+      recommendations: [] as string[],
+    }));
+
+  const overallCondition =
+    rooms.length > 0 ? rooms[0].condition : "Good";
 
   return {
-    executive_summary: src.executive_summary ?? "",
-    overall_condition: src.overall_condition ?? "Good",
-    dispute_risk_score: Number(src.dispute_risk_score ?? 0),
-    dispute_risk_reasons: Array.isArray(src.dispute_risk_reasons)
-      ? src.dispute_risk_reasons.filter((x): x is string => typeof x === "string")
-      : [],
-    rooms: Array.isArray(src.rooms)
-      ? src.rooms.map((room) => ({
-          name: room?.name ?? "Room",
-          condition: room?.condition ?? "Good",
-          summary: room?.summary ?? "",
-          items: Array.isArray(room?.items)
-            ? room.items.map((i) => ({
-                name: i?.name ?? "",
-                condition: i?.condition ?? "Good",
-                notes: i?.notes ?? "",
-              }))
-            : [],
-          recommendations: Array.isArray(room?.recommendations)
-            ? room.recommendations.filter((x): x is string => typeof x === "string")
-            : [],
-        }))
-      : [],
-    legal_notes: src.legal_notes ?? "",
-    recommendations: Array.isArray(src.recommendations)
-      ? src.recommendations.filter((x): x is string => typeof x === "string")
-      : [],
+    executive_summary: "Inspection report generated from inspection data.",
+    overall_condition: overallCondition,
+    dispute_risk_score: 0,
+    dispute_risk_reasons: [],
+    rooms,
+    legal_notes: "",
+    recommendations: [],
   };
 }
+
+type InspectionRow = {
+  id: string;
+  agent_id?: string | null;
+  type?: string | null;
+  status?: string | null;
+  report_url?: string | null;
+  completed_at?: string | null;
+  created_at?: string | null;
+  properties?: PropRow | PropRow[] | null;
+  tenancies?: TenancyRow | TenancyRow[] | null;
+  rooms?: RoomRow[] | null;
+  signatures?: unknown[] | null;
+};
+
+type PropRow = {
+  building_name?: string | null;
+  unit_number?: string | null;
+  property_type?: string | null;
+  address?: string | null;
+};
+
+type TenancyRow = {
+  tenant_name?: string | null;
+  tenant_email?: string | null;
+  tenant_phone?: string | null;
+  landlord_name?: string | null;
+  landlord_email?: string | null;
+  landlord_phone?: string | null;
+  ejari_ref?: string | null;
+  contract_from?: string | null;
+  contract_to?: string | null;
+  annual_rent?: number | null;
+  security_deposit?: number | null;
+};
+
+type RoomRow = {
+  id: string;
+  name: string;
+  order_index?: number | null;
+  overall_condition?: string | null;
+  room_items?: { id: string; name: string; condition?: string | null; notes?: string | null; ai_description?: string | null }[];
+  photos?: { id: string; url: string; ai_analysis?: string | null; taken_at?: string | null }[];
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,14 +98,60 @@ export async function POST(request: NextRequest) {
       .from("inspections")
       .select(
         `
-        id, type, created_at, property_id, agent_id, tenancy_id, report_data,
-        properties (*),
-        tenancies (*),
-        rooms (
-          id, name, order_index,
-          photos (*)
+        id,
+        type,
+        status,
+        report_url,
+        completed_at,
+        created_at,
+        agent_id,
+        property_id,
+        tenancy_id,
+        properties (
+          building_name,
+          unit_number,
+          property_type,
+          address
         ),
-        signatures (*)
+        tenancies (
+          tenant_name,
+          tenant_email,
+          tenant_phone,
+          landlord_name,
+          landlord_email,
+          landlord_phone,
+          ejari_ref,
+          contract_from,
+          contract_to,
+          annual_rent,
+          security_deposit
+        ),
+        rooms (
+          id,
+          name,
+          order_index,
+          overall_condition,
+          room_items (
+            id,
+            name,
+            condition,
+            notes,
+            ai_description
+          ),
+          photos (
+            id,
+            url,
+            ai_analysis,
+            taken_at
+          )
+        ),
+        signatures (
+          id,
+          signer_type,
+          otp_verified,
+          signed_at,
+          signature_data
+        )
       `
       )
       .eq("id", inspectionId)
@@ -94,53 +164,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const reportData = toReportData(inspection.report_data);
-    if (!reportData) {
-      return NextResponse.json(
-        { error: "Missing report_data. Generate report content first." },
-        { status: 400 }
-      );
-    }
+    const row = inspection as InspectionRow;
+    const reportData = buildReportDataFromInspection(row);
 
-    const prop = Array.isArray(inspection.properties)
-      ? inspection.properties[0]
-      : inspection.properties;
-    const tenancy = Array.isArray(inspection.tenancies)
-      ? inspection.tenancies[0]
-      : inspection.tenancies;
+    const prop = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+    const tenancy = Array.isArray(row.tenancies) ? row.tenancies[0] : row.tenancies;
 
-    const { data: agent } = await supabase
-      .from("profiles")
-      .select("full_name, agency_name")
-      .eq("id", inspection.agent_id)
-      .single();
-
-    const roomIds = (inspection.rooms ?? []).map((r: { id: string }) => r.id);
-    const { data: roomItems } =
-      roomIds.length > 0
-        ? await supabase.from("room_items").select("*").in("room_id", roomIds)
-        : { data: [] as RoomItemRow[] };
-
-    const roomItemsByRoom = (roomItems ?? []).reduce(
-      (acc: Record<string, RoomItemRow[]>, item: RoomItemRow) => {
-        (acc[item.room_id] ??= []).push(item);
-        return acc;
-      },
-      {} as Record<string, RoomItemRow[]>
-    );
+    const agentId = row.agent_id ?? (inspection as { agent_id?: string }).agent_id;
+    const { data: agentData } = agentId
+      ? await supabase
+          .from("profiles")
+          .select("full_name, agency_name")
+          .eq("id", agentId)
+          .single()
+      : { data: null };
 
     const meta: InspectionMeta = {
       inspection: {
-        id: inspection.id,
-        type: inspection.type ?? undefined,
-        created_at: inspection.created_at ?? undefined,
+        id: row.id,
+        type: row.type ?? undefined,
+        created_at: row.created_at ?? undefined,
         landlord_name: tenancy?.landlord_name ?? undefined,
         landlord_email: tenancy?.landlord_email ?? undefined,
         tenant_name: tenancy?.tenant_name ?? undefined,
         tenant_email: tenancy?.tenant_email ?? undefined,
         ejari_ref: tenancy?.ejari_ref ?? undefined,
-        contract_from: tenancy?.contract_from ?? undefined,
-        contract_to: tenancy?.contract_to ?? undefined,
+        contract_from: tenancy?.contract_from != null ? String(tenancy.contract_from) : undefined,
+        contract_to: tenancy?.contract_to != null ? String(tenancy.contract_to) : undefined,
       },
       property: prop
         ? {
@@ -150,41 +200,21 @@ export async function POST(request: NextRequest) {
             property_type: prop.property_type ?? undefined,
           }
         : null,
-      agent: agent
+      agent: agentData
         ? {
-            full_name: agent.full_name ?? undefined,
-            agency_name: agent.agency_name ?? undefined,
+            full_name: agentData.full_name ?? undefined,
+            agency_name: agentData.agency_name ?? undefined,
           }
         : null,
-      rooms: (inspection.rooms ?? [])
-        .sort(
-          (a: { order_index: number | null }, b: { order_index: number | null }) =>
-            (a.order_index ?? 0) - (b.order_index ?? 0)
-        )
-        .map((room: { id: string; name: string; photos?: RoomPhotoRow[] }) => {
-          const mergedItems = (roomItemsByRoom[room.id] ?? []).map((i: RoomItemRow) => ({
-            name: i.name,
-            condition: i.condition ?? "Good",
-            notes: i.notes ?? "",
-          }));
-          const reportRoom = reportData.rooms.find(
-            (r: { name: string }) => r.name.toLowerCase() === room.name.toLowerCase()
-          );
-          if (
-            reportRoom &&
-            (!Array.isArray(reportRoom.items) || reportRoom.items.length === 0) &&
-            mergedItems.length > 0
-          ) {
-            reportRoom.items = mergedItems;
-          }
-          return {
-            name: room.name,
-            photos: (room.photos ?? []).map((p: RoomPhotoRow) => ({
-              url: p.url,
-              ai_analysis: p.ai_analysis ?? undefined,
-            })),
-          };
-        }),
+      rooms: (row.rooms ?? [])
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+        .map((room) => ({
+          name: room.name,
+          photos: (room.photos ?? []).map((p) => ({
+            url: p.url,
+            ai_analysis: p.ai_analysis ?? undefined,
+          })),
+        })),
     };
 
     const pdfBuffer = await generateInspectionPDFBuffer(reportData, meta);

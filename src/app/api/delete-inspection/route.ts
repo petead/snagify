@@ -24,6 +24,8 @@ export async function DELETE(request: Request) {
     return Response.json({ error: "Inspection not found" }, { status: 404 });
   }
 
+  const tenancyId = inspection.tenancy_id ?? null;
+
   // Block if any signature has been verified
   const sigs = (inspection.signatures ?? []) as {
     id: string;
@@ -94,6 +96,18 @@ export async function DELETE(request: Request) {
     .eq("inspection_id", inspectionId);
 
   await supabase.from("inspections").delete().eq("id", inspectionId);
+
+  // After deleting the inspection: if check-in, delete the associated tenancy when no other inspection uses it
+  if (inspection.type === "check-in" && tenancyId) {
+    const { data: otherInspections } = await supabase
+      .from("inspections")
+      .select("id")
+      .eq("tenancy_id", tenancyId);
+
+    if (!otherInspections || otherInspections.length === 0) {
+      await supabase.from("tenancies").delete().eq("id", tenancyId);
+    }
+  }
 
   return Response.json({ success: true });
 }
