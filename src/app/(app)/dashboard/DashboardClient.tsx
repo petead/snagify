@@ -3,7 +3,18 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import {
+  Loader2,
+  Building2,
+  ClipboardList,
+  CalendarDays,
+  PenLine,
+  Check,
+  FileText,
+  Search,
+  SquarePen,
+  AlertTriangle,
+} from "lucide-react";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 
 type InspectionRow = {
@@ -36,7 +47,7 @@ type PropertyRow = {
 export type AlertItem = {
   type: string;
   color: string;
-  icon: string;
+  icon: "alert" | "signature";
   title: string;
   subtitle: string;
   href: string;
@@ -55,7 +66,7 @@ type RecentInspectionRow = {
 };
 
 type ActivityItem = {
-  icon: string;
+  icon: "signed" | "report" | "progress" | "started";
   color: string;
   title: string;
   subtitle: string;
@@ -79,7 +90,7 @@ function getActivityItem(inspection: RecentInspectionRow): ActivityItem {
 
   if (inspection.status === "signed") {
     return {
-      icon: "✅",
+      icon: "signed",
       color: "#cafe87",
       title: `${type} signed`,
       subtitle: property,
@@ -89,7 +100,7 @@ function getActivityItem(inspection: RecentInspectionRow): ActivityItem {
   }
   if (inspection.status === "completed") {
     return {
-      icon: "📄",
+      icon: "report",
       color: "#9A88FD",
       title: `${type} report generated`,
       subtitle: property,
@@ -99,7 +110,7 @@ function getActivityItem(inspection: RecentInspectionRow): ActivityItem {
   }
   if (inspection.status === "in_progress") {
     return {
-      icon: "🔍",
+      icon: "progress",
       color: "#FEDE80",
       title: `${type} in progress`,
       subtitle: tenant ? `${property} — ${tenant}` : property,
@@ -108,7 +119,7 @@ function getActivityItem(inspection: RecentInspectionRow): ActivityItem {
     };
   }
   return {
-    icon: "📝",
+    icon: "started",
     color: "#E5E7EB",
     title: `${type} started`,
     subtitle: property,
@@ -207,10 +218,10 @@ export function DashboardClient({
   }, []);
 
   const stats = [
-    { value: totalProperties, label: "Properties", icon: "🏢", href: "/properties" as string | null },
-    { value: totalInspections, label: "Inspections", icon: "📋", href: "/reports" as string | null },
-    { value: thisMonthCount, label: "This Month", icon: "📅", href: null },
-    { value: pendingSigCount, label: "Pending Sign", icon: "✍️", href: "/reports" as string | null },
+    { value: totalProperties, label: "Properties", icon: Building2, href: "/properties" as string | null },
+    { value: totalInspections, label: "Inspections", icon: ClipboardList, href: "/reports" as string | null },
+    { value: thisMonthCount, label: "This Month", icon: CalendarDays, href: null },
+    { value: pendingSigCount, label: "Pending Sign", icon: PenLine, href: "/reports" as string | null },
   ];
 
   return (
@@ -232,7 +243,7 @@ export function DashboardClient({
         >
           <div>
             <h1 className="font-heading font-bold text-2xl mt-0 mb-0" style={{ color: "white" }}>
-              {greetingText}, {displayName} 👋
+              {greetingText}, {displayName}
             </h1>
             <p className="font-body text-sm mt-1 mb-0" style={{ color: "white", opacity: 0.8 }}>
               Dubai Property Inspections
@@ -273,7 +284,13 @@ export function DashboardClient({
                   borderLeft: `4px solid ${alert.color === "#FEDE80" ? "#F59E0B" : "#9A88FD"}`,
                 }}
               >
-                <span className="text-xl flex-shrink-0">{alert.icon}</span>
+                <span className="text-xl flex-shrink-0">
+                  {alert.icon === "alert" ? (
+                    <AlertTriangle size={18} color="#F59E0B" />
+                  ) : (
+                    <PenLine size={18} color="#7B65FC" />
+                  )}
+                </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800 truncate">{alert.title}</p>
                   <p className="text-xs text-gray-400 truncate">{alert.subtitle}</p>
@@ -298,7 +315,7 @@ export function DashboardClient({
                 stat.href ? "cursor-pointer active:scale-[0.98] transition-transform" : ""
               }`}
             >
-              <span className="text-lg">{stat.icon}</span>
+              <stat.icon size={18} color="#7B65FC" />
               <div>
                 <p
                   className="text-lg font-bold text-gray-900 leading-none"
@@ -337,7 +354,15 @@ export function DashboardClient({
                         className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base"
                         style={{ backgroundColor: item.color + "33" }}
                       >
-                        {item.icon}
+                        {item.icon === "signed" ? (
+                          <Check size={16} color="#5a7a2e" />
+                        ) : item.icon === "report" ? (
+                          <FileText size={16} color="#7B65FC" />
+                        ) : item.icon === "progress" ? (
+                          <Search size={16} color="#8a6a00" />
+                        ) : (
+                          <SquarePen size={16} color="#6B7280" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p

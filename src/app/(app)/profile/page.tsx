@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Building2, Smartphone, Globe, Info, LogOut } from "lucide-react";
 
 type ProfileRow = {
   full_name: string | null;
@@ -149,7 +150,7 @@ export default function ProfilePage() {
               <p className="text-sm text-gray-400 truncate">{user.email}</p>
               {profile?.agency_name && (
                 <p className="text-xs text-[#9A88FD] font-medium mt-0.5">
-                  🏢 {profile.agency_name}
+                  <Building2 size={12} className="inline mr-1" /> {profile.agency_name}
                 </p>
               )}
             </div>
@@ -257,7 +258,7 @@ export default function ProfilePage() {
 
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
             <div className="flex items-center gap-3">
-              <span className="text-xl">📱</span>
+              <span className="text-xl"><Smartphone size={18} color="#9ca3af" /></span>
               <div>
                 <p className="text-sm font-medium text-gray-800">Install App</p>
                 <p className="text-xs text-gray-400">Add to home screen</p>
@@ -268,7 +269,7 @@ export default function ProfilePage() {
 
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
             <div className="flex items-center gap-3">
-              <span className="text-xl">🌍</span>
+              <span className="text-xl"><Globe size={18} color="#9ca3af" /></span>
               <p className="text-sm font-medium text-gray-800">Language</p>
             </div>
             <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">
@@ -278,7 +279,7 @@ export default function ProfilePage() {
 
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
-              <span className="text-xl">ℹ️</span>
+              <span className="text-xl"><Info size={18} color="#9ca3af" /></span>
               <div>
                 <p className="text-sm font-medium text-gray-800">Snagify</p>
                 <p className="text-xs text-gray-400">Version 1.0.0 MVP</p>
@@ -293,7 +294,7 @@ export default function ProfilePage() {
           onClick={handleLogout}
           className="w-full py-3.5 rounded-2xl bg-red-50 border border-red-100 text-red-500 font-semibold text-sm transition-all active:scale-[0.98] mt-4"
         >
-          🚪 Sign Out
+          <span className="inline-flex items-center gap-2"><LogOut size={16} /> Sign Out</span>
         </button>
       </div>
 

@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ChevronRight } from "lucide-react";
+import {
+  Search,
+  ChevronRight,
+  Building2,
+  House,
+  BedDouble,
+  User,
+} from "lucide-react";
 import { getTenancyStatus } from "@/lib/tenancy";
 import ContractProgress from "@/components/inspection/ContractProgress";
 
@@ -74,10 +81,10 @@ const groupConfig: Record<
   "expiring_soon" | "active" | "upcoming" | "vacant",
   { label: string; color: string }
 > = {
-  expiring_soon: { label: "⚠️ Expiring Soon", color: "#F59E0B" },
-  active: { label: "🟢 Active", color: "#16a34a" },
-  upcoming: { label: "🔵 Upcoming", color: "#9A88FD" },
-  vacant: { label: "⬜ Vacant", color: "#9CA3AF" },
+  expiring_soon: { label: "Expiring Soon", color: "#F59E0B" },
+  active: { label: "Active", color: "#16a34a" },
+  upcoming: { label: "Upcoming", color: "#9A88FD" },
+  vacant: { label: "Vacant", color: "#9CA3AF" },
 };
 
 const GROUP_ORDER: ("expiring_soon" | "active" | "upcoming" | "vacant")[] = [
@@ -87,13 +94,13 @@ const GROUP_ORDER: ("expiring_soon" | "active" | "upcoming" | "vacant")[] = [
   "vacant",
 ];
 
-function propertyEmoji(type: string | null): string {
-  if (!type) return "🏢";
+function propertyIcon(type: string | null) {
+  if (!type) return Building2;
   const t = type.toLowerCase();
-  if (t.includes("villa")) return "🏠";
-  if (t.includes("studio")) return "🛏️";
-  if (t.includes("townhouse")) return "🏬";
-  return "🏢";
+  if (t.includes("villa")) return House;
+  if (t.includes("studio")) return BedDouble;
+  if (t.includes("townhouse")) return House;
+  return Building2;
 }
 
 export function PropertiesClient({ properties: initialProperties }: { properties: PropertyRow[] }) {
@@ -155,7 +162,9 @@ export function PropertiesClient({ properties: initialProperties }: { properties
 
       {properties.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
-          <span className="text-5xl mb-4">🏙️</span>
+          <div className="w-16 h-16 rounded-[20px] bg-[#f5f5f5] mb-4 flex items-center justify-center">
+            <Building2 size={28} color="#9ca3af" />
+          </div>
           <p
             className="font-bold text-gray-800 mb-2"
             style={{ fontFamily: "Poppins, sans-serif" }}
@@ -168,7 +177,8 @@ export function PropertiesClient({ properties: initialProperties }: { properties
           <button
             type="button"
             onClick={() => router.push("/inspection/new")}
-            className="bg-[#9A88FD] text-white font-semibold px-6 py-3 rounded-xl text-sm"
+            className="font-semibold px-6 py-3 rounded-[14px] text-sm"
+            style={{ background: "#cafe87", color: "#1A1A1A" }}
           >
             + New Inspection
           </button>
@@ -198,6 +208,7 @@ export function PropertiesClient({ properties: initialProperties }: { properties
                     ? [tenancy.inspections as InspectionRow]
                     : [];
 
+                const Icon = propertyIcon(property.property_type);
                 return (
                   <div
                     key={property.id}
@@ -213,8 +224,8 @@ export function PropertiesClient({ properties: initialProperties }: { properties
                     <div className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#F0EDFF] text-xl">
-                            {propertyEmoji(property.property_type)}
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#F0EDFF]">
+                            <Icon size={16} color="#7B65FC" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p
@@ -226,7 +237,7 @@ export function PropertiesClient({ properties: initialProperties }: { properties
                             </p>
                             {tenancy ? (
                               <p className="text-xs text-gray-400 truncate mt-0.5">
-                                👤{" "}
+                                <User size={12} className="inline mr-1" />{" "}
                                 {tenancy.tenant_name?.split(" ").slice(0, 2).join(" ") ?? "Tenant"}
                               </p>
                             ) : (
@@ -260,7 +271,7 @@ export function PropertiesClient({ properties: initialProperties }: { properties
                                 }`}
                               >
                                 {checkIn?.status === "completed" || checkIn?.status === "signed"
-                                  ? "✓ Check-in"
+                                  ? "Check-in"
                                   : checkIn?.status === "in_progress"
                                     ? "⋯ Check-in"
                                     : "○ Check-in"}
@@ -282,7 +293,7 @@ export function PropertiesClient({ properties: initialProperties }: { properties
                                 }`}
                               >
                                 {checkOut?.status === "completed" || checkOut?.status === "signed"
-                                  ? "✓ Check-out"
+                                  ? "Check-out"
                                   : checkOut?.status === "in_progress"
                                     ? "⋯ Check-out"
                                     : "○ Check-out"}

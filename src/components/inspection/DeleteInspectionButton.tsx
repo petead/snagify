@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { Trash2, Lock, AlertTriangle } from "lucide-react";
 import { useDeleteInspection } from "@/lib/useDeleteInspection";
 
 interface Props {
@@ -84,7 +85,7 @@ function ConfirmModal({
       <div style={overlayStyle} onClick={onCancel} />
       <div style={sheetStyle}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
-          <span style={{ fontSize: 40 }}>🗑️</span>
+          <span style={{ display: "inline-flex" }}><Trash2 size={32} color="#ef4444" /></span>
         </div>
         <p style={titleStyle}>
           Delete {inspectionType === "check-in" ? "Check-in" : "Check-out"}?
@@ -144,7 +145,7 @@ function BlockedSignedModal({
       <div style={overlayStyle} onClick={onClose} />
       <div style={sheetStyle}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
-          <span style={{ fontSize: 40 }}>🔒</span>
+          <span style={{ display: "inline-flex" }}><Lock size={32} color="#6b7280" /></span>
         </div>
         <p style={titleStyle}>Cannot delete</p>
         <p style={{ ...bodyStyle, marginBottom: 8 }}>
@@ -178,7 +179,7 @@ function BlockedCheckoutModal({ onClose }: { onClose: () => void }) {
       <div style={overlayStyle} onClick={onClose} />
       <div style={sheetStyle}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
-          <span style={{ fontSize: 40 }}>⚠️</span>
+          <span style={{ display: "inline-flex" }}><AlertTriangle size={32} color="#D4A000" /></span>
         </div>
         <p style={titleStyle}>Cannot delete check-in</p>
         <p style={bodyStyle}>
@@ -304,7 +305,7 @@ export default function DeleteInspectionButton({
             transition: "all 0.15s",
           }}
         >
-          {isSignedLocally ? "🔒" : "×"}
+          {isSignedLocally ? <Lock size={14} /> : <Trash2 size={14} />}
         </button>
         {Modals}
       </>
@@ -347,7 +348,7 @@ export default function DeleteInspectionButton({
   return (
     <>
       <button onClick={handlePress} style={btnStyle} disabled={loading}>
-        <span>{isSignedLocally ? "🔒" : "🗑️"}</span>
+        <span>{isSignedLocally ? <Lock size={14} /> : <Trash2 size={14} />}</span>
         {loading
           ? "Deleting..."
           : isSignedLocally

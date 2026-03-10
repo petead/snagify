@@ -62,25 +62,6 @@ const DAMAGE_TAGS = [
 ];
 
 // ─── Helpers ─────────────────────────────────────
-const getRoomEmoji = (name: string) => {
-  const n = name.toLowerCase();
-  if (n.includes("entrance")) return "🚪";
-  if (n.includes("living") && n.includes("bedroom")) return "🛋️";
-  if (n.includes("living")) return "🛋️";
-  if (n.includes("dining")) return "🍽️";
-  if (n.includes("bedroom") || n.includes("bed")) return "🛏️";
-  if (n.includes("bathroom") || n.includes("bath")) return "🚿";
-  if (n.includes("kitchen")) return "🍳";
-  if (n.includes("balcony")) return "🌅";
-  if (n.includes("terrace")) return "🌅";
-  if (n.includes("garden")) return "🌿";
-  if (n.includes("garage")) return "🚗";
-  if (n.includes("laundry")) return "🧺";
-  if (n.includes("storage")) return "📦";
-  if (n.includes("maid")) return "🧹";
-  return "🏠";
-};
-
 // ─── PhotoCard ───────────────────────────────────
 function PhotoCard({
   photo,
@@ -149,7 +130,7 @@ function PhotoCard({
               color: photo.flagged ? "#FF6E40" : "rgba(255,255,255,0.5)",
             }}
           >
-            {photo.flagged ? "⚠ Flagged — tap to unflag" : "Flag as damaged"}
+            {photo.flagged ? "Flagged — tap to unflag" : "Flag as damaged"}
           </button>
           {photo.flagged && (
             <div className="flex flex-wrap gap-1">
@@ -903,7 +884,7 @@ export function InspectionClient({
                   Generating report...
                 </>
               ) : (
-                <>✨ Generate Report</>
+                <>Generate Report</>
               )}
             </button>
           </div>

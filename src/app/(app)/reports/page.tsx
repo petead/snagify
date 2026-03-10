@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { User, CalendarDays, FileText } from "lucide-react";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 
 type ReportRow = {
@@ -111,7 +112,7 @@ export default function ReportsPage() {
               filter === f ? "bg-[#9A88FD] text-white" : "bg-gray-100 text-gray-500"
             }`}
           >
-            {f === "all" ? "All" : f === "pending" ? "✍️ Pending" : "✅ Signed"}
+            {f === "all" ? "All" : f === "pending" ? "Pending" : "Signed"}
           </button>
         ))}
       </div>
@@ -159,7 +160,7 @@ export default function ReportsPage() {
                           : buildingName || unitNumber || "Property"}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5 truncate">
-                        👤 {tenantName ? tenantName.split(" ").slice(0, 2).join(" ") : "Unknown"}
+                        <User size={12} className="inline mr-1" /> {tenantName ? tenantName.split(" ").slice(0, 2).join(" ") : "Unknown"}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
@@ -182,7 +183,7 @@ export default function ReportsPage() {
                         }`}
                       >
                         {report.status === "signed" || isSigned
-                          ? "✓ Signed"
+                          ? "Signed"
                           : report.status === "completed"
                             ? "Completed"
                             : "Draft"}
@@ -192,7 +193,7 @@ export default function ReportsPage() {
 
                   <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
                     <span className="text-xs text-gray-400">
-                      🗓{" "}
+                      <CalendarDays size={12} className="inline mr-1" />{" "}
                       {new Date(report.created_at).toLocaleDateString("en-GB", {
                         day: "2-digit",
                         month: "short",
@@ -224,7 +225,7 @@ export default function ReportsPage() {
           })
         ) : (
           <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
-            <span className="text-5xl mb-4">📄</span>
+            <span className="text-5xl mb-4 inline-flex"><FileText size={36} color="#9ca3af" /></span>
             <p
               className="font-bold text-gray-800 mb-1"
               style={{ fontFamily: "Poppins, sans-serif" }}

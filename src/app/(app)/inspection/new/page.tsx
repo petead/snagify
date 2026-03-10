@@ -2,7 +2,14 @@
 
 import { useState, useRef, useCallback, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  PenLine,
+  Building2,
+  Lock,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 // ─────────────────────────────────────────
@@ -467,7 +474,7 @@ function NewInspectionContent() {
         const hasConflict = await checkTenancyConflict();
         if (hasConflict) {
           const confirmed = window.confirm(
-            `⚠️ ${formData.tenant_name} has an active tenancy without a completed check-out.\n\nDo you want to continue anyway?`
+            `${formData.tenant_name} has an active tenancy without a completed check-out.\n\nDo you want to continue anyway?`
           );
           if (!confirmed) {
             setSaving(false);
@@ -651,7 +658,7 @@ function NewInspectionContent() {
             >
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-[#F0EDFF] flex items-center justify-center text-2xl flex-shrink-0">
-                  📄
+                  <FileText size={24} color="#7B65FC" />
                 </div>
                 <div className="flex-1">
                   <p
@@ -661,7 +668,7 @@ function NewInspectionContent() {
                     Upload Contract PDF
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    AI extracts all details automatically ✨
+                    AI extracts all details automatically
                   </p>
                 </div>
                 <ChevronRight
@@ -681,7 +688,7 @@ function NewInspectionContent() {
             >
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center text-2xl flex-shrink-0">
-                  ✍️
+                  <PenLine size={24} color="#16a34a" />
                 </div>
                 <div className="flex-1">
                   <p
@@ -749,7 +756,7 @@ function NewInspectionContent() {
                     : "border-gray-200 bg-gray-50 hover:border-[#9A88FD] hover:bg-[#F0EDFF]"
                 }`}
               >
-                <div className="text-5xl mb-4">📄</div>
+                <div className="text-5xl mb-4 flex justify-center"><FileText size={40} color="#7B65FC" /></div>
                 <p
                   className="font-semibold text-gray-800 mb-1"
                   style={{ fontFamily: "Poppins,sans-serif" }}
@@ -861,7 +868,7 @@ function NewInspectionContent() {
                     : "bg-white border-gray-200 text-gray-600"
                 }`}
               >
-                {t === "check-in" ? "🔑 Check-In" : "🚪 Check-Out"}
+                {t === "check-in" ? "Check-In" : "Check-Out"}
               </button>
             ))}
           </div>
@@ -903,7 +910,7 @@ function NewInspectionContent() {
                     fontSize: 20,
                   }}
                 >
-                  🏢
+                  <Building2 size={20} color="#6b7280" />
                 </div>
                 <div>
                   <p
@@ -927,7 +934,7 @@ function NewInspectionContent() {
                     {existingProperty.property_type}
                   </p>
                 </div>
-                <span style={{ marginLeft: "auto", fontSize: 16 }}>🔒</span>
+                <span style={{ marginLeft: "auto", fontSize: 16 }}><Lock size={16} color="#9ca3af" /></span>
               </div>
             </div>
           ) : (
@@ -1133,7 +1140,7 @@ function NewInspectionContent() {
             className="text-xl font-bold mb-1"
             style={{ fontFamily: "Poppins,sans-serif" }}
           >
-            Ready to start! 🚀
+            Ready to start!
           </h2>
           <p className="text-sm text-gray-400 mb-5">
             Review before launching the inspection
@@ -1152,7 +1159,7 @@ function NewInspectionContent() {
             </p>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-[#F0EDFF] flex items-center justify-center text-xl">
-                🏢
+                <Building2 size={18} color="#7B65FC" />
               </div>
               <div>
                 <p className="font-bold text-gray-900">

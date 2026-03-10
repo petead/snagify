@@ -53,7 +53,7 @@ export default async function DashboardPage() {
   type AlertItem = {
     type: string;
     color: string;
-    icon: string;
+    icon: "alert" | "signature";
     title: string;
     subtitle: string;
     href: string;
@@ -100,7 +100,7 @@ export default async function DashboardPage() {
         return {
           type: "expiring",
           color: "#FEDE80",
-          icon: "⚠️",
+          icon: "alert" as const,
           title: `${(t.tenant_name ?? "Tenant").split(" ")[0]} — contract expiring soon`,
           subtitle: p?.building_name && p?.unit_number
             ? `${p.building_name}, Unit ${p.unit_number}`
@@ -114,7 +114,7 @@ export default async function DashboardPage() {
         return {
           type: "signature",
           color: "#F0EDFF",
-          icon: "✍️",
+          icon: "signature" as const,
           title: "Report waiting for signature",
           subtitle: p?.building_name && p?.unit_number
             ? `${p.building_name}, Unit ${p.unit_number}`

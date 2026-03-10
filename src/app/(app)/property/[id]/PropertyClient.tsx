@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, Building2, House, BedDouble, Check } from "lucide-react";
 import {
   TENANCY_STATUS_CONFIG,
   getTenancyDaysLeft,
@@ -51,13 +51,13 @@ interface PropertyClientProps {
   totalInspections: number;
 }
 
-function propertyEmoji(type: string | null): string {
-  if (!type) return "🏢";
+function propertyIcon(type: string | null) {
+  if (!type) return Building2;
   const t = type.toLowerCase();
-  if (t.includes("villa")) return "🏠";
-  if (t.includes("studio")) return "🛏️";
-  if (t.includes("townhouse")) return "🏬";
-  return "🏢";
+  if (t.includes("villa")) return House;
+  if (t.includes("studio")) return BedDouble;
+  if (t.includes("townhouse")) return House;
+  return Building2;
 }
 
 function formatDateShort(dateStr: string | null): string {
@@ -141,6 +141,7 @@ export function PropertyClient({
       : "Property");
   const truncTitle = title.length > 26 ? title.slice(0, 23) + "…" : title;
   const newInspectionHref = getNewInspectionHref(property.id, tenancyGroups);
+  const PropertyIcon = propertyIcon(property.property_type);
   return (
     <div className="min-h-screen bg-[#fcfcfc] max-w-lg mx-auto pb-24">
       <header className="sticky top-0 z-40 bg-white border-b border-gray-100">
@@ -169,8 +170,8 @@ export function PropertyClient({
         {/* Property header card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 bg-[#F0EDFF]">
-              {propertyEmoji(property.property_type)}
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#F0EDFF]">
+              <PropertyIcon size={16} color="#7B65FC" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-heading font-bold text-xl text-[#1A1A1A]">
@@ -205,7 +206,7 @@ export function PropertyClient({
           {tenancyGroups.length === 0 ? (
             <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-8 flex flex-col items-center justify-center gap-4 min-h-[200px]">
               <span className="text-4xl" role="img" aria-hidden>
-                🏠
+                <House size={28} color="#9ca3af" />
               </span>
               <p className="font-heading font-semibold text-[#1A1A1A]">
                 No inspections yet
@@ -369,7 +370,7 @@ export function PropertyClient({
                             </Link>
                           ) : group.tenancyId && !group.canStartCheckIn.allowed ? (
                             <span className="font-body text-xs text-[#9A88FD] font-medium">
-                              ✅
+                              <Check size={14} color="#16a34a" />
                             </span>
                           ) : (
                             <Link
@@ -471,7 +472,7 @@ export function PropertyClient({
                         className="rounded-b-2xl p-3 font-body text-xs text-green-700"
                         style={{ backgroundColor: "#F0FDF4" }}
                       >
-                        ✅ Complete tenancy cycle documented
+                        Complete tenancy cycle documented
                       </div>
                     )}
                   </div>

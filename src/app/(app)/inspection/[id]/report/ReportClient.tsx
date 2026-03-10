@@ -1,6 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import {
+  Building2,
+  CalendarDays,
+  BedDouble,
+  Star,
+  FileText,
+  AlertTriangle,
+  Users,
+  Clock3,
+  Download,
+  PenLine,
+  Link as LinkIcon,
+  Check,
+} from "lucide-react";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 import {
   type InspectionWithRelations,
@@ -39,10 +53,10 @@ const getConditionStyle = (
   );
 };
 
-const conditionDot = (c: string | null | undefined) =>
-  ({ good: "🟢", fair: "🟡", poor: "🔴" } as Record<string, string>)[
+const conditionDotColor = (c: string | null | undefined) =>
+  ({ good: "#22c55e", fair: "#D4A000", poor: "#ef4444" } as Record<string, string>)[
     c?.toLowerCase() ?? ""
-  ] || "⚪";
+  ] || "#9ca3af";
 
 function normalizeOne<T>(v: T | T[] | null | undefined): T | null {
   if (v == null) return null;
@@ -69,10 +83,6 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   const [showSignModal, setShowSignModal] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState({ landlord: false, tenant: false });
-  const [sentSignUrl, setSentSignUrl] = useState<{
-    landlord?: string;
-    tenant?: string;
-  }>({});
   const [downloadLoading, setDownloadLoading] = useState(false);
 
   const prop = normalizeOne(inspection.properties) as PropertyRelation | null;
@@ -126,9 +136,9 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
       : null;
 
   const metrics = [
-    { icon: "🏠", label: "Type", value: prop?.property_type ?? "—" },
+    { icon: Building2, label: "Type", value: prop?.property_type ?? "—" },
     {
-      icon: "📅",
+      icon: CalendarDays,
       label: "Date",
       value: inspection.completed_at
         ? new Date(inspection.completed_at).toLocaleDateString("en-GB", {
@@ -137,8 +147,8 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
           })
         : "—",
     },
-    { icon: "🛏️", label: "Rooms", value: `${rooms.length} inspected` },
-    { icon: "⭐", label: "Condition", value: overallCondition },
+    { icon: BedDouble, label: "Rooms", value: `${rooms.length} inspected` },
+    { icon: Star, label: "Condition", value: overallCondition },
   ];
 
   const parties = [
@@ -232,7 +242,6 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
       const data = await res.json();
       if (data.success) {
         setSent((prev) => ({ ...prev, [signerType]: true }));
-        setSentSignUrl((prev) => ({ ...prev, [signerType]: data.signUrl }));
       } else {
         alert("Error: " + (data.error ?? "Failed to send email"));
       }
@@ -262,7 +271,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
               color: "white",
             }}
           >
-            {isCheckIn ? "🔑 CHECK-IN" : "🚪 CHECK-OUT"} REPORT
+            {isCheckIn ? "CHECK-IN" : "CHECK-OUT"} REPORT
           </span>
 
           <h1
@@ -283,10 +292,10 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
             }}
           >
             {status === "signed"
-              ? "✅ Fully Signed"
+              ? "Fully Signed"
               : status === "completed"
-                ? "📄 Awaiting Signatures"
-                : "🔄 In Progress"}
+                ? "Awaiting Signatures"
+                : "In Progress"}
           </span>
         </div>
       </div>
@@ -298,7 +307,9 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
             key={m.label}
             className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 flex-shrink-0 min-w-[100px] text-center"
           >
-            <p className="text-xl mb-1">{m.icon}</p>
+            <div className="flex justify-center mb-1">
+              <m.icon size={16} color="#7B65FC" />
+            </div>
             <p className="text-sm font-bold text-gray-900">{m.value}</p>
             <p className="text-xs text-gray-400">{m.label}</p>
           </div>
@@ -309,7 +320,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
       {execSummary && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mx-4 mb-4 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-50">
-            <span className="text-base">📋</span>
+            <FileText size={16} color="#7B65FC" />
             <p
               className="font-bold text-gray-900 text-sm"
               style={{ fontFamily: "Poppins,sans-serif" }}
@@ -330,7 +341,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mx-4 mb-4 p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <span>⚠️</span>
+              <AlertTriangle size={16} color="#D4A000" />
               <p
                 className="font-bold text-gray-900 text-sm"
                 style={{ fontFamily: "Poppins,sans-serif" }}
@@ -377,7 +388,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
             className="font-bold text-gray-900 text-sm"
             style={{ fontFamily: "Poppins,sans-serif" }}
           >
-            👥 Parties
+            <span className="inline-flex items-center gap-1"><Users size={14} color="#7B65FC" /> Parties</span>
           </p>
         </div>
         {parties.map((party, i, arr) => (
@@ -414,7 +425,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
           className="font-bold text-gray-900 text-sm mb-3"
           style={{ fontFamily: "Poppins,sans-serif" }}
         >
-          📄 Contract
+          <span className="inline-flex items-center gap-1"><FileText size={14} color="#7B65FC" /> Contract</span>
         </p>
         <div className="grid grid-cols-2 gap-3">
           {[
@@ -449,7 +460,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
           className="font-bold text-gray-900 text-sm mb-3"
           style={{ fontFamily: "Poppins,sans-serif" }}
         >
-          🏠 Rooms ({rooms.length} inspected)
+          <span className="inline-flex items-center gap-1"><Building2 size={14} color="#7B65FC" /> Rooms ({rooms.length} inspected)</span>
         </p>
         {rooms
           .slice()
@@ -478,8 +489,8 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                   {(room.room_items ?? []).map((item) => (
                     <div key={item.id} className="px-4 py-2.5">
                       <div className="flex items-start gap-2">
-                        <span className="text-sm mt-0.5 flex-shrink-0">
-                          {conditionDot(item.condition)}
+                        <span className="text-sm mt-0.5 flex-shrink-0" style={{ color: conditionDotColor(item.condition) }}>
+                          •
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-800">
@@ -492,7 +503,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                           )}
                           {item.notes && (
                             <p className="text-xs text-[#9A88FD] mt-0.5">
-                              📝 {item.notes}
+                              {item.notes}
                             </p>
                           )}
                         </div>
@@ -512,7 +523,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
             className="font-bold text-gray-900 text-sm"
             style={{ fontFamily: "Poppins,sans-serif" }}
           >
-            ✍️ Signatures
+            <span className="inline-flex items-center gap-1"><PenLine size={14} color="#7B65FC" /> Signatures</span>
           </p>
         </div>
         {(["landlord", "tenant"] as const).map((type, i) => {
@@ -529,7 +540,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                   sig?.otp_verified ? "bg-[#cafe87]" : "bg-gray-100"
                 }`}
               >
-                {sig?.otp_verified ? "✅" : "⏳"}
+                {sig?.otp_verified ? <Check size={14} color="#1A1A1A" /> : <Clock3 size={14} color="#6b7280" />}
               </div>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-900 capitalize">
@@ -628,7 +639,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
             cursor: downloadLoading ? "default" : "pointer",
           }}
         >
-          {downloadLoading ? "⏳ Generating PDF..." : "⬇️ Download PDF"}
+          {downloadLoading ? "Generating PDF..." : <span className="inline-flex items-center gap-2"><Download size={16} /> Download PDF</span>}
         </button>
 
         {/* Row 2 — Sign + Share */}
@@ -638,7 +649,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
               className="flex-1 h-12 rounded-2xl font-semibold bg-[#cafe87] text-gray-800 flex items-center justify-center gap-2 text-sm"
               style={{ fontFamily: "Poppins, sans-serif" }}
             >
-              ✅ Fully Signed
+              <span className="inline-flex items-center gap-2"><Check size={16} /> Fully Signed</span>
             </div>
           ) : (
             <button
@@ -647,7 +658,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
               className="flex-1 h-12 rounded-2xl font-semibold border-2 border-[#9A88FD] text-[#9A88FD] flex items-center justify-center gap-2 text-sm active:bg-[#F0EDFF] transition-colors"
               style={{ fontFamily: "Poppins, sans-serif" }}
             >
-              ✍️ Send for Signature
+              <span className="inline-flex items-center gap-2"><PenLine size={16} /> Send for Signature</span>
             </button>
           )}
 
@@ -669,7 +680,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
             className="flex-1 h-12 rounded-2xl font-semibold border-2 border-gray-200 text-gray-600 flex items-center justify-center gap-2 text-sm active:bg-gray-50 transition-colors"
             style={{ fontFamily: "Poppins, sans-serif" }}
           >
-            🔗 Share
+            <span className="inline-flex items-center gap-2"><LinkIcon size={16} /> Share</span>
           </button>
         </div>
       </div>
@@ -683,7 +694,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                 className="text-lg font-bold text-gray-900"
                 style={{ fontFamily: "Poppins, sans-serif" }}
               >
-                ✍️ Send for Signature
+                <span className="inline-flex items-center gap-2"><PenLine size={16} /> Send for Signature</span>
               </h2>
               <button
                 type="button"
@@ -729,7 +740,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                     : {}
                 }
               >
-                {sent.landlord ? "✓ Email Sent" : "📧 Send via Email"}
+                {sent.landlord ? "Email Sent" : "Send via Email"}
               </button>
             </div>
 
@@ -767,14 +778,14 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                     : {}
                 }
               >
-                {sent.tenant ? "✓ Email Sent" : "📧 Send via Email"}
+                {sent.tenant ? "Email Sent" : "Send via Email"}
               </button>
             </div>
 
             {sent.landlord && sent.tenant && (
               <div className="bg-[#F0EDFF] rounded-xl p-3 text-center">
                 <p className="text-sm text-[#9A88FD] font-medium">
-                  ✅ Both emails sent! Waiting for signatures...
+                  Both emails sent. Waiting for signatures...
                 </p>
               </div>
             )}
