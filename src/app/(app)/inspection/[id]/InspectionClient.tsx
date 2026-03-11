@@ -1190,19 +1190,6 @@ export function InspectionClient({
                   {inspectionType === "check-in" ? "Check-in Review" : "Check-out Review"}
                 </p>
               </div>
-
-              {/* Stats badge */}
-              <div style={{
-                display: "flex", gap: 8, alignItems: "center",
-              }}>
-                <div style={{
-                  fontSize: 11, fontWeight: 700, padding: "4px 10px",
-                  borderRadius: 100, background: damagedPhotos > 0 ? "#fff0f0" : "#f0fff4",
-                  color: damagedPhotos > 0 ? "#ef4444" : "#22c55e",
-                }}>
-                  {damagedPhotos > 0 ? `${damagedPhotos} damage${damagedPhotos > 1 ? "s" : ""}` : "No damage"}
-                </div>
-              </div>
             </div>
 
             {/* Room pills */}
@@ -1300,52 +1287,59 @@ export function InspectionClient({
                           ? "1.5px solid rgba(255,110,64,0.3)"
                           : "1.5px solid #f0f0f0",
                       }}>
-                        {/* Photo */}
-                        <div style={{ position: "relative", marginBottom: 10 }}>
+                        <div style={{ position: "relative", marginBottom: 8 }}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={photo.url}
                             alt=""
                             style={{
                               width: "100%",
-                              aspectRatio: "16/9",
+                              aspectRatio: "4/3",
                               objectFit: "cover",
-                              borderRadius: 10,
+                              borderRadius: 12,
+                              display: "block",
                             }}
                           />
+
+                          {/* Delete button top-right */}
                           <button
                             type="button"
                             onClick={() => handleDeletePhoto(photo.id, photo.url)}
                             style={{
-                              position: "absolute", top: 8, right: 8,
-                              width: 28, height: 28, borderRadius: "50%",
+                              position: "absolute", top: 6, right: 6,
+                              width: 26, height: 26, borderRadius: "50%",
                               border: "none", cursor: "pointer",
                               background: "rgba(0,0,0,0.55)",
-                              color: "white", fontSize: 16, fontWeight: 700,
+                              color: "white", fontSize: 15, fontWeight: 700,
                               display: "flex", alignItems: "center", justifyContent: "center",
                             }}
                           >
                             ×
                           </button>
-                        </div>
 
-                        {/* Damage tags */}
-                        {photo.damage_tags.length > 0 && (
-                          <div style={{
-                            display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10,
-                          }}>
-                            {photo.damage_tags.map((tag) => (
-                              <span key={tag} style={{
-                                fontSize: 11, fontWeight: 700,
-                                padding: "4px 10px", borderRadius: 100,
-                                background: "#fff0f0", color: "#ef4444",
-                                textTransform: "uppercase", letterSpacing: 0.5,
-                              }}>
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                          {/* Damage tags overlay — bottom of photo */}
+                          {photo.damage_tags.length > 0 && (
+                            <div style={{
+                              position: "absolute", bottom: 0, left: 0, right: 0,
+                              background: "linear-gradient(transparent, rgba(0,0,0,0.65))",
+                              padding: "14px 8px 6px",
+                              borderRadius: "0 0 12px 12px",
+                              display: "flex", flexWrap: "wrap", gap: 4,
+                            }}>
+                              {photo.damage_tags.map((tag) => (
+                                <span key={tag} style={{
+                                  fontSize: 10, fontWeight: 800,
+                                  padding: "2px 7px", borderRadius: 100,
+                                  background: "rgba(239,68,68,0.85)",
+                                  color: "white", textTransform: "uppercase",
+                                  letterSpacing: 0.3,
+                                }}>
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
 
                         {/* Notes textarea */}
                         <textarea
@@ -1396,43 +1390,6 @@ export function InspectionClient({
                     >
                       Add photos
                     </button>
-                  </div>
-                )}
-
-                {/* Prev / Next room navigation */}
-                {liveRooms.length > 1 && (
-                  <div style={{
-                    display: "flex", gap: 10, marginTop: 20,
-                  }}>
-                    {activeReviewRoom > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveReviewRoom(activeReviewRoom - 1)}
-                        style={{
-                          flex: 1, height: 44, borderRadius: 12,
-                          border: "1.5px solid #e5e7eb",
-                          background: "white", color: "#374151",
-                          fontSize: 13, fontWeight: 700, cursor: "pointer",
-                        }}
-                      >
-                        ← {liveRooms[activeReviewRoom - 1]?.name}
-                      </button>
-                    )}
-                    {activeReviewRoom < liveRooms.length - 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveReviewRoom(activeReviewRoom + 1)}
-                        style={{
-                          flex: 1, height: 44, borderRadius: 12,
-                          border: "none",
-                          background: "linear-gradient(135deg, #9A88FD22, #9A88FD33)",
-                          color: "#7B65FC",
-                          fontSize: 13, fontWeight: 700, cursor: "pointer",
-                        }}
-                      >
-                        {liveRooms[activeReviewRoom + 1]?.name} →
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
