@@ -18,28 +18,19 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: "Snagify",
-  description: "Digital property inspections for Dubai real estate",
+  description: "Digital property inspections for Dubai",
   manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "Snagify",
-  },
   icons: {
     icon: [
-      { url: "/icons/icon-16x16.png", sizes: "16x16", type: "image/png" },
-      { url: "/icons/icon-32x32.png", sizes: "32x32", type: "image/png" },
-      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-16x16.png", sizes: "16x16", type: "image/png" },
     ],
-    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
-    shortcut: "/icons/favicon.ico",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   themeColor: "#9A88FD",
-  other: {
-    "apple-mobile-web-app-capable": "yes",
-    "apple-mobile-web-app-title": "Snagify",
-  },
 };
 
 export default function RootLayout({
