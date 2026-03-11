@@ -53,11 +53,6 @@ const getConditionStyle = (
   );
 };
 
-const conditionDotColor = (c: string | null | undefined) =>
-  ({ good: "#22c55e", fair: "#D4A000", poor: "#ef4444" } as Record<string, string>)[
-    c?.toLowerCase() ?? ""
-  ] || "#9ca3af";
-
 function normalizeOne<T>(v: T | T[] | null | undefined): T | null {
   if (v == null) return null;
   return Array.isArray(v) ? v[0] ?? null : v;
@@ -465,68 +460,89 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
         {rooms
           .slice()
           .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-          .map((room) => (
-            <div
-              key={room.id}
-              className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-3 overflow-hidden"
-            >
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
-                <p
-                  className="font-semibold text-gray-900 text-sm"
-                  style={{ fontFamily: "Poppins,sans-serif" }}
-                >
-                  {room.name ?? "Room"}
-                </p>
-                <span
-                  className="text-xs px-2 py-1 rounded-full font-medium capitalize"
-                  style={getConditionStyle(room.overall_condition)}
-                >
-                  {room.overall_condition ?? "Not set"}
-                </span>
-              </div>
-              {(() => {
-                const damageEntries: { tag: string; notes: string | null; ai_analysis: string | null }[] = [];
-                for (const photo of room.photos ?? []) {
-                  const tags = Array.isArray(photo.damage_tags) ? photo.damage_tags : [];
-                  for (const tag of tags) {
-                    damageEntries.push({
-                      tag,
-                      notes: photo.notes ?? null,
-                      ai_analysis: photo.ai_analysis ?? null,
-                    });
-                  }
-                }
-                return damageEntries.length > 0 ? (
-                  <div className="divide-y divide-gray-50">
-                    {damageEntries.map((entry, idx) => (
-                      <div key={`${entry.tag}-${idx}`} className="px-4 py-2.5">
-                        <div className="flex items-start gap-2">
-                          <span className="text-sm mt-0.5 flex-shrink-0" style={{ color: conditionDotColor("poor") }}>
-                            •
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-800 capitalize">
-                              {entry.tag}
-                            </p>
-                            {entry.ai_analysis && (
-                              <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">
-                                {entry.ai_analysis}
-                              </p>
-                            )}
-                            {entry.notes && (
-                              <p className="text-xs text-[#9A88FD] mt-0.5">
-                                {entry.notes}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+          .map((room) => {
+            const allPhotos = room.photos ?? [];
+            const damagedPhotos = allPhotos.filter(
+              (p) => Array.isArray(p.damage_tags) && p.damage_tags.length > 0
+            );
+            const totalPhotos = allPhotos.length;
+            const damageCount = damagedPhotos.length;
+            const hasDamage = damageCount > 0;
+
+            return (
+              <div
+                key={room.id}
+                style={{
+                  background: "white",
+                  borderRadius: 16,
+                  marginBottom: 8,
+                  padding: "12px 16px",
+                  border: hasDamage
+                    ? "1px solid rgba(255,110,64,0.2)"
+                    : "1px solid #f0f0f0",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                {/* Left: dot + room name */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{
+                    width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                    background: hasDamage ? "#ef4444"
+                      : totalPhotos > 0 ? "#cafe87"
+                      : "#e5e7eb",
+                  }} />
+                  <span style={{
+                    fontSize: 14, fontWeight: 600, color: "#1a1a1a",
+                    fontFamily: "Poppins, sans-serif",
+                  }}>
+                    {room.name ?? "Room"}
+                  </span>
+                </div>
+
+                {/* Right: counters */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {/* Total photos badge */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 4,
+                    padding: "4px 10px", borderRadius: 100,
+                    background: "#f5f5f5",
+                  }}>
+                    <span style={{ fontSize: 11, color: "#9ca3af" }}>📷</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>
+                      {totalPhotos}
+                    </span>
                   </div>
-                ) : null;
-              })()}
-            </div>
-          ))}
+
+                  {/* Damage badge — only shown if > 0 */}
+                  {hasDamage && (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 4,
+                      padding: "4px 10px", borderRadius: 100,
+                      background: "#fff0f0",
+                    }}>
+                      <span style={{ fontSize: 11 }}>⚠️</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#ef4444" }}>
+                        {damageCount}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Condition badge */}
+                  <span style={{
+                    fontSize: 11, fontWeight: 700,
+                    padding: "4px 10px", borderRadius: 100,
+                    textTransform: "capitalize",
+                    ...getConditionStyle(room.overall_condition),
+                  }}>
+                    {room.overall_condition ?? "Not set"}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
       </div>
 
       {/* SECTION 8 — Signatures */}

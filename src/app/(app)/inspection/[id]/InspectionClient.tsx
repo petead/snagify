@@ -734,11 +734,15 @@ export function InspectionClient({
     if (existing) clearTimeout(existing);
     notesTimers.current[photoId] = setTimeout(async () => {
       if (photoId.startsWith("temp_")) return;
-      await supabase.from("photos").update({ notes: value }).eq("id", photoId);
+      await fetch("/api/update-photo-tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photoId, notes: value }),
+      });
     }, 600);
   };
 
-  // ── Add/remove damage tag (persist to DB when photo has real id)
+  // ── Add/remove damage tag (persist via service-role API to bypass RLS)
   const handleTagToggle = async (photoId: string, tag: string) => {
     let newTags: string[] = [];
     setPhotos((prev) =>
@@ -753,17 +757,18 @@ export function InspectionClient({
     );
 
     if (photoId.startsWith("temp_")) return;
-    console.log("Saving tags to DB:", photoId, newTags);
-    const { data, error } = await supabase
-      .from("photos")
-      .update({ damage_tags: newTags })
-      .eq("id", photoId)
-      .select("id, damage_tags");
 
-    if (error) {
-      console.error("TAG SAVE FAILED:", error.message, error.code, error.details);
+    const res = await fetch("/api/update-photo-tags", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ photoId, damage_tags: newTags }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      console.error("TAG SAVE FAILED:", data.error);
     } else {
-      console.log("TAG SAVED OK:", data);
+      console.log("Tags saved:", photoId, newTags);
     }
   };
 
