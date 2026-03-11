@@ -20,6 +20,7 @@ type RoomData = {
 
 type PhotoItem = {
   id: string;
+  room_id: string;
   src: string;
   damageTags: string[];
   uploading: boolean;
@@ -193,7 +194,7 @@ export function InspectionClient({
 
   const [liveRooms, setLiveRooms] = useState<RoomData[]>(initialRooms);
   const [activeRoom, setActiveRoom] = useState(0);
-  const [photos, setPhotos] = useState<Record<number, PhotoItem[]>>({});
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [screen, setScreen] = useState<"rooms" | "inspect" | "review">(
     initialRooms.length > 0 ? "inspect" : "rooms"
   );
@@ -243,15 +244,14 @@ export function InspectionClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialRooms]);
 
-  // Load existing photos on mount
+  // Load existing photos on mount (flat array with room_id)
   useEffect(() => {
     if (initialRooms.length === 0) return;
     const load = async () => {
-      const initial: Record<number, PhotoItem[]> = {};
-      for (let i = 0; i < initialRooms.length; i++) {
-        const room = initialRooms[i];
+      const flat: PhotoItem[] = [];
+      for (const room of initialRooms) {
         if (room.existingPhotos.length > 0) {
-          const loaded: PhotoItem[] = await Promise.all(
+          const loaded = await Promise.all(
             room.existingPhotos.map(async (p) => {
               const path = p.url.includes("/inspection-photos/")
                 ? p.url.split("/inspection-photos/").pop()
@@ -265,6 +265,7 @@ export function InspectionClient({
               }
               return {
                 id: p.id,
+                room_id: room.id,
                 src,
                 damageTags: Array.isArray(p.damage_tags) ? p.damage_tags : [],
                 uploading: false,
@@ -273,10 +274,10 @@ export function InspectionClient({
               };
             })
           );
-          initial[i] = loaded;
+          flat.push(...loaded);
         }
       }
-      setPhotos(initial);
+      setPhotos(flat);
     };
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -292,12 +293,16 @@ export function InspectionClient({
 
   const showToast = (msg: string) => setToast(msg);
 
-  // ── Derived
-  const roomCurrentPhotos = photos[activeRoom] || [];
-  const allPhotosFlat = Object.values(photos).flat();
-  const totalPhotos = allPhotosFlat.length;
-  const damagedPhotos = allPhotosFlat.filter((p) => p.damageTags?.length > 0).length;
-  const roomsWithPhotos = Object.keys(photos).filter((k) => (photos[Number(k)] || []).length > 0).length;
+  // ── Derived (currentRoom = selected room for dock and handlers)
+  const currentRoom = liveRooms[activeRoom] ?? null;
+  const roomCurrentPhotos = currentRoom
+    ? photos.filter((p) => p.room_id === currentRoom.id)
+    : [];
+  const totalPhotos = photos.length;
+  const damagedPhotos = photos.filter((p) => p.damageTags?.length > 0).length;
+  const roomsWithPhotos = liveRooms.filter((room) =>
+    photos.some((p) => p.room_id === room.id)
+  ).length;
   const progressPct = liveRooms.length > 0 ? (roomsWithPhotos / liveRooms.length) * 100 : 0;
 
   // ── Setup handlers
@@ -332,7 +337,7 @@ export function InspectionClient({
       existingPhotos: [],
     }));
     setLiveRooms(mapped);
-    setPhotos({});
+    setPhotos([]);
     setActiveRoom(0);
     setCreatingRooms(false);
     setScreen("inspect");
@@ -342,8 +347,7 @@ export function InspectionClient({
   const analyzePhotoInBackground = async (
     photoId: string,
     rawBase64: string,
-    roomName: string,
-    roomIdx: number
+    roomName: string
   ) => {
     try {
       const res = await fetch("/api/analyze-photo", {
@@ -357,9 +361,8 @@ export function InspectionClient({
         }),
       });
       const data = await res.json();
-      setPhotos((prev) => ({
-        ...prev,
-        [roomIdx]: (prev[roomIdx] || []).map((p) =>
+      setPhotos((prev) =>
+        prev.map((p) =>
           p.id === photoId
             ? {
                 ...p,
@@ -368,22 +371,34 @@ export function InspectionClient({
                 damageTags: Array.isArray(data.damage_tags) ? data.damage_tags : p.damageTags ?? [],
               }
             : p
-        ),
-      }));
+        )
+      );
     } catch (err) {
       console.error("AI analysis failed (non-blocking):", err);
     }
   };
 
-  // ── Photo capture: insert immediately, then AI in background
+  // ── Photo capture: add temp photo INSTANTLY (dock updates), then upload + insert + AI in background
   const handlePhotoCapture = async (files: FileList | null) => {
     if (!files) return;
-    const room = liveRooms[activeRoom];
+    const room = currentRoom;
     if (!room) return;
-    const roomIdx = activeRoom;
+
+    const placeholderSrc = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1' viewBox='0 0 1 1'%3E%3Crect fill='%23ddd' width='1' height='1'/%3E%3C/svg%3E";
 
     for (const file of Array.from(files)) {
       const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+      // 1. Add temp photo to state IMMEDIATELY so dock shows it (before any await)
+      const tempPhoto: PhotoItem = {
+        id: tempId,
+        room_id: room.id,
+        src: placeholderSrc,
+        damageTags: [],
+        uploading: true,
+      };
+      setPhotos((prev) => [...prev, tempPhoto]);
+
       const coordsPromise = getGeoCoords();
       const base64: string = await new Promise((res) => {
         const reader = new FileReader();
@@ -392,13 +407,10 @@ export function InspectionClient({
       });
       const rawBase64 = base64.split(",")[1] ?? "";
 
-      setPhotos((prev) => ({
-        ...prev,
-        [roomIdx]: [
-          ...(prev[roomIdx] || []),
-          { id: tempId, src: base64, damageTags: [], uploading: true, notes: undefined, aiAnalysis: undefined },
-        ],
-      }));
+      // 2. Replace placeholder with base64 preview so user sees the actual image
+      setPhotos((prev) =>
+        prev.map((p) => (p.id === tempId ? { ...p, src: base64 } : p))
+      );
 
       try {
         const fileName = `inspections/${inspectionId}/${room.id}/${tempId}.jpg`;
@@ -437,45 +449,32 @@ export function InspectionClient({
           if (signed?.signedUrl) displayUrl = signed.signedUrl;
         } catch { /* use publicUrl */ }
 
-        setPhotos((prev) => ({
-          ...prev,
-          [roomIdx]: (prev[roomIdx] || []).map((p) =>
+        setPhotos((prev) =>
+          prev.map((p) =>
             p.id === tempId
-              ? {
-                  ...p,
-                  id: photo.id,
-                  src: displayUrl,
-                  uploading: false,
-                }
+              ? { ...p, id: photo.id, src: displayUrl, uploading: false }
               : p
-          ),
-        }));
+          )
+        );
 
-        analyzePhotoInBackground(photo.id, rawBase64, room.name, roomIdx);
+        analyzePhotoInBackground(photo.id, rawBase64, room.name);
       } catch (err) {
         console.error("Photo capture error:", err);
-        setPhotos((prev) => ({
-          ...prev,
-          [roomIdx]: (prev[roomIdx] || []).filter((p) => p.id !== tempId),
-        }));
+        setPhotos((prev) => prev.filter((p) => p.id !== tempId));
       }
     }
   };
 
   // ── Add/remove damage tag (persist to DB when photo has real id)
   const addTag = async (photoId: string, tag: string) => {
-    const roomPhotos = photos[activeRoom] || [];
-    const photo = roomPhotos.find((p) => p.id === photoId);
+    const photo = photos.find((p) => p.id === photoId);
     if (!photo) return;
     const newTags = photo.damageTags.includes(tag)
       ? photo.damageTags.filter((t) => t !== tag)
       : [...photo.damageTags, tag];
-    setPhotos((prev) => ({
-      ...prev,
-      [activeRoom]: (prev[activeRoom] || []).map((p) =>
-        p.id === photoId ? { ...p, damageTags: newTags } : p
-      ),
-    }));
+    setPhotos((prev) =>
+      prev.map((p) => (p.id === photoId ? { ...p, damageTags: newTags } : p))
+    );
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(photoId);
     if (isUuid) {
       await supabase.from("photos").update({ damage_tags: newTags }).eq("id", photoId);
@@ -486,9 +485,8 @@ export function InspectionClient({
   const handleGenerateReport = async () => {
     setGenerating(true);
     try {
-      for (const [roomIdx, roomPhotos] of Object.entries(photos)) {
-        const room = liveRooms[Number(roomIdx)];
-        if (!room) continue;
+      for (const room of liveRooms) {
+        const roomPhotos = photos.filter((p) => p.room_id === room.id);
         const hasDamages = roomPhotos.some((p) => p.damageTags?.length > 0);
         await supabase
           .from("rooms")
@@ -773,7 +771,7 @@ export function InspectionClient({
             {/* Room pills */}
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
               {liveRooms.map((room, i) => {
-                const rp = photos[i] || [];
+                const rp = photos.filter((p) => p.room_id === room.id);
                 const hasDamages = rp.some((p) => p.damageTags?.length > 0);
                 const isActive = i === activeRoom;
                 return (
@@ -873,8 +871,8 @@ export function InspectionClient({
 
             {/* Room cards with editable notes */}
             <div className="px-4">
-              {liveRooms.map((room, i) => {
-                const rp = photos[i] || [];
+              {liveRooms.map((room) => {
+                const rp = photos.filter((p) => p.room_id === room.id);
                 const damagesCount = rp.filter((p) => p.damageTags?.length > 0).length;
                 return (
                   <div key={room.id} className="mb-4 rounded-2xl p-4"
@@ -936,12 +934,11 @@ export function InspectionClient({
                               value={photo.notes ?? ""}
                               onChange={async (e) => {
                                 const newNotes = e.target.value;
-                                setPhotos((prev) => ({
-                                  ...prev,
-                                  [i]: (prev[i] || []).map((p) =>
+                                setPhotos((prev) =>
+                                  prev.map((p) =>
                                     p.id === photo.id ? { ...p, notes: newNotes } : p
-                                  ),
-                                }));
+                                  )
+                                );
                                 const prevTimer = notesDebounceRef.current[photo.id];
                                 if (prevTimer) clearTimeout(prevTimer);
                                 notesDebounceRef.current[photo.id] = setTimeout(async () => {
