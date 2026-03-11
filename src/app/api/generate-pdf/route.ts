@@ -213,9 +213,9 @@ export async function POST(request: NextRequest) {
       rooms: (row.rooms ?? [])
         .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
         .map((room) => {
-          const sortedPhotos = [...(room.photos ?? [])].sort(
-            (a, b) => (a.damage_tags?.length ?? 0) - (b.damage_tags?.length ?? 0)
-          );
+          const sortedPhotos = [...(room.photos ?? [])]
+            .filter((p) => p.url && p.url.startsWith("https://"))
+            .sort((a, b) => (a.damage_tags?.length ?? 0) - (b.damage_tags?.length ?? 0));
           return {
             name: room.name,
             photos: sortedPhotos.map((p) => ({

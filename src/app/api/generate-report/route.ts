@@ -98,6 +98,7 @@ export async function POST(request: Request) {
         .select("room_id, url, ai_analysis, damage_tags, notes")
         .in("room_id", roomIds);
       for (const photo of photosData ?? []) {
+        if (!photo.url || !photo.url.startsWith("https://")) continue;
         const tags = Array.isArray(photo.damage_tags) ? photo.damage_tags : [];
         (roomPhotos[photo.room_id] ??= []).push({
           url: photo.url,

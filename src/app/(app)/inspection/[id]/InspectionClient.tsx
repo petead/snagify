@@ -424,19 +424,26 @@ export function InspectionClient({
         .in("room_id", roomIds)
         .order("taken_at", { ascending: true });
       if (data) {
-        setPhotos(
-          data
+        setPhotos((prev) => {
+          const localById: Record<string, PhotoItem> = {};
+          for (const p of prev) localById[p.id] = p;
+          return data
             .filter((p) => !deletedPhotoIds.current.has(p.id))
-            .map((p) => ({
-              id: p.id,
-              room_id: p.room_id,
-              url: p.url,
-              damage_tags: Array.isArray(p.damage_tags) ? p.damage_tags : [],
-              notes: p.notes ?? "",
-              isUploading: false,
-              uploadFailed: false,
-            }))
-        );
+            .map((p) => {
+              const local = localById[p.id];
+              return {
+                id: p.id,
+                room_id: p.room_id,
+                url: p.url,
+                damage_tags: local
+                  ? local.damage_tags
+                  : Array.isArray(p.damage_tags) ? p.damage_tags : [],
+                notes: local ? local.notes : (p.notes ?? ""),
+                isUploading: false,
+                uploadFailed: false,
+              };
+            });
+        });
       }
     };
     loadPhotos();
@@ -630,19 +637,27 @@ export function InspectionClient({
         .in("room_id", roomIds)
         .order("taken_at", { ascending: true });
       if (data && data.length > 0) {
-        setPhotos(
-          data
+        setPhotos((prev) => {
+          const localById: Record<string, PhotoItem> = {};
+          for (const p of prev) localById[p.id] = p;
+
+          return data
             .filter((p) => !deletedPhotoIds.current.has(p.id))
-            .map((p) => ({
-              id: p.id,
-              room_id: p.room_id,
-              url: p.url,
-              damage_tags: Array.isArray(p.damage_tags) ? p.damage_tags : [],
-              notes: p.notes ?? "",
-              isUploading: false,
-              uploadFailed: false,
-            }))
-        );
+            .map((p) => {
+              const local = localById[p.id];
+              return {
+                id: p.id,
+                room_id: p.room_id,
+                url: p.url,
+                damage_tags: local
+                  ? local.damage_tags
+                  : Array.isArray(p.damage_tags) ? p.damage_tags : [],
+                notes: local ? local.notes : (p.notes ?? ""),
+                isUploading: false,
+                uploadFailed: false,
+              };
+            });
+        });
       }
     };
     reload();
@@ -689,8 +704,10 @@ export function InspectionClient({
         .eq("id", photoId);
 
       if (error) {
-        console.error("Delete from DB failed:", error);
+        console.error("PHOTO DELETE FAILED:", error.message, "photoId:", photoId);
         return;
+      } else {
+        console.log("Photo deleted from DB:", photoId);
       }
 
       const urlParts = photoUrl.split("/inspection-photos/");
@@ -733,11 +750,29 @@ export function InspectionClient({
     );
 
     if (photoId.startsWith("temp_")) return;
-    await supabase.from("photos").update({ damage_tags: newTags }).eq("id", photoId);
+    const { error } = await supabase
+      .from("photos")
+      .update({ damage_tags: newTags })
+      .eq("id", photoId);
+
+    if (error) {
+      console.error("Failed to save tags:", error);
+    } else {
+      console.log("Tags saved for", photoId, ":", newTags);
+    }
   };
 
   // ── Generate report (from review screen)
   const handleGenerateReport = async () => {
+    for (const [photoId, timer] of Object.entries(notesTimers.current)) {
+      clearTimeout(timer);
+      const photo = photos.find((p) => p.id === photoId);
+      if (photo && !photo.id.startsWith("temp_")) {
+        await supabase.from("photos").update({ notes: photo.notes }).eq("id", photo.id);
+      }
+    }
+    notesTimers.current = {};
+
     setGenerating(true);
     try {
       for (const room of liveRooms) {
