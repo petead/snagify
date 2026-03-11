@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
+  Check,
   Camera,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -94,45 +95,48 @@ function PhotoCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasDamage = photo.damage_tags.length > 0;
+  const isAnalyzing = photo.notes === "Analyzing...";
 
   return (
-    <div>
+    <div style={{ marginBottom: 2 }}>
+      {/* Thumbnail */}
       <div
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => !photo.isUploading && setExpanded(!expanded)}
         style={{
           position: "relative",
+          aspectRatio: "1",
           borderRadius: 10,
           overflow: "hidden",
           border: hasDamage
-            ? "2px solid #FF6E40"
-            : "2px solid rgba(202,254,135,0.15)",
-          cursor: "pointer",
-          aspectRatio: "1",
+            ? "2px solid rgba(255,110,64,0.8)"
+            : "2px solid rgba(202,254,135,0.2)",
+          cursor: photo.isUploading ? "default" : "pointer",
+          background: "#1a1a2e",
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={photo.url}
           alt=""
-          style={{ width: "100%", height: "100%", objectFit: "cover", opacity: photo.isUploading ? 0.4 : 1 }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            opacity: photo.isUploading ? 0.35 : 1,
+            transition: "opacity 0.25s",
+          }}
         />
 
+        {/* Uploading spinner */}
         {photo.isUploading && (
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+          <div style={{
+            position: "absolute", inset: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
             <div
               style={{
-                width: 20,
-                height: 20,
-                borderRadius: "50%",
-                border: "2px solid rgba(255,255,255,0.2)",
+                width: 22, height: 22, borderRadius: "50%",
+                border: "2px solid rgba(255,255,255,0.15)",
                 borderTopColor: "white",
                 animation: "spin 0.7s linear infinite",
               }}
@@ -140,66 +144,39 @@ function PhotoCard({
           </div>
         )}
 
+        {/* Badge top-right */}
         {!photo.isUploading && (
-          <div
-            style={{
-              position: "absolute",
-              top: 4,
-              right: 4,
-              width: 18,
-              height: 18,
-              borderRadius: "50%",
-              background: hasDamage ? "#ef4444" : "#cafe87",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+          <div style={{
+            position: "absolute", top: 4, right: 4,
+            minWidth: 18, height: 18, borderRadius: 9,
+            background: hasDamage ? "#ef4444" : "#cafe87",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "0 4px",
+          }}>
             {hasDamage ? (
-              <span style={{ fontSize: 8, color: "white", fontWeight: 900 }}>
+              <span style={{ fontSize: 9, fontWeight: 900, color: "white" }}>
                 {photo.damage_tags.length}
               </span>
             ) : (
-              <svg width="8" height="8" viewBox="0 0 10 10">
-                <polyline
-                  points="2,5 4,8 8,2"
-                  stroke="#1a1a2e"
-                  strokeWidth="2"
-                  fill="none"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <Check size={9} color="#1a1a2e" strokeWidth={3} />
             )}
           </div>
         )}
 
+        {/* Damage tags overlay */}
         {hasDamage && !expanded && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              background: "linear-gradient(transparent, rgba(0,0,0,0.7))",
-              padding: "8px 4px 4px",
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 2,
-            }}
-          >
-            {photo.damage_tags.map((t) => (
-              <span
-                key={t}
-                style={{
-                  fontSize: 7,
-                  fontWeight: 800,
-                  padding: "1px 4px",
-                  borderRadius: 3,
-                  background: "rgba(239,68,68,0.85)",
-                  color: "white",
-                  textTransform: "uppercase",
-                }}
-              >
+          <div style={{
+            position: "absolute", bottom: 0, left: 0, right: 0,
+            background: "linear-gradient(transparent, rgba(0,0,0,0.75))",
+            padding: "10px 4px 4px",
+            display: "flex", flexWrap: "wrap", gap: 2,
+          }}>
+            {photo.damage_tags.slice(0, 2).map((t) => (
+              <span key={t} style={{
+                fontSize: 7, fontWeight: 800, padding: "1px 4px",
+                borderRadius: 3, background: "rgba(239,68,68,0.9)",
+                color: "white", textTransform: "uppercase",
+              }}>
                 {t}
               </span>
             ))}
@@ -207,54 +184,57 @@ function PhotoCard({
         )}
       </div>
 
-      {photo.isUploading || photo.notes === "..." ? (
-        <p
-          style={{
-            fontSize: 10,
-            color: "rgba(255,255,255,0.3)",
-            margin: "4px 2px 0",
-            fontStyle: "italic",
-            lineHeight: 1.3,
-          }}
-        >
+      {/* ── NOTES — always visible below thumbnail ── */}
+      {photo.isUploading ? (
+        <p style={{
+          fontSize: 10, margin: "4px 2px 0",
+          color: "rgba(255,255,255,0.25)",
+          fontStyle: "italic", lineHeight: 1.3,
+        }}>
+          Uploading...
+        </p>
+      ) : isAnalyzing ? (
+        <p style={{
+          fontSize: 10, margin: "4px 2px 0",
+          color: "rgba(154,136,253,0.7)",
+          fontStyle: "italic", lineHeight: 1.3,
+        }}>
           Analyzing...
         </p>
       ) : photo.notes ? (
-        <p
-          style={{
-            fontSize: 10,
-            color: "rgba(255,255,255,0.7)",
-            margin: "4px 2px 0",
-            lineHeight: 1.3,
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-          }}
-        >
+        <p style={{
+          fontSize: 10, margin: "4px 2px 0",
+          color: "rgba(255,255,255,0.65)",
+          lineHeight: 1.3,
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        } as React.CSSProperties}>
           {photo.notes}
         </p>
       ) : null}
 
+      {/* Expanded: tag selector */}
       {expanded && (
-        <div
-          style={{
-            marginTop: 6,
-            padding: "8px 10px",
-            borderRadius: 10,
-            background: "rgba(255,255,255,0.06)",
-          }}
-        >
-          <p
-            style={{
-              fontSize: 9,
-              color: "rgba(255,255,255,0.4)",
-              marginBottom: 6,
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-            }}
-          >
-            Damage tags
+        <div style={{
+          marginTop: 6, padding: "8px 10px",
+          borderRadius: 10,
+          background: "rgba(255,255,255,0.07)",
+        }}>
+          {photo.notes && !isAnalyzing && (
+            <p style={{
+              fontSize: 9, color: "rgba(255,255,255,0.5)",
+              marginBottom: 8, lineHeight: 1.4,
+            }}>
+              {photo.notes}
+            </p>
+          )}
+          <p style={{
+            fontSize: 9, color: "rgba(255,255,255,0.35)",
+            marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5,
+          }}>
+            Tap to tag damage
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {DAMAGE_TAGS.map((tag) => (
@@ -263,14 +243,13 @@ function PhotoCard({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onTagToggle(tag); }}
                 style={{
-                  padding: "4px 8px",
-                  borderRadius: 6,
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  background: photo.damage_tags.includes(tag) ? "#FEDE80" : "rgba(255,255,255,0.1)",
-                  color: photo.damage_tags.includes(tag) ? "#1a1a2e" : "rgba(255,255,255,0.5)",
+                  padding: "5px 9px", borderRadius: 7, border: "none",
+                  cursor: "pointer", fontSize: 10, fontWeight: 700,
+                  background: photo.damage_tags.includes(tag)
+                    ? "#FEDE80" : "rgba(255,255,255,0.09)",
+                  color: photo.damage_tags.includes(tag)
+                    ? "#1a1a2e" : "rgba(255,255,255,0.5)",
+                  transition: "all 0.15s",
                 }}
               >
                 {tag}
@@ -448,13 +427,19 @@ export function InspectionClient({
       const res = await fetch("/api/analyze-photo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          base64,
-          photoId,
-          roomName,
-        }),
+        body: JSON.stringify({ base64, photoId, roomName }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        // AI failed — clear the "..." placeholder
+        if (isMounted.current) {
+          setPhotos((prev) =>
+            prev.map((p) =>
+              p.id === photoId ? { ...p, notes: "" } : p
+            )
+          );
+        }
+        return;
+      }
       const data = await res.json();
       if (!isMounted.current) return;
       setPhotos((prev) =>
@@ -463,15 +448,23 @@ export function InspectionClient({
             ? {
                 ...p,
                 notes: data.ai_analysis || "",
-                damage_tags: (data.damage_tags?.length ?? 0) > 0
-                  ? (data.damage_tags ?? [])
-                  : p.damage_tags,
+                damage_tags:
+                  Array.isArray(data.damage_tags) && data.damage_tags.length > 0
+                    ? data.damage_tags
+                    : p.damage_tags,
               }
             : p
         )
       );
     } catch {
-      // Ignore AI failure: photo is already saved
+      // AI failed silently — clear placeholder
+      if (isMounted.current) {
+        setPhotos((prev) =>
+          prev.map((p) =>
+            p.id === photoId ? { ...p, notes: "" } : p
+          )
+        );
+      }
     }
   };
 
@@ -536,7 +529,13 @@ export function InspectionClient({
       setPhotos((prev) =>
         prev.map((p) =>
           p.id === tempId
-            ? { ...p, id: newPhoto.id, url: publicUrl, isUploading: false, notes: "..." }
+            ? {
+                ...p,
+                id: newPhoto.id,
+                url: publicUrl,
+                isUploading: false,
+                notes: "Analyzing...",
+              }
             : p
         )
       );
