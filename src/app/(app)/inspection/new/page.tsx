@@ -267,8 +267,8 @@ function NewInspectionContent() {
   const [propertyMismatch, setPropertyMismatch] = useState(false);
 
   // Room selector state (used in recap step)
-  const [selectedType, setSelectedType] = useState<string | null>(null);
-  const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
+  const [selectedType, setSelectedType] = useState<string | null>("Studio");
+  const [selectedRooms, setSelectedRooms] = useState<string[]>(ROOM_TEMPLATES["Studio"]);
   const [customRoom, setCustomRoom] = useState("");
 
   const toggleRoom = (room: string) =>
@@ -282,6 +282,12 @@ function NewInspectionContent() {
       setFormData((d) => ({ ...d, inspectionType: urlType }));
     }
   }, [urlType]);
+
+  useEffect(() => {
+    if (step === 3) {
+      window.scrollTo(0, 0);
+    }
+  }, [step]);
 
   useEffect(() => {
     if (!existingPropertyId) return;
@@ -1136,16 +1142,6 @@ function NewInspectionContent() {
       {/* STEP 3 — Recap */}
       {step === 3 && (
         <div className="px-4 pt-5 pb-48">
-          <h2
-            className="text-xl font-bold mb-1"
-            style={{ fontFamily: "Poppins,sans-serif" }}
-          >
-            Ready to start!
-          </h2>
-          <p className="text-sm text-gray-400 mb-5">
-            Review before launching the inspection
-          </p>
-
           {saveError && (
             <div className="bg-red-50 text-red-500 text-sm rounded-xl p-3 mb-4">
               {saveError}

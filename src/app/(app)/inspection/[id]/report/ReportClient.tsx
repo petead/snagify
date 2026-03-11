@@ -37,22 +37,6 @@ const formatDate = (d: string | null | undefined) =>
       })
     : "—";
 
-const getConditionStyle = (
-  condition: string | null | undefined
-): { backgroundColor: string; color: string } => {
-  const styles: Record<string, { backgroundColor: string; color: string }> = {
-    good: { backgroundColor: "#cafe8733", color: "#5a7a2e" },
-    fair: { backgroundColor: "#FEDE8033", color: "#8a6a00" },
-    poor: { backgroundColor: "#FF6B6B33", color: "#cc2222" },
-  };
-  return (
-    styles[condition?.toLowerCase() ?? ""] || {
-      backgroundColor: "#F3F4F6",
-      color: "#6B7280",
-    }
-  );
-};
-
 function normalizeOne<T>(v: T | T[] | null | undefined): T | null {
   if (v == null) return null;
   return Array.isArray(v) ? v[0] ?? null : v;
@@ -530,15 +514,6 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                     </div>
                   )}
 
-                  {/* Condition badge */}
-                  <span style={{
-                    fontSize: 11, fontWeight: 700,
-                    padding: "4px 10px", borderRadius: 100,
-                    textTransform: "capitalize",
-                    ...getConditionStyle(room.overall_condition),
-                  }}>
-                    {room.overall_condition ?? "Not set"}
-                  </span>
                 </div>
               </div>
             );
