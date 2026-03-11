@@ -158,7 +158,6 @@ Analyze the property condition visible in this photo only.`,
       success: true,
       ai_analysis: conditionSummary,
       damage_tags: suggestedTags,
-      damage_found: parsed.damage_found,
     });
   } catch (err) {
     console.error("analyze-photo error:", err);

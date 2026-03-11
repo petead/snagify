@@ -4,9 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
-  Check,
   Camera,
-  AlertTriangle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -101,59 +99,177 @@ function PhotoCard({
     <div>
       <div
         onClick={() => setExpanded(!expanded)}
-        className="relative rounded-xl overflow-hidden cursor-pointer"
         style={{
+          position: "relative",
+          borderRadius: 10,
+          overflow: "hidden",
           border: hasDamage
             ? "2px solid #FF6E40"
-            : "2px solid rgba(202,254,135,0.25)",
-          boxShadow: hasDamage ? "0 0 12px rgba(255,110,64,0.25)" : "none",
+            : "2px solid rgba(202,254,135,0.15)",
+          cursor: "pointer",
+          aspectRatio: "1",
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photo.url} alt="" className="w-full aspect-square object-cover" />
-        <div className="absolute top-1.5 right-1.5">
-          {hasDamage ? (
-            <span className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
-              <AlertTriangle size={10} className="text-white" />
-            </span>
-          ) : photo.isUploading ? (
-            <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            </span>
-          ) : (
-            <span className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "#cafe87" }}>
-              <Check size={10} color="#1a1a2e" />
-            </span>
-          )}
-        </div>
-        {photo.damage_tags.length > 0 && !expanded && (
-          <div className="absolute bottom-1 left-1 right-1 flex flex-wrap gap-0.5">
+        <img
+          src={photo.url}
+          alt=""
+          style={{ width: "100%", height: "100%", objectFit: "cover", opacity: photo.isUploading ? 0.4 : 1 }}
+        />
+
+        {photo.isUploading && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                border: "2px solid rgba(255,255,255,0.2)",
+                borderTopColor: "white",
+                animation: "spin 0.7s linear infinite",
+              }}
+            />
+          </div>
+        )}
+
+        {!photo.isUploading && (
+          <div
+            style={{
+              position: "absolute",
+              top: 4,
+              right: 4,
+              width: 18,
+              height: 18,
+              borderRadius: "50%",
+              background: hasDamage ? "#ef4444" : "#cafe87",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {hasDamage ? (
+              <span style={{ fontSize: 8, color: "white", fontWeight: 900 }}>
+                {photo.damage_tags.length}
+              </span>
+            ) : (
+              <svg width="8" height="8" viewBox="0 0 10 10">
+                <polyline
+                  points="2,5 4,8 8,2"
+                  stroke="#1a1a2e"
+                  strokeWidth="2"
+                  fill="none"
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
+          </div>
+        )}
+
+        {hasDamage && !expanded && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              background: "linear-gradient(transparent, rgba(0,0,0,0.7))",
+              padding: "8px 4px 4px",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 2,
+            }}
+          >
             {photo.damage_tags.map((t) => (
-              <span key={t} className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-black/60 text-white">{t}</span>
+              <span
+                key={t}
+                style={{
+                  fontSize: 7,
+                  fontWeight: 800,
+                  padding: "1px 4px",
+                  borderRadius: 3,
+                  background: "rgba(239,68,68,0.85)",
+                  color: "white",
+                  textTransform: "uppercase",
+                }}
+              >
+                {t}
+              </span>
             ))}
           </div>
         )}
-        {photo.notes && !expanded && photo.damage_tags.length === 0 && (
-          <div className="absolute bottom-1 left-1 right-1 bg-black/60 rounded px-1.5 py-0.5">
-            <p className="text-[8px] text-white/80 line-clamp-1">{photo.notes}</p>
-          </div>
-        )}
       </div>
+
+      {photo.isUploading || photo.notes === "..." ? (
+        <p
+          style={{
+            fontSize: 10,
+            color: "rgba(255,255,255,0.3)",
+            margin: "4px 2px 0",
+            fontStyle: "italic",
+            lineHeight: 1.3,
+          }}
+        >
+          Analyzing...
+        </p>
+      ) : photo.notes ? (
+        <p
+          style={{
+            fontSize: 10,
+            color: "rgba(255,255,255,0.7)",
+            margin: "4px 2px 0",
+            lineHeight: 1.3,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {photo.notes}
+        </p>
+      ) : null}
+
       {expanded && (
-        <div className="mt-1.5 p-2 rounded-xl" style={{ background: "rgba(255,255,255,0.06)" }}>
-          {photo.notes && (
-            <p className="text-[10px] text-white/60 mb-2 line-clamp-3">{photo.notes}</p>
-          )}
-          <p className="text-[10px] text-white/50 mb-1.5">Damage tags</p>
-          <div className="flex flex-wrap gap-1">
+        <div
+          style={{
+            marginTop: 6,
+            padding: "8px 10px",
+            borderRadius: 10,
+            background: "rgba(255,255,255,0.06)",
+          }}
+        >
+          <p
+            style={{
+              fontSize: 9,
+              color: "rgba(255,255,255,0.4)",
+              marginBottom: 6,
+              textTransform: "uppercase",
+              letterSpacing: 0.5,
+            }}
+          >
+            Damage tags
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {DAMAGE_TAGS.map((tag) => (
               <button
                 key={tag}
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onTagToggle(tag); }}
-                className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold"
                 style={{
-                  background: photo.damage_tags.includes(tag) ? "#FEDE80" : "rgba(255,255,255,0.08)",
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  background: photo.damage_tags.includes(tag) ? "#FEDE80" : "rgba(255,255,255,0.1)",
                   color: photo.damage_tags.includes(tag) ? "#1a1a2e" : "rgba(255,255,255,0.5)",
                 }}
               >
@@ -420,7 +536,7 @@ export function InspectionClient({
       setPhotos((prev) =>
         prev.map((p) =>
           p.id === tempId
-            ? { ...p, id: newPhoto.id, url: publicUrl, isUploading: false }
+            ? { ...p, id: newPhoto.id, url: publicUrl, isUploading: false, notes: "..." }
             : p
         )
       );
@@ -950,8 +1066,8 @@ export function InspectionClient({
                             <textarea
                               value={photo.notes ?? ""}
                               onChange={(e) => handleNotesChange(photo.id, e.target.value)}
-                              placeholder="No description — tap to add..."
-                              rows={2}
+                              placeholder="AI description — tap to edit..."
+                              rows={Math.max(2, Math.ceil((photo.notes?.length || 0) / 40))}
                               style={{
                                 width: "100%",
                                 padding: "8px 10px",
