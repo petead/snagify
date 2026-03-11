@@ -18,16 +18,7 @@ function buildReportDataFromInspection(inspection: InspectionRow): ReportData {
     .map((room) => {
       const photos = room.photos ?? [];
       const items: { name: string; condition: string; notes: string }[] = [];
-      for (const p of photos) {
-        const tags = Array.isArray(p.damage_tags) ? p.damage_tags : [];
-        for (const tag of tags) {
-          items.push({
-            name: tag,
-            condition: "Poor",
-            notes: (p.notes ?? p.ai_analysis ?? "").trim(),
-          });
-        }
-      }
+      // Items table removed — info shown on photos directly
       return {
         name: room.name ?? "Room",
         condition: (room.overall_condition ?? "Good").trim() || "Good",

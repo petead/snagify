@@ -109,23 +109,10 @@ export async function POST(request: Request) {
       }
     }
 
-    // Build items per room from photos with damage_tags (for AI report structure)
+    // Items table removed — damage info shown on photos in PDF
     const roomItemsFromPhotos: Record<string, { name: string; condition: string; notes: string }[]> = {};
     for (const r of rooms ?? []) {
-      const photosInRoom = roomPhotos[r.id] ?? [];
-      const items: { name: string; condition: string; notes: string }[] = [];
-      for (const p of photosInRoom) {
-        if (p.damage_tags.length > 0) {
-          for (const tag of p.damage_tags) {
-            items.push({
-              name: tag,
-              condition: "Poor",
-              notes: (p.notes || p.ai_analysis || "").trim(),
-            });
-          }
-        }
-      }
-      roomItemsFromPhotos[r.id] = items;
+      roomItemsFromPhotos[r.id] = []; // always empty — no items table
     }
 
     const { data: signatures } = await supabase

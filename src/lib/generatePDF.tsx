@@ -91,21 +91,6 @@ const s = StyleSheet.create({
   roomCondText: { fontSize: 9, fontFamily: "Helvetica-Bold" },
   roomSummary: { fontSize: 10, lineHeight: 1.5, marginBottom: 10 },
 
-  /* Table */
-  tableHeader: {
-    flexDirection: "row",
-    backgroundColor: PURPLE,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-  },
-  tableHeaderText: { color: "#fff", fontSize: 9, fontFamily: "Helvetica-Bold" },
-  tableRow: { flexDirection: "row", paddingVertical: 5, paddingHorizontal: 8, borderBottomWidth: 0.5, borderBottomColor: "#E5E7EB" },
-  tableRowAlt: { backgroundColor: "#FAFAFA" },
-  cellName: { width: "30%" },
-  cellCond: { width: "20%" },
-  cellNotes: { width: "50%" },
-
   /* Photo grid */
   photoRow: { flexDirection: "row", gap: 12, marginTop: 10, marginBottom: 6 },
   photoBlock: { flex: 1 },
@@ -394,78 +379,79 @@ function InspectionReport({
 
             <Text style={s.roomSummary}>{room.summary}</Text>
 
-            {room.items.length > 0 && (
-              <View>
-                <View style={s.tableHeader}>
-                  <Text style={[s.tableHeaderText, s.cellName]}>Item</Text>
-                  <Text style={[s.tableHeaderText, s.cellCond]}>Condition</Text>
-                  <Text style={[s.tableHeaderText, s.cellNotes]}>Notes</Text>
-                </View>
-                {room.items.map((item, ii) => (
-                  <View key={ii} style={[s.tableRow, ii % 2 === 1 ? s.tableRowAlt : {}]}>
-                    <Text style={[{ fontSize: 9 }, s.cellName]}>{item.name}</Text>
-                    <Text style={[{ fontSize: 9 }, s.cellCond]}>{item.condition}</Text>
-                    <Text style={[{ fontSize: 9, color: "#666" }, s.cellNotes]}>{item.notes || "—"}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {photos.length > 0 && (
+            {photos.filter((p) => p.url && p.url.startsWith("https://")).length > 0 && (
               <View style={{ marginTop: 14 }}>
-                <Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", marginBottom: 6 }}>Photos</Text>
-                {photos.map((photo) =>
-                  photo.url && photo.url.startsWith("https://") ? (
-                    <View key={photo.id} style={{ marginBottom: 12 }}>
-                      <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+                <Text style={{
+                  fontSize: 10, fontFamily: "Helvetica-Bold",
+                  marginBottom: 8, color: DARK,
+                }}>
+                  Photos
+                </Text>
+                {/* 2-column grid */}
+                {chunkArray(
+                  photos.filter((p) => p.url && p.url.startsWith("https://")),
+                  2
+                ).map((pair, rowIdx) => (
+                  <View key={rowIdx} style={{
+                    flexDirection: "row", gap: 10, marginBottom: 12,
+                  }}>
+                    {pair.map((photo) => (
+                      <View key={photo.id} style={{ flex: 1 }}>
+                        {/* Photo */}
                         <Image
-                          src={photo.url}
+                          src={photo.url!}
                           style={{
-                            width: 160,
-                            height: 120,
+                            width: "100%",
+                            height: 140,
                             objectFit: "cover",
                             borderRadius: 6,
+                            marginBottom: 5,
                           }}
                         />
-                        <View style={{ flex: 1 }}>
-                          {photo.damage_tags && photo.damage_tags.length > 0 && (
-                            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
-                              {photo.damage_tags.map((tag) => (
-                                <View
-                                  key={tag}
-                                  style={{
-                                    backgroundColor: "#fff0f0",
-                                    borderRadius: 4,
-                                    paddingHorizontal: 6,
-                                    paddingVertical: 2,
-                                  }}
-                                >
-                                  <Text style={{ fontSize: 8, color: "#ef4444", fontWeight: "bold" }}>
-                                    {tag.toUpperCase()}
-                                  </Text>
-                                </View>
-                              ))}
-                            </View>
-                          )}
-                          {photo.notes ? (
-                            <Text style={{ fontSize: 9, color: "#555", lineHeight: 1.4 }}>
-                              {photo.notes}
-                            </Text>
-                          ) : (
-                            <Text style={{ fontSize: 9, color: "#9ca3af", fontStyle: "italic" }}>
-                              General view
-                            </Text>
-                          )}
-                          {photo.taken_at && (
-                            <Text style={{ fontSize: 8, color: "#9ca3af", marginTop: 4 }}>
-                              {new Date(photo.taken_at).toLocaleDateString("en-GB")}
-                            </Text>
-                          )}
-                        </View>
+                        {/* Damage tags */}
+                        {photo.damage_tags && photo.damage_tags.length > 0 && (
+                          <View style={{
+                            flexDirection: "row", flexWrap: "wrap", gap: 3, marginBottom: 4,
+                          }}>
+                            {photo.damage_tags.map((tag) => (
+                              <View key={tag} style={{
+                                backgroundColor: "#fff0f0",
+                                borderRadius: 3,
+                                paddingHorizontal: 5,
+                                paddingVertical: 2,
+                              }}>
+                                <Text style={{
+                                  fontSize: 7,
+                                  color: "#ef4444",
+                                  fontFamily: "Helvetica-Bold",
+                                }}>
+                                  {tag.toUpperCase()}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                        {/* Notes */}
+                        <Text style={{
+                          fontSize: 8,
+                          color: photo.notes ? "#444" : "#9ca3af",
+                          lineHeight: 1.4,
+                          fontStyle: photo.notes ? "normal" : "italic",
+                        }}>
+                          {photo.notes || "General view"}
+                        </Text>
+                        {/* Date */}
+                        {photo.taken_at && (
+                          <Text style={{ fontSize: 7, color: "#bbb", marginTop: 3 }}>
+                            {new Date(photo.taken_at).toLocaleDateString("en-GB")}
+                          </Text>
+                        )}
                       </View>
-                    </View>
-                  ) : null
-                )}
+                    ))}
+                    {/* Fill empty slot if odd number of photos */}
+                    {pair.length === 1 && <View style={{ flex: 1 }} />}
+                  </View>
+                ))}
               </View>
             )}
 
