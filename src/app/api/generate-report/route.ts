@@ -182,8 +182,8 @@ export async function POST(request: Request) {
 
     const anthropic = new Anthropic({ apiKey, timeout: 120000 });
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2048,
       messages: [
         {
           role: "user",
@@ -224,14 +224,17 @@ export async function POST(request: Request) {
       recommendations: report.recommendations ?? [],
     };
 
-    await supabase
+    const { error: updateErr } = await supabase
       .from("inspections")
       .update({
-        report_data: reportData,
         status: "completed",
         completed_at: new Date().toISOString(),
       })
       .eq("id", inspectionId);
+    
+    if (updateErr) {
+      console.error("Failed to update inspection status:", updateErr);
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

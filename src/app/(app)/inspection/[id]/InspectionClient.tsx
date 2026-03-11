@@ -375,6 +375,7 @@ export function InspectionClient({
 
   // Report generation (review screen)
   const [generating, setGenerating] = useState(false);
+  const [navigating, setNavigating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const notesTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -750,20 +751,25 @@ export function InspectionClient({
     );
 
     if (photoId.startsWith("temp_")) return;
-    const { error } = await supabase
+    console.log("Saving tags to DB:", photoId, newTags);
+    const { data, error } = await supabase
       .from("photos")
       .update({ damage_tags: newTags })
-      .eq("id", photoId);
+      .eq("id", photoId)
+      .select("id, damage_tags");
 
     if (error) {
-      console.error("Failed to save tags:", error);
+      console.error("TAG SAVE FAILED:", error.message, error.code, error.details);
     } else {
-      console.log("Tags saved for", photoId, ":", newTags);
+      console.log("TAG SAVED OK:", data);
     }
   };
 
   // ── Generate report (from review screen)
   const handleGenerateReport = async () => {
+    if (generating || navigating) return;
+    setGenerating(true);
+
     for (const [photoId, timer] of Object.entries(notesTimers.current)) {
       clearTimeout(timer);
       const photo = photos.find((p) => p.id === photoId);
@@ -772,8 +778,6 @@ export function InspectionClient({
       }
     }
     notesTimers.current = {};
-
-    setGenerating(true);
     try {
       for (const room of liveRooms) {
         const roomPhotos = photos.filter((p) => p.room_id === room.id);
@@ -796,12 +800,13 @@ export function InspectionClient({
       });
       if (!res.ok) throw new Error("Generation failed");
 
+      setNavigating(true);
       router.push(`/inspection/${inspectionId}/report`);
       return;
     } catch {
       showToast("❌ Error generating report");
-    } finally {
       setGenerating(false);
+      setNavigating(false);
     }
   };
 
@@ -1293,16 +1298,27 @@ export function InspectionClient({
               borderTop: "1px solid #f0f0f0", padding: "12px 16px",
               paddingBottom: "max(12px, env(safe-area-inset-bottom))",
             }}>
-            <button type="button" onClick={handleGenerateReport} disabled={generating}
+            <button type="button" onClick={handleGenerateReport} disabled={generating || navigating}
               style={{
                 width: "100%", height: 56, borderRadius: 16, border: "none",
-                background: generating ? "#e5e7eb" : "linear-gradient(135deg, #9A88FD, #7B65FC)",
-                color: generating ? "#9ca3af" : "white",
+                background: (generating || navigating) ? "#e5e7eb"
+                  : "linear-gradient(135deg, #9A88FD, #7B65FC)",
+                color: (generating || navigating) ? "#9ca3af" : "white",
                 fontWeight: 800, fontSize: 16,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                cursor: generating ? "default" : "pointer",
+                cursor: (generating || navigating) ? "default" : "pointer",
+                transition: "all 0.2s",
               }}>
-              {generating ? (
+              {navigating ? (
+                <>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: "50%",
+                    border: "2px solid #9ca3af", borderTopColor: "transparent",
+                    animation: "spin 0.8s linear infinite",
+                  }} />
+                  Opening report...
+                </>
+              ) : generating ? (
                 <>
                   <div style={{
                     width: 18, height: 18, borderRadius: "50%",
