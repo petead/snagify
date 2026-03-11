@@ -305,6 +305,7 @@ export function InspectionClient({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const notesTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const deletedPhotoIds = useRef<Set<string>>(new Set());
 
   // Lock body scroll
   useEffect(() => {
@@ -351,20 +352,23 @@ export function InspectionClient({
         .order("taken_at", { ascending: true });
       if (data) {
         setPhotos(
-          data.map((p) => ({
-            id: p.id,
-            room_id: p.room_id,
-            url: p.url,
-            damage_tags: Array.isArray(p.damage_tags) ? p.damage_tags : [],
-            notes: p.notes ?? "",
-            isUploading: false,
-            uploadFailed: false,
-          }))
+          data
+            .filter((p) => !deletedPhotoIds.current.has(p.id))
+            .map((p) => ({
+              id: p.id,
+              room_id: p.room_id,
+              url: p.url,
+              damage_tags: Array.isArray(p.damage_tags) ? p.damage_tags : [],
+              notes: p.notes ?? "",
+              isUploading: false,
+              uploadFailed: false,
+            }))
         );
       }
     };
     loadPhotos();
-  }, [liveRooms, supabase]);
+// eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveRooms.map((r) => r.id).join(",")]);
 
   // Toast auto-dismiss
   useEffect(() => {
@@ -553,15 +557,19 @@ export function InspectionClient({
         .in("room_id", roomIds)
         .order("taken_at", { ascending: true });
       if (data && data.length > 0) {
-        setPhotos(data.map((p) => ({
-          id: p.id,
-          room_id: p.room_id,
-          url: p.url,
-          damage_tags: Array.isArray(p.damage_tags) ? p.damage_tags : [],
-          notes: p.notes ?? "",
-          isUploading: false,
-          uploadFailed: false,
-        })));
+        setPhotos(
+          data
+            .filter((p) => !deletedPhotoIds.current.has(p.id))
+            .map((p) => ({
+              id: p.id,
+              room_id: p.room_id,
+              url: p.url,
+              damage_tags: Array.isArray(p.damage_tags) ? p.damage_tags : [],
+              notes: p.notes ?? "",
+              isUploading: false,
+              uploadFailed: false,
+            }))
+        );
       }
     };
     reload();
@@ -595,19 +603,32 @@ export function InspectionClient({
   };
 
   const handleDeletePhoto = async (photoId: string, photoUrl: string) => {
+    deletedPhotoIds.current.add(photoId);
+
     setPhotos((prev) => prev.filter((p) => p.id !== photoId));
 
     if (photoId.startsWith("temp_")) return;
 
     try {
-      await supabase.from("photos").delete().eq("id", photoId);
+      const { error } = await supabase
+        .from("photos")
+        .delete()
+        .eq("id", photoId);
+
+      if (error) {
+        console.error("Delete from DB failed:", error);
+        return;
+      }
 
       const urlParts = photoUrl.split("/inspection-photos/");
       if (urlParts.length > 1) {
-        const filePath = urlParts[1].split("?")[0];
-        await supabase.storage
+        const filePath = decodeURIComponent(urlParts[1].split("?")[0]);
+        const { error: storageError } = await supabase.storage
           .from("inspection-photos")
           .remove([filePath]);
+        if (storageError) {
+          console.error("Storage delete failed:", storageError);
+        }
       }
     } catch (err) {
       console.error("Delete photo error:", err);
