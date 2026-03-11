@@ -186,25 +186,16 @@ function PhotoCard({
 
       {/* ── NOTES — always visible below thumbnail ── */}
       {photo.isUploading ? (
-        <p style={{
-          fontSize: 10, margin: "4px 2px 0",
-          color: "rgba(255,255,255,0.25)",
-          fontStyle: "italic", lineHeight: 1.3,
-        }}>
+        <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", margin: "4px 2px 0", fontStyle: "italic" }}>
           Uploading...
         </p>
-      ) : isAnalyzing ? (
-        <p style={{
-          fontSize: 10, margin: "4px 2px 0",
-          color: "rgba(154,136,253,0.7)",
-          fontStyle: "italic", lineHeight: 1.3,
-        }}>
+      ) : photo.notes === "Analyzing..." ? (
+        <p style={{ fontSize: 10, color: "rgba(154,136,253,0.7)", margin: "4px 2px 0", fontStyle: "italic" }}>
           Analyzing...
         </p>
       ) : photo.notes ? (
         <p style={{
-          fontSize: 10, margin: "4px 2px 0",
-          color: "rgba(255,255,255,0.65)",
+          fontSize: 10, color: "rgba(255,255,255,0.7)", margin: "4px 2px 0",
           lineHeight: 1.3,
           display: "-webkit-box",
           WebkitLineClamp: 2,
@@ -291,12 +282,6 @@ export function InspectionClient({
   const [generating, setGenerating] = useState(false);
 
   const notesTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const isMounted = useRef(true);
-  useEffect(() => {
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
 
   // Lock body scroll
   useEffect(() => {
@@ -417,99 +402,43 @@ export function InspectionClient({
     setScreen("inspect");
   };
 
-  // ── Analyze photo in background (non-blocking); updates DB and local state when done
-  const triggerAIAnalysis = async (
-    photoId: string,
-    base64: string,
-    roomName: string
-  ) => {
-    try {
-      const res = await fetch("/api/analyze-photo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base64, photoId, roomName }),
-      });
-      if (!res.ok) {
-        // AI failed — clear the "..." placeholder
-        if (isMounted.current) {
-          setPhotos((prev) =>
-            prev.map((p) =>
-              p.id === photoId ? { ...p, notes: "" } : p
-            )
-          );
-        }
-        return;
-      }
-      const data = await res.json();
-      if (!isMounted.current) return;
-      setPhotos((prev) =>
-        prev.map((p) =>
-          p.id === photoId
-            ? {
-                ...p,
-                notes: data.ai_analysis || "",
-                damage_tags:
-                  Array.isArray(data.damage_tags) && data.damage_tags.length > 0
-                    ? data.damage_tags
-                    : p.damage_tags,
-              }
-            : p
-        )
-      );
-    } catch {
-      // AI failed silently — clear placeholder
-      if (isMounted.current) {
-        setPhotos((prev) =>
-          prev.map((p) =>
-            p.id === photoId ? { ...p, notes: "" } : p
-          )
-        );
-      }
-    }
-  };
-
   const handlePhotoCapture = async (base64: string, roomId: string, roomName: string) => {
-    const tempId = `temp_${Date.now()}_${Math.random()}`;
-    const coordsPromise = getGeoCoords();
+    const tempId = `temp_${Date.now()}`;
 
-    // STEP 1: Add to state immediately with base64 preview
-    setPhotos((prev) => [
-      ...prev,
-      {
-        id: tempId,
-        room_id: roomId,
-        url: base64,
-        damage_tags: [],
-        notes: "",
-        isUploading: true,
-        uploadFailed: false,
-      },
-    ]);
+    // ── STEP 1: Show preview immediately
+    setPhotos((prev) => [...prev, {
+      id: tempId,
+      room_id: roomId,
+      url: base64,
+      damage_tags: [],
+      notes: "Uploading...",
+      isUploading: true,
+      uploadFailed: false,
+    }]);
 
     try {
-      // STEP 2: Upload to storage
-      const timestamp = Date.now();
-      const fileName = `inspections/${inspectionId}/${roomId}/${timestamp}.jpg`;
+      // ── STEP 2: Upload to Supabase Storage
+      const fileName = `inspections/${inspectionId}/${roomId}/${Date.now()}.jpg`;
       const base64Clean = base64.replace(/^data:image\/\w+;base64,/, "");
       const byteCharacters = atob(base64Clean);
-      const byteNumbers = new Array(byteCharacters.length);
+      const byteArray = new Uint8Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+        byteArray[i] = byteCharacters.charCodeAt(i);
       }
-      const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: "image/jpeg" });
 
       const { error: storageError } = await supabase.storage
         .from("inspection-photos")
         .upload(fileName, blob, { contentType: "image/jpeg", upsert: false });
-      if (storageError) throw storageError;
+
+      if (storageError) throw new Error(`Storage: ${storageError.message}`);
 
       const { data: { publicUrl } } = supabase.storage
         .from("inspection-photos")
         .getPublicUrl(fileName);
 
-      // STEP 3: Insert DB row immediately
-      const coords = await coordsPromise;
+      // ── STEP 3: Insert photo in DB
+      const coords = await getGeoCoords();
       const { data: newPhoto, error: dbError } = await supabase
         .from("photos")
         .insert({
@@ -523,38 +452,89 @@ export function InspectionClient({
         })
         .select("id")
         .single();
-      if (dbError) throw dbError;
 
-      // STEP 4: Replace temp with real photo
-      setPhotos((prev) =>
-        prev.map((p) =>
-          p.id === tempId
-            ? {
-                ...p,
-                id: newPhoto.id,
-                url: publicUrl,
-                isUploading: false,
-                notes: "Analyzing...",
-              }
-            : p
-        )
-      );
+      if (dbError) throw new Error(`DB: ${dbError.message}`);
 
-      // STEP 5: AI in background
-      triggerAIAnalysis(newPhoto.id, base64, roomName);
+      // ── STEP 4: Replace temp with real URL, show "Analyzing..."
+      setPhotos((prev) => prev.map((p) =>
+        p.id === tempId
+          ? { ...p, id: newPhoto.id, url: publicUrl, isUploading: false, notes: "Analyzing..." }
+          : p
+      ));
+
+      // ── STEP 5: Call AI — await it so notes update right after
+      try {
+        const res = await fetch("/api/analyze-photo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            base64,
+            photoId: newPhoto.id,
+            roomName,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          // Update state with AI result
+          setPhotos((prev) => prev.map((p) =>
+            p.id === newPhoto.id
+              ? {
+                  ...p,
+                  notes: data.ai_analysis || "",
+                  damage_tags: Array.isArray(data.damage_tags) && data.damage_tags.length > 0
+                    ? data.damage_tags
+                    : [],
+                }
+              : p
+          ));
+        } else {
+          // AI failed — just clear "Analyzing..."
+          setPhotos((prev) => prev.map((p) =>
+            p.id === newPhoto.id ? { ...p, notes: "" } : p
+          ));
+        }
+      } catch {
+        setPhotos((prev) => prev.map((p) =>
+          p.id === newPhoto.id ? { ...p, notes: "" } : p
+        ));
+      }
+
     } catch (err) {
-      console.error("Upload error:", err);
-      // Keep photo in state — don't delete it
-      // Just mark upload as done so spinner stops
-      setPhotos((prev) =>
-        prev.map((p) =>
-          p.id === tempId
-            ? { ...p, isUploading: false, uploadFailed: false }
-            : p
-        )
-      );
+      console.error("Photo capture error:", err);
+      // Keep photo visible but mark upload failed
+      setPhotos((prev) => prev.map((p) =>
+        p.id === tempId
+          ? { ...p, isUploading: false, notes: "Upload failed" }
+          : p
+      ));
     }
   };
+
+  useEffect(() => {
+    if (screen !== "review") return;
+    if (liveRooms.length === 0) return;
+    const reload = async () => {
+      const roomIds = liveRooms.map((r) => r.id);
+      const { data } = await supabase
+        .from("photos")
+        .select("id, room_id, url, damage_tags, notes")
+        .in("room_id", roomIds)
+        .order("taken_at", { ascending: true });
+      if (data && data.length > 0) {
+        setPhotos(data.map((p) => ({
+          id: p.id,
+          room_id: p.room_id,
+          url: p.url,
+          damage_tags: Array.isArray(p.damage_tags) ? p.damage_tags : [],
+          notes: p.notes ?? "",
+          isUploading: false,
+          uploadFailed: false,
+        })));
+      }
+    };
+    reload();
+  }, [screen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePhotoFiles = async (files: FileList | null) => {
     if (!files || !currentRoom) return;
@@ -1065,7 +1045,7 @@ export function InspectionClient({
                             <textarea
                               value={photo.notes ?? ""}
                               onChange={(e) => handleNotesChange(photo.id, e.target.value)}
-                              placeholder="AI description — tap to edit..."
+                              placeholder="No AI description — tap to edit"
                               rows={Math.max(2, Math.ceil((photo.notes?.length || 0) / 40))}
                               style={{
                                 width: "100%",
