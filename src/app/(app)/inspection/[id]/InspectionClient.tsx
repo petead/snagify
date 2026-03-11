@@ -380,6 +380,7 @@ export function InspectionClient({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const notesTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const tagsTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const deletedPhotoIds = useRef<Set<string>>(new Set());
 
   // Lock body scroll
@@ -742,34 +743,52 @@ export function InspectionClient({
     }, 600);
   };
 
-  // ── Add/remove damage tag (persist via service-role API to bypass RLS)
+  // ── Add/remove damage tag (persist via service-role API; debounce to avoid race)
   const handleTagToggle = async (photoId: string, tag: string) => {
-    let newTags: string[] = [];
-    setPhotos((prev) =>
-      prev.map((p) => {
+    let capturedTags: string[] = [];
+
+    setPhotos((prev) => {
+      const updated = prev.map((p) => {
         if (p.id !== photoId) return p;
         const hasTag = p.damage_tags.includes(tag);
-        newTags = hasTag
+        const newTags = hasTag
           ? p.damage_tags.filter((t) => t !== tag)
           : [...p.damage_tags, tag];
+        capturedTags = newTags;
         return { ...p, damage_tags: newTags };
-      })
-    );
+      });
+      return updated;
+    });
 
     if (photoId.startsWith("temp_")) return;
 
-    const res = await fetch("/api/update-photo-tags", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ photoId, damage_tags: newTags }),
-    });
+    // Debounce the DB save — wait 500ms after last tag toggle
+    const existing = tagsTimers.current[photoId];
+    if (existing) clearTimeout(existing);
 
-    if (!res.ok) {
-      const data = await res.json();
-      console.error("TAG SAVE FAILED:", data.error);
-    } else {
-      console.log("Tags saved:", photoId, newTags);
-    }
+    tagsTimers.current[photoId] = setTimeout(() => {
+      setPhotos((prev) => {
+        const photo = prev.find((p) => p.id === photoId);
+        const finalTags = photo?.damage_tags ?? capturedTags;
+
+        fetch("/api/update-photo-tags", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ photoId, damage_tags: finalTags }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.error) {
+              console.error("TAG SAVE FAILED:", data.error);
+            } else {
+              console.log("Tags saved OK:", photoId, finalTags);
+            }
+          })
+          .catch((err) => console.error("TAG SAVE ERROR:", err));
+
+        return prev;
+      });
+    }, 500);
   };
 
   // ── Generate report (from review screen)
@@ -1157,25 +1176,26 @@ export function InspectionClient({
       {screen === "review" && (
         <div className="fixed inset-0 z-40 flex flex-col" style={{ background: "#fafafa" }}>
 
-          {/* ── STICKY HEADER ── */}
+          {/* Sticky header */}
           <div style={{
-            background: "white",
-            borderBottom: "1px solid #f0f0f0",
-            padding: "14px 16px 0",
-            flexShrink: 0,
             position: "sticky", top: 0, zIndex: 10,
+            background: "rgba(250,250,250,0.97)",
+            backdropFilter: "blur(12px)",
+            borderBottom: "1px solid #f0f0f0",
+            padding: "14px 16px 12px",
           }}>
-            {/* Top row */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <button type="button" onClick={() => setScreen("inspect")}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <button
+                type="button"
+                onClick={() => setScreen("inspect")}
                 style={{
-                  display: "flex", alignItems: "center", gap: 4,
-                  background: "none", border: "none", cursor: "pointer",
-                  color: "#8888a0", fontSize: 13, fontWeight: 600,
-                }}>
-                <ChevronLeft size={18} /> Capture
+                  width: 34, height: 34, borderRadius: "50%", border: "none",
+                  background: "#f5f5f5", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <ChevronLeft size={18} color="#555" />
               </button>
-
               <div style={{ textAlign: "center" }}>
                 <p style={{
                   fontFamily: "Poppins, sans-serif", fontWeight: 700,
@@ -1184,14 +1204,17 @@ export function InspectionClient({
                   {buildingName}, Unit {unitNumber}
                 </p>
                 <p style={{
-                  fontSize: 11, fontWeight: 700, margin: "2px 0 0",
+                  fontSize: 12, fontWeight: 600, margin: "2px 0 0",
                   color: inspectionType === "check-in" ? "#9A88FD" : "#FF8A65",
                 }}>
-                  {inspectionType === "check-in" ? "Check-in Review" : "Check-out Review"}
+                  {inspectionType === "check-in" ? "● Check-in Review" : "● Check-out Review"}
                 </p>
               </div>
+              <div style={{ width: 34 }} />
             </div>
+          </div>
 
+          <div style={{ padding: "16px 16px 0" }}>
             {/* Room pills */}
             <div style={{
               display: "flex", gap: 8, overflowX: "auto",
