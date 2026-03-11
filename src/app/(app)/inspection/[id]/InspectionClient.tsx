@@ -361,6 +361,7 @@ export function InspectionClient({
 
   const [liveRooms, setLiveRooms] = useState<RoomData[]>(initialRooms);
   const [activeRoom, setActiveRoom] = useState(0);
+  const [activeReviewRoom, setActiveReviewRoom] = useState(0);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [screen, setScreen] = useState<"rooms" | "inspect" | "review">(
     initialRooms.length > 0 ? "inspect" : "rooms"
@@ -662,6 +663,7 @@ export function InspectionClient({
       }
     };
     reload();
+    setActiveReviewRoom(0);
   }, [screen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePhotoFiles = async (files: FileList | null) => {
@@ -1149,170 +1151,338 @@ export function InspectionClient({
       {/* ═══ REVIEW SCREEN ═══ */}
       {screen === "review" && (
         <div className="fixed inset-0 z-40 flex flex-col" style={{ background: "#fafafa" }}>
-          {/* Scrollable content */}
-          <div className="flex-1 overflow-y-auto no-scrollbar pb-44">
-            <div className="px-6 pt-6 pb-4">
-              <button type="button" onClick={() => setScreen("inspect")}
-                className="text-sm mb-4 flex items-center gap-1" style={{ color: "#8888a0" }}>
-                <ChevronLeft size={18} /> Back to capture
-              </button>
-              <h2 className="text-2xl font-bold mb-1"
-                style={{ fontFamily: "Poppins,sans-serif", color: "#1a1a2e" }}>
-                {inspectionType === "check-in" ? "Check-in Review" : "Check-out Review"}
-              </h2>
-              <p className="text-sm mb-4" style={{ color: "#8888a0" }}>
-                {buildingName}, Unit {unitNumber}
-              </p>
 
-              {/* Stats row */}
-              <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-                {[
-                  { label: "Rooms", value: liveRooms.length, color: "#9A88FD" },
-                  { label: "Photos", value: totalPhotos, color: "#cafe87" },
-                  { label: "Damages", value: damagedPhotos, color: damagedPhotos > 0 ? "#FF6E40" : "#cafe87" },
-                ].map((s) => (
-                  <div key={s.label} style={{
-                    flex: 1, padding: "12px 8px", borderRadius: 14, textAlign: "center",
-                    background: `${s.color}18`,
-                  }}>
-                    <p style={{ fontSize: 22, fontWeight: 800, color: s.color, margin: 0 }}>{s.value}</p>
-                    <p style={{ fontSize: 10, fontWeight: 600, color: "#888", margin: "2px 0 0" }}>{s.label}</p>
-                  </div>
-                ))}
+          {/* ── STICKY HEADER ── */}
+          <div style={{
+            background: "white",
+            borderBottom: "1px solid #f0f0f0",
+            padding: "14px 16px 0",
+            flexShrink: 0,
+            position: "sticky", top: 0, zIndex: 10,
+          }}>
+            {/* Top row */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <button type="button" onClick={() => setScreen("inspect")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 4,
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "#8888a0", fontSize: 13, fontWeight: 600,
+                }}>
+                <ChevronLeft size={18} /> Capture
+              </button>
+
+              <div style={{ textAlign: "center" }}>
+                <p style={{
+                  fontFamily: "Poppins, sans-serif", fontWeight: 700,
+                  fontSize: 14, margin: 0, color: "#1a1a2e",
+                }}>
+                  {buildingName}, Unit {unitNumber}
+                </p>
+                <p style={{
+                  fontSize: 11, fontWeight: 700, margin: "2px 0 0",
+                  color: inspectionType === "check-in" ? "#9A88FD" : "#FF8A65",
+                }}>
+                  {inspectionType === "check-in" ? "Check-in Review" : "Check-out Review"}
+                </p>
+              </div>
+
+              {/* Stats badge */}
+              <div style={{
+                display: "flex", gap: 8, alignItems: "center",
+              }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, padding: "4px 10px",
+                  borderRadius: 100, background: damagedPhotos > 0 ? "#fff0f0" : "#f0fff4",
+                  color: damagedPhotos > 0 ? "#ef4444" : "#22c55e",
+                }}>
+                  {damagedPhotos > 0 ? `${damagedPhotos} damage${damagedPhotos > 1 ? "s" : ""}` : "No damage"}
+                </div>
               </div>
             </div>
 
-            {/* Room cards with editable notes (from local photos state only) */}
-            <div className="px-4">
-              {liveRooms.map((room) => {
-                const roomPhotos = photos.filter((p) => p.room_id === room.id);
+            {/* Room pills */}
+            <div style={{
+              display: "flex", gap: 8, overflowX: "auto",
+              paddingBottom: 12, scrollbarWidth: "none",
+              marginLeft: -16, paddingLeft: 16,
+              marginRight: -16, paddingRight: 16,
+            } as React.CSSProperties}>
+              {liveRooms.map((room, i) => {
+                const rp = photos.filter((p) => p.room_id === room.id);
+                const hasDamages = rp.some((p) => p.damage_tags?.length > 0);
+                const isActive = i === activeReviewRoom;
                 return (
-                  <div key={room.id} className="mb-4 rounded-2xl p-4"
+                  <button
+                    key={room.id}
+                    type="button"
+                    onClick={() => setActiveReviewRoom(i)}
                     style={{
-                      background: "white",
-                      border: `1px solid ${roomPhotos.some((p) => p.damage_tags.length > 0) ? "rgba(255,110,64,0.3)" : "#eee"}`,
-                      boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-                    }}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{
-                          background: roomPhotos.length > 0
-                            ? (roomPhotos.some((p) => p.damage_tags.length > 0) ? "#FF6E40" : "#cafe87")
-                            : "#ddd",
-                        }} />
-                        <span className="text-sm font-semibold text-gray-900">{room.name}</span>
-                      </div>
-                      <span className="text-xs text-gray-400">
-                        {roomPhotos.length} photo{roomPhotos.length !== 1 ? "s" : ""}
+                      flexShrink: 0,
+                      padding: "8px 16px",
+                      borderRadius: 100,
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: 12, fontWeight: 700,
+                      whiteSpace: "nowrap",
+                      transition: "all 0.15s",
+                      position: "relative",
+                      background: isActive
+                        ? (inspectionType === "check-in" ? "#9A88FD" : "#FF8A65")
+                        : rp.length > 0 ? "#f5f5f5" : "#f0f0f0",
+                      color: isActive ? "white" : rp.length > 0 ? "#374151" : "#9ca3af",
+                    }}
+                  >
+                    {room.name}
+                    {rp.length > 0 && (
+                      <span style={{ marginLeft: 5, opacity: 0.7, fontSize: 11 }}>
+                        ({rp.length})
                       </span>
-                    </div>
-                    {roomPhotos.length > 0 ? (
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                        {roomPhotos.map((photo) => (
-                          <div key={photo.id} style={{ marginBottom: 0 }}>
-                            <div style={{ position: "relative", marginBottom: 8 }}>
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={photo.url}
-                                alt=""
-                                style={{
-                                  width: "100%",
-                                  aspectRatio: "4/3",
-                                  objectFit: "cover",
-                                  borderRadius: 12,
-                                }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleDeletePhoto(photo.id, photo.url)}
-                                style={{
-                                  position: "absolute", top: 6, right: 6,
-                                  width: 24, height: 24, borderRadius: "50%",
-                                  border: "none", cursor: "pointer",
-                                  background: "rgba(0,0,0,0.6)",
-                                  color: "white", fontSize: 14, fontWeight: 700,
-                                  display: "flex", alignItems: "center", justifyContent: "center",
-                                }}
-                              >
-                                ×
-                              </button>
-                            </div>
-                            {photo.damage_tags?.length > 0 && (
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
-                                {photo.damage_tags.map((tag) => (
-                                  <span
-                                    key={tag}
-                                    style={{
-                                      fontSize: 11,
-                                      fontWeight: 700,
-                                      padding: "3px 8px",
-                                      borderRadius: 100,
-                                      background: "#fff0f0",
-                                      color: "#ef4444",
-                                      textTransform: "uppercase",
-                                      letterSpacing: 0.5,
-                                    }}
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                            <textarea
-                              value={photo.notes ?? ""}
-                              onChange={(e) => handleNotesChange(photo.id, e.target.value)}
-                              placeholder="No AI description — tap to edit"
-                              rows={Math.max(2, Math.ceil((photo.notes?.length || 0) / 40))}
-                              style={{
-                                width: "100%",
-                                padding: "8px 10px",
-                                borderRadius: 8,
-                                border: "1.5px solid #e5e7eb",
-                                fontSize: 12,
-                                color: "#374151",
-                                fontFamily: "DM Sans, sans-serif",
-                                lineHeight: 1.4,
-                                resize: "none",
-                                outline: "none",
-                                boxSizing: "border-box",
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p style={{ fontSize: 12, color: "#9ca3af", fontStyle: "italic" }}>
-                        No photos taken
-                      </p>
                     )}
-                  </div>
+                    {hasDamages && !isActive && (
+                      <span style={{
+                        position: "absolute", top: 2, right: 2,
+                        width: 7, height: 7, borderRadius: "50%",
+                        background: "#FF6E40",
+                      }} />
+                    )}
+                  </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Bottom action bar */}
-          <div className="fixed bottom-16 left-0 right-0 z-20"
-            style={{
-              background: "rgba(255,255,255,0.97)", backdropFilter: "blur(12px)",
-              borderTop: "1px solid #f0f0f0", padding: "12px 16px",
-              paddingBottom: "max(12px, env(safe-area-inset-bottom))",
+          {/* ── ROOM CONTENT ── */}
+          {(() => {
+            const room = liveRooms[activeReviewRoom];
+            if (!room) return null;
+            const roomPhotos = photos.filter((p) => p.room_id === room.id);
+            const hasDamages = roomPhotos.some((p) => p.damage_tags.length > 0);
+
+            return (
+              <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 160px" }}>
+
+                {/* Room header */}
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  marginBottom: 16,
+                }}>
+                  <div style={{
+                    width: 10, height: 10, borderRadius: "50%",
+                    background: roomPhotos.length === 0 ? "#ddd"
+                      : hasDamages ? "#FF6E40" : "#cafe87",
+                  }} />
+                  <span style={{
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: 700, fontSize: 18, color: "#1a1a2e",
+                  }}>
+                    {room.name}
+                  </span>
+                  <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 500 }}>
+                    {roomPhotos.length} photo{roomPhotos.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+
+                {/* Photos */}
+                {roomPhotos.length > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {roomPhotos.map((photo) => (
+                      <div key={photo.id} style={{
+                        background: "white",
+                        borderRadius: 16,
+                        padding: 12,
+                        boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
+                        border: photo.damage_tags.length > 0
+                          ? "1.5px solid rgba(255,110,64,0.3)"
+                          : "1.5px solid #f0f0f0",
+                      }}>
+                        {/* Photo */}
+                        <div style={{ position: "relative", marginBottom: 10 }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={photo.url}
+                            alt=""
+                            style={{
+                              width: "100%",
+                              aspectRatio: "16/9",
+                              objectFit: "cover",
+                              borderRadius: 10,
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePhoto(photo.id, photo.url)}
+                            style={{
+                              position: "absolute", top: 8, right: 8,
+                              width: 28, height: 28, borderRadius: "50%",
+                              border: "none", cursor: "pointer",
+                              background: "rgba(0,0,0,0.55)",
+                              color: "white", fontSize: 16, fontWeight: 700,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+
+                        {/* Damage tags */}
+                        {photo.damage_tags.length > 0 && (
+                          <div style={{
+                            display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10,
+                          }}>
+                            {photo.damage_tags.map((tag) => (
+                              <span key={tag} style={{
+                                fontSize: 11, fontWeight: 700,
+                                padding: "4px 10px", borderRadius: 100,
+                                background: "#fff0f0", color: "#ef4444",
+                                textTransform: "uppercase", letterSpacing: 0.5,
+                              }}>
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Notes textarea */}
+                        <textarea
+                          value={photo.notes ?? ""}
+                          onChange={(e) => handleNotesChange(photo.id, e.target.value)}
+                          placeholder="AI description — tap to edit..."
+                          rows={Math.max(2, Math.ceil((photo.notes?.length || 0) / 45))}
+                          style={{
+                            width: "100%",
+                            padding: "10px 12px",
+                            borderRadius: 10,
+                            border: "1.5px solid #e5e7eb",
+                            fontSize: 13,
+                            color: "#374151",
+                            fontFamily: "DM Sans, sans-serif",
+                            lineHeight: 1.5,
+                            resize: "none",
+                            outline: "none",
+                            boxSizing: "border-box",
+                            background: photo.notes ? "white" : "#fafafa",
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{
+                    display: "flex", flexDirection: "column",
+                    alignItems: "center", justifyContent: "center",
+                    padding: "60px 20px", opacity: 0.4,
+                  }}>
+                    <Camera size={40} color="#9ca3af" />
+                    <p style={{ color: "#9ca3af", fontSize: 13, marginTop: 12 }}>
+                      No photos for this room
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveRoom(activeReviewRoom);
+                        setScreen("inspect");
+                      }}
+                      style={{
+                        marginTop: 16, padding: "10px 20px",
+                        borderRadius: 100, border: "none", cursor: "pointer",
+                        background: "#9A88FD", color: "white",
+                        fontSize: 13, fontWeight: 700,
+                      }}
+                    >
+                      Add photos
+                    </button>
+                  </div>
+                )}
+
+                {/* Prev / Next room navigation */}
+                {liveRooms.length > 1 && (
+                  <div style={{
+                    display: "flex", gap: 10, marginTop: 20,
+                  }}>
+                    {activeReviewRoom > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveReviewRoom(activeReviewRoom - 1)}
+                        style={{
+                          flex: 1, height: 44, borderRadius: 12,
+                          border: "1.5px solid #e5e7eb",
+                          background: "white", color: "#374151",
+                          fontSize: 13, fontWeight: 700, cursor: "pointer",
+                        }}
+                      >
+                        ← {liveRooms[activeReviewRoom - 1]?.name}
+                      </button>
+                    )}
+                    {activeReviewRoom < liveRooms.length - 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveReviewRoom(activeReviewRoom + 1)}
+                        style={{
+                          flex: 1, height: 44, borderRadius: 12,
+                          border: "none",
+                          background: "linear-gradient(135deg, #9A88FD22, #9A88FD33)",
+                          color: "#7B65FC",
+                          fontSize: 13, fontWeight: 700, cursor: "pointer",
+                        }}
+                      >
+                        {liveRooms[activeReviewRoom + 1]?.name} →
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── BOTTOM BAR ── */}
+          <div style={{
+            position: "fixed", bottom: 64, left: 0, right: 0, zIndex: 20,
+            background: "rgba(255,255,255,0.97)",
+            backdropFilter: "blur(12px)",
+            borderTop: "1px solid #f0f0f0",
+            padding: "12px 16px",
+            paddingBottom: "max(12px, env(safe-area-inset-bottom))",
+          }}>
+            {/* Mini stats row */}
+            <div style={{
+              display: "flex", gap: 8, marginBottom: 10, justifyContent: "center",
             }}>
-            <button type="button" onClick={handleGenerateReport} disabled={generating || navigating}
+              {[
+                { label: "Rooms", value: liveRooms.length, color: "#9A88FD" },
+                { label: "Photos", value: totalPhotos, color: "#1a1a2e" },
+                { label: "Damages", value: damagedPhotos, color: damagedPhotos > 0 ? "#ef4444" : "#22c55e" },
+              ].map((s) => (
+                <div key={s.label} style={{
+                  display: "flex", alignItems: "center", gap: 4,
+                  fontSize: 12, fontWeight: 700,
+                }}>
+                  <span style={{ color: s.color }}>{s.value}</span>
+                  <span style={{ color: "#9ca3af" }}>{s.label}</span>
+                  <span style={{ color: "#e5e7eb", marginLeft: 4 }}>·</span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGenerateReport}
+              disabled={generating || navigating}
               style={{
-                width: "100%", height: 56, borderRadius: 16, border: "none",
-                background: (generating || navigating) ? "#e5e7eb"
+                width: "100%", height: 52, borderRadius: 14, border: "none",
+                background: (generating || navigating)
+                  ? "#e5e7eb"
                   : "linear-gradient(135deg, #9A88FD, #7B65FC)",
                 color: (generating || navigating) ? "#9ca3af" : "white",
-                fontWeight: 800, fontSize: 16,
+                fontFamily: "Poppins, sans-serif",
+                fontWeight: 800, fontSize: 15,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 cursor: (generating || navigating) ? "default" : "pointer",
-                transition: "all 0.2s",
-              }}>
+              }}
+            >
               {navigating ? (
                 <>
                   <div style={{
-                    width: 18, height: 18, borderRadius: "50%",
+                    width: 16, height: 16, borderRadius: "50%",
                     border: "2px solid #9ca3af", borderTopColor: "transparent",
                     animation: "spin 0.8s linear infinite",
                   }} />
@@ -1321,14 +1491,14 @@ export function InspectionClient({
               ) : generating ? (
                 <>
                   <div style={{
-                    width: 18, height: 18, borderRadius: "50%",
+                    width: 16, height: 16, borderRadius: "50%",
                     border: "2px solid #9ca3af", borderTopColor: "transparent",
                     animation: "spin 0.8s linear infinite",
                   }} />
-                  Generating report...
+                  Generating...
                 </>
               ) : (
-                <>Generate Report</>
+                "Generate Report"
               )}
             </button>
           </div>
