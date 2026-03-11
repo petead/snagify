@@ -139,20 +139,6 @@ function PhotoCard({
           </div>
         )}
       </div>
-      {photo.notes && (
-        <p
-          style={{
-            fontSize: 12,
-            color: "#555",
-            fontFamily: "DM Sans, sans-serif",
-            lineHeight: 1.5,
-            margin: "8px 0 0",
-            padding: "0 4px",
-          }}
-        >
-          {photo.notes}
-        </p>
-      )}
       {expanded && (
         <div className="mt-1.5 p-2 rounded-xl" style={{ background: "rgba(255,255,255,0.06)" }}>
           {photo.notes && (
@@ -210,6 +196,12 @@ export function InspectionClient({
   const [generating, setGenerating] = useState(false);
 
   const notesTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const isMounted = useRef(true);
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   // Lock body scroll
   useEffect(() => {
@@ -324,7 +316,7 @@ export function InspectionClient({
       existingPhotos: [],
     }));
     setLiveRooms(mapped);
-    setPhotos([]);
+    // Do NOT reset photos — loadPhotos useEffect will reload from DB
     setActiveRoom(0);
     setCreatingRooms(false);
     setScreen("inspect");
@@ -348,13 +340,16 @@ export function InspectionClient({
       });
       if (!res.ok) return;
       const data = await res.json();
+      if (!isMounted.current) return;
       setPhotos((prev) =>
         prev.map((p) =>
           p.id === photoId
             ? {
                 ...p,
                 notes: data.ai_analysis || "",
-                damage_tags: data.damage_tags || [],
+                damage_tags: (data.damage_tags?.length ?? 0) > 0
+                  ? (data.damage_tags ?? [])
+                  : p.damage_tags,
               }
             : p
         )
@@ -434,7 +429,15 @@ export function InspectionClient({
       triggerAIAnalysis(newPhoto.id, base64, roomName);
     } catch (err) {
       console.error("Upload error:", err);
-      setPhotos((prev) => prev.filter((p) => p.id !== tempId));
+      // Keep photo in state — don't delete it
+      // Just mark upload as done so spinner stops
+      setPhotos((prev) =>
+        prev.map((p) =>
+          p.id === tempId
+            ? { ...p, isUploading: false, uploadFailed: false }
+            : p
+        )
+      );
     }
   };
 
@@ -815,105 +818,31 @@ export function InspectionClient({
             </div>
           </div>
 
-          {/* Photo dock */}
-          <div className="flex-1 px-4 pt-4 overflow-y-auto no-scrollbar" style={{ paddingBottom: 16 }}>
+          {/* Photo dock — uses PhotoCard for expand/tag/notes */}
+          <div
+            className="flex-1 overflow-y-auto no-scrollbar"
+            style={{ padding: "12px 0 16px" }}
+          >
             {roomCurrentPhotos.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 opacity-30">
                 <Camera size={40} className="text-white mb-3" />
                 <p className="text-white text-xs">Tap the shutter to capture</p>
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, padding: "12px 16px 0" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 6,
+                  padding: "0 16px",
+                }}
+              >
                 {roomCurrentPhotos.map((photo) => (
-                  <div
+                  <PhotoCard
                     key={photo.id}
-                    style={{ cursor: "pointer" }}
-                    onClick={() => handlePhotoTap(photo)}
-                  >
-                    <div
-                      style={{
-                        position: "relative",
-                        aspectRatio: "1",
-                        borderRadius: 10,
-                        overflow: "hidden",
-                        background: "#1a1a1a",
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={photo.url}
-                        alt=""
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          opacity: photo.isUploading ? 0.4 : 1,
-                          transition: "opacity 0.2s",
-                        }}
-                      />
-
-                      {photo.isUploading && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 22,
-                              height: 22,
-                              borderRadius: "50%",
-                              border: "2px solid rgba(255,255,255,0.2)",
-                              borderTopColor: "white",
-                              animation: "spin 0.7s linear infinite",
-                            }}
-                          />
-                        </div>
-                      )}
-
-                      {!photo.isUploading && photo.damage_tags?.length > 0 && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: 4,
-                            right: 4,
-                            background: "#ef4444",
-                            borderRadius: 100,
-                            minWidth: 18,
-                            height: 18,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            padding: "0 5px",
-                          }}
-                        >
-                          <span style={{ fontSize: 9, fontWeight: 800, color: "white" }}>
-                            {photo.damage_tags.length}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    {photo.notes && (
-                      <p
-                        style={{
-                          fontSize: 10,
-                          color: "rgba(255,255,255,0.8)",
-                          margin: "4px 4px 0",
-                          lineHeight: 1.3,
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {photo.notes}
-                      </p>
-                    )}
-                  </div>
+                    photo={photo}
+                    onTagToggle={(tag) => handleTagToggle(photo.id, tag)}
+                  />
                 ))}
               </div>
             )}
