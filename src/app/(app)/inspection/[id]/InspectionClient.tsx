@@ -21,11 +21,11 @@ type RoomData = {
 type PhotoItem = {
   id: string;
   room_id: string;
-  src: string;
-  damageTags: string[];
-  uploading: boolean;
-  aiAnalysis?: string;
-  notes?: string;
+  url: string;
+  damage_tags: string[];
+  notes: string;
+  isUploading: boolean;
+  uploadFailed: boolean;
 };
 
 type GeoCoords = { lat: number; lng: number };
@@ -89,13 +89,13 @@ const DAMAGE_TAGS = [
 // ─── PhotoCard ───────────────────────────────────
 function PhotoCard({
   photo,
-  onTagAdd,
+  onTagToggle,
 }: {
   photo: PhotoItem;
-  onTagAdd: (tag: string) => void;
+  onTagToggle: (tag: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const hasDamage = photo.damageTags.length > 0;
+  const hasDamage = photo.damage_tags.length > 0;
 
   return (
     <div>
@@ -110,13 +110,13 @@ function PhotoCard({
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photo.src} alt="" className="w-full aspect-square object-cover" />
+        <img src={photo.url} alt="" className="w-full aspect-square object-cover" />
         <div className="absolute top-1.5 right-1.5">
           {hasDamage ? (
             <span className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
               <AlertTriangle size={10} className="text-white" />
             </span>
-          ) : photo.uploading ? (
+          ) : photo.isUploading ? (
             <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
               <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
             </span>
@@ -126,14 +126,14 @@ function PhotoCard({
             </span>
           )}
         </div>
-        {photo.damageTags.length > 0 && !expanded && (
+        {photo.damage_tags.length > 0 && !expanded && (
           <div className="absolute bottom-1 left-1 right-1 flex flex-wrap gap-0.5">
-            {photo.damageTags.map((t) => (
+            {photo.damage_tags.map((t) => (
               <span key={t} className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-black/60 text-white">{t}</span>
             ))}
           </div>
         )}
-        {photo.notes && !expanded && photo.damageTags.length === 0 && (
+        {photo.notes && !expanded && photo.damage_tags.length === 0 && (
           <div className="absolute bottom-1 left-1 right-1 bg-black/60 rounded px-1.5 py-0.5">
             <p className="text-[8px] text-white/80 line-clamp-1">{photo.notes}</p>
           </div>
@@ -164,11 +164,11 @@ function PhotoCard({
               <button
                 key={tag}
                 type="button"
-                onClick={(e) => { e.stopPropagation(); onTagAdd(tag); }}
+                onClick={(e) => { e.stopPropagation(); onTagToggle(tag); }}
                 className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold"
                 style={{
-                  background: photo.damageTags.includes(tag) ? "#FEDE80" : "rgba(255,255,255,0.08)",
-                  color: photo.damageTags.includes(tag) ? "#1a1a2e" : "rgba(255,255,255,0.5)",
+                  background: photo.damage_tags.includes(tag) ? "#FEDE80" : "rgba(255,255,255,0.08)",
+                  color: photo.damage_tags.includes(tag) ? "#1a1a2e" : "rgba(255,255,255,0.5)",
                 }}
               >
                 {tag}
@@ -244,44 +244,32 @@ export function InspectionClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialRooms]);
 
-  // Load existing photos on mount (flat array with room_id)
+  // Load existing photos from DB on mount (single source of truth)
   useEffect(() => {
-    if (initialRooms.length === 0) return;
-    const load = async () => {
-      const flat: PhotoItem[] = [];
-      for (const room of initialRooms) {
-        if (room.existingPhotos.length > 0) {
-          const loaded = await Promise.all(
-            room.existingPhotos.map(async (p) => {
-              const path = p.url.includes("/inspection-photos/")
-                ? p.url.split("/inspection-photos/").pop()
-                : null;
-              let src = p.url;
-              if (path) {
-                const { data: signed } = await supabase.storage
-                  .from("inspection-photos")
-                  .createSignedUrl(path, 60 * 60 * 24 * 7);
-                if (signed?.signedUrl) src = signed.signedUrl;
-              }
-              return {
-                id: p.id,
-                room_id: room.id,
-                src,
-                damageTags: Array.isArray(p.damage_tags) ? p.damage_tags : [],
-                uploading: false,
-                aiAnalysis: p.ai_analysis ?? undefined,
-                notes: p.notes ?? undefined,
-              };
-            })
-          );
-          flat.push(...loaded);
-        }
+    if (liveRooms.length === 0) return;
+    const loadPhotos = async () => {
+      const roomIds = liveRooms.map((r) => r.id);
+      const { data } = await supabase
+        .from("photos")
+        .select("id, room_id, url, damage_tags, notes")
+        .in("room_id", roomIds)
+        .order("taken_at", { ascending: true });
+      if (data) {
+        setPhotos(
+          data.map((p) => ({
+            id: p.id,
+            room_id: p.room_id,
+            url: p.url,
+            damage_tags: Array.isArray(p.damage_tags) ? p.damage_tags : [],
+            notes: p.notes ?? "",
+            isUploading: false,
+            uploadFailed: false,
+          }))
+        );
       }
-      setPhotos(flat);
     };
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    loadPhotos();
+  }, [liveRooms, supabase]);
 
   // Toast auto-dismiss
   useEffect(() => {
@@ -295,11 +283,10 @@ export function InspectionClient({
 
   // ── Derived (currentRoom = selected room for dock and handlers)
   const currentRoom = liveRooms[activeRoom] ?? null;
-  const roomCurrentPhotos = currentRoom
-    ? photos.filter((p) => p.room_id === currentRoom.id)
-    : [];
+  const currentRoomId = currentRoom?.id;
+  const roomCurrentPhotos = photos.filter((p) => p.room_id === currentRoomId);
   const totalPhotos = photos.length;
-  const damagedPhotos = photos.filter((p) => p.damageTags?.length > 0).length;
+  const damagedPhotos = photos.filter((p) => p.damage_tags?.length > 0).length;
   const roomsWithPhotos = liveRooms.filter((room) =>
     photos.some((p) => p.room_id === room.id)
   ).length;
@@ -344,9 +331,9 @@ export function InspectionClient({
   };
 
   // ── Analyze photo in background (non-blocking); updates DB and local state when done
-  const analyzePhotoInBackground = async (
+  const triggerAIAnalysis = async (
     photoId: string,
-    rawBase64: string,
+    base64: string,
     roomName: string
   ) => {
     try {
@@ -354,131 +341,144 @@ export function InspectionClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          image: rawBase64,
+          image: base64,
           mimeType: "image/jpeg",
           photoId,
           roomName,
         }),
       });
+      if (!res.ok) return;
       const data = await res.json();
       setPhotos((prev) =>
         prev.map((p) =>
           p.id === photoId
             ? {
                 ...p,
-                notes: data.ai_analysis ?? p.notes ?? "",
-                aiAnalysis: data.ai_analysis ?? p.aiAnalysis,
-                damageTags: Array.isArray(data.damage_tags) ? data.damage_tags : p.damageTags ?? [],
+                notes: data.ai_analysis || p.notes,
+                damage_tags: Array.isArray(data.damage_tags) && data.damage_tags.length > 0
+                  ? data.damage_tags
+                  : p.damage_tags,
               }
             : p
         )
       );
-    } catch (err) {
-      console.error("AI analysis failed (non-blocking):", err);
+    } catch {
+      // Ignore AI failure: photo is already saved
     }
   };
 
-  // ── Photo capture: add temp photo INSTANTLY (dock updates), then upload + insert + AI in background
-  const handlePhotoCapture = async (files: FileList | null) => {
-    if (!files) return;
-    const room = currentRoom;
-    if (!room) return;
+  const handlePhotoCapture = async (base64: string, roomId: string, roomName: string) => {
+    const tempId = `temp_${Date.now()}_${Math.random()}`;
+    const coordsPromise = getGeoCoords();
 
-    const placeholderSrc = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1' viewBox='0 0 1 1'%3E%3Crect fill='%23ddd' width='1' height='1'/%3E%3C/svg%3E";
-
-    for (const file of Array.from(files)) {
-      const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-
-      // 1. Add temp photo to state IMMEDIATELY so dock shows it (before any await)
-      const tempPhoto: PhotoItem = {
+    // STEP 1: Add to state immediately with base64 preview
+    setPhotos((prev) => [
+      ...prev,
+      {
         id: tempId,
-        room_id: room.id,
-        src: placeholderSrc,
-        damageTags: [],
-        uploading: true,
-      };
-      setPhotos((prev) => [...prev, tempPhoto]);
+        room_id: roomId,
+        url: base64,
+        damage_tags: [],
+        notes: "",
+        isUploading: true,
+        uploadFailed: false,
+      },
+    ]);
 
-      const coordsPromise = getGeoCoords();
+    try {
+      // STEP 2: Upload to storage
+      const timestamp = Date.now();
+      const fileName = `inspections/${inspectionId}/${roomId}/${timestamp}.jpg`;
+      const base64Clean = base64.replace(/^data:image\/\w+;base64,/, "");
+      const byteCharacters = atob(base64Clean);
+      const byteArray = new Uint8Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteArray[i] = byteCharacters.charCodeAt(i);
+      }
+      const blob = new Blob([byteArray], { type: "image/jpeg" });
+
+      const { error: storageError } = await supabase.storage
+        .from("inspection-photos")
+        .upload(fileName, blob, { contentType: "image/jpeg", upsert: false });
+      if (storageError) throw storageError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("inspection-photos")
+        .getPublicUrl(fileName);
+
+      // STEP 3: Insert DB row immediately
+      const coords = await coordsPromise;
+      const { data: newPhoto, error: dbError } = await supabase
+        .from("photos")
+        .insert({
+          room_id: roomId,
+          url: publicUrl,
+          damage_tags: [],
+          notes: "",
+          taken_at: new Date().toISOString(),
+          gps_lat: coords?.lat ?? null,
+          gps_lng: coords?.lng ?? null,
+        })
+        .select("id")
+        .single();
+      if (dbError) throw dbError;
+
+      // STEP 4: Replace temp with real photo
+      setPhotos((prev) =>
+        prev.map((p) =>
+          p.id === tempId
+            ? { ...p, id: newPhoto.id, url: publicUrl, isUploading: false }
+            : p
+        )
+      );
+
+      // STEP 5: AI in background
+      triggerAIAnalysis(newPhoto.id, base64, roomName);
+    } catch (err) {
+      console.error("Photo upload failed:", err);
+      // Keep failed photo visible
+      setPhotos((prev) =>
+        prev.map((p) =>
+          p.id === tempId
+            ? { ...p, isUploading: false, uploadFailed: true }
+            : p
+        )
+      );
+    }
+  };
+
+  const handlePhotoFiles = async (files: FileList | null) => {
+    if (!files || !currentRoom) return;
+    for (const file of Array.from(files)) {
       const base64: string = await new Promise((res) => {
         const reader = new FileReader();
         reader.onload = () => res(reader.result as string);
         reader.readAsDataURL(file);
       });
-      const rawBase64 = base64.split(",")[1] ?? "";
-
-      // 2. Replace placeholder with base64 preview so user sees the actual image
-      setPhotos((prev) =>
-        prev.map((p) => (p.id === tempId ? { ...p, src: base64 } : p))
-      );
-
-      try {
-        const fileName = `inspections/${inspectionId}/${room.id}/${tempId}.jpg`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("inspection-photos")
-          .upload(fileName, file, { contentType: file.type || "image/jpeg", upsert: false });
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from("inspection-photos")
-          .getPublicUrl(fileName);
-
-        const coords = await coordsPromise;
-        const { data: photo, error: insertError } = await supabase
-          .from("photos")
-          .insert({
-            room_id: room.id,
-            url: publicUrl,
-            damage_tags: [],
-            notes: "",
-            taken_at: new Date().toISOString(),
-            gps_lat: coords?.lat ?? null,
-            gps_lng: coords?.lng ?? null,
-          })
-          .select("id")
-          .single();
-
-        if (insertError) throw insertError;
-
-        let displayUrl = publicUrl;
-        try {
-          const { data: signed } = await supabase.storage
-            .from("inspection-photos")
-            .createSignedUrl(uploadData.path, 60 * 60 * 24 * 7);
-          if (signed?.signedUrl) displayUrl = signed.signedUrl;
-        } catch { /* use publicUrl */ }
-
-        setPhotos((prev) =>
-          prev.map((p) =>
-            p.id === tempId
-              ? { ...p, id: photo.id, src: displayUrl, uploading: false }
-              : p
-          )
-        );
-
-        analyzePhotoInBackground(photo.id, rawBase64, room.name);
-      } catch (err) {
-        console.error("Photo capture error:", err);
-        setPhotos((prev) => prev.filter((p) => p.id !== tempId));
-      }
+      await handlePhotoCapture(base64, currentRoom.id, currentRoom.name);
     }
   };
 
+  const handlePhotoTap = (_photo: PhotoItem) => {
+    // Placeholder for future fullscreen/photo actions
+  };
+
   // ── Add/remove damage tag (persist to DB when photo has real id)
-  const addTag = async (photoId: string, tag: string) => {
-    const photo = photos.find((p) => p.id === photoId);
-    if (!photo) return;
-    const newTags = photo.damageTags.includes(tag)
-      ? photo.damageTags.filter((t) => t !== tag)
-      : [...photo.damageTags, tag];
+  const handleTagToggle = async (photoId: string, tag: string) => {
+    let newTags: string[] = [];
     setPhotos((prev) =>
-      prev.map((p) => (p.id === photoId ? { ...p, damageTags: newTags } : p))
+      prev.map((p) => {
+        if (p.id !== photoId) return p;
+        const hasTag = p.damage_tags.includes(tag);
+        newTags = hasTag
+          ? p.damage_tags.filter((t) => t !== tag)
+          : [...p.damage_tags, tag];
+        return { ...p, damage_tags: newTags };
+      })
     );
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(photoId);
-    if (isUuid) {
-      await supabase.from("photos").update({ damage_tags: newTags }).eq("id", photoId);
-    }
+
+    if (photoId.startsWith("temp_")) return;
+    await supabase.from("photos").update({ damage_tags: newTags }).eq("id", photoId);
   };
 
   // ── Generate report (from review screen)
@@ -487,7 +487,7 @@ export function InspectionClient({
     try {
       for (const room of liveRooms) {
         const roomPhotos = photos.filter((p) => p.room_id === room.id);
-        const hasDamages = roomPhotos.some((p) => p.damageTags?.length > 0);
+        const hasDamages = roomPhotos.some((p) => p.damage_tags?.length > 0);
         await supabase
           .from("rooms")
           .update({ overall_condition: hasDamages ? "poor" : "good" })
@@ -772,7 +772,7 @@ export function InspectionClient({
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
               {liveRooms.map((room, i) => {
                 const rp = photos.filter((p) => p.room_id === room.id);
-                const hasDamages = rp.some((p) => p.damageTags?.length > 0);
+                const hasDamages = rp.some((p) => p.damage_tags?.length > 0);
                 const isActive = i === activeRoom;
                 return (
                   <button key={room.id} type="button" onClick={() => setActiveRoom(i)}
@@ -808,7 +808,7 @@ export function InspectionClient({
                 style={{ background: "rgba(255,255,255,0.08)", border: `3px solid ${accentColor}` }}>
                 <div className="w-10 h-10 rounded-full" style={{ background: accentColor }} />
                 <input type="file" accept="image/*" capture="environment" className="hidden" multiple
-                  onChange={(e) => handlePhotoCapture(e.target.files)} />
+                  onChange={(e) => handlePhotoFiles(e.target.files)} />
               </label>
               <p className="text-[10px] text-white/30 mt-3">Tap to capture</p>
             </div>
@@ -822,10 +822,92 @@ export function InspectionClient({
                 <p className="text-white text-xs">Tap the shutter to capture</p>
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-2">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, padding: "12px 16px 0" }}>
                 {roomCurrentPhotos.map((photo) => (
-                  <PhotoCard key={photo.id} photo={photo}
-                    onTagAdd={(tag) => addTag(photo.id, tag)} />
+                  <div
+                    key={photo.id}
+                    style={{
+                      position: "relative",
+                      aspectRatio: "1",
+                      borderRadius: 10,
+                      overflow: "hidden",
+                      background: "#1a1a1a",
+                    }}
+                    onClick={() => handlePhotoTap(photo)}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={photo.url}
+                      alt=""
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        opacity: photo.isUploading ? 0.4 : photo.uploadFailed ? 0.2 : 1,
+                        transition: "opacity 0.2s",
+                      }}
+                    />
+
+                    {photo.isUploading && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: "50%",
+                            border: "2px solid rgba(255,255,255,0.2)",
+                            borderTopColor: "white",
+                            animation: "spin 0.7s linear infinite",
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {photo.uploadFailed && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "rgba(239,68,68,0.4)",
+                        }}
+                      >
+                        <span style={{ fontSize: 18 }}>!</span>
+                      </div>
+                    )}
+
+                    {!photo.isUploading && photo.damage_tags?.length > 0 && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: 4,
+                          right: 4,
+                          background: "#ef4444",
+                          borderRadius: 100,
+                          minWidth: 18,
+                          height: 18,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "0 5px",
+                        }}
+                      >
+                        <span style={{ fontSize: 9, fontWeight: 800, color: "white" }}>
+                          {photo.damage_tags.length}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -873,7 +955,7 @@ export function InspectionClient({
             <div className="px-4">
               {liveRooms.map((room) => {
                 const rp = photos.filter((p) => p.room_id === room.id);
-                const damagesCount = rp.filter((p) => p.damageTags?.length > 0).length;
+                const damagesCount = rp.filter((p) => p.damage_tags?.length > 0).length;
                 return (
                   <div key={room.id} className="mb-4 rounded-2xl p-4"
                     style={{
@@ -899,7 +981,7 @@ export function InspectionClient({
                           <div key={photo.id} style={{ marginBottom: 0 }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
-                              src={photo.src}
+                              src={photo.url}
                               alt=""
                               style={{
                                 width: "100%",
@@ -909,9 +991,9 @@ export function InspectionClient({
                                 marginBottom: 8,
                               }}
                             />
-                            {photo.damageTags?.length > 0 && (
+                            {photo.damage_tags?.length > 0 && (
                               <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
-                                {photo.damageTags.map((tag) => (
+                                {photo.damage_tags.map((tag) => (
                                   <span
                                     key={tag}
                                     style={{
