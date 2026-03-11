@@ -53,12 +53,14 @@ Photo of a cracked tile with water stain:
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { image: base64Data, mimeType = "image/jpeg", photoId, roomName } = body as {
-      image: string;
+    const { image, base64, mimeType = "image/jpeg", photoId, roomName } = body as {
+      image?: string;
+      base64?: string;
       mimeType?: string;
       photoId?: string;
       roomName?: string;
     };
+    const base64Data = base64 ?? image;
 
     if (!base64Data || typeof base64Data !== "string") {
       return NextResponse.json(
