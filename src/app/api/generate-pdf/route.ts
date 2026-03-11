@@ -246,14 +246,22 @@ export async function POST(request: NextRequest) {
         upsert: true,
       });
 
-    if (!uploadError) {
+    if (uploadError) {
+      console.error("PDF upload to storage FAILED:", uploadError.message);
+    } else {
       const {
         data: { publicUrl },
       } = storageClient.storage.from("reports").getPublicUrl(fileName);
-      await storageClient
+      console.log("PDF uploaded OK:", publicUrl);
+      const { error: updateErr } = await storageClient
         .from("inspections")
         .update({ report_url: publicUrl })
         .eq("id", inspectionId);
+      if (updateErr) {
+        console.error("Failed to save report_url:", updateErr.message);
+      } else {
+        console.log("report_url saved in inspections table OK");
+      }
     }
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
