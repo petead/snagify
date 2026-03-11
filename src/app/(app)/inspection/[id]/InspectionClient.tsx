@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import {
   ChevronLeft,
   Check,
@@ -95,183 +96,255 @@ function PhotoCard({
   onTagToggle: (tag: string) => void;
   onDelete: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
   const hasDamage = photo.damage_tags.length > 0;
   const isAnalyzing = photo.notes === "Analyzing...";
 
-  return (
-    <div style={{ marginBottom: 2 }}>
-      {/* Thumbnail */}
-      <div
-        onClick={() => !photo.isUploading && setExpanded(!expanded)}
-        style={{
-          position: "relative",
-          aspectRatio: "1",
-          borderRadius: 10,
-          overflow: "hidden",
-          border: hasDamage
-            ? "2px solid rgba(255,110,64,0.8)"
-            : "2px solid rgba(202,254,135,0.2)",
-          cursor: photo.isUploading ? "default" : "pointer",
-          background: "#1a1a2e",
-        }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={photo.url}
-          alt=""
-          onError={(e) => {
-            console.error("Image load failed:", photo.url?.substring(0, 80));
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
+  const modal = open && typeof document !== "undefined"
+    ? createPortal(
+        <div
           style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            opacity: photo.isUploading ? 0.35 : 1,
-            transition: "opacity 0.25s",
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(10,10,20,0.97)",
+            display: "flex", flexDirection: "column",
+            paddingBottom: "env(safe-area-inset-bottom, 0px)",
           }}
-        />
-
-        {/* Uploading spinner */}
-        {photo.isUploading && (
+        >
+          {/* Header */}
           <div style={{
-            position: "absolute", inset: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "16px 16px 12px",
+            flexShrink: 0,
           }}>
-            <div
+            <p style={{
+              fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.9)",
+              margin: 0,
+            }}>
+              Photo details
+            </p>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
               style={{
+                width: 32, height: 32, borderRadius: "50%",
+                border: "none", cursor: "pointer",
+                background: "rgba(255,255,255,0.1)",
+                color: "white", fontSize: 18, fontWeight: 700,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Photo */}
+          <div style={{
+            flex: 1, padding: "0 16px",
+            display: "flex", flexDirection: "column",
+            gap: 16, overflowY: "auto",
+          }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photo.url}
+              alt=""
+              style={{
+                width: "100%", borderRadius: 16,
+                objectFit: "cover", maxHeight: 280,
+              }}
+            />
+
+            {/* AI Notes */}
+            {photo.notes && !isAnalyzing && (
+              <div style={{
+                padding: "12px 14px", borderRadius: 12,
+                background: "rgba(255,255,255,0.07)",
+              }}>
+                <p style={{
+                  fontSize: 11, fontWeight: 700,
+                  color: "rgba(255,255,255,0.35)",
+                  textTransform: "uppercase", letterSpacing: 0.5,
+                  marginBottom: 6,
+                }}>
+                  AI Description
+                </p>
+                <p style={{
+                  fontSize: 13, color: "rgba(255,255,255,0.8)",
+                  lineHeight: 1.5, margin: 0,
+                }}>
+                  {photo.notes}
+                </p>
+              </div>
+            )}
+
+            {/* Damage Tags */}
+            <div style={{
+              padding: "12px 14px", borderRadius: 12,
+              background: "rgba(255,255,255,0.07)",
+            }}>
+              <p style={{
+                fontSize: 11, fontWeight: 700,
+                color: "rgba(255,255,255,0.35)",
+                textTransform: "uppercase", letterSpacing: 0.5,
+                marginBottom: 10,
+              }}>
+                Tag damage
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {DAMAGE_TAGS.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => onTagToggle(tag)}
+                    style={{
+                      padding: "8px 14px", borderRadius: 8, border: "none",
+                      cursor: "pointer", fontSize: 12, fontWeight: 700,
+                      background: photo.damage_tags.includes(tag)
+                        ? "#FEDE80" : "rgba(255,255,255,0.1)",
+                      color: photo.damage_tags.includes(tag)
+                        ? "#1a1a2e" : "rgba(255,255,255,0.5)",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Delete button */}
+            <button
+              type="button"
+              onClick={() => { onDelete(); setOpen(false); }}
+              style={{
+                width: "100%", padding: "14px",
+                borderRadius: 12, border: "none", cursor: "pointer",
+                background: "rgba(239,68,68,0.12)",
+                color: "#ef4444", fontSize: 13, fontWeight: 700,
+              }}
+            >
+              Delete photo
+            </button>
+
+            {/* Spacer */}
+            <div style={{ height: 16 }} />
+          </div>
+        </div>,
+        document.body
+      )
+    : null;
+
+  return (
+    <>
+      {modal}
+      <div style={{ marginBottom: 2 }}>
+        {/* Thumbnail */}
+        <div
+          onClick={() => !photo.isUploading && setOpen(true)}
+          style={{
+            position: "relative",
+            aspectRatio: "1",
+            borderRadius: 10,
+            overflow: "hidden",
+            border: hasDamage
+              ? "2px solid rgba(255,110,64,0.8)"
+              : "2px solid rgba(202,254,135,0.2)",
+            cursor: photo.isUploading ? "default" : "pointer",
+            background: "#1a1a2e",
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={photo.url}
+            alt=""
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+            style={{
+              width: "100%", height: "100%", objectFit: "cover",
+              opacity: photo.isUploading ? 0.35 : 1,
+              transition: "opacity 0.25s",
+            }}
+          />
+
+          {/* Uploading spinner */}
+          {photo.isUploading && (
+            <div style={{
+              position: "absolute", inset: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <div style={{
                 width: 22, height: 22, borderRadius: "50%",
                 border: "2px solid rgba(255,255,255,0.15)",
                 borderTopColor: "white",
                 animation: "spin 0.7s linear infinite",
-              }}
-            />
-          </div>
-        )}
-
-        {/* Badge top-right */}
-        {!photo.isUploading && (
-          <div style={{
-            position: "absolute", top: 4, right: 4,
-            minWidth: 18, height: 18, borderRadius: 9,
-            background: hasDamage ? "#ef4444" : "#cafe87",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: "0 4px",
-          }}>
-            {hasDamage ? (
-              <span style={{ fontSize: 9, fontWeight: 900, color: "white" }}>
-                {photo.damage_tags.length}
-              </span>
-            ) : (
-              <Check size={9} color="#1a1a2e" strokeWidth={3} />
-            )}
-          </div>
-        )}
-
-        {/* Damage tags overlay */}
-        {hasDamage && !expanded && (
-          <div style={{
-            position: "absolute", bottom: 0, left: 0, right: 0,
-            background: "linear-gradient(transparent, rgba(0,0,0,0.75))",
-            padding: "10px 4px 4px",
-            display: "flex", flexWrap: "wrap", gap: 2,
-          }}>
-            {photo.damage_tags.slice(0, 2).map((t) => (
-              <span key={t} style={{
-                fontSize: 7, fontWeight: 800, padding: "1px 4px",
-                borderRadius: 3, background: "rgba(239,68,68,0.9)",
-                color: "white", textTransform: "uppercase",
-              }}>
-                {t}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── NOTES — always visible below thumbnail ── */}
-      {photo.isUploading ? (
-        <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", margin: "4px 2px 0", fontStyle: "italic" }}>
-          Uploading...
-        </p>
-      ) : photo.notes === "Analyzing..." ? (
-        <p style={{ fontSize: 10, color: "rgba(154,136,253,0.7)", margin: "4px 2px 0", fontStyle: "italic" }}>
-          Analyzing...
-        </p>
-      ) : photo.notes ? (
-        <p style={{
-          fontSize: 10, color: "rgba(255,255,255,0.7)", margin: "4px 2px 0",
-          lineHeight: 1.3,
-          display: "-webkit-box",
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden",
-        } as React.CSSProperties}>
-          {photo.notes}
-        </p>
-      ) : null}
-
-      {/* Expanded: tag selector */}
-      {expanded && (
-        <div style={{
-          marginTop: 6, padding: "8px 10px",
-          borderRadius: 10,
-          background: "rgba(255,255,255,0.07)",
-        }}>
-          {photo.notes && !isAnalyzing && (
-            <p style={{
-              fontSize: 9, color: "rgba(255,255,255,0.5)",
-              marginBottom: 8, lineHeight: 1.4,
-            }}>
-              {photo.notes}
-            </p>
+              }} />
+            </div>
           )}
-          <p style={{
-            fontSize: 9, color: "rgba(255,255,255,0.35)",
-            marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5,
-          }}>
-            Tap to tag damage
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {DAMAGE_TAGS.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onTagToggle(tag); }}
-                style={{
-                  padding: "5px 9px", borderRadius: 7, border: "none",
-                  cursor: "pointer", fontSize: 10, fontWeight: 700,
-                  background: photo.damage_tags.includes(tag)
-                    ? "#FEDE80" : "rgba(255,255,255,0.09)",
-                  color: photo.damage_tags.includes(tag)
-                    ? "#1a1a2e" : "rgba(255,255,255,0.5)",
-                  transition: "all 0.15s",
-                }}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-              setExpanded(false);
-            }}
-            style={{
-              marginTop: 10, width: "100%", padding: "7px",
-              borderRadius: 8, border: "none", cursor: "pointer",
-              background: "rgba(239,68,68,0.15)",
-              color: "#ef4444", fontSize: 11, fontWeight: 700,
-            }}
-          >
-            Delete photo
-          </button>
+
+          {/* Badge top-right */}
+          {!photo.isUploading && (
+            <div style={{
+              position: "absolute", top: 4, right: 4,
+              minWidth: 18, height: 18, borderRadius: 9,
+              background: hasDamage ? "#ef4444" : "#cafe87",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: "0 4px",
+            }}>
+              {hasDamage ? (
+                <span style={{ fontSize: 9, fontWeight: 900, color: "white" }}>
+                  {photo.damage_tags.length}
+                </span>
+              ) : (
+                <Check size={9} color="#1a1a2e" strokeWidth={3} />
+              )}
+            </div>
+          )}
+
+          {/* Damage tags overlay bottom */}
+          {hasDamage && (
+            <div style={{
+              position: "absolute", bottom: 0, left: 0, right: 0,
+              background: "linear-gradient(transparent, rgba(0,0,0,0.75))",
+              padding: "10px 4px 4px",
+              display: "flex", flexWrap: "wrap", gap: 2,
+            }}>
+              {photo.damage_tags.slice(0, 2).map((t) => (
+                <span key={t} style={{
+                  fontSize: 7, fontWeight: 800, padding: "1px 4px",
+                  borderRadius: 3, background: "rgba(239,68,68,0.9)",
+                  color: "white", textTransform: "uppercase",
+                }}>
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+
+        {/* Notes below thumbnail — truncated, always visible */}
+        {photo.isUploading ? (
+          <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", margin: "4px 2px 0", fontStyle: "italic" }}>
+            Uploading...
+          </p>
+        ) : isAnalyzing ? (
+          <p style={{ fontSize: 10, color: "rgba(154,136,253,0.7)", margin: "4px 2px 0", fontStyle: "italic" }}>
+            Analyzing...
+          </p>
+        ) : photo.notes ? (
+          <p style={{
+            fontSize: 10, color: "rgba(255,255,255,0.7)", margin: "4px 2px 0",
+            lineHeight: 1.3,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          } as React.CSSProperties}>
+            {photo.notes}
+          </p>
+        ) : null}
+      </div>
+    </>
   );
 }
 
