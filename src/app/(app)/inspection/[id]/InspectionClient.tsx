@@ -89,9 +89,11 @@ const DAMAGE_TAGS = [
 function PhotoCard({
   photo,
   onTagToggle,
+  onDelete,
 }: {
   photo: PhotoItem;
   onTagToggle: (tag: string) => void;
+  onDelete: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasDamage = photo.damage_tags.length > 0;
@@ -118,6 +120,10 @@ function PhotoCard({
         <img
           src={photo.url}
           alt=""
+          onError={(e) => {
+            console.error("Image load failed:", photo.url?.substring(0, 80));
+            (e.target as HTMLImageElement).style.display = "none";
+          }}
           style={{
             width: "100%",
             height: "100%",
@@ -247,6 +253,22 @@ function PhotoCard({
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+              setExpanded(false);
+            }}
+            style={{
+              marginTop: 10, width: "100%", padding: "7px",
+              borderRadius: 8, border: "none", cursor: "pointer",
+              background: "rgba(239,68,68,0.15)",
+              color: "#ef4444", fontSize: 11, fontWeight: 700,
+            }}
+          >
+            Delete photo
+          </button>
         </div>
       )}
     </div>
@@ -280,6 +302,7 @@ export function InspectionClient({
 
   // Report generation (review screen)
   const [generating, setGenerating] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const notesTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -403,13 +426,16 @@ export function InspectionClient({
   };
 
   const handlePhotoCapture = async (base64: string, roomId: string, roomName: string) => {
+    const localBase64 = base64;
+    const localRoomId = roomId;
+    const localRoomName = roomName;
     const tempId = `temp_${Date.now()}`;
 
     // ── STEP 1: Show preview immediately
     setPhotos((prev) => [...prev, {
       id: tempId,
-      room_id: roomId,
-      url: base64,
+      room_id: localRoomId,
+      url: localBase64,
       damage_tags: [],
       notes: "Uploading...",
       isUploading: true,
@@ -418,8 +444,8 @@ export function InspectionClient({
 
     try {
       // ── STEP 2: Upload to Supabase Storage
-      const fileName = `inspections/${inspectionId}/${roomId}/${Date.now()}.jpg`;
-      const base64Clean = base64.replace(/^data:image\/\w+;base64,/, "");
+      const fileName = `inspections/${inspectionId}/${localRoomId}/${Date.now()}.jpg`;
+      const base64Clean = localBase64.replace(/^data:image\/\w+;base64,/, "");
       const byteCharacters = atob(base64Clean);
       const byteArray = new Uint8Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
@@ -436,13 +462,17 @@ export function InspectionClient({
       const { data: { publicUrl } } = supabase.storage
         .from("inspection-photos")
         .getPublicUrl(fileName);
+      console.log("Storage publicUrl:", publicUrl);
+      if (!publicUrl || !publicUrl.includes("/storage/v1/object/public/inspection-photos/")) {
+        throw new Error("Storage: invalid public URL");
+      }
 
       // ── STEP 3: Insert photo in DB
       const coords = await getGeoCoords();
       const { data: newPhoto, error: dbError } = await supabase
         .from("photos")
         .insert({
-          room_id: roomId,
+          room_id: localRoomId,
           url: publicUrl,
           damage_tags: [],
           notes: "",
@@ -454,11 +484,12 @@ export function InspectionClient({
         .single();
 
       if (dbError) throw new Error(`DB: ${dbError.message}`);
+      const realPhotoId = newPhoto.id;
 
       // ── STEP 4: Replace temp with real URL, show "Analyzing..."
       setPhotos((prev) => prev.map((p) =>
         p.id === tempId
-          ? { ...p, id: newPhoto.id, url: publicUrl, isUploading: false, notes: "Analyzing..." }
+          ? { ...p, id: realPhotoId, url: publicUrl, isUploading: false, notes: "Analyzing..." }
           : p
       ));
 
@@ -468,9 +499,9 @@ export function InspectionClient({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            base64,
-            photoId: newPhoto.id,
-            roomName,
+            base64: localBase64,
+            photoId: realPhotoId,
+            roomName: localRoomName,
           }),
         });
 
@@ -478,7 +509,7 @@ export function InspectionClient({
           const data = await res.json();
           // Update state with AI result
           setPhotos((prev) => prev.map((p) =>
-            p.id === newPhoto.id
+            p.id === realPhotoId
               ? {
                   ...p,
                   notes: data.ai_analysis || "",
@@ -491,12 +522,12 @@ export function InspectionClient({
         } else {
           // AI failed — just clear "Analyzing..."
           setPhotos((prev) => prev.map((p) =>
-            p.id === newPhoto.id ? { ...p, notes: "" } : p
+            p.id === realPhotoId ? { ...p, notes: "" } : p
           ));
         }
       } catch {
         setPhotos((prev) => prev.map((p) =>
-          p.id === newPhoto.id ? { ...p, notes: "" } : p
+          p.id === realPhotoId ? { ...p, notes: "" } : p
         ));
       }
 
@@ -538,18 +569,49 @@ export function InspectionClient({
 
   const handlePhotoFiles = async (files: FileList | null) => {
     if (!files || !currentRoom) return;
-    for (const file of Array.from(files)) {
+    const fileArray = Array.from(files);
+
+    for (const file of fileArray) {
       const base64: string = await new Promise((res) => {
         const reader = new FileReader();
         reader.onload = () => res(reader.result as string);
         reader.readAsDataURL(file);
       });
+
+      if (!base64.startsWith("data:image")) {
+        console.error("Invalid base64:", base64.substring(0, 50));
+        return;
+      }
+
       await handlePhotoCapture(base64, currentRoom.id, currentRoom.name);
     }
+
+    const input = document.querySelector('input[type="file"][accept="image/*"]') as HTMLInputElement;
+    if (input) input.value = "";
   };
 
   const handlePhotoTap = (_photo: PhotoItem) => {
     // Placeholder for future fullscreen/photo actions
+  };
+
+  const handleDeletePhoto = async (photoId: string, photoUrl: string) => {
+    setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+
+    if (photoId.startsWith("temp_")) return;
+
+    try {
+      await supabase.from("photos").delete().eq("id", photoId);
+
+      const urlParts = photoUrl.split("/inspection-photos/");
+      if (urlParts.length > 1) {
+        const filePath = urlParts[1].split("?")[0];
+        await supabase.storage
+          .from("inspection-photos")
+          .remove([filePath]);
+      }
+    } catch (err) {
+      console.error("Delete photo error:", err);
+    }
   };
 
   const handleNotesChange = (photoId: string, value: string) => {
@@ -907,7 +969,11 @@ export function InspectionClient({
                 style={{ background: "rgba(255,255,255,0.08)", border: `3px solid ${accentColor}` }}>
                 <div className="w-10 h-10 rounded-full" style={{ background: accentColor }} />
                 <input type="file" accept="image/*" capture="environment" className="hidden" multiple
-                  onChange={(e) => handlePhotoFiles(e.target.files)} />
+                  ref={fileInputRef}
+                  onChange={async (e) => {
+                    await handlePhotoFiles(e.target.files);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }} />
               </label>
               <p className="text-[10px] text-white/30 mt-3">Tap to capture</p>
             </div>
@@ -937,6 +1003,7 @@ export function InspectionClient({
                     key={photo.id}
                     photo={photo}
                     onTagToggle={(tag) => handleTagToggle(photo.id, tag)}
+                    onDelete={() => handleDeletePhoto(photo.id, photo.url)}
                   />
                 ))}
               </div>
@@ -1009,18 +1076,33 @@ export function InspectionClient({
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                         {roomPhotos.map((photo) => (
                           <div key={photo.id} style={{ marginBottom: 0 }}>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={photo.url}
-                              alt=""
-                              style={{
-                                width: "100%",
-                                aspectRatio: "4/3",
-                                objectFit: "cover",
-                                borderRadius: 12,
-                                marginBottom: 8,
-                              }}
-                            />
+                            <div style={{ position: "relative", marginBottom: 8 }}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={photo.url}
+                                alt=""
+                                style={{
+                                  width: "100%",
+                                  aspectRatio: "4/3",
+                                  objectFit: "cover",
+                                  borderRadius: 12,
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePhoto(photo.id, photo.url)}
+                                style={{
+                                  position: "absolute", top: 6, right: 6,
+                                  width: 24, height: 24, borderRadius: "50%",
+                                  border: "none", cursor: "pointer",
+                                  background: "rgba(0,0,0,0.6)",
+                                  color: "white", fontSize: 14, fontWeight: 700,
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                }}
+                              >
+                                ×
+                              </button>
+                            </div>
                             {photo.damage_tags?.length > 0 && (
                               <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
                                 {photo.damage_tags.map((tag) => (

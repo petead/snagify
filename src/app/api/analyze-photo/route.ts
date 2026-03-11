@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 export const maxDuration = 30;
 
@@ -143,8 +143,11 @@ Analyze the property condition visible in this photo only.`,
     const conditionSummary = parsed.condition_summary ?? "";
 
     if (photoId && typeof photoId === "string") {
-      const supabase = await createClient();
-      await supabase
+      const supabase = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      const { error: updateError } = await supabase
         .from("photos")
         .update({
           ai_analysis: conditionSummary,
@@ -152,6 +155,15 @@ Analyze the property condition visible in this photo only.`,
           damage_tags: suggestedTags,
         })
         .eq("id", photoId);
+      if (updateError) {
+        console.error("Failed to update photo:", updateError);
+      }
+      console.log(
+        "AI update result for photoId:",
+        photoId,
+        "notes:",
+        conditionSummary?.substring(0, 50)
+      );
     }
 
     return NextResponse.json({
