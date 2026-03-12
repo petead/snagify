@@ -294,7 +294,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
-        paddingBottom: 180,
+        paddingBottom: 260,
       }}
     >
       <style>{`
@@ -927,22 +927,25 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
         </div>
       </div>
 
-      {/* Action Buttons — fixed bottom */}
+      {/* Action Buttons — fixed above bottom navbar */}
       <div
         className={loaded ? "fade-up" : ""}
         style={{
           position: "fixed",
-          bottom: 0,
+          bottom: 72,
           left: 0,
           right: 0,
           maxWidth: 480,
           margin: "0 auto",
-          background: "#fff",
+          background: "rgba(255,255,255,0.97)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
           borderTop: "1px solid #F0EFEC",
-          padding: "16px 24px",
-          paddingBottom: "max(24px, env(safe-area-inset-bottom))",
+          padding: "12px 24px",
+          paddingBottom: "max(12px, env(safe-area-inset-bottom))",
           animationDelay: "0.54s",
-          zIndex: 10,
+          zIndex: 40,
+          borderRadius: "16px 16px 0 0",
         }}
       >
         <button
