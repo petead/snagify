@@ -190,7 +190,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
     );
   }
 
-  const initials = getInitials(form.full_name || profile?.full_name ?? null, userEmail);
+  const initials = getInitials((form.full_name || profile?.full_name) ?? null, userEmail);
 
   return (
     <div
