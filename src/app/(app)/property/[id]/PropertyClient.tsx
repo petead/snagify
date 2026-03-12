@@ -2,11 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Building2, House, BedDouble, Check } from "lucide-react";
-import {
-  TENANCY_STATUS_CONFIG,
-  getTenancyDaysLeft,
-} from "@/lib/tenancy";
+import { useRouter } from "next/navigation";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 
 type InspectionSignature = {
@@ -52,15 +48,6 @@ interface PropertyClientProps {
   totalInspections: number;
 }
 
-function propertyIcon(type: string | null) {
-  if (!type) return Building2;
-  const t = type.toLowerCase();
-  if (t.includes("villa")) return House;
-  if (t.includes("studio")) return BedDouble;
-  if (t.includes("townhouse")) return House;
-  return Building2;
-}
-
 function formatDateShort(dateStr: string | null): string {
   if (!dateStr) return "";
   try {
@@ -74,60 +61,175 @@ function formatDateShort(dateStr: string | null): string {
   }
 }
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "";
-  try {
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
-  } catch {
-    return "";
-  }
+function tenantInitials(name: string | null): string {
+  if (!name) return "?";
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 }
 
-function formatContractPeriod(from: string | null, to: string | null): string {
-  const a = formatDateShort(from);
-  const b = formatDateShort(to);
-  if (!a && !b) return "";
-  if (!a) return b;
-  if (!b) return a;
-  return `${a} → ${b}`;
+function inspectionDisplayStatus(status: string | null): "draft" | "signed" {
+  if (status === "signed" || status === "completed") return "signed";
+  return "draft";
 }
 
-function formatAnnualRent(rent: number | null): string {
-  if (rent == null) return "";
-  return `AED ${rent.toLocaleString("en-AE")}/yr`;
-}
+function InspectionRow({
+  label,
+  data,
+  canStart,
+  accentLabel,
+  inspectionId,
+  propertyId,
+  tenancyId,
+  inspectionType,
+  inspectionStatus,
+  onRemove,
+  onRollback,
+  signatures,
+}: {
+  label: string;
+  data: { date: string; status: string } | null;
+  canStart: boolean;
+  accentLabel: boolean;
+  inspectionId?: string;
+  propertyId: string;
+  tenancyId: string | null;
+  inspectionType: "check-in" | "check-out";
+  inspectionStatus?: string | null;
+  onRemove?: () => void;
+  onRollback?: () => void;
+  signatures?: InspectionSignature[];
+}) {
+  const router = useRouter();
 
-function statusBadge(status: string | null) {
-  switch (status) {
-    case "completed":
-      return { label: "Completed", className: "bg-[#F0EDFF] text-[#9A88FD] font-medium text-xs" };
-    case "signed":
-      return { label: "Signed ✓", className: "bg-[#cafe87] text-[#1A1A1A] font-medium text-xs" };
-    default:
-      return { label: "Draft", className: "bg-gray-100 text-gray-600 font-medium text-xs" };
-  }
-}
+  const handleStart = () => {
+    const params = new URLSearchParams({ propertyId, type: inspectionType });
+    if (tenancyId) params.set("tenancyId", tenancyId);
+    router.push(`/inspection/new?${params.toString()}`);
+  };
 
-function getNewInspectionHref(
-  propertyId: string,
-  tenancyGroups: TenancyGroup[]
-): string {
-  if (tenancyGroups.length === 0)
-    return `/inspection/new?propertyId=${propertyId}&type=check-in`;
-  const g = tenancyGroups[0];
-  if (g.canStartCheckIn.allowed)
-    return g.tenancyId
-      ? `/inspection/new?propertyId=${propertyId}&tenancyId=${g.tenancyId}&type=check-in`
-      : `/inspection/new?propertyId=${propertyId}&type=check-in`;
-  if (g.canStartCheckOut.allowed)
-    return g.tenancyId
-      ? `/inspection/new?propertyId=${propertyId}&tenancyId=${g.tenancyId}&type=check-out`
-      : `/inspection/new?propertyId=${propertyId}&type=check-out`;
-  return `/inspection/new?propertyId=${propertyId}&type=check-in`;
+  const handleOpen = () => {
+    if (inspectionId && data?.status === "signed") {
+      router.push(`/inspection/${inspectionId}/report`);
+    } else if (inspectionId) {
+      router.push(`/inspection/${inspectionId}`);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "12px 0",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: accentLabel ? "#9A88FD" : "#999",
+            background: accentLabel ? "rgba(154,136,253,0.1)" : "#EEEDE9",
+            padding: "4px 10px",
+            borderRadius: 8,
+            letterSpacing: 0.5,
+            flexShrink: 0,
+          }}
+        >
+          {label}
+        </span>
+        {data ? (
+          <button
+            type="button"
+            onClick={handleOpen}
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              color: "#1A1A1A",
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            {data.date}
+          </button>
+        ) : (
+          <span style={{ fontSize: 13, color: "#CCC" }}>—</span>
+        )}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {data ? (
+          <>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: data.status === "signed" ? "#9A88FD" : "#999",
+                background: data.status === "signed" ? "rgba(154,136,253,0.1)" : "#EEEDE9",
+                padding: "4px 10px",
+                borderRadius: 8,
+                textTransform: "capitalize",
+              }}
+            >
+              {data.status}
+            </span>
+            {data.status === "draft" && inspectionId && onRemove && onRollback && signatures && (
+              <div
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 8,
+                  background: "#F8F7F4",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <DeleteInspectionButton
+                  inspectionId={inspectionId}
+                  inspectionType={inspectionType}
+                  status={inspectionStatus ?? "draft"}
+                  signatures={signatures}
+                  redirectTo={`/property/${propertyId}`}
+                  variant="icon"
+                  onOptimisticRemove={onRemove}
+                  onRollback={onRollback}
+                />
+              </div>
+            )}
+          </>
+        ) : canStart ? (
+          <button
+            type="button"
+            onClick={handleStart}
+            style={{
+              background: accentLabel ? "#9A88FD" : "#1A1A1A",
+              color: "#fff",
+              padding: "6px 14px",
+              borderRadius: 10,
+              fontSize: 12,
+              fontWeight: 600,
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            Start
+          </button>
+        ) : (
+          <span style={{ fontSize: 12, color: "#DDD" }}>—</span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function PropertyClient({
@@ -135,9 +237,13 @@ export function PropertyClient({
   tenancyGroups: initialTenancyGroups,
   totalInspections,
 }: PropertyClientProps) {
+  const [loaded, setLoaded] = useState(false);
   const [tenancyGroups, setTenancyGroups] = useState(initialTenancyGroups);
   const groupsRollbackRef = useRef<TenancyGroup[]>([]);
 
+  useEffect(() => {
+    setLoaded(true);
+  }, []);
   useEffect(() => {
     setTenancyGroups(initialTenancyGroups);
   }, [initialTenancyGroups]);
@@ -156,357 +262,329 @@ export function PropertyClient({
   };
   const rollbackGroups = () => setTenancyGroups(groupsRollbackRef.current);
 
-  const title =
-    property.address ??
-    (property.building_name && property.unit_number
-      ? `${property.building_name}, Unit ${property.unit_number}`
-      : "Property");
-  const truncTitle = title.length > 26 ? title.slice(0, 23) + "…" : title;
-  const newInspectionHref = getNewInspectionHref(property.id, tenancyGroups);
-  const PropertyIcon = propertyIcon(property.property_type);
-  return (
-    <div className="min-h-screen bg-[#fcfcfc] max-w-lg mx-auto pb-24">
-      <header className="sticky top-0 z-40 bg-white border-b border-gray-100">
-        <div className="flex items-center justify-between h-14 px-4">
-          <Link
-            href="/dashboard"
-            className="p-2 -ml-2 rounded-lg text-gray-600 hover:bg-gray-100"
-          >
-            <ArrowLeft size={24} />
-          </Link>
-          <span className="font-heading font-bold text-sm text-[#1A1A1A] truncate max-w-[180px]">
-            {truncTitle}
-          </span>
-          <Link
-            href={newInspectionHref}
-            className="rounded-xl px-3 py-2 font-heading font-bold text-xs text-[#1A1A1A] flex items-center gap-1"
-            style={{ backgroundColor: "#cafe87" }}
-          >
-            <Plus size={14} />
-            Inspection
-          </Link>
-        </div>
-      </header>
+  const propertyName = property.building_name ?? property.address ?? "Property";
+  const unit = property.unit_number ? `Unit ${property.unit_number}` : "";
+  const propertyType = property.property_type ?? "";
 
-      <div className="px-4 py-5 space-y-6">
-        {/* Property header card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#F0EDFF]">
-              <PropertyIcon size={16} color="#7B65FC" />
+  return (
+    <div
+      style={{
+        maxWidth: 480,
+        margin: "0 auto",
+        minHeight: "100vh",
+        background: "#F8F7F4",
+        fontFamily: "'DM Sans', sans-serif",
+        position: "relative",
+        paddingBottom: 24,
+      }}
+    >
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
+        .back-btn { transition: all 0.2s ease; cursor: pointer; }
+        .back-btn:active { transform: scale(0.9); }
+        .trash-btn { transition: all 0.2s ease; cursor: pointer; }
+        .trash-btn:active { transform: scale(0.9); background: rgba(239,68,68,0.12) !important; }
+        .scroll-hide::-webkit-scrollbar { display: none; }
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(16px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-up {
+          animation: fadeUp 0.55s cubic-bezier(0.16,1,0.3,1) forwards;
+          opacity: 0;
+        }
+      `}</style>
+
+      {/* Back button */}
+      <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: "0s" }}>
+        <Link
+          href="/properties"
+          className="back-btn"
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 12,
+            background: "#EEEDE9",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textDecoration: "none",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="2.5" strokeLinecap="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </Link>
+      </div>
+
+      <div className="scroll-hide" style={{ overflowY: "auto", maxHeight: 700, paddingBottom: 100 }}>
+        {/* Property Info Card */}
+        <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: "0.06s" }}>
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              padding: 20,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+            }}
+          >
+            <div
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 16,
+                background: "rgba(154,136,253,0.1)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-heading font-bold text-xl text-[#1A1A1A]">
-                {title}
-              </p>
-              {property.property_type && (
-                <p className="font-body text-sm text-[#9A88FD] capitalize mt-0.5">
-                  {property.property_type}
-                </p>
+            <div style={{ minWidth: 0 }}>
+              <h3
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: "#1A1A1A",
+                  margin: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {propertyName}
+                {unit ? `, ${unit}` : ""}
+              </h3>
+              {propertyType && (
+                <p style={{ fontSize: 13, color: "#9A88FD", margin: "2px 0 0", fontWeight: 600 }}>{propertyType}</p>
               )}
-              {property.property_size != null && (
-                <p className="font-body text-sm text-gray-500 mt-1">
-                  {Number(property.property_size).toLocaleString("en-GB", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{" "}
-                  m²
-                </p>
-              )}
-              <p className="font-body text-xs text-gray-400 mt-2">
+              <p style={{ fontSize: 12, color: "#BBB", margin: "2px 0 0" }}>
                 {totalInspections} inspection{totalInspections !== 1 ? "s" : ""} total
               </p>
             </div>
           </div>
         </div>
 
-        <div>
-          <h2 className="font-heading font-bold text-lg text-[#1A1A1A] mb-4">
+        {/* Tenancy History Title */}
+        <div className={loaded ? "fade-up" : ""} style={{ padding: "24px 24px 0", animationDelay: "0.12s" }}>
+          <h2 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 20, fontWeight: 800, color: "#1A1A1A", margin: 0 }}>
             Tenancy History
           </h2>
+        </div>
 
-          {tenancyGroups.length === 0 ? (
-            <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-8 flex flex-col items-center justify-center gap-4 min-h-[200px]">
-              <span className="text-4xl" role="img" aria-hidden>
-                <House size={28} color="#9ca3af" />
-              </span>
-              <p className="font-heading font-semibold text-[#1A1A1A]">
-                No inspections yet
-              </p>
-              <p className="font-body text-sm text-gray-500">
-                Start with a Check-In inspection
-              </p>
+        {/* Tenancy Cards */}
+        {tenancyGroups.length === 0 ? (
+          <div className={loaded ? "fade-up" : ""} style={{ padding: "14px 24px 0", animationDelay: "0.18s" }}>
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: 22,
+                padding: 32,
+                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                textAlign: "center",
+              }}
+            >
+              <p style={{ fontSize: 14, color: "#999", margin: 0 }}>No tenancies yet</p>
+              <p style={{ fontSize: 13, color: "#BBB", margin: "8px 0 0" }}>Start with a Check-in inspection</p>
               <Link
                 href={`/inspection/new?propertyId=${property.id}&type=check-in`}
-                className="inline-flex items-center justify-center rounded-xl px-6 py-3 font-heading font-bold text-white transition-transform active:scale-[0.98]"
-                style={{ backgroundColor: "#9A88FD" }}
+                style={{
+                  display: "inline-block",
+                  marginTop: 16,
+                  background: "#9A88FD",
+                  color: "#fff",
+                  padding: "12px 24px",
+                  borderRadius: 14,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  textDecoration: "none",
+                }}
               >
                 + New Inspection
               </Link>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {tenancyGroups.map((group) => {
-                const statusConfig = TENANCY_STATUS_CONFIG[group.status] ?? TENANCY_STATUS_CONFIG.active;
-                const checkIn = group.inspections.find(
-                  (i) =>
-                    (i.type ?? "").toLowerCase().includes("check-in") ||
-                    (i.type ?? "").toLowerCase() === "check_in"
-                );
-                const checkOut = group.inspections.find(
-                  (i) =>
-                    (i.type ?? "").toLowerCase().includes("check-out") ||
-                    (i.type ?? "").toLowerCase() === "check_out"
-                );
-                const bothComplete =
-                  checkIn &&
-                  checkOut &&
-                  (checkIn.status === "completed" || checkIn.status === "signed") &&
-                  (checkOut.status === "completed" || checkOut.status === "signed");
-                const daysLeft = group.tenancyId
-                  ? getTenancyDaysLeft({
-                      contract_to: group.contractTo,
-                      actual_end_date: null,
-                    })
-                  : null;
+          </div>
+        ) : (
+          tenancyGroups.map((group, i) => {
+            const checkIn = group.inspections.find(
+              (insp) =>
+                (insp.type ?? "").toLowerCase().includes("check-in") ||
+                (insp.type ?? "").toLowerCase() === "check_in"
+            );
+            const checkOut = group.inspections.find(
+              (insp) =>
+                (insp.type ?? "").toLowerCase().includes("check-out") ||
+                (insp.type ?? "").toLowerCase() === "check_out"
+            );
+            const tenancyStatusDisplay =
+              group.status === "active" || group.status === "expiring_soon" || group.status === "upcoming"
+                ? "active"
+                : "past";
 
-                return (
-                  <div
-                    key={group.key}
-                    className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-4"
-                  >
-                    {/* Card header with optional tenancy status */}
-                    <div
-                      className="p-4 rounded-t-2xl"
-                      style={{ backgroundColor: "#F0EDFF" }}
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-heading font-bold text-base text-[#1A1A1A]">
-                              {group.tenantName ?? "Unknown tenant"}
-                            </p>
-                            {group.tenancyId && (
-                              <span
-                                className="rounded-full px-2.5 py-0.5 font-body text-xs font-medium"
-                                style={{
-                                  backgroundColor: statusConfig.bg,
-                                  color: statusConfig.text,
-                                }}
-                              >
-                                {statusConfig.label}
-                                {group.status === "expiring_soon" &&
-                                  daysLeft != null &&
-                                  daysLeft >= 0 &&
-                                  ` (${daysLeft}d)`}
-                              </span>
-                            )}
-                          </div>
-                          {group.ejariRef && (
-                            <p className="font-body text-xs text-[#9A88FD] mt-0.5">
-                              {group.ejariRef}
-                            </p>
-                          )}
+            const checkInData = checkIn
+              ? {
+                  date: formatDateShort(checkIn.completed_at ?? checkIn.created_at),
+                  status: inspectionDisplayStatus(
+                    checkIn.status === "signed" || (checkIn.signatures ?? []).some((s) => s.otp_verified || s.signed_at)
+                      ? "signed"
+                      : checkIn.status
+                  ),
+                }
+              : null;
+            const checkOutData = checkOut
+              ? {
+                  date: formatDateShort(checkOut.completed_at ?? checkOut.created_at),
+                  status: inspectionDisplayStatus(
+                    checkOut.status === "signed" || (checkOut.signatures ?? []).some((s) => s.otp_verified || s.signed_at)
+                      ? "signed"
+                      : checkOut.status
+                  ),
+                }
+              : null;
+
+            return (
+              <div
+                key={group.key}
+                className={loaded ? "fade-up" : ""}
+                style={{ padding: "14px 24px 0", animationDelay: `${0.18 + i * 0.08}s` }}
+              >
+                <div
+                  style={{
+                    background: "#fff",
+                    borderRadius: 22,
+                    overflow: "hidden",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                  }}
+                >
+                  {/* Tenant Info */}
+                  <div style={{ padding: "18px 20px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 10,
+                            background: "#9A88FD",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#fff",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {tenantInitials(group.tenantName)}
                         </div>
-                        <div className="text-right">
-                          {group.contractFrom != null && (
-                            <p className="font-body text-xs text-gray-500">
-                              {formatContractPeriod(
-                                group.contractFrom,
-                                group.contractTo
-                              )}
-                            </p>
-                          )}
-                          {group.annualRent != null && (
-                            <p className="font-body text-xs text-gray-600 font-medium mt-0.5">
-                              {formatAnnualRent(group.annualRent)}
-                            </p>
-                          )}
+                        <div style={{ minWidth: 0 }}>
+                          <h4
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: "#1A1A1A",
+                              margin: 0,
+                              fontFamily: "'Poppins', sans-serif",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {group.tenantName ?? "Unknown tenant"}
+                          </h4>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="p-4">
-                      {/* CHECK-IN row */}
-                      {checkIn ? (
-                        <div style={{ position: "relative" }}>
-                          <Link
-                            href={
-                              checkIn.status === "completed" || checkIn.status === "signed"
-                                ? `/inspection/${checkIn.id}/report`
-                                : `/inspection/${checkIn.id}`
-                            }
-                            className="flex items-center justify-between py-2 border-b border-gray-50 active:bg-gray-50/50 transition-colors pr-10"
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="bg-[#F0EDFF] text-[#9A88FD] text-xs font-semibold px-3 py-1 rounded-full">
-                                CHECK-IN
-                              </span>
-                              <div>
-                                <p className="font-body text-sm font-medium text-gray-800">
-                                  {formatDate(checkIn.created_at)}
-                                </p>
-                                <p className="font-body text-xs text-gray-400">
-                                  {checkIn.room_count} room
-                                  {checkIn.room_count !== 1 ? "s" : ""} inspected
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`rounded-full px-2.5 py-0.5 ${statusBadge(checkIn.status).className}`}
-                              >
-                                {statusBadge(checkIn.status).label}
-                              </span>
-                              {(checkIn.status === "completed" ||
-                                checkIn.status === "signed") && (
-                                <span className="font-body text-xs text-[#9A88FD] font-medium">
-                                  View →
-                                </span>
-                              )}
-                            </div>
-                          </Link>
-                          <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10 }}>
-                            <DeleteInspectionButton
-                              inspectionId={checkIn.id}
-                              inspectionType="check-in"
-                              status={checkIn.status}
-                              signatures={checkIn.signatures}
-                              redirectTo={`/property/${property.id}`}
-                              variant="icon"
-                              onOptimisticRemove={() => removeInspectionFromList(checkIn.id)}
-                              onRollback={rollbackGroups}
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between py-2 border-b border-gray-50">
-                          <span className="bg-gray-100 text-gray-400 text-xs px-3 py-1 rounded-full font-body">
-                            CHECK-IN
-                          </span>
-                          {group.tenancyId && group.canStartCheckIn.allowed ? (
-                            <Link
-                              href={`/inspection/new?propertyId=${property.id}&tenancyId=${group.tenancyId}&type=check-in`}
-                              className="rounded-lg px-3 py-1.5 font-body text-xs font-semibold text-white"
-                              style={{ backgroundColor: "#9A88FD" }}
-                            >
-                              Start Check-in
-                            </Link>
-                          ) : group.tenancyId && !group.canStartCheckIn.allowed ? (
-                            <span className="font-body text-xs text-[#9A88FD] font-medium">
-                              <Check size={14} color="#16a34a" />
-                            </span>
-                          ) : (
-                            <Link
-                              href={`/inspection/new?propertyId=${property.id}&type=check-in`}
-                              className="rounded-lg px-3 py-1.5 font-body text-xs font-semibold text-white"
-                              style={{ backgroundColor: "#9A88FD" }}
-                            >
-                              Start Check-in
-                            </Link>
-                          )}
-                        </div>
-                      )}
-
-                      {/* CHECK-OUT row */}
-                      {checkOut ? (
-                        <div style={{ position: "relative" }}>
-                          <Link
-                            href={
-                              checkOut.status === "completed" || checkOut.status === "signed"
-                                ? `/inspection/${checkOut.id}/report`
-                                : `/inspection/${checkOut.id}`
-                            }
-                            className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0 active:bg-gray-50/50 transition-colors pr-10"
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="bg-[#FEDE80]/80 text-[#1A1A1A] text-xs font-semibold px-3 py-1 rounded-full">
-                                CHECK-OUT
-                              </span>
-                              <div>
-                                <p className="font-body text-sm font-medium text-gray-800">
-                                  {formatDate(checkOut.created_at)}
-                                </p>
-                                <p className="font-body text-xs text-gray-400">
-                                  {checkOut.room_count} room
-                                  {checkOut.room_count !== 1 ? "s" : ""} inspected
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`rounded-full px-2.5 py-0.5 ${statusBadge(checkOut.status).className}`}
-                              >
-                                {statusBadge(checkOut.status).label}
-                              </span>
-                              {(checkOut.status === "completed" ||
-                                checkOut.status === "signed") && (
-                                <span className="font-body text-xs text-[#9A88FD] font-medium">
-                                  View →
-                                </span>
-                              )}
-                            </div>
-                          </Link>
-                          <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10 }}>
-                            <DeleteInspectionButton
-                              inspectionId={checkOut.id}
-                              inspectionType="check-out"
-                              status={checkOut.status}
-                              signatures={checkOut.signatures}
-                              redirectTo={`/property/${property.id}`}
-                              variant="icon"
-                              onOptimisticRemove={() => removeInspectionFromList(checkOut.id)}
-                              onRollback={rollbackGroups}
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                          <span className="bg-gray-100 text-gray-400 text-xs px-3 py-1 rounded-full font-body">
-                            CHECK-OUT
-                          </span>
-                          {group.tenancyId && group.canStartCheckOut.allowed ? (
-                            <Link
-                              href={`/inspection/new?propertyId=${property.id}&tenancyId=${group.tenancyId}&type=check-out`}
-                              className="rounded-lg px-3 py-1.5 font-body text-xs font-semibold text-white"
-                              style={{ backgroundColor: "#9A88FD" }}
-                            >
-                              Start Check-out
-                            </Link>
-                          ) : group.tenancyId && !group.canStartCheckOut.allowed ? (
-                            <span
-                              className="rounded-lg px-3 py-1.5 font-body text-xs font-medium text-gray-400 bg-gray-100 cursor-not-allowed"
-                              title={group.canStartCheckOut.reason ?? undefined}
-                            >
-                              Start Check-out
-                            </span>
-                          ) : (
-                            <Link
-                              href={`/inspection/new?propertyId=${property.id}&type=check-out`}
-                              className="rounded-lg px-3 py-1.5 font-body text-xs font-semibold text-white"
-                              style={{ backgroundColor: "#9A88FD" }}
-                            >
-                              Start Check-out
-                            </Link>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {bothComplete && (
-                      <div
-                        className="rounded-b-2xl p-3 font-body text-xs text-green-700"
-                        style={{ backgroundColor: "#F0FDF4" }}
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          flexShrink: 0,
+                          marginLeft: 8,
+                          color: tenancyStatusDisplay === "active" ? "#9A88FD" : "#999",
+                          background: tenancyStatusDisplay === "active" ? "rgba(154,136,253,0.1)" : "#EEEDE9",
+                          padding: "4px 10px",
+                          borderRadius: 100,
+                          textTransform: "uppercase",
+                          letterSpacing: 0.5,
+                        }}
                       >
-                        Complete tenancy cycle documented
+                        {tenancyStatusDisplay}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        marginTop: 10,
+                        display: "flex",
+                        gap: 16,
+                        alignItems: "center",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#CCC" strokeWidth="2" strokeLinecap="round">
+                          <rect x="3" y="4" width="18" height="18" rx="2" />
+                          <line x1="16" y1="2" x2="16" y2="6" />
+                          <line x1="8" y1="2" x2="8" y2="6" />
+                          <line x1="3" y1="10" x2="21" y2="10" />
+                        </svg>
+                        <span style={{ fontSize: 12, color: "#999" }}>
+                          {formatDateShort(group.contractFrom)} → {formatDateShort(group.contractTo)}
+                        </span>
                       </div>
-                    )}
+                      {group.annualRent != null && (
+                        <span style={{ fontSize: 12, color: "#666", fontWeight: 600 }}>
+                          AED {group.annualRent.toLocaleString("en-AE")}/yr
+                        </span>
+                      )}
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+
+                  {/* Inspections */}
+                  <div style={{ borderTop: "1px solid #F0EFEC", padding: "4px 20px" }}>
+                    <InspectionRow
+                      label="CHECK-IN"
+                      data={checkInData}
+                      canStart={group.canStartCheckIn.allowed}
+                      accentLabel={true}
+                      inspectionId={checkIn?.id}
+                      propertyId={property.id}
+                      tenancyId={group.tenancyId}
+                      inspectionType="check-in"
+                      inspectionStatus={checkIn?.status}
+                      onRemove={checkIn ? () => removeInspectionFromList(checkIn.id) : undefined}
+                      onRollback={rollbackGroups}
+                      signatures={checkIn?.signatures}
+                    />
+                    <div style={{ height: 1, background: "#F0EFEC" }} />
+                    <InspectionRow
+                      label="CHECK-OUT"
+                      data={checkOutData}
+                      canStart={group.canStartCheckOut.allowed}
+                      accentLabel={false}
+                      inspectionId={checkOut?.id}
+                      propertyId={property.id}
+                      tenancyId={group.tenancyId}
+                      inspectionType="check-out"
+                      inspectionStatus={checkOut?.status}
+                      onRemove={checkOut ? () => removeInspectionFromList(checkOut.id) : undefined}
+                      onRollback={rollbackGroups}
+                      signatures={checkOut?.signatures}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
