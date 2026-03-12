@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { DashboardHeader } from "@/components/layout/DashboardHeader";
 import { PropertiesClient } from "./PropertiesClient";
 
 export default async function PropertiesPage() {
@@ -36,11 +35,12 @@ export default async function PropertiesPage() {
   const list = error ? [] : (properties ?? []);
 
   return (
-    <main className="min-h-screen bg-[#fcfcfc]">
-      <header className="bg-white border-b border-gray-100 px-4 h-16 flex items-center justify-between sticky top-0 z-50">
-        <DashboardHeader fullName={fullName} userEmail={user.email ?? null} />
-      </header>
-      <PropertiesClient properties={list} />
+    <main className="min-h-screen" style={{ background: "#F8F7F4" }}>
+      <PropertiesClient
+        properties={list}
+        fullName={fullName}
+        userEmail={user.email ?? null}
+      />
     </main>
   );
 }
