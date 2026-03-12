@@ -81,27 +81,23 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
     .filter(Boolean) as string[];
   const poorCount = roomConditions.filter((c) => c === "poor").length;
   const fairCount = roomConditions.filter((c) => c === "fair").length;
-  const overallCondition =
+  const derivedCondition =
     poorCount > 0
       ? "Poor"
       : fairCount > roomConditions.length / 2
         ? "Fair"
         : "Good";
+  const overallCondition =
+    (inspection.overall_condition?.trim()) || derivedCondition;
 
-  const execSummary = inspection.report_data?.executive_summary;
-  const disputeScore = inspection.report_data?.dispute_risk_score;
+  const execSummary =
+    inspection.executive_summary ?? inspection.report_data?.executive_summary;
+  const disputeScore =
+    inspection.dispute_risk ?? inspection.report_data?.dispute_risk_score ?? 0;
   const riskLabel =
-    (disputeScore ?? 0) <= 30
-      ? "Low Risk"
-      : (disputeScore ?? 0) <= 60
-        ? "Medium Risk"
-        : "High Risk";
+    disputeScore <= 3 ? "Low Risk" : disputeScore <= 6 ? "Medium Risk" : "High Risk";
   const riskColor =
-    (disputeScore ?? 0) <= 30
-      ? "#5a7a2e"
-      : (disputeScore ?? 0) <= 60
-        ? "#8a6a00"
-        : "#cc2222";
+    disputeScore <= 3 ? "#5a7a2e" : disputeScore <= 6 ? "#8a6a00" : "#cc2222";
 
   const contractFrom = tenancy?.contract_from;
   const contractTo = tenancy?.contract_to;
@@ -342,7 +338,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
             <div
               className="h-full rounded-full transition-all"
               style={{
-                width: `${Math.min(100, disputeScore)}%`,
+                width: `${Math.min(100, (disputeScore / 10) * 100)}%`,
                 backgroundColor: riskColor,
               }}
             />
@@ -353,7 +349,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
               className="text-xs font-semibold"
               style={{ color: riskColor }}
             >
-              {disputeScore}/100
+              {disputeScore}/10
             </span>
             <span className="text-xs text-gray-400">High</span>
           </div>

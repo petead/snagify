@@ -1,31 +1,21 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import type { ReportData } from "@/lib/generatePDF";
 
 export const maxDuration = 60;
 
-const REPORT_PROMPT = `You are a professional property inspector in Dubai.
-Generate a formal property inspection report based on this data.
+const EXEC_SUMMARY_SYSTEM = `You are a professional property inspector in Dubai, UAE.
+Write a concise executive summary (3-5 sentences) for a property inspection report. Be factual, professional, and specific.
 
-Return ONLY a JSON object with this exact structure (no other text):
-{
-  "executive_summary": "2-3 sentences overview of the inspection findings",
-  "overall_condition": "Good" | "Fair" | "Poor",
-  "dispute_risk_score": <number 1-10, where 10 is highest risk>,
-  "dispute_risk_reasons": ["reason 1", "reason 2"],
-  "rooms": [
-    {
-      "name": "Room Name",
-      "condition": "Good" | "Fair" | "Poor",
-      "summary": "Brief summary of room condition",
-      "items": [{ "name": "Item", "condition": "Good|Fair|Poor", "notes": "any notes" }],
-      "recommendations": ["recommendation 1"]
-    }
-  ],
-  "legal_notes": "RERA/Dubai law relevant clauses and notes",
-  "recommendations": ["overall recommendation 1", "overall recommendation 2"]
-}`;
+Mention: total rooms inspected, total photos taken, key findings (damage types and which rooms), and the overall condition.
+If damages are found, note which rooms need attention.
+If no damages, confirm the property is in good order.
+
+Write in flowing prose, NO bullet points.
+Do NOT mention "AI" or "automated".
+Write as the inspector addressing landlord and tenant.`;
+
+const SEVERE_TAGS = ["BROKEN", "HOLE", "WATER_DAMAGE", "MOLD"];
 
 export async function POST(request: Request) {
   try {
@@ -34,193 +24,169 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing inspectionId" }, { status: 400 });
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
-    }
-
     const supabase = await createClient();
 
     const { data: inspection, error: inspErr } = await supabase
       .from("inspections")
-      .select("id, type, status, created_at, property_id, agent_id, tenancy_id")
+      .select("id, type, status, created_at, property_id, agent_id, tenancy_id, executive_summary, overall_condition, dispute_risk")
       .eq("id", inspectionId)
       .single();
     if (inspErr || !inspection) {
       return NextResponse.json({ error: "Inspection not found" }, { status: 404 });
     }
 
-    let tenancy: {
-      landlord_name?: string | null;
-      landlord_email?: string | null;
-      tenant_name?: string | null;
-      tenant_email?: string | null;
-      ejari_ref?: string | null;
-      contract_from?: string | null;
-      contract_to?: string | null;
-      annual_rent?: number | null;
-      security_deposit?: number | null;
-      property_size?: number | null;
-    } | null = null;
-    if (inspection.tenancy_id) {
-      const { data: t } = await supabase
-        .from("tenancies")
-        .select("landlord_name, landlord_email, tenant_name, tenant_email, ejari_ref, contract_from, contract_to, annual_rent, security_deposit, property_size")
-        .eq("id", inspection.tenancy_id)
-        .single();
-      tenancy = t ?? null;
-    }
-
-    const { data: property } = await supabase
-      .from("properties")
-      .select("*")
-      .eq("id", inspection.property_id)
-      .single();
-
-    const { data: agent } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", inspection.agent_id)
-      .single();
-
-    const { data: rooms } = await supabase
-      .from("rooms")
-      .select("id, name, order_index, overall_condition")
-      .eq("inspection_id", inspectionId)
-      .order("order_index", { ascending: true });
-
-    const roomIds = (rooms ?? []).map((r) => r.id);
-    const roomPhotos: Record<string, { url: string; ai_analysis: string | null; damage_tags: string[]; notes: string | null }[]> = {};
-
-    if (roomIds.length > 0) {
-      const { data: photosData } = await supabase
-        .from("photos")
-        .select("room_id, url, ai_analysis, damage_tags, notes")
-        .in("room_id", roomIds);
-      for (const photo of photosData ?? []) {
-        if (!photo.url || !photo.url.startsWith("https://")) continue;
-        const tags = Array.isArray(photo.damage_tags) ? photo.damage_tags : [];
-        (roomPhotos[photo.room_id] ??= []).push({
-          url: photo.url,
-          ai_analysis: photo.ai_analysis,
-          damage_tags: tags,
-          notes: photo.notes,
-        });
+    // Only generate summary + condition + risk if not already computed
+    if (!inspection.executive_summary) {
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
       }
+
+      let tenancy: {
+        contract_from?: string | null;
+        contract_to?: string | null;
+      } | null = null;
+      if (inspection.tenancy_id) {
+        const { data: t } = await supabase
+          .from("tenancies")
+          .select("contract_from, contract_to")
+          .eq("id", inspection.tenancy_id)
+          .single();
+        tenancy = t ?? null;
+      }
+
+      const { data: property } = await supabase
+        .from("properties")
+        .select("building_name, unit_number, address")
+        .eq("id", inspection.property_id)
+        .single();
+
+      const { data: rooms } = await supabase
+        .from("rooms")
+        .select("id, name, order_index")
+        .eq("inspection_id", inspectionId)
+        .order("order_index", { ascending: true });
+
+      const roomIds = (rooms ?? []).map((r) => r.id);
+      const roomPhotos: Record<string, { damage_tags: string[] }[]> = {};
+
+      if (roomIds.length > 0) {
+        const { data: photosData } = await supabase
+          .from("photos")
+          .select("room_id, damage_tags")
+          .in("room_id", roomIds);
+        for (const photo of photosData ?? []) {
+          const tags = Array.isArray(photo.damage_tags) ? photo.damage_tags : [];
+          (roomPhotos[photo.room_id] ??= []).push({ damage_tags: tags });
+        }
+      }
+
+      const allPhotos = (rooms ?? []).flatMap((r) => (roomPhotos[r.id] ?? []));
+      const totalPhotos = allPhotos.length;
+      const photosWithIssues = allPhotos.filter((p) => (p.damage_tags?.length ?? 0) > 0).length;
+      const severeCount = allPhotos.filter((p) =>
+        (p.damage_tags ?? []).some((t) => SEVERE_TAGS.includes(String(t).toUpperCase()))
+      ).length;
+
+      let overallCondition: string;
+      if (photosWithIssues === 0) overallCondition = "Excellent";
+      else if (totalPhotos === 0) overallCondition = "Good";
+      else if (photosWithIssues / totalPhotos < 0.25) overallCondition = "Good";
+      else if (photosWithIssues / totalPhotos < 0.5) overallCondition = "Fair";
+      else overallCondition = "Needs Attention";
+
+      const disputeRisk = Math.min(
+        10,
+        totalPhotos === 0 ? 0 : Math.round((photosWithIssues / totalPhotos) * 6 + severeCount * 2)
+      );
+
+      const propertyName = property?.building_name ?? property?.address ?? "Property";
+      const unitNumber = property?.unit_number ?? "";
+      const inspectionType = (inspection.type ?? "check-in") as string;
+      const inspectionDate = inspection.created_at ?? new Date().toISOString();
+      const contractFrom = tenancy?.contract_from != null ? String(tenancy.contract_from) : "";
+      const contractTo = tenancy?.contract_to != null ? String(tenancy.contract_to) : "";
+      const contractPeriod = [contractFrom, contractTo].filter(Boolean).join(" – ") || "—";
+
+      const inspectionContext = {
+        propertyName,
+        unitNumber,
+        inspectionType,
+        inspectionDate,
+        contractPeriod,
+        overallCondition,
+        disputeRisk,
+        totalPhotos,
+        photosWithIssues,
+        rooms: (rooms ?? []).map((r) => {
+          const photos = roomPhotos[r.id] ?? [];
+          return {
+            name: r.name,
+            photoCount: photos.length,
+            damageTags: [...new Set(photos.flatMap((p) => p.damage_tags ?? []))],
+            issueCount: photos.filter((p) => (p.damage_tags?.length ?? 0) > 0).length,
+          };
+        }),
+      };
+
+      let aiSummary: string;
+      try {
+        const anthropic = new Anthropic({ apiKey, timeout: 60000 });
+        const response = await anthropic.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 512,
+          system: EXEC_SUMMARY_SYSTEM,
+          messages: [{ role: "user", content: JSON.stringify(inspectionContext) }],
+        });
+        const text = response.content
+          .filter((block): block is { type: "text"; text: string } => block.type === "text")
+          .map((block) => block.text)
+          .join("")
+          .trim();
+        aiSummary = text || fallbackSummary(inspectionContext);
+      } catch (err) {
+        console.error("generate-report AI summary failed:", err);
+        aiSummary = fallbackSummary(inspectionContext);
+      }
+
+      const dateStr = inspectionContext.inspectionDate
+        ? new Date(inspectionContext.inspectionDate).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          })
+        : "—";
+
+      const { error: updateErr } = await supabase
+        .from("inspections")
+        .update({
+          executive_summary: aiSummary,
+          overall_condition: overallCondition,
+          dispute_risk: disputeRisk,
+          status: "completed",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", inspectionId);
+
+      if (updateErr) {
+        console.error("Failed to save executive summary / condition / risk:", updateErr);
+        return NextResponse.json({ error: updateErr.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
     }
 
-    // Items table removed — damage info shown on photos in PDF
-    const roomItemsFromPhotos: Record<string, { name: string; condition: string; notes: string }[]> = {};
-    for (const r of rooms ?? []) {
-      roomItemsFromPhotos[r.id] = []; // always empty — no items table
-    }
-
-    const { data: signatures } = await supabase
-      .from("signatures")
-      .select("*")
-      .eq("inspection_id", inspectionId);
-
-    const inspectionData = {
-      inspection: {
-        id: inspection.id,
-        type: inspection.type,
-        status: inspection.status,
-        created_at: inspection.created_at,
-        landlord_name: tenancy?.landlord_name ?? null,
-        landlord_email: tenancy?.landlord_email ?? null,
-        tenant_name: tenancy?.tenant_name ?? null,
-        tenant_email: tenancy?.tenant_email ?? null,
-        ejari_ref: tenancy?.ejari_ref ?? null,
-        contract_from: tenancy?.contract_from ?? null,
-        contract_to: tenancy?.contract_to ?? null,
-        annual_rent: tenancy?.annual_rent ?? null,
-        security_deposit: tenancy?.security_deposit ?? null,
-        property_size: tenancy?.property_size ?? null,
-      },
-      property: property
-        ? {
-            building_name: property.building_name,
-            unit_number: property.unit_number,
-            address: property.address,
-            property_type: property.property_type,
-            furnished: property.furnished,
-          }
-        : null,
-      agent: agent
-        ? { full_name: agent.full_name, agency_name: agent.agency_name, phone: agent.phone }
-        : null,
-      rooms: (rooms ?? []).map((r) => ({
-        name: r.name,
-        overall_condition: r.overall_condition,
-        items: (roomItemsFromPhotos[r.id] ?? []).map((i) => ({
-          name: i.name,
-          condition: i.condition,
-          notes: i.notes,
-        })),
-        photos: (roomPhotos[r.id] ?? []).map((p) => ({
-          url: p.url,
-          ai_analysis: p.ai_analysis,
-          damage_tags: p.damage_tags,
-          notes: p.notes,
-        })),
-      })),
-      signatures: signatures ?? [],
-    };
-
-    const anthropic = new Anthropic({ apiKey, timeout: 120000 });
-    const response = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 2048,
-      messages: [
-        {
-          role: "user",
-          content: `${REPORT_PROMPT}\n\nInspection Data:\n${JSON.stringify(inspectionData, null, 2)}`,
-        },
-      ],
-    });
-
-    const text = response.content
-      .filter((block): block is { type: "text"; text: string } => block.type === "text")
-      .map((block) => block.text)
-      .join("")
-      .trim();
-
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return NextResponse.json({ error: "Failed to parse report from AI" }, { status: 500 });
-    }
-
-    const report = JSON.parse(jsonMatch[0]) as Partial<ReportData>;
-    const reportData: ReportData = {
-      executive_summary: report.executive_summary ?? "",
-      overall_condition: report.overall_condition ?? "Good",
-      dispute_risk_score: report.dispute_risk_score ?? 0,
-      dispute_risk_reasons: report.dispute_risk_reasons ?? [],
-      rooms: (report.rooms ?? []).map((r) => ({
-        name: r.name ?? "Room",
-        condition: r.condition ?? "Good",
-        summary: r.summary ?? "",
-        items: (r.items ?? []).map((i) => ({
-          name: i.name ?? "",
-          condition: i.condition ?? "Good",
-          notes: i.notes ?? "",
-        })),
-        recommendations: r.recommendations ?? [],
-      })),
-      legal_notes: report.legal_notes ?? "",
-      recommendations: report.recommendations ?? [],
-    };
-
-    const { error: updateErr } = await supabase
+    // Summary already exists — just ensure status is completed
+    const { error: statusErr } = await supabase
       .from("inspections")
       .update({
         status: "completed",
         completed_at: new Date().toISOString(),
       })
       .eq("id", inspectionId);
-    
-    if (updateErr) {
-      console.error("Failed to update inspection status:", updateErr);
+
+    if (statusErr) {
+      console.error("Failed to update inspection status:", statusErr);
     }
 
     return NextResponse.json({ success: true });
@@ -231,4 +197,23 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+function fallbackSummary(ctx: {
+  propertyName: string;
+  unitNumber: string;
+  inspectionDate: string;
+  rooms: { name: string }[];
+  totalPhotos: number;
+  photosWithIssues: number;
+  overallCondition: string;
+}): string {
+  const dateStr = ctx.inspectionDate
+    ? new Date(ctx.inspectionDate).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })
+    : "—";
+  return `Inspection of ${ctx.propertyName}, Unit ${ctx.unitNumber} completed on ${dateStr}. ${ctx.rooms.length} room(s) inspected with ${ctx.totalPhotos} photo(s) captured. ${ctx.photosWithIssues} issue(s) identified across the property. Overall condition: ${ctx.overallCondition}.`;
 }

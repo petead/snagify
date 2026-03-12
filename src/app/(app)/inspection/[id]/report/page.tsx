@@ -110,6 +110,9 @@ export type InspectionWithRelations = {
     executive_summary?: string;
     dispute_risk_score?: number;
   } | null;
+  executive_summary?: string | null;
+  overall_condition?: string | null;
+  dispute_risk?: number | null;
   properties?: PropertyRelation | PropertyRelation[] | null;
   tenancies?: TenancyRelation | TenancyRelation[] | null;
   rooms?: Room[] | null;

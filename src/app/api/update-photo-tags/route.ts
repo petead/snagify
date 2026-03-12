@@ -32,6 +32,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Invalidate cached report summary so it gets recomputed on next Generate Report / PDF
+    const { data: photoRow } = await supabase
+      .from("photos")
+      .select("room_id")
+      .eq("id", photoId)
+      .single();
+    if (photoRow?.room_id) {
+      const { data: roomRow } = await supabase
+        .from("rooms")
+        .select("inspection_id")
+        .eq("id", photoRow.room_id)
+        .single();
+      if (roomRow?.inspection_id) {
+        await supabase
+          .from("inspections")
+          .update({
+            executive_summary: null,
+            overall_condition: "Good",
+            dispute_risk: 0,
+          })
+          .eq("id", roomRow.inspection_id);
+      }
+    }
+
     return NextResponse.json({ success: true });
   } catch (err) {
     return NextResponse.json(

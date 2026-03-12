@@ -9,8 +9,39 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
 
-/** Build ReportData from rooms + photos (damage_tags → items) */
-function buildReportDataFromInspection(inspection: InspectionRow): ReportData {
+/** Fallback when executive_summary is null (e.g. old inspections or before first Generate Report) */
+function fallbackExecutiveSummary(row: InspectionRow): string {
+  const prop = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+  const propertyName = prop?.building_name ?? prop?.address ?? "Property";
+  const unitNumber = prop?.unit_number ?? "";
+  const dateStr = row.completed_at ?? row.created_at
+    ? new Date((row.completed_at ?? row.created_at) as string).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })
+    : "—";
+  const rooms = row.rooms ?? [];
+  let totalPhotos = 0;
+  let photosWithIssues = 0;
+  for (const r of rooms) {
+    const photos = r.photos ?? [];
+    for (const p of photos) {
+      if (p.url?.startsWith("https://")) totalPhotos += 1;
+      if (Array.isArray(p.damage_tags) && p.damage_tags.length > 0) photosWithIssues += 1;
+    }
+  }
+  const overallCondition = (row.overall_condition ?? "Good").trim() || "Good";
+  return `Inspection of ${propertyName}${unitNumber ? `, Unit ${unitNumber}` : ""} completed on ${dateStr}. ${rooms.length} room(s) inspected with ${totalPhotos} photo(s) captured. ${photosWithIssues} issue(s) identified across the property. Overall condition: ${overallCondition}.`;
+}
+
+/** Build ReportData from inspection row (reads executive_summary, overall_condition, dispute_risk from DB) */
+function buildReportDataFromInspection(
+  inspection: InspectionRow,
+  executiveSummary: string,
+  overallCondition: string,
+  disputeRiskScore: number
+): ReportData {
   const rooms = (inspection.rooms ?? [])
     .sort(
       (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
@@ -18,23 +49,19 @@ function buildReportDataFromInspection(inspection: InspectionRow): ReportData {
     .map((room) => {
       const photos = room.photos ?? [];
       const items: { name: string; condition: string; notes: string }[] = [];
-      // Items table removed — info shown on photos directly
       return {
         name: room.name ?? "Room",
-        condition: (room.overall_condition ?? "Good").trim() || "Good",
+        condition: (room.overall_condition ?? overallCondition).trim() || overallCondition,
         summary: "",
         items,
         recommendations: [] as string[],
       };
     });
 
-  const overallCondition =
-    rooms.length > 0 ? rooms[0].condition : "Good";
-
   return {
-    executive_summary: "Inspection report generated from inspection data.",
+    executive_summary: executiveSummary,
     overall_condition: overallCondition,
-    dispute_risk_score: 0,
+    dispute_risk_score: disputeRiskScore,
     dispute_risk_reasons: [],
     rooms,
     legal_notes: "",
@@ -50,6 +77,9 @@ type InspectionRow = {
   report_url?: string | null;
   completed_at?: string | null;
   created_at?: string | null;
+  executive_summary?: string | null;
+  overall_condition?: string | null;
+  dispute_risk?: number | null;
   properties?: PropRow | PropRow[] | null;
   tenancies?: TenancyRow | TenancyRow[] | null;
   rooms?: RoomRow[] | null;
@@ -104,6 +134,9 @@ export async function POST(request: NextRequest) {
         report_url,
         completed_at,
         created_at,
+        executive_summary,
+        overall_condition,
+        dispute_risk,
         agent_id,
         property_id,
         tenancy_id,
@@ -160,7 +193,19 @@ export async function POST(request: NextRequest) {
     }
 
     const row = inspection as InspectionRow;
-    const reportData = buildReportDataFromInspection(row);
+    const executiveSummary =
+      (row.executive_summary?.trim()) || fallbackExecutiveSummary(row);
+    const overallCondition =
+      (row.overall_condition?.trim()) || "Good";
+    const disputeRiskScore =
+      row.dispute_risk != null ? Number(row.dispute_risk) : 0;
+
+    const reportData = buildReportDataFromInspection(
+      row,
+      executiveSummary,
+      overallCondition,
+      disputeRiskScore
+    );
 
     const prop = Array.isArray(row.properties) ? row.properties[0] : row.properties;
     const tenancy = Array.isArray(row.tenancies) ? row.tenancies[0] : row.tenancies;
