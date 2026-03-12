@@ -732,7 +732,7 @@ function NewInspectionContent() {
           <div className="mt-6 bg-[#F0EDFF] rounded-xl p-3 flex gap-2">
             <span className="text-sm">💡</span>
             <p className="text-xs text-[#7B65FC]">
-              Tip: Upload a PDF for faster setup — Claude reads Ejari
+              Tip: Upload a PDF for faster setup — AI reads Ejari
               contracts, standard RERA agreements and most UAE tenancy
               documents.
             </p>
@@ -826,7 +826,7 @@ function NewInspectionContent() {
                 Analyzing contract...
               </p>
               <p className="text-sm text-gray-400 text-center mb-6">
-                Claude AI is reading your document
+                AI is reading your document
               </p>
               <div className="w-full max-w-xs space-y-2">
                 {[
