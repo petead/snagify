@@ -1,19 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Building2,
-  CalendarDays,
-  BedDouble,
-  FileText,
-  Users,
-  Clock3,
-  Download,
-  PenLine,
-  Link as LinkIcon,
-  Check,
-} from "lucide-react";
+import { PenLine, Link as LinkIcon, Check } from "lucide-react";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 import {
   type InspectionWithRelations,
@@ -36,6 +26,14 @@ const formatDate = (d: string | null | undefined) =>
       })
     : "—";
 
+const formatDateShort = (d: string | null | undefined) =>
+  d
+    ? new Date(d).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+      })
+    : "—";
+
 function normalizeOne<T>(v: T | T[] | null | undefined): T | null {
   if (v == null) return null;
   return Array.isArray(v) ? v[0] ?? null : v;
@@ -50,15 +48,106 @@ const initials = (name: string | null | undefined) =>
     .slice(0, 2)
     .toUpperCase() || "?";
 
-function safeFilename(str: string | null | undefined): string {
-  return (str ?? "")
-    .replace(/\s+/g, "_")
-    .replace(/[^a-zA-Z0-9_-]/g, "")
-    || "report";
+function Section({
+  icon,
+  title,
+  children,
+  delay,
+  loaded,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+  delay: string;
+  loaded: boolean;
+}) {
+  return (
+    <div
+      className={loaded ? "fade-up" : ""}
+      style={{ padding: "0 24px", marginTop: 16, animationDelay: delay }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 20,
+          overflow: "hidden",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+        }}
+      >
+        <div
+          style={{
+            padding: "16px 20px 14px",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            borderBottom: "1px solid #F0EFEC",
+          }}
+        >
+          {icon}
+          <h3
+            style={{
+              fontFamily: "'Poppins', sans-serif",
+              fontSize: 14,
+              fontWeight: 700,
+              color: "#1A1A1A",
+              margin: 0,
+            }}
+          >
+            {title}
+          </h3>
+        </div>
+        <div style={{ padding: "14px 20px" }}>{children}</div>
+      </div>
+    </div>
+  );
 }
+
+const iconDoc = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round">
+    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+  </svg>
+);
+const iconUsers = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round">
+    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 00-3-3.87" />
+    <path d="M16 3.13a4 4 0 010 7.75" />
+  </svg>
+);
+const iconCalendar = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+);
+const iconRooms = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+  </svg>
+);
+const iconKeys = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round">
+    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+  </svg>
+);
+const iconSign = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round">
+    <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+  </svg>
+);
 
 export function ReportClient({ inspection, profile }: ReportClientProps) {
   const router = useRouter();
+  const [loaded, setLoaded] = useState(false);
   const [showSignModal, setShowSignModal] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState({ landlord: false, tenant: false });
@@ -68,6 +157,9 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
     inspection.executive_summary ?? inspection.report_data?.executive_summary ?? null
   );
 
+  useEffect(() => {
+    setLoaded(true);
+  }, []);
   useEffect(() => {
     setReportUrl(inspection.report_url ?? null);
     setExecSummary(
@@ -79,59 +171,51 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   const tenancy = normalizeOne(inspection.tenancies) as TenancyRelation | null;
   const buildingName = prop?.building_name ?? prop?.address ?? "Property";
   const unitNumber = prop?.unit_number;
-  const propertyName = unitNumber
-    ? `${buildingName}, Unit ${unitNumber}`
-    : buildingName;
+  const unitLabel = unitNumber ? `Unit ${unitNumber}` : "";
   const rooms = (inspection.rooms ?? []) as Room[];
+  const sortedRooms = rooms.slice().sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+  const totalPhotos = sortedRooms.reduce((acc, r) => acc + (r.photos?.length ?? 0), 0);
   const signatures = inspection.signatures ?? [];
-  const isCheckIn = inspection.type === "check-in";
+  const isCheckIn = (inspection.type ?? "").toLowerCase().includes("check-in") || (inspection.type ?? "").toLowerCase() === "check_in";
+  const typeLabel = isCheckIn ? "Check-in" : "Check-out";
   const status = inspection.status ?? "draft";
+  const statusDisplay =
+    status === "signed"
+      ? "Fully Signed"
+      : status === "completed"
+        ? "Awaiting Signatures"
+        : "In Progress";
   const contractFrom = tenancy?.contract_from;
   const contractTo = tenancy?.contract_to;
   const durationMonths =
     contractFrom && contractTo
       ? Math.round(
-          (new Date(contractTo).getTime() -
-            new Date(contractFrom).getTime()) /
+          (new Date(contractTo).getTime() - new Date(contractFrom).getTime()) /
             (1000 * 60 * 60 * 24 * 30)
         )
       : null;
-
-  const metrics = [
-    { icon: Building2, label: "Type", value: prop?.property_type ?? "—" },
-    {
-      icon: CalendarDays,
-      label: "Date",
-      value: inspection.completed_at
-        ? new Date(inspection.completed_at).toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-          })
-        : "—",
-    },
-    { icon: BedDouble, label: "Rooms", value: `${rooms.length} inspected` },
-  ];
 
   const parties = [
     {
       role: "Landlord",
       name: tenancy?.landlord_name,
       contact: tenancy?.landlord_phone || tenancy?.landlord_email,
-      color: "#9A88FD",
     },
     {
       role: "Tenant",
       name: tenancy?.tenant_name,
       contact: tenancy?.tenant_phone || tenancy?.tenant_email,
-      color: "#FEDE80",
     },
     {
       role: "Agent",
       name: profile?.full_name,
       contact: profile?.agency_name,
-      color: "#cafe87",
     },
   ];
+
+  const handover = Array.isArray(inspection.key_handover)
+    ? inspection.key_handover.filter((k) => k && typeof k.item === "string" && typeof k.qty === "number")
+    : [];
 
   const handleDownloadPDF = async () => {
     setDownloadLoading(true);
@@ -146,9 +230,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
         executive_summary?: string;
         error?: string;
       };
-      if (!res.ok) {
-        throw new Error(data?.error ?? "PDF generation failed");
-      }
+      if (!res.ok) throw new Error(data?.error ?? "PDF generation failed");
       if (data.report_url) {
         setReportUrl(data.report_url);
         if (data.executive_summary) setExecSummary(data.executive_summary);
@@ -157,9 +239,9 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
       }
     } catch (err) {
       console.error("Generate report failed:", err);
-      const message =
-        err instanceof Error ? err.message : "Could not generate PDF. Please try again.";
-      alert(`Could not generate PDF: ${message}`);
+      alert(
+        `Could not generate PDF: ${err instanceof Error ? err.message : "Please try again."}`
+      );
     } finally {
       setDownloadLoading(false);
     }
@@ -184,16 +266,13 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
           inspectionId: inspection.id,
           signerType,
           signerName: signerName || "there",
-          propertyName,
+          propertyName: buildingName + (unitNumber ? `, Unit ${unitNumber}` : ""),
           inspectionType: inspection.type ?? "check-in",
         }),
       });
       const data = await res.json();
-      if (data.success) {
-        setSent((prev) => ({ ...prev, [signerType]: true }));
-      } else {
-        alert("Error: " + (data.error ?? "Failed to send email"));
-      }
+      if (data.success) setSent((prev) => ({ ...prev, [signerType]: true }));
+      else alert("Error: " + (data.error ?? "Failed to send email"));
     } catch {
       alert("Failed to send email");
     } finally {
@@ -202,379 +281,762 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-52">
-      {/* SECTION 1 — Hero Banner */}
-      <div
-        className="rounded-b-3xl overflow-hidden"
-        style={{
-          background: isCheckIn
-            ? "linear-gradient(135deg,#9A88FD,#7B65FC)"
-            : "linear-gradient(135deg,#FEDE80,#F5C842)",
-        }}
-      >
-        <div className="px-6 py-8 text-center">
-          <span
-            className="inline-block px-3 py-1 rounded-full text-xs font-bold mb-4"
-            style={{
-              backgroundColor: "rgba(255,255,255,0.25)",
-              color: "white",
-            }}
-          >
-            {isCheckIn ? "CHECK-IN" : "CHECK-OUT"} REPORT
-          </span>
+    <div
+      style={{
+        maxWidth: 480,
+        margin: "0 auto",
+        minHeight: "100vh",
+        background: "#F8F7F4",
+        fontFamily: "'DM Sans', sans-serif",
+        position: "relative",
+        paddingBottom: 180,
+      }}
+    >
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
+        .back-btn { transition: all 0.2s ease; cursor: pointer; }
+        .back-btn:active { transform: scale(0.9); }
+        .cta-btn { transition: all 0.3s cubic-bezier(0.4,0,0.2,1); cursor: pointer; }
+        .cta-btn:active { transform: scale(0.97); }
+        .scroll-hide::-webkit-scrollbar { display: none; }
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(16px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-up { animation: fadeUp 0.55s cubic-bezier(0.16,1,0.3,1) forwards; opacity: 0; }
+      `}</style>
 
-          <h1
-            className="text-2xl font-extrabold text-white mb-1"
-            style={{ fontFamily: "Poppins,sans-serif" }}
-          >
-            {buildingName}
-          </h1>
-          {unitNumber && (
-            <p className="text-white/80 text-base mb-4">Unit {unitNumber}</p>
-          )}
-
-          <span
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold"
-            style={{
-              backgroundColor: "rgba(255,255,255,0.2)",
-              color: "white",
-            }}
-          >
-            {status === "signed"
-              ? "Fully Signed"
-              : status === "completed"
-                ? "Awaiting Signatures"
-                : "In Progress"}
-          </span>
-        </div>
+      {/* Back */}
+      <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: "0s" }}>
+        <Link
+          href={inspection.property_id ? `/property/${inspection.property_id}` : "/dashboard"}
+          className="back-btn"
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 12,
+            background: "#EEEDE9",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textDecoration: "none",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="2.5" strokeLinecap="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </Link>
       </div>
 
-      {/* SECTION 2 — Key Metrics */}
-      <div className="flex gap-3 px-4 py-4 overflow-x-auto">
-        {metrics.map((m) => (
+      <div className="scroll-hide" style={{ overflowY: "auto", maxHeight: "calc(100vh - 120px)", paddingBottom: 24 }}>
+        {/* Report Header */}
+        <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: "0.06s" }}>
           <div
-            key={m.label}
-            className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 flex-shrink-0 min-w-[100px] text-center"
-          >
-            <div className="flex justify-center mb-1">
-              <m.icon size={16} color="#7B65FC" />
-            </div>
-            <p className="text-sm font-bold text-gray-900">{m.value}</p>
-            <p className="text-xs text-gray-400">{m.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* SECTION 3 — AI Summary */}
-      {execSummary && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mx-4 mb-4 overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-50">
-            <FileText size={16} color="#7B65FC" />
-            <p
-              className="font-bold text-gray-900 text-sm"
-              style={{ fontFamily: "Poppins,sans-serif" }}
-            >
-              AI Summary
-            </p>
-          </div>
-          <div className="px-4 py-3">
-            <p className="text-sm text-gray-600 leading-relaxed">
-              {execSummary}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* SECTION 5 — Parties */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mx-4 mb-4 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-50">
-          <p
-            className="font-bold text-gray-900 text-sm"
-            style={{ fontFamily: "Poppins,sans-serif" }}
-          >
-            <span className="inline-flex items-center gap-1"><Users size={14} color="#7B65FC" /> Parties</span>
-          </p>
-        </div>
-        {parties.map((party, i, arr) => (
-          <div
-            key={party.role}
-            className={`flex items-center gap-3 px-4 py-3 ${
-              i < arr.length - 1 ? "border-b border-gray-50" : ""
-            }`}
+            style={{
+              background: "#1A1A1A",
+              borderRadius: 22,
+              padding: "24px 20px",
+              position: "relative",
+              overflow: "hidden",
+            }}
           >
             <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-              style={{ backgroundColor: party.color + "CC" }}
+              style={{
+                position: "absolute",
+                top: -30,
+                right: -20,
+                width: 120,
+                height: 120,
+                borderRadius: "50%",
+                border: "1px solid rgba(255,255,255,0.06)",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                bottom: -40,
+                left: -20,
+                width: 100,
+                height: 100,
+                borderRadius: "50%",
+                background: "rgba(154,136,253,0.08)",
+              }}
+            />
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#9A88FD",
+                background: "rgba(154,136,253,0.15)",
+                padding: "4px 12px",
+                borderRadius: 100,
+                letterSpacing: 1,
+                textTransform: "uppercase",
+              }}
             >
-              {initials(party.name)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 truncate">
-                {party.name ?? "—"}
-              </p>
-              <p className="text-xs text-gray-400 truncate">
-                {party.contact ?? "—"}
-              </p>
-            </div>
-            <span className="text-xs text-gray-400 flex-shrink-0">
-              {party.role}
+              {typeLabel} Report
             </span>
+            <h1
+              style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontSize: 22,
+                fontWeight: 800,
+                color: "#fff",
+                margin: "12px 0 2px",
+                letterSpacing: -0.3,
+              }}
+            >
+              {buildingName}
+            </h1>
+            {unitLabel && (
+              <p style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", margin: 0 }}>{unitLabel}</p>
+            )}
+            <div style={{ marginTop: 16 }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: status === "signed" ? "#22C55E" : "#FBBF24",
+                  background: status === "signed" ? "rgba(34,197,94,0.15)" : "rgba(251,191,36,0.15)",
+                  padding: "5px 14px",
+                  borderRadius: 100,
+                }}
+              >
+                {statusDisplay}
+              </span>
+            </div>
           </div>
-        ))}
-      </div>
+        </div>
 
-      {/* SECTION 6 — Contract */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mx-4 mb-4 p-4">
-        <p
-          className="font-bold text-gray-900 text-sm mb-3"
-          style={{ fontFamily: "Poppins,sans-serif" }}
+        {/* Quick Stats */}
+        <div
+          className={loaded ? "fade-up" : ""}
+          style={{
+            padding: "14px 24px 0",
+            display: "flex",
+            gap: 8,
+            animationDelay: "0.1s",
+          }}
         >
-          <span className="inline-flex items-center gap-1"><FileText size={14} color="#7B65FC" /> Contract</span>
-        </p>
-        <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Start", value: formatDate(contractFrom) },
-            { label: "End", value: formatDate(contractTo) },
-            {
-              label: "Annual Rent",
-              value:
-                tenancy?.annual_rent != null
-                  ? `AED ${tenancy.annual_rent.toLocaleString()}`
-                  : "—",
-            },
-            {
-              label: "Duration",
-              value:
-                durationMonths != null ? `${durationMonths} months` : "—",
-            },
-          ].map((item) => (
-            <div key={item.label} className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs text-gray-400 mb-0.5">{item.label}</p>
-              <p className="text-sm font-semibold text-gray-900">
-                {item.value}
+            { label: "Type", value: prop?.property_type ?? "—" },
+            { label: "Date", value: formatDateShort(inspection.completed_at ?? undefined) || "—" },
+            { label: "Rooms", value: `${rooms.length} inspected` },
+            { label: "Photos", value: String(totalPhotos) },
+          ].map((s) => (
+            <div
+              key={s.label}
+              style={{
+                flex: 1,
+                background: "#fff",
+                borderRadius: 14,
+                padding: "12px 8px",
+                textAlign: "center",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.03)",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#1A1A1A",
+                  margin: 0,
+                  fontFamily: "'Poppins', sans-serif",
+                }}
+              >
+                {s.value}
+              </p>
+              <p style={{ fontSize: 10, color: "#BBB", margin: "3px 0 0", fontWeight: 500 }}>
+                {s.label}
               </p>
             </div>
           ))}
         </div>
-      </div>
 
-      {/* SECTION 7 — Rooms */}
-      <div className="mx-4 mb-4">
-        <p
-          className="font-bold text-gray-900 text-sm mb-3"
-          style={{ fontFamily: "Poppins,sans-serif" }}
+        {/* AI Summary */}
+        {execSummary && (
+          <Section
+            delay="0.16s"
+            loaded={loaded}
+            icon={iconDoc}
+            title="AI Summary"
+          >
+            <p style={{ fontSize: 13, color: "#666", margin: 0, lineHeight: 1.65 }}>{execSummary}</p>
+          </Section>
+        )}
+
+        {/* Parties */}
+        <Section delay="0.22s" loaded={loaded} icon={iconUsers} title="Parties">
+          {parties.map((p, i) => (
+            <div
+              key={p.role}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "10px 0",
+                borderBottom: i < parties.length - 1 ? "1px solid #F0EFEC" : "none",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 10,
+                    background: "#9A88FD",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#fff",
+                    flexShrink: 0,
+                  }}
+                >
+                  {initials(p.name)}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#1A1A1A",
+                      margin: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      maxWidth: 190,
+                    }}
+                  >
+                    {p.name ?? "—"}
+                  </p>
+                  <p style={{ fontSize: 11, color: "#BBB", margin: "1px 0 0" }}>
+                    {p.contact ?? "—"}
+                  </p>
+                </div>
+              </div>
+              <span style={{ fontSize: 11, color: "#999", fontWeight: 500, flexShrink: 0 }}>
+                {p.role}
+              </span>
+            </div>
+          ))}
+        </Section>
+
+        {/* Contract */}
+        <Section delay="0.28s" loaded={loaded} icon={iconCalendar} title="Contract">
+          <div style={{ display: "flex", gap: 8 }}>
+            <div
+              style={{
+                flex: 1,
+                background: "#F8F7F4",
+                borderRadius: 12,
+                padding: 12,
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 10,
+                  color: "#BBB",
+                  margin: 0,
+                  fontWeight: 500,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                }}
+              >
+                Start
+              </p>
+              <p
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#1A1A1A",
+                  margin: "4px 0 0",
+                  fontFamily: "'Poppins', sans-serif",
+                }}
+              >
+                {formatDate(contractFrom)}
+              </p>
+            </div>
+            <div
+              style={{
+                flex: 1,
+                background: "#F8F7F4",
+                borderRadius: 12,
+                padding: 12,
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 10,
+                  color: "#BBB",
+                  margin: 0,
+                  fontWeight: 500,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                }}
+              >
+                End
+              </p>
+              <p
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#1A1A1A",
+                  margin: "4px 0 0",
+                  fontFamily: "'Poppins', sans-serif",
+                }}
+              >
+                {formatDate(contractTo)}
+              </p>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <div
+              style={{
+                flex: 1,
+                background: "#F8F7F4",
+                borderRadius: 12,
+                padding: 12,
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 10,
+                  color: "#BBB",
+                  margin: 0,
+                  fontWeight: 500,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                }}
+              >
+                Annual Rent
+              </p>
+              <p
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#1A1A1A",
+                  margin: "4px 0 0",
+                  fontFamily: "'Poppins', sans-serif",
+                }}
+              >
+                {tenancy?.annual_rent != null
+                  ? `AED ${tenancy.annual_rent.toLocaleString("en-AE")}`
+                  : "—"}
+              </p>
+            </div>
+            <div
+              style={{
+                flex: 1,
+                background: "#F8F7F4",
+                borderRadius: 12,
+                padding: 12,
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 10,
+                  color: "#BBB",
+                  margin: 0,
+                  fontWeight: 500,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                }}
+              >
+                Duration
+              </p>
+              <p
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#1A1A1A",
+                  margin: "4px 0 0",
+                  fontFamily: "'Poppins', sans-serif",
+                }}
+              >
+                {durationMonths != null ? `${durationMonths} months` : "—"}
+              </p>
+            </div>
+          </div>
+        </Section>
+
+        {/* Rooms */}
+        <Section
+          delay="0.34s"
+          loaded={loaded}
+          icon={iconRooms}
+          title={`Rooms (${rooms.length} inspected)`}
         >
-          <span className="inline-flex items-center gap-1"><Building2 size={14} color="#7B65FC" /> Rooms ({rooms.length} inspected)</span>
-        </p>
-        {rooms
-          .slice()
-          .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-          .map((room) => {
+          {sortedRooms.map((room, i) => {
             const allPhotos = room.photos ?? [];
-            const damagedPhotos = allPhotos.filter(
+            const issues = allPhotos.filter(
               (p) => Array.isArray(p.damage_tags) && p.damage_tags.length > 0
-            );
-            const totalPhotos = allPhotos.length;
-            const damageCount = damagedPhotos.length;
-            const hasDamage = damageCount > 0;
-
+            ).length;
+            const photoCount = allPhotos.length;
             return (
               <div
                 key={room.id}
                 style={{
-                  background: "white",
-                  borderRadius: 16,
-                  marginBottom: 8,
-                  padding: "12px 16px",
-                  border: hasDamage
-                    ? "1px solid rgba(255,110,64,0.2)"
-                    : "1px solid #f0f0f0",
-                  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
+                  padding: "12px 14px",
+                  background: "#F8F7F4",
+                  borderRadius: 14,
+                  marginBottom: i < sortedRooms.length - 1 ? 8 : 0,
                 }}
               >
-                {/* Left: dot + room name */}
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{
-                    width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
-                    background: hasDamage ? "#ef4444"
-                      : totalPhotos > 0 ? "#cafe87"
-                      : "#e5e7eb",
-                  }} />
-                  <span style={{
-                    fontSize: 14, fontWeight: 600, color: "#1a1a1a",
-                    fontFamily: "Poppins, sans-serif",
-                  }}>
+                  <div
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: issues > 0 ? "#EF4444" : "#22C55E",
+                    }}
+                  />
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
                     {room.name ?? "Room"}
                   </span>
                 </div>
-
-                {/* Right: counters */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {/* Total photos badge */}
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 4,
-                    padding: "4px 10px", borderRadius: 100,
-                    background: "#f5f5f5",
-                  }}>
-                    <span style={{ fontSize: 11, color: "#9ca3af" }}>📷</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>
-                      {totalPhotos}
-                    </span>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      background: "#EEEDE9",
+                      padding: "4px 10px",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#999"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    >
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <path d="M21 15l-5-5L5 21" />
+                    </svg>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "#666" }}>{photoCount}</span>
                   </div>
-
-                  {/* Damage badge — only shown if > 0 */}
-                  {hasDamage && (
-                    <div style={{
-                      display: "flex", alignItems: "center", gap: 4,
-                      padding: "4px 10px", borderRadius: 100,
-                      background: "#fff0f0",
-                    }}>
-                      <span style={{ fontSize: 11 }}>⚠️</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#ef4444" }}>
-                        {damageCount}
-                      </span>
+                  {issues > 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        background: "rgba(239,68,68,0.08)",
+                        padding: "4px 10px",
+                        borderRadius: 8,
+                      }}
+                    >
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#EF4444"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      >
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                      </svg>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "#EF4444" }}>{issues}</span>
                     </div>
                   )}
-
                 </div>
               </div>
             );
           })}
-      </div>
+        </Section>
 
-      {/* SECTION 8 — Signatures */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mx-4 mb-4 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-50">
-          <p
-            className="font-bold text-gray-900 text-sm"
-            style={{ fontFamily: "Poppins,sans-serif" }}
-          >
-            <span className="inline-flex items-center gap-1"><PenLine size={14} color="#7B65FC" /> Signatures</span>
-          </p>
-        </div>
-        {(["landlord", "tenant"] as const).map((type, i) => {
-          const sig = signatures.find((s) => s.signer_type === type);
-          return (
-            <div
-              key={type}
-              className={`flex items-center gap-3 px-4 py-3 ${
-                i === 0 ? "border-b border-gray-50" : ""
-              }`}
-            >
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 ${
-                  sig?.otp_verified ? "bg-[#cafe87]" : "bg-gray-100"
-                }`}
-              >
-                {sig?.otp_verified ? <Check size={14} color="#1A1A1A" /> : <Clock3 size={14} color="#6b7280" />}
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-900 capitalize">
-                  {type}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {sig?.otp_verified && sig.signed_at
-                    ? `Signed on ${formatDate(sig.signed_at)}`
-                    : "Pending signature"}
-                </p>
-              </div>
-              {!sig?.otp_verified && (
-                <button
-                  type="button"
-                  onClick={() => setShowSignModal(true)}
-                  className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+        {/* Handover Keys */}
+        <Section delay="0.4s" loaded={loaded} icon={iconKeys} title="Handover Keys">
+          {handover.length > 0 ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {handover.map((h, i) => (
+                <div
+                  key={i}
                   style={{
-                    backgroundColor: "#F0EDFF",
-                    color: "#9A88FD",
+                    flex: "1 1 calc(50% - 4px)",
+                    minWidth: "calc(50% - 4px)",
+                    background: "#F8F7F4",
+                    borderRadius: 14,
+                    padding: 14,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                   }}
                 >
-                  Send
-                </button>
-              )}
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "#666" }}>{h.item}</span>
+                  <span
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 800,
+                      color: "#1A1A1A",
+                      fontFamily: "'Poppins', sans-serif",
+                      background: "#fff",
+                      width: 32,
+                      height: 32,
+                      borderRadius: 10,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {h.qty}
+                  </span>
+                </div>
+              ))}
             </div>
-          );
-        })}
-      </div>
+          ) : (
+            <p style={{ fontSize: 13, color: "#BBB", margin: 0 }}>No handover items recorded</p>
+          )}
+        </Section>
 
-      {/* SECTION 9 — Legal Footer */}
-      <div className="mx-4 mb-4 px-4 py-3 bg-gray-50 rounded-2xl">
+        {/* Signatures */}
+        <Section delay="0.46s" loaded={loaded} icon={iconSign} title="Signatures">
+          {(["landlord", "tenant"] as const).map((type, i) => {
+            const sig = signatures.find((s) => s.signer_type === type);
+            const signed = !!(sig?.otp_verified ?? sig?.signed_at);
+            return (
+              <div
+                key={type}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "10px 0",
+                  borderBottom: i < 1 ? "1px solid #F0EFEC" : "none",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 10,
+                      background: signed ? "rgba(154,136,253,0.1)" : "#EEEDE9",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {signed ? (
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#9A88FD"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#CCC"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                      </svg>
+                    )}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </p>
+                    <p style={{ fontSize: 11, color: "#BBB", margin: "1px 0 0" }}>
+                      {signed && sig?.signed_at
+                        ? `Signed on ${formatDate(sig.signed_at)}`
+                        : "Pending signature"}
+                    </p>
+                  </div>
+                </div>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: signed ? "#9A88FD" : "#999",
+                    background: signed ? "rgba(154,136,253,0.1)" : "#EEEDE9",
+                    padding: "4px 10px",
+                    borderRadius: 8,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {signed ? "Signed" : "Pending"}
+                </span>
+              </div>
+            );
+          })}
+        </Section>
+
+        {/* Hash */}
         {inspection.document_hash && (
-          <p className="text-xs text-gray-400 text-center">
-            Document SHA-256: {inspection.document_hash.slice(0, 16)}...
-            {inspection.document_hash.slice(-8)}
-          </p>
+          <div
+            className={loaded ? "fade-up" : ""}
+            style={{ padding: "16px 24px 0", textAlign: "center", animationDelay: "0.5s" }}
+          >
+            <p style={{ fontSize: 11, color: "#CCC", fontFamily: "monospace" }}>
+              SHA-256: {inspection.document_hash.slice(0, 16)}...{inspection.document_hash.slice(-8)}
+            </p>
+          </div>
         )}
+
+        {/* Delete (subtle) */}
+        <div
+          className={loaded ? "fade-up" : ""}
+          style={{ padding: "12px 24px 0", animationDelay: "0.52s" }}
+        >
+          <DeleteInspectionButton
+            inspectionId={inspection.id}
+            inspectionType={(inspection.type ?? "check-in") as "check-in" | "check-out"}
+            status={inspection.status}
+            signatures={
+              (inspection.signatures ?? []) as {
+                signer_type: string;
+                otp_verified: boolean;
+                signed_at?: string | null;
+              }[]
+            }
+            redirectTo={
+              inspection.property_id ? `/property/${inspection.property_id}` : "/dashboard"
+            }
+            variant="button"
+          />
+        </div>
       </div>
 
-      <div style={{ margin: "16px 16px 16px" }}>
-        <DeleteInspectionButton
-          inspectionId={inspection.id}
-          inspectionType={(inspection.type ?? "check-in") as "check-in" | "check-out"}
-          status={inspection.status}
-          signatures={
-            (inspection.signatures ?? []) as {
-              signer_type: string;
-              otp_verified: boolean;
-              signed_at?: string | null;
-            }[]
-          }
-          redirectTo={inspection.property_id ? `/property/${inspection.property_id}` : "/dashboard"}
-          variant="button"
-        />
-      </div>
-
-      {/* BOTTOM FIXED ACTIONS BAR */}
+      {/* Action Buttons — fixed bottom */}
       <div
-        className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-100 px-4 pt-3 max-w-lg mx-auto"
-        style={{ paddingBottom: "max(24px, env(safe-area-inset-bottom))" }}
+        className={loaded ? "fade-up" : ""}
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          maxWidth: 480,
+          margin: "0 auto",
+          background: "#fff",
+          borderTop: "1px solid #F0EFEC",
+          padding: "16px 24px",
+          paddingBottom: "max(24px, env(safe-area-inset-bottom))",
+          animationDelay: "0.54s",
+          zIndex: 10,
+        }}
       >
-        {/* Row 1 — Download PDF (full width) */}
         <button
           type="button"
           onClick={handleDownloadPDF}
           disabled={downloadLoading}
-          className="w-full h-12 rounded-2xl font-semibold text-white flex items-center justify-center gap-2 mb-3 disabled:opacity-70"
+          className="cta-btn"
           style={{
-            background: "linear-gradient(135deg, #9A88FD, #7B65FC)",
-            fontFamily: "Poppins, sans-serif",
-            opacity: 1,
+            background: "#9A88FD",
+            color: "#fff",
+            padding: "16px 0",
+            borderRadius: 16,
+            textAlign: "center",
+            fontSize: 15,
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            boxShadow: "0 4px 20px rgba(154,136,253,0.3)",
+            fontFamily: "'Poppins', sans-serif",
+            width: "100%",
+            border: "none",
             cursor: downloadLoading ? "default" : "pointer",
+            opacity: downloadLoading ? 0.8 : 1,
           }}
         >
-          {downloadLoading ? "Generating PDF..." : <span className="inline-flex items-center gap-2"><Download size={16} /> Download PDF</span>}
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          {downloadLoading ? "Generating PDF..." : "Download PDF"}
         </button>
 
-        {/* Row 2 — Sign + Share */}
-        <div className="flex gap-3">
+        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
           {status === "signed" ? (
             <div
-              className="flex-1 h-12 rounded-2xl font-semibold bg-[#cafe87] text-gray-800 flex items-center justify-center gap-2 text-sm"
-              style={{ fontFamily: "Poppins, sans-serif" }}
+              style={{
+                flex: 1,
+                background: "#22C55E",
+                color: "#fff",
+                padding: "13px 0",
+                borderRadius: 14,
+                textAlign: "center",
+                fontSize: 13,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                fontFamily: "'Poppins', sans-serif",
+              }}
             >
-              <span className="inline-flex items-center gap-2"><Check size={16} /> Fully Signed</span>
+              <Check size={15} />
+              Fully Signed
             </div>
           ) : (
             <button
               type="button"
               onClick={() => setShowSignModal(true)}
-              className="flex-1 h-12 rounded-2xl font-semibold border-2 border-[#9A88FD] text-[#9A88FD] flex items-center justify-center gap-2 text-sm active:bg-[#F0EDFF] transition-colors"
-              style={{ fontFamily: "Poppins, sans-serif" }}
+              className="cta-btn"
+              style={{
+                flex: 1,
+                background: "#fff",
+                border: "1.5px solid #9A88FD",
+                color: "#9A88FD",
+                padding: "13px 0",
+                borderRadius: 14,
+                textAlign: "center",
+                fontSize: 13,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                fontFamily: "'Poppins', sans-serif",
+              }}
             >
-              <span className="inline-flex items-center gap-2"><PenLine size={16} /> Send for Signature</span>
+              <PenLine size={15} />
+              Send for Signature
             </button>
           )}
-
           <button
             type="button"
             onClick={async () => {
               const shareUrl = window.location.href;
               if (navigator.share) {
                 await navigator.share({
-                  title: `Inspection Report — ${prop?.building_name ?? "Property"}`,
-                  text: `Inspection report for Unit ${prop?.unit_number ?? ""}`,
+                  title: `Inspection Report — ${buildingName}`,
+                  text: unitLabel ? `Inspection report for ${unitLabel}` : "Inspection report",
                   url: shareUrl,
                 });
               } else {
@@ -582,43 +1044,97 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                 alert("Link copied to clipboard!");
               }
             }}
-            className="flex-1 h-12 rounded-2xl font-semibold border-2 border-gray-200 text-gray-600 flex items-center justify-center gap-2 text-sm active:bg-gray-50 transition-colors"
-            style={{ fontFamily: "Poppins, sans-serif" }}
+            className="cta-btn"
+            style={{
+              flex: 1,
+              background: "#fff",
+              border: "1.5px solid #DDDCD8",
+              color: "#666",
+              padding: "13px 0",
+              borderRadius: 14,
+              textAlign: "center",
+              fontSize: 13,
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              fontFamily: "'Poppins', sans-serif",
+            }}
           >
-            <span className="inline-flex items-center gap-2"><LinkIcon size={16} /> Share</span>
+            <LinkIcon size={15} />
+            Share
           </button>
         </div>
       </div>
 
       {/* Send for Signature modal */}
       {showSignModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
-          <div className="bg-white rounded-t-3xl w-full max-w-lg mx-auto p-6">
-            <div className="flex items-center justify-between mb-6">
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 9998,
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "center",
+          }}
+          onClick={() => setShowSignModal(false)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "20px 20px 0 0",
+              width: "100%",
+              maxWidth: 480,
+              padding: 24,
+              paddingBottom: "max(80px, env(safe-area-inset-bottom))",
+              boxShadow: "0 -4px 32px rgba(0,0,0,0.15)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
               <h2
-                className="text-lg font-bold text-gray-900"
-                style={{ fontFamily: "Poppins, sans-serif" }}
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: "#1A1A1A",
+                  margin: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
               >
-                <span className="inline-flex items-center gap-2"><PenLine size={16} /> Send for Signature</span>
+                <PenLine size={18} />
+                Send for Signature
               </h2>
               <button
                 type="button"
                 onClick={() => setShowSignModal(false)}
-                className="p-2 text-gray-500 hover:text-gray-700"
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 18,
+                  color: "#999",
+                  cursor: "pointer",
+                  padding: 4,
+                }}
                 aria-label="Close"
               >
                 ✕
               </button>
             </div>
 
-            <div className="bg-gray-50 rounded-2xl p-4 mb-3">
-              <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">
+            <div style={{ background: "#F8F7F4", borderRadius: 16, padding: 16, marginBottom: 12 }}>
+              <p style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: 1, margin: "0 0 8px" }}>
                 Landlord
               </p>
-              <p className="font-semibold text-gray-900">
+              <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
                 {tenancy?.landlord_name ?? "—"}
               </p>
-              <p className="text-sm text-gray-500 mb-3">
+              <p style={{ fontSize: 13, color: "#666", margin: "4px 0 12px" }}>
                 {tenancy?.landlord_email ?? "—"}
               </p>
               <button
@@ -631,32 +1147,30 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                   )
                 }
                 disabled={sent.landlord || sending}
-                className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  sent.landlord
-                    ? "bg-[#cafe87] text-gray-800 cursor-default"
-                    : "text-white active:scale-[0.98]"
-                }`}
-                style={
-                  !sent.landlord
-                    ? {
-                        background:
-                          "linear-gradient(135deg,#9A88FD,#7B65FC)",
-                      }
-                    : {}
-                }
+                style={{
+                  width: "100%",
+                  padding: "10px 0",
+                  borderRadius: 12,
+                  border: "none",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: sent.landlord || sending ? "default" : "pointer",
+                  background: sent.landlord ? "rgba(34,197,94,0.2)" : "#9A88FD",
+                  color: sent.landlord ? "#166534" : "#fff",
+                }}
               >
                 {sent.landlord ? "Email Sent" : "Send via Email"}
               </button>
             </div>
 
-            <div className="bg-gray-50 rounded-2xl p-4 mb-6">
-              <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">
+            <div style={{ background: "#F8F7F4", borderRadius: 16, padding: 16, marginBottom: 24 }}>
+              <p style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: 1, margin: "0 0 8px" }}>
                 Tenant
               </p>
-              <p className="font-semibold text-gray-900">
+              <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
                 {tenancy?.tenant_name ?? "—"}
               </p>
-              <p className="text-sm text-gray-500 mb-3">
+              <p style={{ fontSize: 13, color: "#666", margin: "4px 0 12px" }}>
                 {tenancy?.tenant_email ?? "—"}
               </p>
               <button
@@ -669,27 +1183,32 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                   )
                 }
                 disabled={sent.tenant || sending}
-                className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  sent.tenant
-                    ? "bg-[#cafe87] text-gray-800 cursor-default"
-                    : "text-white active:scale-[0.98]"
-                }`}
-                style={
-                  !sent.tenant
-                    ? {
-                        background:
-                          "linear-gradient(135deg,#9A88FD,#7B65FC)",
-                      }
-                    : {}
-                }
+                style={{
+                  width: "100%",
+                  padding: "10px 0",
+                  borderRadius: 12,
+                  border: "none",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: sent.tenant || sending ? "default" : "pointer",
+                  background: sent.tenant ? "rgba(34,197,94,0.2)" : "#9A88FD",
+                  color: sent.tenant ? "#166534" : "#fff",
+                }}
               >
                 {sent.tenant ? "Email Sent" : "Send via Email"}
               </button>
             </div>
 
             {sent.landlord && sent.tenant && (
-              <div className="bg-[#F0EDFF] rounded-xl p-3 text-center">
-                <p className="text-sm text-[#9A88FD] font-medium">
+              <div
+                style={{
+                  background: "rgba(154,136,253,0.1)",
+                  borderRadius: 12,
+                  padding: 12,
+                  textAlign: "center",
+                }}
+              >
+                <p style={{ fontSize: 13, color: "#9A88FD", fontWeight: 500, margin: 0 }}>
                   Both emails sent. Waiting for signatures...
                 </p>
               </div>

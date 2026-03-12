@@ -106,6 +106,7 @@ export type InspectionWithRelations = {
   agent_id: string | null;
   property_id: string | null;
   tenancy_id: string | null;
+  key_handover?: { item: string; qty: number }[] | null;
   report_data?: {
     executive_summary?: string;
   } | null;
