@@ -208,7 +208,11 @@ export async function buildPdfAndUpload(
 
   const agentId = row.agent_id ?? (inspection as { agent_id?: string }).agent_id;
   const { data: agentData } = agentId
-    ? await supabase.from("profiles").select("full_name, agency_name").eq("id", agentId).single()
+    ? await supabase
+        .from("profiles")
+        .select("full_name, agency_name, company_logo_url, company_primary_color, rera_number, signature_image_url")
+        .eq("id", agentId)
+        .single()
     : { data: null };
 
   const meta: InspectionMeta = {
@@ -238,6 +242,10 @@ export async function buildPdfAndUpload(
       ? {
           full_name: agentData.full_name ?? undefined,
           agency_name: agentData.agency_name ?? undefined,
+          company_logo_url: (agentData as { company_logo_url?: string }).company_logo_url ?? undefined,
+          company_primary_color: (agentData as { company_primary_color?: string }).company_primary_color ?? undefined,
+          rera_number: (agentData as { rera_number?: string }).rera_number ?? undefined,
+          signature_image_url: (agentData as { signature_image_url?: string }).signature_image_url ?? undefined,
         }
       : null,
     rooms: (row.rooms ?? [])

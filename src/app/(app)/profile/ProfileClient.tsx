@@ -5,11 +5,27 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-interface ProfileClientProps {
-  fullName: string | null;
-  userEmail: string | null;
-  agencyName: string | null;
+export type ProfileData = {
+  full_name: string | null;
+  agency_name: string | null;
+  phone: string | null;
   memberSince: string | null;
+  avatar_url: string | null;
+  job_title: string | null;
+  whatsapp_number: string | null;
+  rera_number: string | null;
+  company_logo_url: string | null;
+  company_website: string | null;
+  company_address: string | null;
+  company_trade_license: string | null;
+  signature_image_url: string | null;
+  company_primary_color: string | null;
+};
+
+interface ProfileClientProps {
+  userId: string;
+  userEmail: string | null;
+  profile: ProfileData;
   stats: { properties: number; inspections: number; reports: number };
 }
 
@@ -30,10 +46,9 @@ function formatMemberSince(iso: string | null): string {
 }
 
 export function ProfileClient({
-  fullName,
+  userId: _userId,
   userEmail,
-  agencyName,
-  memberSince,
+  profile,
   stats,
 }: ProfileClientProps) {
   const router = useRouter();
@@ -43,9 +58,10 @@ export function ProfileClient({
     setLoaded(true);
   }, []);
 
-  const initials = getInitials(fullName, userEmail);
-  const displayName = fullName?.trim() || (userEmail ? userEmail.split("@")[0] : "User");
+  const initials = getInitials(profile.full_name, userEmail);
+  const displayName = profile.full_name?.trim() || (userEmail ? userEmail.split("@")[0] : "User");
   const displayEmail = userEmail ?? "";
+  const memberSince = profile.memberSince ?? null;
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -131,71 +147,65 @@ export function ProfileClient({
       </div>
 
       <div className="scroll-hide" style={{ overflowY: "auto", paddingBottom: 24 }}>
-        {/* Profile Card */}
+        {/* Identity card (read-only) */}
         <div className={loaded ? "fade-up" : ""} style={{ padding: "20px 24px 0", animationDelay: "0.1s" }}>
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 22,
-              padding: "24px 20px",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 22, padding: "24px", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
               <div
                 style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 20,
-                  background: "#9A88FD",
+                  width: 72,
+                  height: 72,
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  flexShrink: 0,
+                  border: "2px solid #EEEDE9",
+                  background: profile.avatar_url ? "transparent" : "#9A88FD",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#fff",
-                  fontSize: 22,
-                  fontWeight: 800,
-                  fontFamily: "'Poppins', sans-serif",
-                  letterSpacing: 1,
-                  flexShrink: 0,
                 }}
               >
-                {initials}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h2 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 18, fontWeight: 700, color: "#1A1A1A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {displayName}
-                </h2>
-                <p style={{ fontSize: 13, color: "#999", margin: "3px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {displayEmail}
-                </p>
-                {agencyName && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6 }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round">
-                      <rect x="2" y="7" width="20" height="14" rx="2" />
-                      <path d="M16 7V5a4 4 0 00-8 0v2" />
-                    </svg>
-                    <span style={{ fontSize: 12, color: "#9A88FD", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {agencyName}
-                    </span>
-                  </div>
+                {profile.avatar_url ? (
+                  <img src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <span style={{ color: "#fff", fontSize: 24, fontWeight: 800, fontFamily: "'Poppins', sans-serif" }}>{initials}</span>
                 )}
               </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A", margin: 0, fontFamily: "'Poppins', sans-serif" }}>{displayName}</p>
+                {profile.job_title?.trim() && (
+                  <p style={{ fontSize: 13, color: "#666", margin: "2px 0 0" }}>{profile.job_title}</p>
+                )}
+                <p style={{ fontSize: 13, color: "#999", margin: "4px 0 0" }}>{displayEmail}</p>
+              </div>
             </div>
-
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              {profile.company_logo_url && (
+                <img
+                  src={profile.company_logo_url}
+                  alt=""
+                  style={{ height: 32, width: "auto", maxWidth: 120, objectFit: "contain" }}
+                />
+              )}
+              <span style={{ fontSize: 14, color: "#666", fontWeight: 500 }}>
+                {profile.agency_name?.trim() || "—"}
+              </span>
+            </div>
             <Link
-              href="/profile"
+              href="/profile/edit"
               className="cta-btn"
               style={{
                 display: "block",
-                marginTop: 18,
-                background: "#1A1A1A",
-                color: "#fff",
-                padding: "12px 0",
-                borderRadius: 13,
+                marginTop: 20,
                 textAlign: "center",
-                fontSize: 13,
+                padding: "14px 0",
+                background: "#9A88FD",
+                color: "#fff",
+                borderRadius: 14,
+                fontSize: 14,
                 fontWeight: 600,
                 textDecoration: "none",
+                fontFamily: "inherit",
               }}
             >
               Edit Profile
