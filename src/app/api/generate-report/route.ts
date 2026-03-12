@@ -17,6 +17,23 @@ Write as the inspector addressing landlord and tenant.`;
 
 const SEVERE_TAGS = ["BROKEN", "HOLE", "WATER_DAMAGE", "MOLD"];
 
+/** Room condition from photos (damage tags). Same logic as in generatePDF. */
+function getRoomCondition(photos: { damage_tags?: string[] }[]): string {
+  const photosWithIssues = photos.filter(
+    (p) => (p.damage_tags?.length ?? 0) > 0
+  ).length;
+  if (photosWithIssues === 0) return "Excellent";
+  const hasSevere = photos.some((p) =>
+    (p.damage_tags ?? []).some((t) =>
+      SEVERE_TAGS.includes(String(t).toUpperCase())
+    )
+  );
+  if (hasSevere) return "Needs Attention";
+  if (photos.length === 0) return "Good";
+  if (photosWithIssues / photos.length >= 0.5) return "Fair";
+  return "Good";
+}
+
 export async function POST(request: Request) {
   try {
     const { inspectionId } = (await request.json()) as { inspectionId: string };
@@ -28,11 +45,20 @@ export async function POST(request: Request) {
 
     const { data: inspection, error: inspErr } = await supabase
       .from("inspections")
-      .select("id, type, status, created_at, property_id, agent_id, tenancy_id, executive_summary, overall_condition, dispute_risk")
+      .select("id, type, status, created_at, property_id, agent_id, tenancy_id, executive_summary, overall_condition, dispute_risk, report_url")
       .eq("id", inspectionId)
       .single();
     if (inspErr || !inspection) {
       return NextResponse.json({ error: "Inspection not found" }, { status: 404 });
+    }
+
+    const row = inspection as { report_url?: string | null; executive_summary?: string | null };
+    if (row.report_url && row.executive_summary) {
+      return NextResponse.json({
+        success: true,
+        report_url: row.report_url,
+        cached: true,
+      });
     }
 
     // Only generate summary + condition + risk if not already computed
@@ -87,6 +113,13 @@ export async function POST(request: Request) {
       const severeCount = allPhotos.filter((p) =>
         (p.damage_tags ?? []).some((t) => SEVERE_TAGS.includes(String(t).toUpperCase()))
       ).length;
+
+      // Persist room-level condition to rooms.condition
+      for (const room of rooms ?? []) {
+        const photos = roomPhotos[room.id] ?? [];
+        const condition = getRoomCondition(photos);
+        await supabase.from("rooms").update({ condition }).eq("id", room.id);
+      }
 
       let overallCondition: string;
       if (photosWithIssues === 0) overallCondition = "Excellent";

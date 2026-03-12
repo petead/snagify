@@ -15,6 +15,7 @@ type RoomData = {
   id: string;
   name: string;
   order_index: number | null;
+  condition: string | null;
   existingPhotos: { id: string; url: string; ai_analysis: string | null; damage_tags: string[]; notes: string | null }[];
 };
 
@@ -519,6 +520,7 @@ export function InspectionClient({
       id: r.id,
       name: r.name,
       order_index: r.order_index,
+      condition: null,
       existingPhotos: [],
     }));
     setLiveRooms(mapped);
@@ -588,6 +590,12 @@ export function InspectionClient({
 
       if (dbError) throw new Error(`DB: ${dbError.message}`);
       const realPhotoId = newPhoto.id;
+
+      await fetch("/api/invalidate-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inspectionId, roomId: localRoomId }),
+      });
 
       // ── STEP 4: Replace temp with real URL, show "Analyzing..."
       setPhotos((prev) => prev.map((p) =>
@@ -711,6 +719,7 @@ export function InspectionClient({
   };
 
   const handleDeletePhoto = async (photoId: string, photoUrl: string) => {
+    const roomId = photos.find((p) => p.id === photoId)?.room_id;
     deletedPhotoIds.current.add(photoId);
 
     setPhotos((prev) => prev.filter((p) => p.id !== photoId));
@@ -729,6 +738,12 @@ export function InspectionClient({
       } else {
         console.log("Photo deleted from DB:", photoId);
       }
+
+      await fetch("/api/invalidate-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inspectionId, roomId }),
+      });
 
       const urlParts = photoUrl.split("/inspection-photos/");
       if (urlParts.length > 1) {
@@ -821,15 +836,6 @@ export function InspectionClient({
     }
     notesTimers.current = {};
     try {
-      for (const room of liveRooms) {
-        const roomPhotos = photos.filter((p) => p.room_id === room.id);
-        const hasDamages = roomPhotos.some((p) => p.damage_tags?.length > 0);
-        await supabase
-          .from("rooms")
-          .update({ overall_condition: hasDamages ? "poor" : "good" })
-          .eq("id", room.id);
-      }
-
       await supabase
         .from("inspections")
         .update({ status: "completed", completed_at: new Date().toISOString() })
@@ -1293,25 +1299,48 @@ export function InspectionClient({
               <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 160px" }}>
 
                 {/* Room header */}
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  marginBottom: 16,
-                }}>
-                  <div style={{
-                    width: 10, height: 10, borderRadius: "50%",
-                    background: roomPhotos.length === 0 ? "#ddd"
-                      : hasDamages ? "#FF6E40" : "#cafe87",
-                  }} />
-                  <span style={{
-                    fontFamily: "Poppins, sans-serif",
-                    fontWeight: 700, fontSize: 18, color: "#1a1a2e",
-                  }}>
-                    {room.name}
-                  </span>
-                  <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 500 }}>
-                    {roomPhotos.length} photo{roomPhotos.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
+                {(() => {
+                  const conditionColorMap: Record<string, string> = {
+                    Excellent: "#4CAF50",
+                    Good: "#8BC34A",
+                    Fair: "#FF9800",
+                    "Needs Attention": "#F44336",
+                  };
+                  const cond = room.condition ?? null;
+                  const condColor = cond ? conditionColorMap[cond] ?? "#9ca3af" : null;
+                  return (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      marginBottom: 16,
+                    }}>
+                      <div style={{
+                        width: 10, height: 10, borderRadius: "50%",
+                        background: condColor ?? (roomPhotos.length === 0 ? "#ddd" : hasDamages ? "#FF6E40" : "#cafe87"),
+                      }} />
+                      <span style={{
+                        fontFamily: "Poppins, sans-serif",
+                        fontWeight: 700, fontSize: 18, color: "#1a1a2e",
+                      }}>
+                        {room.name}
+                      </span>
+                      <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 500 }}>
+                        {roomPhotos.length} photo{roomPhotos.length !== 1 ? "s" : ""}
+                      </span>
+                      {cond && (
+                        <span style={{
+                          marginLeft: "auto",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: condColor ?? "#555",
+                          textTransform: "uppercase",
+                          letterSpacing: 0.5,
+                        }}>
+                          {cond}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Photos */}
                 {roomPhotos.length > 0 ? (

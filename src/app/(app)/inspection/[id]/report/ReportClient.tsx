@@ -148,6 +148,11 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   ];
 
   const handleDownloadPDF = async () => {
+    if (inspection.report_url) {
+      window.open(inspection.report_url, "_blank");
+      return;
+    }
+
     setDownloadLoading(true);
     const downloadName = `Snagify_${inspection.type ?? "check-in"}_${safeFilename(prop?.building_name)}_Unit${safeFilename(prop?.unit_number)}.pdf`;
     try {
@@ -168,6 +173,15 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
           if (text?.trim()) errorMessage = text.trim();
         }
         throw new Error(errorMessage);
+      }
+
+      const contentType = res.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        const data = (await res.json()) as { report_url?: string; cached?: boolean };
+        if (data.report_url) {
+          window.open(data.report_url, "_blank");
+        }
+        return;
       }
 
       const blob = await res.blob();

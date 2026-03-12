@@ -51,7 +51,7 @@ function buildReportDataFromInspection(
       const items: { name: string; condition: string; notes: string }[] = [];
       return {
         name: room.name ?? "Room",
-        condition: (room.overall_condition ?? overallCondition).trim() || overallCondition,
+        condition: (room.condition ?? room.overall_condition ?? overallCondition).trim() || overallCondition,
         summary: "",
         items,
         recommendations: [] as string[],
@@ -113,6 +113,7 @@ type RoomRow = {
   name: string;
   order_index?: number | null;
   overall_condition?: string | null;
+  condition?: string | null;
   photos?: { id: string; url: string; ai_analysis?: string | null; damage_tags?: string[]; notes?: string | null; taken_at?: string | null }[];
 };
 
@@ -166,6 +167,7 @@ export async function POST(request: NextRequest) {
           name,
           order_index,
           overall_condition,
+          condition,
           photos (
             id,
             url,
@@ -195,6 +197,14 @@ export async function POST(request: NextRequest) {
     }
 
     const row = inspection as InspectionRow;
+
+    if (row.report_url) {
+      return NextResponse.json({
+        report_url: row.report_url,
+        cached: true,
+      });
+    }
+
     const executiveSummary =
       (row.executive_summary?.trim()) || fallbackExecutiveSummary(row);
     const overallCondition =
@@ -271,7 +281,7 @@ export async function POST(request: NextRequest) {
 
     const pdfBuffer = await generateInspectionPDFBuffer(reportData, meta);
 
-    const fileName = `report_${inspectionId}_${Date.now()}.pdf`;
+    const filePath = `${inspectionId}.pdf`;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const storageClient =
@@ -281,17 +291,17 @@ export async function POST(request: NextRequest) {
 
     const { error: uploadError } = await storageClient.storage
       .from("reports")
-      .upload(fileName, pdfBuffer, {
+      .upload(filePath, pdfBuffer, {
         contentType: "application/pdf",
         upsert: true,
       });
 
+    let publicUrl: string | null = null;
     if (uploadError) {
       console.error("PDF upload to storage FAILED:", uploadError.message);
     } else {
-      const {
-        data: { publicUrl },
-      } = storageClient.storage.from("reports").getPublicUrl(fileName);
+      const { data: urlData } = storageClient.storage.from("reports").getPublicUrl(filePath);
+      publicUrl = urlData.publicUrl;
       console.log("PDF uploaded OK:", publicUrl);
       const { error: updateErr } = await storageClient
         .from("inspections")

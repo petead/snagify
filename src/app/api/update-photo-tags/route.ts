@@ -32,13 +32,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Invalidate cached report summary so it gets recomputed on next Generate Report / PDF
+    // Invalidate cached report so it gets regenerated on next Generate Report / Download PDF
     const { data: photoRow } = await supabase
       .from("photos")
       .select("room_id")
       .eq("id", photoId)
       .single();
     if (photoRow?.room_id) {
+      await supabase
+        .from("rooms")
+        .update({ condition: null })
+        .eq("id", photoRow.room_id);
+
       const { data: roomRow } = await supabase
         .from("rooms")
         .select("inspection_id")
@@ -48,9 +53,8 @@ export async function POST(request: Request) {
         await supabase
           .from("inspections")
           .update({
+            report_url: null,
             executive_summary: null,
-            overall_condition: "Good",
-            dispute_risk: 0,
           })
           .eq("id", roomRow.inspection_id);
       }

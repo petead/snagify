@@ -18,7 +18,7 @@ export default async function InspectionPage({
       properties (building_name, unit_number),
       tenancies (tenant_name, landlord_name),
       rooms (
-        id, name, order_index,
+        id, name, order_index, condition,
         photos (id, url, ai_analysis, damage_tags, notes)
       )
     `
@@ -36,6 +36,7 @@ export default async function InspectionPage({
     id: string;
     name: string;
     order_index: number | null;
+    condition: string | null;
     photos: { id: string; url: string; ai_analysis: string | null; damage_tags: string[]; notes: string | null }[] | null;
   }[];
 
@@ -45,6 +46,7 @@ export default async function InspectionPage({
       id: r.id,
       name: r.name,
       order_index: r.order_index,
+      condition: r.condition ?? null,
       existingPhotos: (r.photos ?? []).map((p) => ({
         id: p.id,
         url: p.url,
