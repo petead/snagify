@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Building2,
   CalendarDays,
@@ -57,10 +58,22 @@ function safeFilename(str: string | null | undefined): string {
 }
 
 export function ReportClient({ inspection, profile }: ReportClientProps) {
+  const router = useRouter();
   const [showSignModal, setShowSignModal] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState({ landlord: false, tenant: false });
   const [downloadLoading, setDownloadLoading] = useState(false);
+  const [reportUrl, setReportUrl] = useState<string | null>(inspection.report_url ?? null);
+  const [execSummary, setExecSummary] = useState<string | null>(
+    inspection.executive_summary ?? inspection.report_data?.executive_summary ?? null
+  );
+
+  useEffect(() => {
+    setReportUrl(inspection.report_url ?? null);
+    setExecSummary(
+      inspection.executive_summary ?? inspection.report_data?.executive_summary ?? null
+    );
+  }, [inspection.report_url, inspection.executive_summary, inspection.report_data?.executive_summary]);
 
   const prop = normalizeOne(inspection.properties) as PropertyRelation | null;
   const tenancy = normalizeOne(inspection.tenancies) as TenancyRelation | null;
@@ -73,8 +86,6 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   const signatures = inspection.signatures ?? [];
   const isCheckIn = inspection.type === "check-in";
   const status = inspection.status ?? "draft";
-  const execSummary =
-    inspection.executive_summary ?? inspection.report_data?.executive_summary ?? null;
   const contractFrom = tenancy?.contract_from;
   const contractTo = tenancy?.contract_to;
   const durationMonths =
@@ -130,11 +141,18 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ inspectionId: inspection.id }),
       });
-      const data = (await res.json()) as { report_url?: string; error?: string };
+      const data = (await res.json()) as {
+        report_url?: string;
+        executive_summary?: string;
+        error?: string;
+      };
       if (!res.ok) {
         throw new Error(data?.error ?? "PDF generation failed");
       }
       if (data.report_url) {
+        setReportUrl(data.report_url);
+        if (data.executive_summary) setExecSummary(data.executive_summary);
+        router.refresh();
         window.open(data.report_url, "_blank");
       }
     } catch (err) {

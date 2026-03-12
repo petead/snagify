@@ -135,16 +135,6 @@ const s = StyleSheet.create({
   sigRole: { fontSize: 10, fontFamily: "Helvetica-Bold", color: PURPLE, marginBottom: 8, textTransform: "uppercase" },
   sigName: { fontSize: 10, marginBottom: 12 },
   sigPending: { fontSize: 10, color: "#999", fontStyle: "italic" },
-  agentSigBox: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 8,
-    padding: 16,
-    alignItems: "center",
-    width: 250,
-    minHeight: 100,
-    marginBottom: 24,
-  },
   qrWrap: { alignItems: "center", marginBottom: 14 },
   qrLabel: { fontSize: 8, color: "#999", marginTop: 4 },
   disclaimerWrap: {
@@ -629,12 +619,6 @@ function InspectionReport({
               <Text style={s.sigName}>{meta.inspection.tenant_name || "—"}</Text>
               <Text style={s.sigPending}>Pending Signature</Text>
             </View>
-          </View>
-
-          <View style={s.agentSigBox}>
-            <Text style={s.sigRole}>Inspector / Agent</Text>
-            <Text style={s.sigName}>{meta.agent?.full_name || "—"}</Text>
-            <Text style={s.sigPending}>Pending Signature</Text>
           </View>
 
           <View style={s.disclaimerWrap}>

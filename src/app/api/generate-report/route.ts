@@ -173,7 +173,11 @@ export async function POST(request: Request) {
       console.error("generate-report PDF build/upload failed:", pdfErr);
     }
 
-    return NextResponse.json({ success: true, report_url: report_url ?? undefined });
+    return NextResponse.json({
+      success: true,
+      report_url: report_url ?? undefined,
+      executive_summary: aiSummary,
+    });
   } catch (err) {
     console.error("generate-report error:", err);
     return NextResponse.json(

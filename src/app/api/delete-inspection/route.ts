@@ -59,6 +59,16 @@ export async function DELETE(request: Request) {
     }
   }
 
+  // Delete PDF from storage bucket
+  try {
+    await supabase.storage
+      .from("reports")
+      .remove([`${inspectionId}/${inspectionId}.pdf`]);
+  } catch (err) {
+    // Don't block deletion if storage cleanup fails
+    console.error("Failed to delete PDF from storage:", err);
+  }
+
   // Cascade delete — photos from storage first
   const rooms = (inspection.rooms ?? []) as {
     id: string;
