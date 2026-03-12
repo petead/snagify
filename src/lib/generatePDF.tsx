@@ -539,6 +539,7 @@ function InspectionReport({
                     {pair.map((photo) => (
                       <View key={photo.id} style={{ flex: 1 }}>
                         {/* Photo */}
+                        {/* eslint-disable-next-line jsx-a11y/alt-text */}
                         <Image
                           src={photo.url!}
                           style={{
@@ -623,6 +624,7 @@ function InspectionReport({
       <Page size="A4" style={s.page}>
         {qrDataUrl && (
           <View style={s.qrWrap}>
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
             <Image src={qrDataUrl} style={{ width: 80, height: 80 }} />
             <Text style={s.qrLabel}>Scan to view report online</Text>
           </View>
