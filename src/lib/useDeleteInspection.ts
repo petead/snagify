@@ -58,9 +58,13 @@ export function useDeleteInspection() {
         return { canDelete: false, reason: "SIGNED", signerType: "", signedCount: 0 };
       }
 
-      router.refresh();
       onSuccess?.();
-      if (redirectTo) router.push(redirectTo);
+      if (data.propertyAutoDeleted) {
+        router.push("/properties");
+      } else {
+        router.refresh();
+        if (redirectTo) router.push(redirectTo);
+      }
 
       return { canDelete: true };
     } catch (err) {

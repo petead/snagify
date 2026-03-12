@@ -12,7 +12,7 @@ export async function DELETE(request: Request) {
     .from("inspections")
     .select(
       `
-      id, type, status, tenancy_id,
+      id, type, status, tenancy_id, property_id, report_url,
       signatures (id, signer_type, otp_verified, signed_at),
       rooms (id, photos (id, url))
     `
@@ -25,6 +25,7 @@ export async function DELETE(request: Request) {
   }
 
   const tenancyId = inspection.tenancy_id ?? null;
+  const propertyId = inspection.property_id ?? null;
 
   // Block if any signature has been verified
   const sigs = (inspection.signatures ?? []) as {
@@ -59,46 +60,56 @@ export async function DELETE(request: Request) {
     }
   }
 
-  // Delete PDF from storage bucket
-  try {
-    await supabase.storage
-      .from("reports")
-      .remove([`${inspectionId}/${inspectionId}.pdf`]);
-  } catch (err) {
-    // Don't block deletion if storage cleanup fails
-    console.error("Failed to delete PDF from storage:", err);
-  }
-
-  // Cascade delete — photos from storage first
   const rooms = (inspection.rooms ?? []) as {
     id: string;
     photos: { id: string; url: string | null }[];
   }[];
+  const roomIds = rooms.map((r) => r.id);
   const allPhotos = rooms.flatMap((r) => r.photos ?? []);
 
-  if (allPhotos.length > 0) {
-    const filePaths = allPhotos
-      .map((p) => {
-        const match = p.url?.match(/inspection-photos\/(.+)/);
-        return match ? match[1] : null;
-      })
-      .filter((p): p is string => p !== null);
+  // ─── STEP 1: Storage cleanup (do not block DB delete on failure) ─────
+  try {
+    // 1. Delete all photos from inspection-photos bucket
+    if (allPhotos.length > 0) {
+      const photoPaths = allPhotos
+        .map((p) => {
+          const url = p.url ?? "";
+          const fromPublic = url.split("/storage/v1/object/public/inspection-photos/")[1]?.split("?")[0];
+          if (fromPublic) return fromPublic;
+          const match = url.match(/inspection-photos\/(.+)/);
+          return match ? match[1].split("?")[0] : null;
+        })
+        .filter((p): p is string => Boolean(p));
 
-    if (filePaths.length > 0) {
-      await supabase.storage.from("inspection-photos").remove(filePaths);
+      if (photoPaths.length > 0) {
+        await supabase.storage.from("inspection-photos").remove(photoPaths);
+      }
     }
+
+    // 2. Delete PDF from reports bucket
+    let reportPath: string | null = null;
+    if (inspection.report_url) {
+      reportPath =
+        inspection.report_url
+          .split("/storage/v1/object/public/reports/")[1]
+          ?.split("?")[0] ?? null;
+    }
+    if (!reportPath) {
+      reportPath = `${inspectionId}/${inspectionId}.pdf`;
+    }
+    await supabase.storage.from("reports").remove([reportPath]);
+  } catch (storageErr) {
+    console.error("Storage cleanup failed, proceeding with DB delete:", storageErr);
   }
 
-  const roomIds = rooms.map((r) => r.id);
+  // ─── STEP 2: DB deletion in FK-safe order ─────────────────────────────
+  await supabase.from("signatures").delete().eq("inspection_id", inspectionId);
 
   if (roomIds.length > 0) {
     await supabase.from("photos").delete().in("room_id", roomIds);
     await supabase.from("rooms").delete().in("id", roomIds);
   }
 
-  await supabase.from("signatures").delete().eq("inspection_id", inspectionId);
-
-  // audit_logs may not exist — ignore error
   await supabase
     .from("audit_logs")
     .delete()
@@ -106,7 +117,7 @@ export async function DELETE(request: Request) {
 
   await supabase.from("inspections").delete().eq("id", inspectionId);
 
-  // After deleting the inspection: if check-in, delete the associated tenancy when no other inspection uses it
+  // If check-in and no other inspection uses this tenancy, remove tenancy
   if (inspection.type === "check-in" && tenancyId) {
     const { data: otherInspections } = await supabase
       .from("inspections")
@@ -118,5 +129,19 @@ export async function DELETE(request: Request) {
     }
   }
 
-  return Response.json({ success: true });
+  // If no inspections remain for this property, delete the property
+  let propertyAutoDeleted = false;
+  if (propertyId) {
+    const { count } = await supabase
+      .from("inspections")
+      .select("id", { count: "exact", head: true })
+      .eq("property_id", propertyId);
+
+    if (count === 0) {
+      await supabase.from("properties").delete().eq("id", propertyId);
+      propertyAutoDeleted = true;
+    }
+  }
+
+  return Response.json({ success: true, propertyAutoDeleted });
 }
