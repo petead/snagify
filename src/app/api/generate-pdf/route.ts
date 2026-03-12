@@ -128,6 +128,184 @@ type RoomRow = {
   }[];
 };
 
+const INSPECTION_SELECT = `
+  id,
+  type,
+  status,
+  report_url,
+  document_hash,
+  completed_at,
+  created_at,
+  executive_summary,
+  key_handover,
+  agent_id,
+  property_id,
+  tenancy_id,
+  properties (
+    building_name,
+    unit_number,
+    property_type,
+    address
+  ),
+  tenancies (
+    tenant_name,
+    tenant_email,
+    tenant_phone,
+    landlord_name,
+    landlord_email,
+    landlord_phone,
+    ejari_ref,
+    contract_from,
+    contract_to,
+    annual_rent,
+    security_deposit
+  ),
+  rooms (
+    id,
+    name,
+    order_index,
+    condition,
+    photos (
+      id,
+      url,
+      ai_analysis,
+      damage_tags,
+      notes,
+      taken_at
+    )
+  ),
+  signatures (
+    id,
+    signer_type,
+    otp_verified,
+    signed_at,
+    signature_data
+  )
+`;
+
+/** Build PDF and upload to storage; always overwrites. Returns report_url and buffer. */
+export async function buildPdfAndUpload(
+  inspectionId: string
+): Promise<{ report_url: string | null; buffer: Uint8Array }> {
+  const supabase = await createServerClient();
+
+  const { data: inspection, error: inspErr } = await supabase
+    .from("inspections")
+    .select(INSPECTION_SELECT)
+    .eq("id", inspectionId)
+    .single();
+
+  if (inspErr || !inspection) {
+    throw new Error(inspErr?.message || "Inspection not found");
+  }
+
+  const row = inspection as InspectionRow;
+  const executiveSummary = row.executive_summary?.trim() || fallbackExecutiveSummary(row);
+  const reportData = buildReportDataFromInspection(row, executiveSummary);
+
+  const prop = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+  const tenancy = Array.isArray(row.tenancies) ? row.tenancies[0] : row.tenancies;
+
+  const agentId = row.agent_id ?? (inspection as { agent_id?: string }).agent_id;
+  const { data: agentData } = agentId
+    ? await supabase.from("profiles").select("full_name, agency_name").eq("id", agentId).single()
+    : { data: null };
+
+  const meta: InspectionMeta = {
+    inspection: {
+      id: row.id,
+      type: row.type ?? undefined,
+      created_at: row.created_at ?? undefined,
+      report_url: row.report_url ?? undefined,
+      landlord_name: tenancy?.landlord_name ?? undefined,
+      landlord_email: tenancy?.landlord_email ?? undefined,
+      tenant_name: tenancy?.tenant_name ?? undefined,
+      tenant_email: tenancy?.tenant_email ?? undefined,
+      ejari_ref: tenancy?.ejari_ref ?? undefined,
+      contract_from: tenancy?.contract_from != null ? String(tenancy.contract_from) : undefined,
+      contract_to: tenancy?.contract_to != null ? String(tenancy.contract_to) : undefined,
+      key_handover: Array.isArray(row.key_handover) ? row.key_handover : undefined,
+    },
+    property: prop
+      ? {
+          building_name: prop.building_name ?? undefined,
+          unit_number: prop.unit_number ?? undefined,
+          address: prop.address ?? undefined,
+          property_type: prop.property_type ?? undefined,
+        }
+      : null,
+    agent: agentData
+      ? {
+          full_name: agentData.full_name ?? undefined,
+          agency_name: agentData.agency_name ?? undefined,
+        }
+      : null,
+    rooms: (row.rooms ?? [])
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+      .map((room) => {
+        const sortedPhotos = [...(room.photos ?? [])]
+          .filter((p) => p.url && p.url.startsWith("https://"))
+          .sort((a, b) => (a.damage_tags?.length ?? 0) - (b.damage_tags?.length ?? 0));
+        return {
+          name: room.name,
+          photos: sortedPhotos.map((p) => ({
+            id: p.id,
+            url: p.url,
+            notes: p.notes ?? undefined,
+            damage_tags: p.damage_tags ?? [],
+            taken_at: p.taken_at ?? undefined,
+          })),
+        };
+      }),
+  };
+
+  const dataString = JSON.stringify({
+    inspectionId,
+    rooms: reportData.rooms,
+    photos: meta.rooms,
+    keyHandover: meta.inspection.key_handover ?? [],
+    generatedAt: new Date().toISOString(),
+  });
+  const documentHash = createHash("sha256").update(dataString).digest("hex");
+
+  await supabase
+    .from("inspections")
+    .update({ document_hash: documentHash })
+    .eq("id", inspectionId);
+
+  const pdfBuffer = await generateInspectionPDFBuffer(reportData, meta, documentHash);
+
+  const filePath = `${inspectionId}/${inspectionId}.pdf`;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const storageClient =
+    supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : supabase;
+
+  const { error: uploadError } = await storageClient.storage
+    .from("reports")
+    .upload(filePath, pdfBuffer, {
+      contentType: "application/pdf",
+      upsert: true,
+    });
+
+  let reportUrl: string | null = null;
+  if (uploadError) {
+    console.error("PDF upload to storage FAILED:", uploadError.message);
+  } else {
+    const { data: urlData } = storageClient.storage.from("reports").getPublicUrl(filePath);
+    reportUrl = urlData.publicUrl;
+    const { error: updateErr } = await storageClient
+      .from("inspections")
+      .update({ report_url: reportUrl })
+      .eq("id", inspectionId);
+    if (updateErr) {
+      console.error("Failed to save report_url:", updateErr.message);
+    }
+  }
+
+  return { report_url: reportUrl, buffer: new Uint8Array(pdfBuffer) };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { inspectionId } = (await request.json()) as { inspectionId?: string };
@@ -135,182 +313,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing inspectionId" }, { status: 400 });
     }
 
-    const supabase = await createServerClient();
+    const { report_url: _reportUrl, buffer } = await buildPdfAndUpload(inspectionId);
 
-    const { data: inspection, error: inspErr } = await supabase
-      .from("inspections")
-      .select(
-        `
-        id,
-        type,
-        status,
-        report_url,
-        document_hash,
-        completed_at,
-        created_at,
-        executive_summary,
-        key_handover,
-        agent_id,
-        property_id,
-        tenancy_id,
-        properties (
-          building_name,
-          unit_number,
-          property_type,
-          address
-        ),
-        tenancies (
-          tenant_name,
-          tenant_email,
-          tenant_phone,
-          landlord_name,
-          landlord_email,
-          landlord_phone,
-          ejari_ref,
-          contract_from,
-          contract_to,
-          annual_rent,
-          security_deposit
-        ),
-        rooms (
-          id,
-          name,
-          order_index,
-          condition,
-          photos (
-            id,
-            url,
-            ai_analysis,
-            damage_tags,
-            notes,
-            taken_at
-          )
-        ),
-        signatures (
-          id,
-          signer_type,
-          otp_verified,
-          signed_at,
-          signature_data
-        )
-      `
-      )
-      .eq("id", inspectionId)
-      .single();
-
-    if (inspErr || !inspection) {
-      return NextResponse.json({ error: inspErr?.message || "Not found" }, { status: 404 });
-    }
-
-    const row = inspection as InspectionRow;
-
-    if (row.report_url) {
-      return NextResponse.json({ report_url: row.report_url, cached: true });
-    }
-
-    const executiveSummary = row.executive_summary?.trim() || fallbackExecutiveSummary(row);
-    const reportData = buildReportDataFromInspection(row, executiveSummary);
-
-    const prop = Array.isArray(row.properties) ? row.properties[0] : row.properties;
-    const tenancy = Array.isArray(row.tenancies) ? row.tenancies[0] : row.tenancies;
-
-    const agentId = row.agent_id ?? (inspection as { agent_id?: string }).agent_id;
-    const { data: agentData } = agentId
-      ? await supabase.from("profiles").select("full_name, agency_name").eq("id", agentId).single()
-      : { data: null };
-
-    const meta: InspectionMeta = {
-      inspection: {
-        id: row.id,
-        type: row.type ?? undefined,
-        created_at: row.created_at ?? undefined,
-        report_url: row.report_url ?? undefined,
-        landlord_name: tenancy?.landlord_name ?? undefined,
-        landlord_email: tenancy?.landlord_email ?? undefined,
-        tenant_name: tenancy?.tenant_name ?? undefined,
-        tenant_email: tenancy?.tenant_email ?? undefined,
-        ejari_ref: tenancy?.ejari_ref ?? undefined,
-        contract_from: tenancy?.contract_from != null ? String(tenancy.contract_from) : undefined,
-        contract_to: tenancy?.contract_to != null ? String(tenancy.contract_to) : undefined,
-        key_handover: Array.isArray(row.key_handover) ? row.key_handover : undefined,
-      },
-      property: prop
-        ? {
-            building_name: prop.building_name ?? undefined,
-            unit_number: prop.unit_number ?? undefined,
-            address: prop.address ?? undefined,
-            property_type: prop.property_type ?? undefined,
-          }
-        : null,
-      agent: agentData
-        ? {
-            full_name: agentData.full_name ?? undefined,
-            agency_name: agentData.agency_name ?? undefined,
-          }
-        : null,
-      rooms: (row.rooms ?? [])
-        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-        .map((room) => {
-          const sortedPhotos = [...(room.photos ?? [])]
-            .filter((p) => p.url && p.url.startsWith("https://"))
-            .sort((a, b) => (a.damage_tags?.length ?? 0) - (b.damage_tags?.length ?? 0));
-          return {
-            name: room.name,
-            photos: sortedPhotos.map((p) => ({
-              id: p.id,
-              url: p.url,
-              notes: p.notes ?? undefined,
-              damage_tags: p.damage_tags ?? [],
-              taken_at: p.taken_at ?? undefined,
-            })),
-          };
-        }),
-    };
-
-    const dataString = JSON.stringify({
-      inspectionId,
-      rooms: reportData.rooms,
-      photos: meta.rooms,
-      keyHandover: meta.inspection.key_handover ?? [],
-      generatedAt: new Date().toISOString(),
-    });
-    const documentHash = createHash("sha256").update(dataString).digest("hex");
-
-    await supabase
-      .from("inspections")
-      .update({ document_hash: documentHash })
-      .eq("id", inspectionId);
-
-    const pdfBuffer = await generateInspectionPDFBuffer(reportData, meta, documentHash);
-
-    const filePath = `${inspectionId}.pdf`;
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const storageClient =
-      supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : supabase;
-
-    const { error: uploadError } = await storageClient.storage
-      .from("reports")
-      .upload(filePath, pdfBuffer, {
-        contentType: "application/pdf",
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error("PDF upload to storage FAILED:", uploadError.message);
-    } else {
-      const { data: urlData } = storageClient.storage.from("reports").getPublicUrl(filePath);
-      const publicUrl = urlData.publicUrl;
-      const { error: updateErr } = await storageClient
-        .from("inspections")
-        .update({ report_url: publicUrl })
-        .eq("id", inspectionId);
-      if (updateErr) {
-        console.error("Failed to save report_url:", updateErr.message);
-      }
-    }
-
-    return new NextResponse(new Uint8Array(pdfBuffer), {
+    return new NextResponse(buffer, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="Snagify_Report_${inspectionId}.pdf"`,

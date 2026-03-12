@@ -123,57 +123,24 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   ];
 
   const handleDownloadPDF = async () => {
-    if (inspection.report_url) {
-      window.open(inspection.report_url, "_blank");
-      return;
-    }
-
     setDownloadLoading(true);
-    const downloadName = `Snagify_${inspection.type ?? "check-in"}_${safeFilename(prop?.building_name)}_Unit${safeFilename(prop?.unit_number)}.pdf`;
     try {
-      const res = await fetch("/api/generate-pdf", {
+      const res = await fetch("/api/generate-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ inspectionId: inspection.id }),
       });
-
+      const data = (await res.json()) as { report_url?: string; error?: string };
       if (!res.ok) {
-        let errorMessage = "PDF generation failed";
-        const contentType = res.headers.get("content-type") ?? "";
-        if (contentType.includes("application/json")) {
-          const data = (await res.json()) as { error?: string };
-          if (data?.error) errorMessage = data.error;
-        } else {
-          const text = await res.text();
-          if (text?.trim()) errorMessage = text.trim();
-        }
-        throw new Error(errorMessage);
+        throw new Error(data?.error ?? "PDF generation failed");
       }
-
-      const contentType = res.headers.get("content-type") ?? "";
-      if (contentType.includes("application/json")) {
-        const data = (await res.json()) as { report_url?: string; cached?: boolean };
-        if (data.report_url) {
-          window.open(data.report_url, "_blank");
-        }
-        return;
+      if (data.report_url) {
+        window.open(data.report_url, "_blank");
       }
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = downloadName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("PDF error:", err);
+      console.error("Generate report failed:", err);
       const message =
-        err instanceof Error
-          ? err.message
-          : "Could not generate PDF. Please try again.";
+        err instanceof Error ? err.message : "Could not generate PDF. Please try again.";
       alert(`Could not generate PDF: ${message}`);
     } finally {
       setDownloadLoading(false);

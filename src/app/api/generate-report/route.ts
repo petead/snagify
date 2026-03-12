@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { buildPdfAndUpload } from "@/app/api/generate-pdf/route";
 
 export const maxDuration = 60;
 
@@ -52,13 +53,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Inspection not found" }, { status: 404 });
     }
 
-    const row = inspection as { report_url?: string | null; executive_summary?: string | null };
-    if (row.report_url && row.executive_summary) {
-      return NextResponse.json({ success: true, report_url: row.report_url, cached: true });
-    }
-
-    if (!inspection.executive_summary) {
-      const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.ANTHROPIC_API_KEY;
       if (!apiKey) {
         return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
       }
@@ -170,22 +165,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: updateErr.message }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true });
+    let report_url: string | null = null;
+    try {
+      const pdfResult = await buildPdfAndUpload(inspectionId);
+      report_url = pdfResult.report_url;
+    } catch (pdfErr) {
+      console.error("generate-report PDF build/upload failed:", pdfErr);
     }
 
-    const { error: statusErr } = await supabase
-      .from("inspections")
-      .update({
-        status: "completed",
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", inspectionId);
-
-    if (statusErr) {
-      console.error("Failed to update inspection status:", statusErr);
-    }
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, report_url: report_url ?? undefined });
   } catch (err) {
     console.error("generate-report error:", err);
     return NextResponse.json(

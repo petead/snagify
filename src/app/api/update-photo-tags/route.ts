@@ -43,21 +43,6 @@ export async function POST(request: Request) {
         .from("rooms")
         .update({ condition: null })
         .eq("id", photoRow.room_id);
-
-      const { data: roomRow } = await supabase
-        .from("rooms")
-        .select("inspection_id")
-        .eq("id", photoRow.room_id)
-        .single();
-      if (roomRow?.inspection_id) {
-        await supabase
-          .from("inspections")
-          .update({
-            report_url: null,
-            executive_summary: null,
-          })
-          .eq("id", roomRow.inspection_id);
-      }
     }
 
     return NextResponse.json({ success: true });

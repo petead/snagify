@@ -591,12 +591,6 @@ export function InspectionClient({
       if (dbError) throw new Error(`DB: ${dbError.message}`);
       const realPhotoId = newPhoto.id;
 
-      await fetch("/api/invalidate-report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inspectionId, roomId: localRoomId }),
-      });
-
       // ── STEP 4: Replace temp with real URL, show "Analyzing..."
       setPhotos((prev) => prev.map((p) =>
         p.id === tempId
@@ -738,12 +732,6 @@ export function InspectionClient({
       } else {
         console.log("Photo deleted from DB:", photoId);
       }
-
-      await fetch("/api/invalidate-report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inspectionId, roomId }),
-      });
 
       const urlParts = photoUrl.split("/inspection-photos/");
       if (urlParts.length > 1) {

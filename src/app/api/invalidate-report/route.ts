@@ -19,11 +19,6 @@ export async function POST(request: Request) {
       await supabase.from("rooms").update({ condition: null }).eq("id", roomId);
     }
 
-    await supabase
-      .from("inspections")
-      .update({ report_url: null, executive_summary: null })
-      .eq("id", inspectionId);
-
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("invalidate-report error:", err);
