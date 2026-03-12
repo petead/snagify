@@ -179,7 +179,7 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
             </span>
           </div>
           <Link
-            href="/dashboard/profile"
+            href="/profile"
             style={{
               width: 42,
               height: 42,

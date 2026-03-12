@@ -91,7 +91,7 @@ export function DashboardHeader({ fullName, userEmail }: DashboardHeaderProps) {
                 </div>
 
                 <Link
-                  href="/dashboard/profile"
+                  href="/profile"
                   onClick={() => setShowMenu(false)}
                   className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
                 >

@@ -193,7 +193,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
             </span>
           </div>
           <Link
-            href="/dashboard/profile"
+            href="/profile"
             style={{
               width: 42, height: 42, borderRadius: "50%",
               background: "#9A88FD",

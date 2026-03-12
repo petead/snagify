@@ -12,7 +12,7 @@ export default function BottomNav() {
     { icon: Building2, label: "Properties", path: "/properties" },
     { icon: Plus, label: null, path: "/inspection/new" }, // center button
     { icon: FileText, label: "Reports", path: "/reports" },
-    { icon: User, label: "Profile", path: "/dashboard/profile" },
+    { icon: User, label: "Profile", path: "/profile" },
   ];
 
   return (
