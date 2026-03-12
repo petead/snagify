@@ -112,6 +112,7 @@ type RoomRow = {
   name: string;
   order_index?: number | null;
   overall_condition?: string | null;
+  items_provided?: string[] | null;
   photos?: { id: string; url: string; ai_analysis?: string | null; damage_tags?: string[]; notes?: string | null; taken_at?: string | null }[];
 };
 
@@ -164,6 +165,7 @@ export async function POST(request: NextRequest) {
           name,
           order_index,
           overall_condition,
+          items_provided,
           photos (
             id,
             url,
@@ -224,6 +226,7 @@ export async function POST(request: NextRequest) {
         id: row.id,
         type: row.type ?? undefined,
         created_at: row.created_at ?? undefined,
+        report_url: row.report_url ?? undefined,
         landlord_name: tenancy?.landlord_name ?? undefined,
         landlord_email: tenancy?.landlord_email ?? undefined,
         tenant_name: tenancy?.tenant_name ?? undefined,
@@ -254,6 +257,7 @@ export async function POST(request: NextRequest) {
             .sort((a, b) => (a.damage_tags?.length ?? 0) - (b.damage_tags?.length ?? 0));
           return {
             name: room.name,
+            items_provided: room.items_provided ?? [],
             photos: sortedPhotos.map((p) => ({
               id: p.id,
               url: p.url,

@@ -8,6 +8,7 @@ import {
   pdf,
   renderToBuffer,
 } from "@react-pdf/renderer";
+import QRCode from "qrcode";
 
 const PURPLE = "#9A88FD";
 const GREEN = "#cafe87";
@@ -90,6 +91,16 @@ const s = StyleSheet.create({
   roomCondBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 },
   roomCondText: { fontSize: 9, fontFamily: "Helvetica-Bold" },
   roomSummary: { fontSize: 10, lineHeight: 1.5, marginBottom: 10 },
+  roomMetaLine: { fontSize: 9, color: "#666", marginBottom: 8 },
+
+  /* Recap / overview table */
+  overviewTitle: { fontSize: 18, fontFamily: "Helvetica-Bold", color: DARK, marginBottom: 12 },
+  tableWrap: { borderWidth: 1, borderColor: "#eeeeee", borderRadius: 6, overflow: "hidden" },
+  tableHeaderRow: { flexDirection: "row", backgroundColor: "#f5f5f5", borderBottomWidth: 1, borderBottomColor: "#eeeeee" },
+  tableHeaderCell: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "#444", paddingVertical: 7, paddingHorizontal: 6 },
+  tableRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#f0f0f0" },
+  tableCell: { fontSize: 9, color: "#444", paddingVertical: 6, paddingHorizontal: 6 },
+  tableSummary: { fontSize: 10, color: "#666", marginTop: 10 },
 
   /* Photo grid */
   photoRow: { flexDirection: "row", gap: 12, marginTop: 10, marginBottom: 6 },
@@ -133,6 +144,23 @@ const s = StyleSheet.create({
     width: 250,
     minHeight: 100,
     marginBottom: 24,
+  },
+  qrWrap: { alignItems: "center", marginBottom: 14 },
+  qrLabel: { fontSize: 8, color: "#999", marginTop: 4 },
+  disclaimerWrap: {
+    width: "100%",
+    borderTopWidth: 1,
+    borderTopColor: "#eeeeee",
+    marginTop: 8,
+    paddingTop: 10,
+    alignItems: "center",
+  },
+  disclaimerText: {
+    fontSize: 9,
+    color: "#999",
+    textAlign: "center",
+    lineHeight: 1.45,
+    maxWidth: "80%",
   },
 
   /* Footer */
@@ -228,6 +256,7 @@ interface InspectionMeta {
     id: string;
     type?: string;
     created_at?: string;
+    report_url?: string;
     landlord_name?: string;
     landlord_email?: string;
     tenant_name?: string;
@@ -248,6 +277,7 @@ interface InspectionMeta {
   } | null;
   rooms: {
     name: string;
+    items_provided?: string[];
     photos: {
       id: string;
       url?: string;
@@ -262,15 +292,45 @@ function InspectionReport({
   report,
   meta,
   documentHash,
+  qrDataUrl,
 }: {
   report: ReportData;
   meta: InspectionMeta;
   documentHash: string;
+  qrDataUrl?: string;
 }) {
   const cond = conditionColor(report.overall_condition);
   const riskPct = (report.dispute_risk_score / 10) * 100;
   const inspType = (meta.inspection.type ?? "check-in").toUpperCase();
-  const totalPages = 2 + report.rooms.length;
+  const totalPages = 3 + report.rooms.length;
+  const roomStats = report.rooms.map((room) => {
+    const matchingMeta = meta.rooms.find(
+      (mr) => mr.name.toLowerCase() === room.name.toLowerCase()
+    );
+    const photos = matchingMeta?.photos ?? [];
+    const validPhotos = photos.filter((p) => p.url && p.url.startsWith("https://"));
+    const photosWithIssues = validPhotos.filter(
+      (p) => (p.damage_tags?.length ?? 0) > 0
+    ).length;
+    const roomCondition = getRoomCondition(validPhotos);
+    const keyFindings = Array.from(
+      new Set(validPhotos.flatMap((p) => p.damage_tags ?? []).map((t) => t.toUpperCase()))
+    );
+    const roomInspectionDate =
+      validPhotos.map((p) => p.taken_at).filter(Boolean)[0] ?? meta.inspection.created_at;
+    const itemsProvided = (matchingMeta?.items_provided ?? []).filter(Boolean);
+    return {
+      room,
+      validPhotos,
+      photosWithIssues,
+      roomCondition,
+      keyFindings,
+      roomInspectionDate,
+      itemsProvided,
+    };
+  });
+  const totalPhotos = roomStats.reduce((sum, r) => sum + r.validPhotos.length, 0);
+  const totalIssues = roomStats.reduce((sum, r) => sum + r.photosWithIssues, 0);
 
   return (
     <Document>
@@ -395,22 +455,55 @@ function InspectionReport({
         </View>
       </Page>
 
+      {/* PAGE 2 — INSPECTION OVERVIEW */}
+      <Page size="A4" style={s.page}>
+        <Text style={s.overviewTitle}>Inspection Overview</Text>
+
+        <View style={s.tableWrap}>
+          <View style={s.tableHeaderRow}>
+            <Text style={[s.tableHeaderCell, { width: "24%" }]}>Room</Text>
+            <Text style={[s.tableHeaderCell, { width: "11%", textAlign: "center" }]}>Photos</Text>
+            <Text style={[s.tableHeaderCell, { width: "11%", textAlign: "center" }]}>Issues</Text>
+            <Text style={[s.tableHeaderCell, { width: "18%" }]}>Condition</Text>
+            <Text style={[s.tableHeaderCell, { width: "36%" }]}>Key Findings</Text>
+          </View>
+          {roomStats.map((r, i) => {
+            const c = conditionColor(r.roomCondition);
+            return (
+              <View key={`${r.room.name}-${i}`} style={s.tableRow}>
+                <Text style={[s.tableCell, { width: "24%" }]}>{r.room.name}</Text>
+                <Text style={[s.tableCell, { width: "11%", textAlign: "center" }]}>{r.validPhotos.length}</Text>
+                <Text style={[s.tableCell, { width: "11%", textAlign: "center" }]}>{r.photosWithIssues}</Text>
+                <Text style={[s.tableCell, { width: "18%", color: c.bg === "#F44336" ? "#F44336" : c.bg }]}>
+                  {r.roomCondition}
+                </Text>
+                <Text style={[s.tableCell, { width: "36%" }]}>
+                  {r.keyFindings.length > 0 ? r.keyFindings.join(", ") : "—"}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+
+        <Text style={s.tableSummary}>
+          Total: {roomStats.length} rooms · {totalPhotos} photos · {totalIssues} issues
+        </Text>
+
+        <View style={s.footer}>
+          <Text style={s.footerText}>
+            Page 2 of {totalPages} · Generated by Snagify — snagify.net
+          </Text>
+        </View>
+      </Page>
+
       {/* ROOM PAGES */}
-      {report.rooms.map((room, ri) => {
-        const matchingMeta = meta.rooms.find(
-          (mr) => mr.name.toLowerCase() === room.name.toLowerCase()
-        );
-        const photos = matchingMeta?.photos ?? [];
-        const validPhotos = photos.filter((p) => p.url && p.url.startsWith("https://"));
-        const roomCondition = getRoomCondition(validPhotos);
+      {roomStats.map((r, ri) => {
+        const room = r.room;
+        const validPhotos = r.validPhotos;
+        const roomCondition = r.roomCondition;
         const rc = conditionColor(roomCondition);
-        const photosWithIssues = validPhotos.filter(
-          (p) => (p.damage_tags?.length ?? 0) > 0
-        ).length;
-        const roomInspectionDate =
-          validPhotos
-            .map((p) => p.taken_at)
-            .filter(Boolean)[0] ?? meta.inspection.created_at;
+        const photosWithIssues = r.photosWithIssues;
+        const roomInspectionDate = r.roomInspectionDate;
 
         return (
           <Page key={ri} size="A4" style={s.page}>
@@ -432,11 +525,7 @@ function InspectionReport({
 
             {validPhotos.length > 0 && (
               <View style={{ marginTop: 14 }}>
-                <Text style={{
-                  fontSize: 9,
-                  color: "#666",
-                  marginBottom: 8,
-                }}>
+                <Text style={s.roomMetaLine}>
                   {validPhotos.length} photo{validPhotos.length > 1 ? "s" : ""} captured
                   {photosWithIssues > 0
                     ? ` · ${photosWithIssues} issue${photosWithIssues > 1 ? "s" : ""} flagged`
@@ -501,6 +590,17 @@ function InspectionReport({
               </View>
             )}
 
+            {r.itemsProvided.length > 0 && (
+              <View style={{ marginTop: 4 }}>
+                <Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", color: "#444", marginBottom: 4 }}>
+                  Items Provided
+                </Text>
+                <Text style={{ fontSize: 11, color: "#555", lineHeight: 1.4 }}>
+                  {r.itemsProvided.join(" · ")}
+                </Text>
+              </View>
+            )}
+
             {room.recommendations.length > 0 && (
               <View style={s.recsBox}>
                 <Text style={s.recsTitle}>Recommendations</Text>
@@ -512,7 +612,7 @@ function InspectionReport({
 
             <View style={s.footer}>
               <Text style={s.footerText}>
-                Page {ri + 2} of {totalPages} · Generated by Snagify — snagify.net
+                Page {ri + 3} of {totalPages} · Generated by Snagify — snagify.net
               </Text>
             </View>
           </Page>
@@ -521,6 +621,12 @@ function InspectionReport({
 
       {/* LEGAL + RECOMMENDATIONS + SIGNATURES PAGE */}
       <Page size="A4" style={s.page}>
+        {qrDataUrl && (
+          <View style={s.qrWrap}>
+            <Image src={qrDataUrl} style={{ width: 80, height: 80 }} />
+            <Text style={s.qrLabel}>Scan to view report online</Text>
+          </View>
+        )}
         {report.legal_notes && (
           <View style={s.legalBox}>
             <Text style={s.legalTitle}>Legal Notes (RERA / Dubai Law)</Text>
@@ -559,6 +665,16 @@ function InspectionReport({
             <Text style={s.sigRole}>Inspector / Agent</Text>
             <Text style={s.sigName}>{meta.agent?.full_name || "—"}</Text>
             <Text style={s.sigPending}>Pending Signature</Text>
+          </View>
+
+          <View style={s.disclaimerWrap}>
+            <Text style={s.disclaimerText}>
+              This report documents the condition of the property as observed at the time of inspection.
+              It is based on a visual assessment only and does not constitute a structural, electrical,
+              or plumbing survey. All parties are advised to review this report carefully. By signing,
+              each party acknowledges the findings recorded herein. This document is generated
+              electronically and verified by SHA-256 hash.
+            </Text>
           </View>
 
           <View style={s.coverRow}>
@@ -603,8 +719,15 @@ export async function generateInspectionPDF(
   meta: InspectionMeta
 ): Promise<Blob> {
   const documentHash = await computeHash(JSON.stringify({ report, meta }));
-
-  const doc = <InspectionReport report={report} meta={meta} documentHash={documentHash} />;
+  const qrDataUrl = await buildReportQrDataUrl(meta);
+  const doc = (
+    <InspectionReport
+      report={report}
+      meta={meta}
+      documentHash={documentHash}
+      qrDataUrl={qrDataUrl}
+    />
+  );
   const blob = await pdf(doc).toBlob();
   return blob;
 }
@@ -615,8 +738,31 @@ export async function generateInspectionPDFBuffer(
   meta: InspectionMeta
 ): Promise<Buffer> {
   const documentHash = await computeHash(JSON.stringify({ report, meta }));
-  const doc = <InspectionReport report={report} meta={meta} documentHash={documentHash} />;
+  const qrDataUrl = await buildReportQrDataUrl(meta);
+  const doc = (
+    <InspectionReport
+      report={report}
+      meta={meta}
+      documentHash={documentHash}
+      qrDataUrl={qrDataUrl}
+    />
+  );
   return renderToBuffer(doc);
+}
+
+async function buildReportQrDataUrl(meta: InspectionMeta): Promise<string | undefined> {
+  const reportUrl =
+    meta.inspection.report_url ??
+    `https://snagify.vercel.app/report/${meta.inspection.id}`;
+  try {
+    return await QRCode.toDataURL(reportUrl, {
+      width: 200,
+      margin: 1,
+      color: { dark: "#1a1a2e", light: "#FFFFFF" },
+    });
+  } catch {
+    return undefined;
+  }
 }
 
 export type { ReportData, InspectionMeta };
