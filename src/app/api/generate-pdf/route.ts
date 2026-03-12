@@ -315,7 +315,7 @@ export async function POST(request: NextRequest) {
 
     const { report_url: _reportUrl, buffer } = await buildPdfAndUpload(inspectionId);
 
-    return new NextResponse(buffer, {
+    return new NextResponse(Buffer.from(buffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="Snagify_Report_${inspectionId}.pdf"`,
