@@ -1,32 +1,47 @@
-import { DashboardHeader } from "@/components/layout/DashboardHeader";
-import { DashboardBottomNav } from "@/components/layout/DashboardBottomNav";
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { ProfileClient } from "./ProfileClient";
 
-export default async function ProfilePage() {
+export default async function DashboardProfilePage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  let fullName: string | null = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", user.id)
-      .single();
-    fullName = data?.full_name ?? null;
-  }
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, agency_name, created_at")
+    .eq("id", user.id)
+    .single();
+
+  const [
+    { count: propertiesCount },
+    { count: inspectionsCount },
+    { count: reportsCount },
+  ] = await Promise.all([
+    supabase.from("properties").select("*", { count: "exact", head: true }).eq("agent_id", user.id),
+    supabase.from("inspections").select("*", { count: "exact", head: true }).eq("agent_id", user.id),
+    supabase
+      .from("inspections")
+      .select("*", { count: "exact", head: true })
+      .eq("agent_id", user.id)
+      .in("status", ["completed", "signed"]),
+  ]);
 
   return (
-    <div className="min-h-screen bg-[#fcfcfc]">
-      <DashboardHeader fullName={fullName} userEmail={user?.email ?? null} />
-      <main className="max-w-[480px] mx-auto px-4 pb-24 pt-6">
-        <h1 className="font-heading font-bold text-lg text-brand-dark">
-          Profile
-        </h1>
-        <p className="font-body text-gray-500 mt-2">Coming soon.</p>
-      </main>
-      <DashboardBottomNav />
-    </div>
+    <main className="min-h-screen" style={{ background: "#F8F7F4" }}>
+      <ProfileClient
+        fullName={profile?.full_name ?? null}
+        userEmail={user.email ?? null}
+        agencyName={profile?.agency_name ?? null}
+        memberSince={profile?.created_at ?? null}
+        stats={{
+          properties: propertiesCount ?? 0,
+          inspections: inspectionsCount ?? 0,
+          reports: reportsCount ?? 0,
+        }}
+      />
+    </main>
   );
 }
