@@ -15,7 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 // ─────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────
-type Step = 0 | 1 | 2 | 3;
+type Step = 0 | 1 | 2 | 3 | 4;
 type Mode = "upload" | "manual" | null;
 
 interface FormData {
@@ -170,8 +170,19 @@ const stepTitles: Record<Step, string> = {
   0: "Start",
   1: "Contract Details",
   2: "Verify Info",
-  3: "Ready to Start",
+  3: "Room Selection",
+  4: "Key Handover",
 };
+
+const HANDOVER_ITEMS = [
+  { id: "door_keys", label: "Door Keys" },
+  { id: "mailbox_key", label: "Mailbox Key" },
+  { id: "parking_card", label: "Parking Card" },
+  { id: "access_card", label: "Access Card" },
+  { id: "ac_remote", label: "AC Remote" },
+  { id: "gate_remote", label: "Gate Remote" },
+  { id: "intercom", label: "Intercom" },
+];
 
 const ROOM_TEMPLATES: Record<string, string[]> = {
   "Studio":    ["Entrance", "Living / Bedroom", "Kitchen", "Bathroom 1", "Balcony"],
@@ -271,6 +282,10 @@ function NewInspectionContent() {
   const [selectedRooms, setSelectedRooms] = useState<string[]>(ROOM_TEMPLATES["Studio"]);
   const [customRoom, setCustomRoom] = useState("");
 
+  // Key handover state (step 4)
+  const [keyHandover, setKeyHandover] = useState<{ item: string; qty: number }[]>([]);
+  const [customItemInput, setCustomItemInput] = useState("");
+
   const toggleRoom = (room: string) =>
     setSelectedRooms((prev) =>
       prev.includes(room) ? prev.filter((r) => r !== room) : [...prev, room]
@@ -284,9 +299,7 @@ function NewInspectionContent() {
   }, [urlType]);
 
   useEffect(() => {
-    if (step === 3) {
-      window.scrollTo(0, 0);
-    }
+    window.scrollTo(0, 0);
   }, [step]);
 
   useEffect(() => {
@@ -321,7 +334,7 @@ function NewInspectionContent() {
   const handleBack = () => {
     if (step === 0) router.back();
     else if (step === 2 && mode === "manual") setStep(0);
-    else setStep(((step - 1) as Step));
+    else setStep((step - 1) as Step);
   };
 
   // ── PDF extraction: ONLY pre-fills form state; no DB write until "Start Inspection"
@@ -557,6 +570,7 @@ function NewInspectionContent() {
           agent_id: user.id,
           type: formData.inspectionType,
           status: "draft",
+          key_handover: keyHandover.length > 0 ? keyHandover : [],
         })
         .select()
         .single();
@@ -624,7 +638,7 @@ function NewInspectionContent() {
           </div>
           {/* Step dots */}
           <div className="flex gap-1 items-center">
-            {([0, 1, 2, 3] as Step[]).map((i) => (
+            {([0, 1, 2, 3, 4] as Step[]).map((i) => (
               <div
                 key={i}
                 className={`h-1.5 rounded-full transition-all ${
@@ -1286,6 +1300,149 @@ function NewInspectionContent() {
         </div>
       )}
 
+      {/* STEP 4 — Key Handover */}
+      {step === 4 && (
+        <div className="px-4 pt-5 pb-48">
+          {/* Section label */}
+          <p style={{
+            fontSize: 11, fontWeight: 700, color: "#9ca3af",
+            textTransform: "uppercase", letterSpacing: 1, marginBottom: 10,
+          }}>
+            Handover items
+          </p>
+
+          {/* Chip grid — same style as room chips */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+            {HANDOVER_ITEMS.map(({ id, label }) => {
+              const isSelected = keyHandover.some((k) => k.item === label);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    if (isSelected) {
+                      setKeyHandover((prev) => prev.filter((k) => k.item !== label));
+                    } else {
+                      setKeyHandover((prev) => [...prev, { item: label, qty: 1 }]);
+                    }
+                  }}
+                  style={{
+                    padding: "9px 16px",
+                    borderRadius: 10,
+                    border: `1.5px solid ${isSelected ? "#9A88FD" : "#e5e7eb"}`,
+                    background: isSelected ? "#9A88FD" : "white",
+                    color: isSelected ? "white" : "#374151",
+                    fontWeight: 600, fontSize: 13,
+                    cursor: "pointer", transition: "all 0.15s",
+                    boxShadow: isSelected ? "0 2px 8px rgba(154,136,253,0.25)" : "none",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Qty steppers for selected items */}
+          {keyHandover.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              {keyHandover.map((k) => (
+                <div key={k.item} style={{
+                  display: "flex", alignItems: "center",
+                  justifyContent: "space-between", padding: "12px 0",
+                  borderBottom: "1px solid #f0f0f0",
+                }}>
+                  <span style={{ fontSize: 14, color: "#1a1a2e" }}>{k.item}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <button type="button"
+                      onClick={() => {
+                        if (k.qty <= 1) return;
+                        setKeyHandover((prev) =>
+                          prev.map((x) => (x.item === k.item ? { ...x, qty: x.qty - 1 } : x))
+                        );
+                      }}
+                      style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        border: "1.5px solid #e0e0e0", background: "white",
+                        fontSize: 16, cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                      −
+                    </button>
+                    <span style={{
+                      fontSize: 16, fontWeight: 600, minWidth: 20, textAlign: "center",
+                    }}>
+                      {k.qty}
+                    </span>
+                    <button type="button"
+                      onClick={() =>
+                        setKeyHandover((prev) =>
+                          prev.map((x) => (x.item === k.item ? { ...x, qty: x.qty + 1 } : x))
+                        )
+                      }
+                      style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        border: "1.5px solid #9A88FD", background: "#F3F0FF",
+                        color: "#9A88FD", fontSize: 16, cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                      +
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Section label */}
+          <p style={{
+            fontSize: 11, fontWeight: 700, color: "#9ca3af",
+            textTransform: "uppercase", letterSpacing: 1, marginBottom: 10,
+          }}>
+            Add custom item
+          </p>
+
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <input
+              placeholder="e.g. Storage key"
+              value={customItemInput}
+              onChange={(e) => setCustomItemInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && customItemInput.trim()) {
+                  setKeyHandover((prev) => [...prev, { item: customItemInput.trim(), qty: 1 }]);
+                  setCustomItemInput("");
+                }
+              }}
+              className={inputCls}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (customItemInput.trim()) {
+                  setKeyHandover((prev) => [...prev, { item: customItemInput.trim(), qty: 1 }]);
+                  setCustomItemInput("");
+                }
+              }}
+              disabled={!customItemInput.trim()}
+              style={{
+                padding: "12px 20px", borderRadius: 12, border: "none",
+                background: customItemInput.trim() ? "#9A88FD" : "#e0e0e0",
+                color: "white", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              Add
+            </button>
+          </div>
+
+          {keyHandover.length === 0 && (
+            <p style={{ color: "#bbb", fontSize: 13, textAlign: "center", marginTop: 24 }}>
+              No items selected — you can skip this step
+            </p>
+          )}
+        </div>
+      )}
+
       {/* BOTTOM BUTTONS */}
       {step === 2 && (
         <BottomBar>
@@ -1305,20 +1462,40 @@ function NewInspectionContent() {
         <BottomBar>
           <button
             type="button"
-            onClick={handleStartInspection}
-            disabled={selectedRooms.length === 0 || saving}
+            onClick={() => selectedRooms.length > 0 && setStep(4)}
+            disabled={selectedRooms.length === 0}
             className="w-full h-12 rounded-xl font-bold text-base active:scale-[0.98] transition-transform disabled:opacity-50"
             style={{
-              backgroundColor: selectedRooms.length > 0 ? "#cafe87" : "#e5e7eb",
-              color: selectedRooms.length > 0 ? "#111827" : "#9ca3af",
+              background: selectedRooms.length > 0 ? "linear-gradient(135deg,#9A88FD,#7B65FC)" : "#e5e7eb",
+              color: selectedRooms.length > 0 ? "white" : "#9ca3af",
+              fontFamily: "Poppins,sans-serif",
+            }}
+          >
+            {selectedRooms.length > 0
+              ? `Continue → ${selectedRooms.length} rooms`
+              : "Select rooms to continue"}
+          </button>
+        </BottomBar>
+      )}
+
+      {step === 4 && (
+        <BottomBar>
+          <button
+            type="button"
+            onClick={handleStartInspection}
+            disabled={saving}
+            className="w-full h-12 rounded-xl font-bold text-base active:scale-[0.98] transition-transform disabled:opacity-50"
+            style={{
+              background: "linear-gradient(135deg,#9A88FD,#7B65FC)",
+              color: "white",
               fontFamily: "Poppins,sans-serif",
             }}
           >
             {saving
               ? "Creating..."
-              : selectedRooms.length > 0
-              ? `Start Inspection → ${selectedRooms.length} rooms`
-              : "Select rooms to continue"}
+              : keyHandover.length > 0
+                ? "Start Inspection"
+                : "Skip — Start Inspection"}
           </button>
         </BottomBar>
       )}
