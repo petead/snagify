@@ -73,6 +73,8 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   const signatures = inspection.signatures ?? [];
   const isCheckIn = inspection.type === "check-in";
   const status = inspection.status ?? "draft";
+  const execSummary =
+    inspection.executive_summary ?? inspection.report_data?.executive_summary ?? null;
   const contractFrom = tenancy?.contract_from;
   const contractTo = tenancy?.contract_to;
   const durationMonths =
