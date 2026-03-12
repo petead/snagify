@@ -80,6 +80,7 @@ type InspectionRow = {
   executive_summary?: string | null;
   overall_condition?: string | null;
   dispute_risk?: number | null;
+  key_handover?: { item: string; qty: number }[] | null;
   properties?: PropRow | PropRow[] | null;
   tenancies?: TenancyRow | TenancyRow[] | null;
   rooms?: RoomRow[] | null;
@@ -137,6 +138,7 @@ export async function POST(request: NextRequest) {
         executive_summary,
         overall_condition,
         dispute_risk,
+        key_handover,
         agent_id,
         property_id,
         tenancy_id,
@@ -232,6 +234,7 @@ export async function POST(request: NextRequest) {
         ejari_ref: tenancy?.ejari_ref ?? undefined,
         contract_from: tenancy?.contract_from != null ? String(tenancy.contract_from) : undefined,
         contract_to: tenancy?.contract_to != null ? String(tenancy.contract_to) : undefined,
+        key_handover: Array.isArray(row.key_handover) ? row.key_handover : undefined,
       },
       property: prop
         ? {

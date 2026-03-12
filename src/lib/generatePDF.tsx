@@ -264,6 +264,7 @@ interface InspectionMeta {
     ejari_ref?: string;
     contract_from?: string;
     contract_to?: string;
+    key_handover?: { item: string; qty: number }[];
   };
   property: {
     building_name?: string;
@@ -485,6 +486,26 @@ function InspectionReport({
         <Text style={s.tableSummary}>
           Total: {roomStats.length} rooms · {totalPhotos} photos · {totalIssues} issues
         </Text>
+
+        {meta.inspection.key_handover && meta.inspection.key_handover.length > 0 && (
+          <View style={{ marginTop: 20 }}>
+            <Text style={{ fontSize: 16, fontWeight: 700, fontFamily: "Helvetica-Bold", marginBottom: 12, color: "#1a1a2e" }}>
+              Key Handover
+            </Text>
+            <View style={s.tableWrap}>
+              <View style={s.tableHeaderRow}>
+                <Text style={[s.tableHeaderCell, { width: "80%" }]}>Item</Text>
+                <Text style={[s.tableHeaderCell, { width: "20%", textAlign: "center" }]}>Qty</Text>
+              </View>
+              {meta.inspection.key_handover.map((k, i) => (
+                <View key={`${k.item}-${i}`} style={s.tableRow}>
+                  <Text style={[s.tableCell, { width: "80%" }]}>{k.item}</Text>
+                  <Text style={[s.tableCell, { width: "20%", textAlign: "center" }]}>{k.qty}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         <View style={s.footer}>
           <Text style={s.footerText}>

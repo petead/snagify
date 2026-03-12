@@ -54,6 +54,11 @@ export default async function InspectionPage({
       })),
     }));
 
+  const keyHandover = (inspection as { key_handover?: { item: string; qty: number }[] }).key_handover;
+  const initialKeyHandover = Array.isArray(keyHandover)
+    ? keyHandover.filter((k) => k && typeof k.item === "string" && typeof k.qty === "number")
+    : [];
+
   return (
     <InspectionClient
       inspectionId={id}
@@ -61,6 +66,7 @@ export default async function InspectionPage({
       buildingName={prop?.building_name ?? "Property"}
       unitNumber={prop?.unit_number ?? ""}
       rooms={rooms}
+      initialKeyHandover={initialKeyHandover}
     />
   );
 }
