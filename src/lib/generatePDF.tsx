@@ -277,7 +277,6 @@ interface InspectionMeta {
   } | null;
   rooms: {
     name: string;
-    items_provided?: string[];
     photos: {
       id: string;
       url?: string;
@@ -318,7 +317,6 @@ function InspectionReport({
     );
     const roomInspectionDate =
       validPhotos.map((p) => p.taken_at).filter(Boolean)[0] ?? meta.inspection.created_at;
-    const itemsProvided = (matchingMeta?.items_provided ?? []).filter(Boolean);
     return {
       room,
       validPhotos,
@@ -326,7 +324,6 @@ function InspectionReport({
       roomCondition,
       keyFindings,
       roomInspectionDate,
-      itemsProvided,
     };
   });
   const totalPhotos = roomStats.reduce((sum, r) => sum + r.validPhotos.length, 0);
@@ -588,17 +585,6 @@ function InspectionReport({
                     {pair.length === 1 && <View style={{ flex: 1 }} />}
                   </View>
                 ))}
-              </View>
-            )}
-
-            {r.itemsProvided.length > 0 && (
-              <View style={{ marginTop: 4 }}>
-                <Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", color: "#444", marginBottom: 4 }}>
-                  Items Provided
-                </Text>
-                <Text style={{ fontSize: 11, color: "#555", lineHeight: 1.4 }}>
-                  {r.itemsProvided.join(" · ")}
-                </Text>
               </View>
             )}
 
