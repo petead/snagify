@@ -240,7 +240,16 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
         setReportUrl(data.report_url);
         if (data.executive_summary) setExecSummary(data.executive_summary);
         router.refresh();
-        window.open(data.report_url, "_blank");
+        const bustUrl = `${data.report_url}?t=${Date.now()}`;
+        const response = await fetch(bustUrl, { cache: "no-store" });
+        if (!response.ok) throw new Error("Failed to fetch PDF");
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `snagify-report-${inspection.id}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
       }
     } catch (err) {
       console.error("Generate report failed:", err);
