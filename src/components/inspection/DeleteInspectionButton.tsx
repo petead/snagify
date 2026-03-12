@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Trash2, Lock, AlertTriangle } from "lucide-react";
 import { useDeleteInspection } from "@/lib/useDeleteInspection";
 
@@ -86,10 +87,15 @@ function ConfirmModal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const handleCancel = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onCancel();
+  };
   return (
     <>
-      <div style={overlayStyle} onClick={onCancel} />
-      <div style={sheetStyle}>
+      <div style={overlayStyle} onClick={handleCancel} role="button" tabIndex={-1} aria-label="Close" />
+      <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <span style={{ display: "inline-flex" }}><Trash2 size={32} color="#ef4444" /></span>
         </div>
@@ -102,7 +108,8 @@ function ConfirmModal({
         </p>
         <div style={{ display: "flex", gap: 10 }}>
           <button
-            onClick={onCancel}
+            type="button"
+            onClick={handleCancel}
             style={{
               flex: 1,
               height: 48,
@@ -118,7 +125,11 @@ function ConfirmModal({
             Cancel
           </button>
           <button
-            onClick={onConfirm}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onConfirm();
+            }}
             style={{
               flex: 1,
               height: 48,
@@ -146,10 +157,15 @@ function BlockedSignedModal({
   blockedReason: BlockedReason | null;
   onClose: () => void;
 }) {
+  const handleClose = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+  };
   return (
     <>
-      <div style={overlayStyle} onClick={onClose} />
-      <div style={sheetStyle}>
+      <div style={overlayStyle} onClick={handleClose} role="button" tabIndex={-1} aria-label="Close" />
+      <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <span style={{ display: "inline-flex" }}><Lock size={32} color="#6b7280" /></span>
         </div>
@@ -171,7 +187,7 @@ function BlockedSignedModal({
           This document is legally protected under RERA/DLD regulations and
           cannot be deleted.
         </p>
-        <button onClick={onClose} style={okBtnStyle}>
+        <button type="button" onClick={handleClose} style={okBtnStyle}>
           OK, understood
         </button>
       </div>
@@ -180,10 +196,15 @@ function BlockedSignedModal({
 }
 
 function BlockedCheckoutModal({ onClose }: { onClose: () => void }) {
+  const handleClose = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+  };
   return (
     <>
-      <div style={overlayStyle} onClick={onClose} />
-      <div style={sheetStyle}>
+      <div style={overlayStyle} onClick={handleClose} role="button" tabIndex={-1} aria-label="Close" />
+      <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <span style={{ display: "inline-flex" }}><AlertTriangle size={32} color="#D4A000" /></span>
         </div>
@@ -192,7 +213,7 @@ function BlockedCheckoutModal({ onClose }: { onClose: () => void }) {
           A check-out inspection exists for this tenancy. Delete the check-out
           inspection first before deleting the check-in.
         </p>
-        <button onClick={onClose} style={okBtnStyle}>
+        <button type="button" onClick={handleClose} style={okBtnStyle}>
           OK
         </button>
       </div>
@@ -218,6 +239,18 @@ export default function DeleteInspectionButton({
     null | "confirm" | "blocked_signed" | "blocked_checkout"
   >(null);
   const [blockedReason, setBlockedReason] = useState<BlockedReason | null>(null);
+
+  useEffect(() => {
+    if (!modal) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setModal(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [modal]);
 
   const signedSigs = signatures.filter((s) => s.otp_verified);
   const isSignedLocally = signedSigs.length > 0 || status === "signed";
@@ -257,26 +290,28 @@ export default function DeleteInspectionButton({
     }
   };
 
-  const Modals = (
+  const closeModal = () => setModal(null);
+
+  const Modals = modal ? (
     <>
       {modal === "confirm" && (
         <ConfirmModal
           inspectionType={inspectionType}
           onConfirm={handleConfirm}
-          onCancel={() => setModal(null)}
+          onCancel={closeModal}
         />
       )}
       {modal === "blocked_signed" && (
         <BlockedSignedModal
           blockedReason={blockedReason}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
         />
       )}
       {modal === "blocked_checkout" && (
-        <BlockedCheckoutModal onClose={() => setModal(null)} />
+        <BlockedCheckoutModal onClose={closeModal} />
       )}
     </>
-  );
+  ) : null;
 
   // ── Icon variant ──────────────────────────────────────────────────────────
   if (variant === "icon") {
@@ -320,7 +355,7 @@ export default function DeleteInspectionButton({
         >
           {isSignedLocally ? <Lock size={14} /> : <Trash2 size={14} />}
         </button>
-        {Modals}
+        {typeof document !== "undefined" && Modals && createPortal(Modals, document.body)}
       </>
     );
   }
@@ -368,7 +403,7 @@ export default function DeleteInspectionButton({
           ? "Cannot delete — legally signed"
           : `Delete ${inspectionType}`}
       </button>
-      {Modals}
+      {typeof document !== "undefined" && Modals && createPortal(Modals, document.body)}
     </>
   );
 }
