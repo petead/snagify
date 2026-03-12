@@ -10,7 +10,7 @@ export async function GET(
 
   const { data: rooms, error: roomsErr } = await supabase
     .from("rooms")
-    .select("id, name, order_index, overall_condition")
+    .select("id, name, order_index, condition")
     .eq("inspection_id", inspectionId)
     .order("order_index", { ascending: true });
 

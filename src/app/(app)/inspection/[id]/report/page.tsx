@@ -23,7 +23,7 @@ export default async function ReportPage({
         ejari_ref, tenancy_type
       ),
       rooms (
-        id, name, overall_condition, order_index,
+        id, name, condition, order_index,
         photos (id, url, ai_analysis, damage_tags, notes)
       ),
       signatures (signer_type, otp_verified, signed_at)
@@ -64,7 +64,7 @@ export type RoomPhoto = {
 export type Room = {
   id: string;
   name: string | null;
-  overall_condition: string | null;
+  condition: string | null;
   order_index: number | null;
   photos?: RoomPhoto[] | null;
 };
@@ -108,11 +108,8 @@ export type InspectionWithRelations = {
   tenancy_id: string | null;
   report_data?: {
     executive_summary?: string;
-    dispute_risk_score?: number;
   } | null;
   executive_summary?: string | null;
-  overall_condition?: string | null;
-  dispute_risk?: number | null;
   properties?: PropertyRelation | PropertyRelation[] | null;
   tenancies?: TenancyRelation | TenancyRelation[] | null;
   rooms?: Room[] | null;

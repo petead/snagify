@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
 import {
   generateInspectionPDFBuffer,
   type ReportData,
@@ -9,7 +10,20 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
 
-/** Fallback when executive_summary is null (e.g. old inspections or before first Generate Report) */
+function getRoomCondition(photos: { damage_tags?: string[] }[]): string {
+  const photosWithIssues = photos.filter((p) => (p.damage_tags?.length ?? 0) > 0).length;
+  if (photosWithIssues === 0) return "Excellent";
+
+  const severeTags = ["BROKEN", "HOLE", "WATER_DAMAGE", "MOLD"];
+  const hasSevere = photos.some((p) =>
+    (p.damage_tags ?? []).some((t) => severeTags.includes(String(t).toUpperCase()))
+  );
+  if (hasSevere) return "Needs Attention";
+
+  if (photos.length > 0 && photosWithIssues / photos.length >= 0.5) return "Fair";
+  return "Good";
+}
+
 function fallbackExecutiveSummary(row: InspectionRow): string {
   const prop = Array.isArray(row.properties) ? row.properties[0] : row.properties;
   const propertyName = prop?.building_name ?? prop?.address ?? "Property";
@@ -31,27 +45,22 @@ function fallbackExecutiveSummary(row: InspectionRow): string {
       if (Array.isArray(p.damage_tags) && p.damage_tags.length > 0) photosWithIssues += 1;
     }
   }
-  const overallCondition = (row.overall_condition ?? "Good").trim() || "Good";
-  return `Inspection of ${propertyName}${unitNumber ? `, Unit ${unitNumber}` : ""} completed on ${dateStr}. ${rooms.length} room(s) inspected with ${totalPhotos} photo(s) captured. ${photosWithIssues} issue(s) identified across the property. Overall condition: ${overallCondition}.`;
+  return `Inspection of ${propertyName}${unitNumber ? `, Unit ${unitNumber}` : ""} completed on ${dateStr}. ${rooms.length} room(s) inspected with ${totalPhotos} photo(s) captured. ${photosWithIssues} issue(s) identified across the property.`;
 }
 
-/** Build ReportData from inspection row (reads executive_summary, overall_condition, dispute_risk from DB) */
 function buildReportDataFromInspection(
   inspection: InspectionRow,
-  executiveSummary: string,
-  overallCondition: string,
-  disputeRiskScore: number
+  executiveSummary: string
 ): ReportData {
   const rooms = (inspection.rooms ?? [])
-    .sort(
-      (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
-    )
+    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
     .map((room) => {
       const photos = room.photos ?? [];
       const items: { name: string; condition: string; notes: string }[] = [];
+      const condition = room.condition?.trim() || getRoomCondition(photos);
       return {
         name: room.name ?? "Room",
-        condition: (room.condition ?? room.overall_condition ?? overallCondition).trim() || overallCondition,
+        condition,
         summary: "",
         items,
         recommendations: [] as string[],
@@ -60,9 +69,6 @@ function buildReportDataFromInspection(
 
   return {
     executive_summary: executiveSummary,
-    overall_condition: overallCondition,
-    dispute_risk_score: disputeRiskScore,
-    dispute_risk_reasons: [],
     rooms,
     legal_notes: "",
     recommendations: [],
@@ -78,8 +84,7 @@ type InspectionRow = {
   completed_at?: string | null;
   created_at?: string | null;
   executive_summary?: string | null;
-  overall_condition?: string | null;
-  dispute_risk?: number | null;
+  document_hash?: string | null;
   key_handover?: { item: string; qty: number }[] | null;
   properties?: PropRow | PropRow[] | null;
   tenancies?: TenancyRow | TenancyRow[] | null;
@@ -112,9 +117,15 @@ type RoomRow = {
   id: string;
   name: string;
   order_index?: number | null;
-  overall_condition?: string | null;
   condition?: string | null;
-  photos?: { id: string; url: string; ai_analysis?: string | null; damage_tags?: string[]; notes?: string | null; taken_at?: string | null }[];
+  photos?: {
+    id: string;
+    url: string;
+    ai_analysis?: string | null;
+    damage_tags?: string[];
+    notes?: string | null;
+    taken_at?: string | null;
+  }[];
 };
 
 export async function POST(request: NextRequest) {
@@ -134,11 +145,10 @@ export async function POST(request: NextRequest) {
         type,
         status,
         report_url,
+        document_hash,
         completed_at,
         created_at,
         executive_summary,
-        overall_condition,
-        dispute_risk,
         key_handover,
         agent_id,
         property_id,
@@ -166,7 +176,6 @@ export async function POST(request: NextRequest) {
           id,
           name,
           order_index,
-          overall_condition,
           condition,
           photos (
             id,
@@ -190,45 +199,24 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (inspErr || !inspection) {
-      return NextResponse.json(
-        { error: inspErr?.message || "Not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: inspErr?.message || "Not found" }, { status: 404 });
     }
 
     const row = inspection as InspectionRow;
 
     if (row.report_url) {
-      return NextResponse.json({
-        report_url: row.report_url,
-        cached: true,
-      });
+      return NextResponse.json({ report_url: row.report_url, cached: true });
     }
 
-    const executiveSummary =
-      (row.executive_summary?.trim()) || fallbackExecutiveSummary(row);
-    const overallCondition =
-      (row.overall_condition?.trim()) || "Good";
-    const disputeRiskScore =
-      row.dispute_risk != null ? Number(row.dispute_risk) : 0;
-
-    const reportData = buildReportDataFromInspection(
-      row,
-      executiveSummary,
-      overallCondition,
-      disputeRiskScore
-    );
+    const executiveSummary = row.executive_summary?.trim() || fallbackExecutiveSummary(row);
+    const reportData = buildReportDataFromInspection(row, executiveSummary);
 
     const prop = Array.isArray(row.properties) ? row.properties[0] : row.properties;
     const tenancy = Array.isArray(row.tenancies) ? row.tenancies[0] : row.tenancies;
 
     const agentId = row.agent_id ?? (inspection as { agent_id?: string }).agent_id;
     const { data: agentData } = agentId
-      ? await supabase
-          .from("profiles")
-          .select("full_name, agency_name")
-          .eq("id", agentId)
-          .single()
+      ? await supabase.from("profiles").select("full_name, agency_name").eq("id", agentId).single()
       : { data: null };
 
     const meta: InspectionMeta = {
@@ -279,15 +267,27 @@ export async function POST(request: NextRequest) {
         }),
     };
 
-    const pdfBuffer = await generateInspectionPDFBuffer(reportData, meta);
+    const dataString = JSON.stringify({
+      inspectionId,
+      rooms: reportData.rooms,
+      photos: meta.rooms,
+      keyHandover: meta.inspection.key_handover ?? [],
+      generatedAt: new Date().toISOString(),
+    });
+    const documentHash = createHash("sha256").update(dataString).digest("hex");
+
+    await supabase
+      .from("inspections")
+      .update({ document_hash: documentHash })
+      .eq("id", inspectionId);
+
+    const pdfBuffer = await generateInspectionPDFBuffer(reportData, meta, documentHash);
 
     const filePath = `${inspectionId}.pdf`;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const storageClient =
-      supabaseUrl && serviceRoleKey
-        ? createClient(supabaseUrl, serviceRoleKey)
-        : supabase;
+      supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : supabase;
 
     const { error: uploadError } = await storageClient.storage
       .from("reports")
@@ -296,21 +296,17 @@ export async function POST(request: NextRequest) {
         upsert: true,
       });
 
-    let publicUrl: string | null = null;
     if (uploadError) {
       console.error("PDF upload to storage FAILED:", uploadError.message);
     } else {
       const { data: urlData } = storageClient.storage.from("reports").getPublicUrl(filePath);
-      publicUrl = urlData.publicUrl;
-      console.log("PDF uploaded OK:", publicUrl);
+      const publicUrl = urlData.publicUrl;
       const { error: updateErr } = await storageClient
         .from("inspections")
         .update({ report_url: publicUrl })
         .eq("id", inspectionId);
       if (updateErr) {
         console.error("Failed to save report_url:", updateErr.message);
-      } else {
-        console.log("report_url saved in inspections table OK");
       }
     }
 

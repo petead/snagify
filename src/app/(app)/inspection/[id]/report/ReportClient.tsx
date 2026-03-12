@@ -5,9 +5,7 @@ import {
   Building2,
   CalendarDays,
   BedDouble,
-  Star,
   FileText,
-  AlertTriangle,
   Users,
   Clock3,
   Download,
@@ -75,30 +73,6 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   const signatures = inspection.signatures ?? [];
   const isCheckIn = inspection.type === "check-in";
   const status = inspection.status ?? "draft";
-
-  const roomConditions = rooms
-    .map((r) => r.overall_condition)
-    .filter(Boolean) as string[];
-  const poorCount = roomConditions.filter((c) => c === "poor").length;
-  const fairCount = roomConditions.filter((c) => c === "fair").length;
-  const derivedCondition =
-    poorCount > 0
-      ? "Poor"
-      : fairCount > roomConditions.length / 2
-        ? "Fair"
-        : "Good";
-  const overallCondition =
-    (inspection.overall_condition?.trim()) || derivedCondition;
-
-  const execSummary =
-    inspection.executive_summary ?? inspection.report_data?.executive_summary;
-  const disputeScore =
-    inspection.dispute_risk ?? inspection.report_data?.dispute_risk_score ?? 0;
-  const riskLabel =
-    disputeScore <= 3 ? "Low Risk" : disputeScore <= 6 ? "Medium Risk" : "High Risk";
-  const riskColor =
-    disputeScore <= 3 ? "#5a7a2e" : disputeScore <= 6 ? "#8a6a00" : "#cc2222";
-
   const contractFrom = tenancy?.contract_from;
   const contractTo = tenancy?.contract_to;
   const durationMonths =
@@ -123,7 +97,6 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
         : "—",
     },
     { icon: BedDouble, label: "Rooms", value: `${rooms.length} inspected` },
-    { icon: Star, label: "Condition", value: overallCondition },
   ];
 
   const parties = [
@@ -321,51 +294,6 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
             <p className="text-sm text-gray-600 leading-relaxed">
               {execSummary}
             </p>
-          </div>
-        </div>
-      )}
-
-      {/* SECTION 4 — Dispute Risk */}
-      {disputeScore != null && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mx-4 mb-4 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle size={16} color="#D4A000" />
-              <p
-                className="font-bold text-gray-900 text-sm"
-                style={{ fontFamily: "Poppins,sans-serif" }}
-              >
-                Dispute Risk
-              </p>
-            </div>
-            <span
-              className="text-xs font-bold px-2 py-1 rounded-full"
-              style={{
-                backgroundColor: riskColor + "33",
-                color: riskColor,
-              }}
-            >
-              {riskLabel}
-            </span>
-          </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all"
-              style={{
-                width: `${Math.min(100, (disputeScore / 10) * 100)}%`,
-                backgroundColor: riskColor,
-              }}
-            />
-          </div>
-          <div className="flex justify-between mt-1.5">
-            <span className="text-xs text-gray-400">Low</span>
-            <span
-              className="text-xs font-semibold"
-              style={{ color: riskColor }}
-            >
-              {disputeScore}/10
-            </span>
-            <span className="text-xs text-gray-400">High</span>
           </div>
         </div>
       )}
