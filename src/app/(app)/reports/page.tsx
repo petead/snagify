@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { User, CalendarDays, FileText } from "lucide-react";
@@ -30,51 +30,54 @@ export default function ReportsPage() {
   const [signedIds, setSignedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "pending" | "signed">("all");
+  const reportsRollbackRef = useRef<ReportRow[]>([]);
+
+  const refetch = useCallback(async () => {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+
+    const { data: reportsData } = await supabase
+      .from("inspections")
+      .select(
+        `
+        id, type, status, signed_at, created_at,
+        properties (building_name, unit_number, property_type),
+        tenancies (tenant_name, ejari_ref, contract_from, contract_to),
+        signatures (signer_type, otp_verified, signed_at)
+      `
+      )
+      .eq("agent_id", user.id)
+      .in("status", ["completed", "signed", "in_progress"])
+      .order("created_at", { ascending: false });
+
+    const list = (reportsData ?? []) as ReportRow[];
+    setReports(list);
+
+    const ids = list.map((r) => r.id);
+    if (ids.length > 0) {
+      const { data: sigs } = await supabase
+        .from("signatures")
+        .select("inspection_id")
+        .in("inspection_id", ids)
+        .not("signed_at", "is", null);
+      const set = new Set<string>();
+      (sigs ?? []).forEach((s: { inspection_id: string }) => set.add(s.inspection_id));
+      setSignedIds(set);
+    } else {
+      setSignedIds(new Set());
+    }
+    setLoading(false);
+  }, [router]);
 
   useEffect(() => {
-    const load = async () => {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        router.replace("/login");
-        return;
-      }
-
-      const { data: reportsData } = await supabase
-        .from("inspections")
-        .select(
-          `
-          id, type, status, signed_at, created_at,
-          properties (building_name, unit_number, property_type),
-          tenancies (tenant_name, ejari_ref, contract_from, contract_to),
-          signatures (signer_type, otp_verified, signed_at)
-        `
-        )
-        .eq("agent_id", user.id)
-        .in("status", ["completed", "signed", "in_progress"])
-        .order("created_at", { ascending: false });
-
-      const list = (reportsData ?? []) as ReportRow[];
-      setReports(list);
-
-      const ids = list.map((r) => r.id);
-      if (ids.length > 0) {
-        const { data: sigs } = await supabase
-          .from("signatures")
-          .select("inspection_id")
-          .in("inspection_id", ids)
-          .not("signed_at", "is", null);
-        const set = new Set<string>();
-        (sigs ?? []).forEach((s: { inspection_id: string }) => set.add(s.inspection_id));
-        setSignedIds(set);
-      }
-
-      setLoading(false);
-    };
-    load();
-  }, [router]);
+    refetch();
+  }, [refetch]);
 
   const filtered =
     reports?.filter((r) => {
@@ -218,6 +221,12 @@ export default function ReportsPage() {
                     signatures={report.signatures ?? []}
                     redirectTo="/reports"
                     variant="icon"
+                    onOptimisticRemove={() => {
+                      reportsRollbackRef.current = [...reports];
+                      setReports((prev) => prev.filter((r) => r.id !== report.id));
+                    }}
+                    onRollback={() => setReports(reportsRollbackRef.current)}
+                    onSuccess={refetch}
                   />
                 </div>
               </div>

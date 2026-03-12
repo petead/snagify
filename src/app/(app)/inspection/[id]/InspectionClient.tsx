@@ -849,6 +849,7 @@ export function InspectionClient({
       if (!res.ok) throw new Error("Generation failed");
 
       setNavigating(true);
+      router.refresh();
       router.push(`/inspection/${inspectionId}/report`);
       return;
     } catch {

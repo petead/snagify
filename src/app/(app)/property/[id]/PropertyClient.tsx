@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, Plus, Building2, House, BedDouble, Check } from "lucide-react";
 import {
@@ -131,9 +132,30 @@ function getNewInspectionHref(
 
 export function PropertyClient({
   property,
-  tenancyGroups,
+  tenancyGroups: initialTenancyGroups,
   totalInspections,
 }: PropertyClientProps) {
+  const [tenancyGroups, setTenancyGroups] = useState(initialTenancyGroups);
+  const groupsRollbackRef = useRef<TenancyGroup[]>([]);
+
+  useEffect(() => {
+    setTenancyGroups(initialTenancyGroups);
+  }, [initialTenancyGroups]);
+
+  const removeInspectionFromList = (inspectionId: string) => {
+    groupsRollbackRef.current = tenancyGroups.map((g) => ({
+      ...g,
+      inspections: [...g.inspections],
+    }));
+    setTenancyGroups((prev) =>
+      prev.map((g) => ({
+        ...g,
+        inspections: g.inspections.filter((i) => i.id !== inspectionId),
+      }))
+    );
+  };
+  const rollbackGroups = () => setTenancyGroups(groupsRollbackRef.current);
+
   const title =
     property.address ??
     (property.building_name && property.unit_number
@@ -352,6 +374,8 @@ export function PropertyClient({
                               signatures={checkIn.signatures}
                               redirectTo={`/property/${property.id}`}
                               variant="icon"
+                              onOptimisticRemove={() => removeInspectionFromList(checkIn.id)}
+                              onRollback={rollbackGroups}
                             />
                           </div>
                         </div>
@@ -431,6 +455,8 @@ export function PropertyClient({
                               signatures={checkOut.signatures}
                               redirectTo={`/property/${property.id}`}
                               variant="icon"
+                              onOptimisticRemove={() => removeInspectionFromList(checkOut.id)}
+                              onRollback={rollbackGroups}
                             />
                           </div>
                         </div>

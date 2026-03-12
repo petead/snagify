@@ -10,6 +10,12 @@ interface Props {
   signatures?: { signer_type: string; otp_verified: boolean; signed_at?: string | null }[];
   redirectTo?: string;
   variant?: "button" | "menuitem" | "icon";
+  /** Call before API call for optimistic UI; item is removed from list immediately. */
+  onOptimisticRemove?: () => void;
+  /** Call when API fails to rollback optimistic update. */
+  onRollback?: () => void;
+  /** Call when delete succeeds (e.g. to refetch client-side data). */
+  onSuccess?: () => void;
 }
 
 type BlockedReason =
@@ -203,6 +209,9 @@ export default function DeleteInspectionButton({
   signatures = [],
   redirectTo,
   variant = "button",
+  onOptimisticRemove,
+  onRollback,
+  onSuccess,
 }: Props) {
   const { deleteInspection, loading } = useDeleteInspection();
   const [modal, setModal] = useState<
@@ -228,7 +237,11 @@ export default function DeleteInspectionButton({
 
   const handleConfirm = async () => {
     setModal(null);
-    const result = await deleteInspection(inspectionId, redirectTo);
+    const result = await deleteInspection(inspectionId, redirectTo, {
+      onOptimistic: onOptimisticRemove,
+      onRollback,
+      onSuccess,
+    });
     if (!result.canDelete) {
       if (result.reason === "HAS_CHECKOUT") {
         setBlockedReason({ reason: "HAS_CHECKOUT" });

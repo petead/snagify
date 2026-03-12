@@ -169,11 +169,17 @@ export function DashboardClient({
   displayName,
   properties: initialProperties,
   alerts = [],
-  recentInspections = [],
+  recentInspections: initialRecentInspections = [],
 }: DashboardClientProps) {
   const [properties] = useState(() => normalizeProperties(initialProperties));
+  const [recentInspections, setRecentInspections] = useState(initialRecentInspections);
+  const recentRollbackRef = useRef<RecentInspectionRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setRecentInspections(initialRecentInspections);
+  }, [initialRecentInspections]);
 
   const touchStartY = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -385,6 +391,11 @@ export function DashboardClient({
                         signatures={inspection.signatures ?? []}
                         redirectTo="/dashboard"
                         variant="icon"
+                        onOptimisticRemove={() => {
+                          recentRollbackRef.current = [...recentInspections];
+                          setRecentInspections((prev) => prev.filter((i) => i.id !== inspection.id));
+                        }}
+                        onRollback={() => setRecentInspections(recentRollbackRef.current)}
                       />
                     </div>
                   </div>

@@ -12,14 +12,24 @@ type DeleteResult =
     }
   | { canDelete: false; reason: "HAS_CHECKOUT" };
 
+export type DeleteInspectionOptions = {
+  onOptimistic?: () => void;
+  onRollback?: () => void;
+  onSuccess?: () => void;
+};
+
 export function useDeleteInspection() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const deleteInspection = async (
     inspectionId: string,
-    redirectTo?: string
+    redirectTo?: string,
+    options?: DeleteInspectionOptions
   ): Promise<DeleteResult> => {
+    const { onOptimistic, onRollback, onSuccess } = options ?? {};
+    onOptimistic?.();
+
     setLoading(true);
     try {
       const res = await fetch("/api/delete-inspection", {
@@ -42,13 +52,22 @@ export function useDeleteInspection() {
         if (data.error === "HAS_CHECKOUT") {
           return { canDelete: false, reason: "HAS_CHECKOUT" };
         }
+        onRollback?.();
+        console.error("Delete inspection failed:", data.error);
+        alert("Failed to delete. Please try again.");
         return { canDelete: false, reason: "SIGNED", signerType: "", signedCount: 0 };
       }
 
+      router.refresh();
+      onSuccess?.();
       if (redirectTo) router.push(redirectTo);
-      else router.refresh();
 
       return { canDelete: true };
+    } catch (err) {
+      onRollback?.();
+      console.error("Delete inspection error:", err);
+      alert("Failed to delete. Please try again.");
+      return { canDelete: false, reason: "SIGNED", signerType: "", signedCount: 0 };
     } finally {
       setLoading(false);
     }
