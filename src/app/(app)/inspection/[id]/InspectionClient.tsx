@@ -60,14 +60,14 @@ interface Props {
   initialKeyHandover?: { item: string; qty: number }[];
 }
 
-const DEFAULT_HANDOVER_ITEMS = [
-  { item: "Door keys", icon: "🔑" },
-  { item: "Mailbox key", icon: "📬" },
-  { item: "Parking card", icon: "🅿️" },
-  { item: "Access card", icon: "🏢" },
-  { item: "AC remote", icon: "❄️" },
-  { item: "Gate remote", icon: "🚪" },
-  { item: "Intercom", icon: "📞" },
+const HANDOVER_ITEMS = [
+  { id: "door_keys", label: "Door Keys" },
+  { id: "mailbox_key", label: "Mailbox Key" },
+  { id: "parking_card", label: "Parking Card" },
+  { id: "access_card", label: "Access Card" },
+  { id: "ac_remote", label: "AC Remote" },
+  { id: "gate_remote", label: "Gate Remote" },
+  { id: "intercom", label: "Intercom" },
 ];
 
 // ─── Constants ───────────────────────────────────
@@ -381,7 +381,7 @@ export function InspectionClient({
   const [toast, setToast] = useState<string | null>(null);
 
   const [keyHandover, setKeyHandover] = useState<{ item: string; qty: number }[]>([]);
-  const [customItem, setCustomItem] = useState("");
+  const [customItemInput, setCustomItemInput] = useState("");
 
   // Setup state
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -422,11 +422,9 @@ export function InspectionClient({
     }
   }, [initialKeyHandover]);
 
-  // Scroll to top when entering key-handover screen
+  // Scroll to top on any screen change
   useEffect(() => {
-    if (screen === "key-handover") {
-      window.scrollTo(0, 0);
-    }
+    window.scrollTo(0, 0);
   }, [screen]);
 
   // Pre-select existing room names on mount + detect matching template
@@ -538,7 +536,7 @@ export function InspectionClient({
     // Do NOT reset photos — loadPhotos useEffect will reload from DB
     setActiveRoom(0);
     setCreatingRooms(false);
-    setScreen("inspect");
+    setScreen("key-handover");
   };
 
   const handlePhotoCapture = async (base64: string, roomId: string, roomName: string) => {
@@ -820,17 +818,18 @@ export function InspectionClient({
     }, 500);
   };
 
-  const handleContinueToReview = async () => {
-    try {
-      const { error } = await supabase
-        .from("inspections")
-        .update({ key_handover: keyHandover })
-        .eq("id", inspectionId);
-      if (error) console.error("Failed to save key handover:", error);
-    } catch (err) {
-      console.error("Key handover save error:", err);
+  const handleKeyHandoverContinue = async () => {
+    if (keyHandover.length > 0) {
+      try {
+        await supabase
+          .from("inspections")
+          .update({ key_handover: keyHandover })
+          .eq("id", inspectionId);
+      } catch (err) {
+        console.error("Key handover save error:", err);
+      }
     }
-    setScreen("review");
+    setScreen("inspect");
   };
 
   // ── Generate report (from review screen)
@@ -1110,7 +1109,7 @@ export function InspectionClient({
           {/* Top bar */}
           <div style={{ background: "#0e0e14", padding: "16px 16px 8px", flexShrink: 0 }}>
             <div className="flex items-center justify-between mb-3">
-              <button type="button" onClick={() => setScreen("rooms")} className="text-white/60">
+              <button type="button" onClick={() => setScreen("key-handover")} className="text-white/60">
                 <ChevronLeft size={22} />
               </button>
               <div className="text-center">
@@ -1121,7 +1120,7 @@ export function InspectionClient({
                   {inspectionType === "check-in" ? "Check-in" : "Check-out"}
                 </p>
               </div>
-              <button type="button" onClick={() => setScreen("key-handover")}
+              <button type="button" onClick={() => setScreen("review")}
                 className="text-xs font-semibold px-3 py-1.5 rounded-lg"
                 style={{
                   background: totalPhotos > 0 ? "#9A88FD" : "rgba(255,255,255,0.1)",
@@ -1216,34 +1215,33 @@ export function InspectionClient({
 
       {/* ═══ KEY HANDOVER SCREEN ═══ */}
       {screen === "key-handover" && (
-        <div className="fixed inset-0 z-40 flex flex-col" style={{ background: "#fafafa" }}>
+        <div style={{ minHeight: "100vh", background: "white", display: "flex", flexDirection: "column" }}>
+
+          {/* Sticky header — same as rooms screen */}
           <div style={{
             position: "sticky", top: 0, zIndex: 10,
-            background: "rgba(250,250,250,0.97)",
-            backdropFilter: "blur(12px)",
-            borderBottom: "1px solid #f0f0f0",
+            background: "white", borderBottom: "1px solid #f0f0f0",
             padding: "14px 16px 12px",
           }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <button
-                type="button"
-                onClick={() => setScreen("inspect")}
-                style={{
-                  width: 34, height: 34, borderRadius: "50%", border: "none",
-                  background: "#f5f5f5", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}
-              >
+              <button type="button" onClick={() => setScreen("rooms")} style={{
+                width: 34, height: 34, borderRadius: "50%", border: "none",
+                background: "#f5f5f5", cursor: "pointer", display: "flex",
+                alignItems: "center", justifyContent: "center",
+              }}>
                 <ChevronLeft size={18} color="#555" />
               </button>
               <div style={{ textAlign: "center" }}>
                 <p style={{
                   fontFamily: "Poppins, sans-serif", fontWeight: 700,
-                  fontSize: 14, margin: 0, color: "#1a1a2e",
+                  fontSize: 14, margin: 0, color: "#1a1a1a",
                 }}>
                   {buildingName}, Unit {unitNumber}
                 </p>
-                <p style={{ fontSize: 12, fontWeight: 600, margin: "2px 0 0", color: "#9A88FD" }}>
+                <p style={{
+                  fontSize: 12, fontWeight: 600, margin: "2px 0 0",
+                  color: inspectionType === "check-in" ? "#9A88FD" : "#FF8A65",
+                }}>
                   Key Handover
                 </p>
               </div>
@@ -1251,176 +1249,142 @@ export function InspectionClient({
             </div>
           </div>
 
-          <div style={{ padding: "20px 16px 120px" }}>
+          {/* Scrollable content */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px 180px" }}>
+
             <p style={{ color: "#8888a0", fontSize: 14, marginBottom: 20 }}>
               Select items handed over to the tenant
             </p>
 
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              {DEFAULT_HANDOVER_ITEMS.map(({ item, icon }) => {
-                const entry = keyHandover.find((k) => k.item === item);
-                const selected = !!entry;
-                const qty = entry?.qty ?? 1;
+            {/* Section label — same as rooms screen */}
+            <p style={{
+              fontSize: 11, fontWeight: 700, color: "#9ca3af",
+              textTransform: "uppercase", letterSpacing: 1, marginBottom: 10,
+            }}>
+              Handover items
+            </p>
+
+            {/* Chip grid — same style as room selection chips */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+              {HANDOVER_ITEMS.map(({ id, label }) => {
+                const isSelected = keyHandover.some((k) => k.item === label);
                 return (
-                  <div key={item} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (selected) {
-                          setKeyHandover((prev) => prev.filter((k) => k.item !== item));
-                        } else {
-                          setKeyHandover((prev) => [...prev, { item, qty: 1 }]);
-                        }
-                      }}
-                      style={{
-                        borderRadius: 12, padding: "10px 16px", fontSize: 14,
-                        border: selected ? "1.5px solid #9A88FD" : "1.5px solid #e0e0e0",
-                        background: selected ? "#F3F0FF" : "white",
-                        cursor: "pointer",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {icon} {item}
-                    </button>
-                    {selected && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (qty <= 1) return;
-                            setKeyHandover((prev) =>
-                              prev.map((k) => (k.item === item ? { ...k, qty: k.qty - 1 } : k))
-                            );
-                          }}
-                          style={{
-                            width: 28, height: 28, borderRadius: 8, border: "none",
-                            background: "#9A88FD", color: "white", cursor: "pointer",
-                            fontSize: 16, lineHeight: 1, padding: 0,
-                          }}
-                        >
-                          −
-                        </button>
-                        <span style={{ fontSize: 14, fontWeight: 600, minWidth: 20, textAlign: "center" }}>{qty}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setKeyHandover((prev) =>
-                              prev.map((k) => (k.item === item ? { ...k, qty: k.qty + 1 } : k))
-                            );
-                          }}
-                          style={{
-                            width: 28, height: 28, borderRadius: 8, border: "none",
-                            background: "#9A88FD", color: "white", cursor: "pointer",
-                            fontSize: 16, lineHeight: 1, padding: 0,
-                          }}
-                        >
-                          +
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <button key={id} type="button"
+                    onClick={() => {
+                      if (isSelected) {
+                        setKeyHandover((prev) => prev.filter((k) => k.item !== label));
+                      } else {
+                        setKeyHandover((prev) => [...prev, { item: label, qty: 1 }]);
+                      }
+                    }}
+                    style={{
+                      padding: "9px 16px",
+                      borderRadius: 10,
+                      border: `1.5px solid ${isSelected ? "#9A88FD" : "#e5e7eb"}`,
+                      background: isSelected ? "#9A88FD" : "white",
+                      color: isSelected ? "white" : "#374151",
+                      fontWeight: 600, fontSize: 13,
+                      cursor: "pointer", transition: "all 0.15s",
+                      boxShadow: isSelected ? "0 2px 8px rgba(154,136,253,0.25)" : "none",
+                    }}>
+                    {label}
+                  </button>
                 );
               })}
             </div>
 
-            {keyHandover.filter((k) => !DEFAULT_HANDOVER_ITEMS.some((d) => d.item === k.item)).length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <p style={{ fontSize: 12, fontWeight: 600, color: "#888", marginBottom: 8 }}>Custom items</p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {keyHandover
-                    .filter((k) => !DEFAULT_HANDOVER_ITEMS.some((d) => d.item === k.item))
-                    .map((k) => {
-                      const qty = k.qty;
-                      return (
-                        <div
-                          key={k.item}
-                          style={{
-                            display: "inline-flex", alignItems: "center", gap: 6,
-                            padding: "8px 12px", borderRadius: 10,
-                            background: "#F3F0FF", border: "1.5px solid #9A88FD",
-                          }}
-                        >
-                          <span style={{ fontSize: 13, fontWeight: 600 }}>{k.item}</span>
-                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (qty <= 1) {
-                                  setKeyHandover((prev) => prev.filter((x) => x.item !== k.item));
-                                  return;
-                                }
-                                setKeyHandover((prev) =>
-                                  prev.map((x) => (x.item === k.item ? { ...x, qty: x.qty - 1 } : x))
-                                );
-                              }}
-                              style={{
-                                width: 24, height: 24, borderRadius: 6, border: "none",
-                                background: "#9A88FD", color: "white", cursor: "pointer",
-                                fontSize: 14, lineHeight: 1, padding: 0,
-                              }}
-                            >
-                              −
-                            </button>
-                            <span style={{ fontSize: 13, fontWeight: 600, minWidth: 16, textAlign: "center" }}>{qty}</span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setKeyHandover((prev) =>
-                                  prev.map((x) => (x.item === k.item ? { ...x, qty: x.qty + 1 } : x))
-                                )
-                              }
-                              style={{
-                                width: 24, height: 24, borderRadius: 6, border: "none",
-                                background: "#9A88FD", color: "white", cursor: "pointer",
-                                fontSize: 14, lineHeight: 1, padding: 0,
-                              }}
-                            >
-                              +
-                            </button>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setKeyHandover((prev) => prev.filter((x) => x.item !== k.item))}
-                            style={{
-                              marginLeft: 4, padding: "2px 6px", borderRadius: 6, border: "none",
-                              background: "rgba(0,0,0,0.08)", cursor: "pointer", fontSize: 11,
-                            }}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      );
-                    })}
-                </div>
+            {/* Quantity steppers for selected items */}
+            {keyHandover.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                {keyHandover.map((k) => (
+                  <div key={k.item} style={{
+                    display: "flex", alignItems: "center",
+                    justifyContent: "space-between", padding: "12px 0",
+                    borderBottom: "1px solid #f0f0f0",
+                  }}>
+                    <span style={{ fontSize: 14, color: "#1a1a2e" }}>{k.item}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <button type="button"
+                        onClick={() => {
+                          if (k.qty <= 1) return;
+                          setKeyHandover((prev) =>
+                            prev.map((x) => (x.item === k.item ? { ...x, qty: x.qty - 1 } : x))
+                          );
+                        }}
+                        style={{
+                          width: 32, height: 32, borderRadius: 8,
+                          border: "1.5px solid #e0e0e0", background: "white",
+                          fontSize: 16, cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                        −
+                      </button>
+                      <span style={{
+                        fontSize: 16, fontWeight: 600, minWidth: 20, textAlign: "center",
+                      }}>
+                        {k.qty}
+                      </span>
+                      <button type="button"
+                        onClick={() =>
+                          setKeyHandover((prev) =>
+                            prev.map((x) => (x.item === k.item ? { ...x, qty: x.qty + 1 } : x))
+                          )
+                        }
+                        style={{
+                          width: 32, height: 32, borderRadius: 8,
+                          border: "1.5px solid #9A88FD", background: "#F3F0FF",
+                          color: "#9A88FD", fontSize: 16, cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                        +
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
-            <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
+            {/* Section label for custom item */}
+            <p style={{
+              fontSize: 11, fontWeight: 700, color: "#9ca3af",
+              textTransform: "uppercase", letterSpacing: 1, marginBottom: 10,
+            }}>
+              Custom item
+            </p>
+
+            <div style={{ display: "flex", gap: 8 }}>
               <input
                 type="text"
-                placeholder="Add custom item..."
-                value={customItem}
-                onChange={(e) => setCustomItem(e.target.value)}
+                placeholder="e.g. Storage key"
+                value={customItemInput}
+                onChange={(e) => setCustomItemInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && customItemInput.trim()) {
+                    setKeyHandover((prev) => [...prev, { item: customItemInput.trim(), qty: 1 }]);
+                    setCustomItemInput("");
+                  }
+                }}
                 style={{
-                  flex: 1, padding: "10px 14px", borderRadius: 10,
+                  flex: 1, padding: "12px 14px", borderRadius: 12,
                   border: "1.5px solid #e0e0e0", fontSize: 14, outline: "none",
+                  fontFamily: "DM Sans, sans-serif", color: "#374151",
+                  background: "white",
                 }}
               />
               <button
                 type="button"
                 onClick={() => {
-                  if (customItem.trim()) {
-                    setKeyHandover((prev) => [...prev, { item: customItem.trim(), qty: 1 }]);
-                    setCustomItem("");
+                  if (customItemInput.trim()) {
+                    setKeyHandover((prev) => [...prev, { item: customItemInput.trim(), qty: 1 }]);
+                    setCustomItemInput("");
                   }
                 }}
-                disabled={!customItem.trim()}
+                disabled={!customItemInput.trim()}
                 style={{
-                  padding: "10px 16px", borderRadius: 10, border: "none",
-                  background: customItem.trim() ? "#9A88FD" : "#e0e0e0",
+                  padding: "12px 20px", borderRadius: 12, border: "none",
+                  background: customItemInput.trim() ? "#9A88FD" : "#e0e0e0",
                   color: "white", fontWeight: 600, fontSize: 14, cursor: "pointer",
-                }}
-              >
+                }}>
                 Add
               </button>
             </div>
@@ -1432,23 +1396,47 @@ export function InspectionClient({
             )}
           </div>
 
+          {/* Fixed bottom bar — same style as rooms screen */}
           <div style={{
-            position: "fixed", bottom: 0, left: 0, right: 0,
-            padding: 16, background: "white",
+            position: "fixed", bottom: 64, left: 0, right: 0,
+            background: "rgba(255,255,255,0.97)",
             borderTop: "1px solid #f0f0f0",
-            zIndex: 10,
+            padding: "12px 16px",
+            paddingBottom: "max(12px, env(safe-area-inset-bottom))",
+            zIndex: 20,
           }}>
-            <button
-              type="button"
-              onClick={handleContinueToReview}
+            {keyHandover.length > 0 && (
+              <div style={{
+                display: "flex", gap: 6, overflowX: "auto",
+                marginBottom: 10, paddingBottom: 2,
+                scrollbarWidth: "none",
+              } as React.CSSProperties}>
+                {keyHandover.map((k) => (
+                  <span key={k.item} style={{
+                    flexShrink: 0, fontSize: 11, fontWeight: 600,
+                    padding: "4px 10px", borderRadius: 100,
+                    background: "#F0EDFF", color: "#7B65FC",
+                    whiteSpace: "nowrap",
+                  }}>
+                    {k.item} x{k.qty}
+                  </span>
+                ))}
+              </div>
+            )}
+            <button type="button"
+              onClick={handleKeyHandoverContinue}
               style={{
-                width: "100%", padding: 16, borderRadius: 14, border: "none",
-                background: "linear-gradient(135deg, #9A88FD 0%, #7B68EE 100%)",
-                color: "white", fontSize: 16, fontWeight: 700,
-                fontFamily: "Poppins, sans-serif", cursor: "pointer",
-              }}
-            >
-              Continue to Review →
+                width: "100%", height: 52, borderRadius: 14, border: "none",
+                background: "linear-gradient(135deg, #9A88FD, #7B65FC)",
+                color: "white",
+                fontFamily: "Poppins, sans-serif",
+                fontWeight: 700, fontSize: 15,
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}>
+              {keyHandover.length > 0
+                ? "Start Inspection"
+                : "Skip — Start Inspection"}
             </button>
           </div>
         </div>
@@ -1469,7 +1457,7 @@ export function InspectionClient({
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <button
                 type="button"
-                onClick={() => setScreen("key-handover")}
+                onClick={() => setScreen("inspect")}
                 style={{
                   width: 34, height: 34, borderRadius: "50%", border: "none",
                   background: "#f5f5f5", cursor: "pointer",
@@ -1697,31 +1685,31 @@ export function InspectionClient({
                     </button>
                   </div>
                 )}
+              {keyHandover.length > 0 && (
+                  <div
+                    onClick={() => setScreen("key-handover")}
+                    style={{
+                      margin: "16px 0", padding: 16, borderRadius: 14,
+                      background: "#FAFAFA", border: "1px solid #f0f0f0",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <p style={{
+                      fontWeight: 700, fontSize: 11, marginBottom: 8,
+                      fontFamily: "Poppins, sans-serif", color: "#1a1a2e",
+                      textTransform: "uppercase", letterSpacing: 1,
+                    }}>
+                      Key Handover
+                    </p>
+                    <p style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>
+                      {keyHandover.map((k) => `${k.item} x${k.qty}`).join(" · ")}
+                    </p>
+                  </div>
+                )}
+
               </div>
             );
           })()}
-
-          {keyHandover.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setScreen("key-handover")}
-              style={{
-                margin: "16px 0", padding: 16, borderRadius: 14,
-                background: "#FAFAFA", border: "1px solid #f0f0f0",
-                cursor: "pointer", width: "100%", textAlign: "left",
-              }}
-            >
-              <p style={{
-                fontWeight: 700, fontSize: 14, marginBottom: 8,
-                fontFamily: "Poppins, sans-serif", color: "#1a1a2e",
-              }}>
-                🔑 Key Handover
-              </p>
-              <p style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>
-                {keyHandover.map((k) => `${k.item} ×${k.qty}`).join(" · ")}
-              </p>
-            </button>
-          )}
 
           {/* ── BOTTOM BAR ── */}
           <div style={{
