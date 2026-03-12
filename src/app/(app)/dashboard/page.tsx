@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { DashboardHeader } from "@/components/layout/DashboardHeader";
 import { DashboardClient } from "./DashboardClient";
 
 export default async function DashboardPage() {
@@ -156,7 +155,7 @@ export default async function DashboardPage() {
     }
   }
 
-  // Recent Activity timeline (last 5 inspections)
+  // Recent inspections with rooms/photos for dashboard cards
   type RecentInspection = {
     id: string;
     type: string | null;
@@ -166,6 +165,7 @@ export default async function DashboardPage() {
     properties?: unknown;
     tenancies?: unknown;
     signatures?: { signer_type: string; otp_verified: boolean; signed_at: string | null }[];
+    rooms?: { id: string; photos?: { id: string }[] }[];
   };
   let recentInspections: RecentInspection[] = [];
   if (user) {
@@ -176,22 +176,22 @@ export default async function DashboardPage() {
         id, type, status, created_at, completed_at,
         properties (building_name, unit_number),
         tenancies (tenant_name),
-        signatures (signer_type, otp_verified, signed_at)
+        signatures (signer_type, otp_verified, signed_at),
+        rooms (id, photos (id))
       `
       )
       .eq("agent_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(5);
+      .limit(10);
     recentInspections = (recent ?? []) as RecentInspection[];
   }
 
   return (
-    <main className="min-h-screen bg-[#fcfcfc]">
-      <header className="bg-white border-b border-gray-100 px-4 h-16 flex items-center justify-between sticky top-0 z-50">
-        <DashboardHeader fullName={fullName} userEmail={user?.email ?? null} />
-      </header>
+    <main className="min-h-screen" style={{ background: "#F8F7F4" }}>
       <DashboardClient
         displayName={displayName}
+        fullName={fullName}
+        userEmail={user?.email ?? null}
         properties={propertiesData}
         alerts={alerts}
         recentInspections={recentInspections}
