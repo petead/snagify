@@ -452,6 +452,7 @@ function InspectionReport({
                         {/* Photo */}
                         <Image
                           src={photo.url!}
+                          alt={`Inspection photo - ${photo.notes?.slice(0, 50) || room.name}`}
                           style={{
                             width: "100%",
                             height: 140,

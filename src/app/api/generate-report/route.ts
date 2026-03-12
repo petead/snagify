@@ -123,7 +123,7 @@ export async function POST(request: Request) {
           return {
             name: r.name,
             photoCount: photos.length,
-            damageTags: [...new Set(photos.flatMap((p) => p.damage_tags ?? []))],
+            damageTags: Array.from(new Set(photos.flatMap((p) => p.damage_tags ?? []))),
             issueCount: photos.filter((p) => (p.damage_tags?.length ?? 0) > 0).length,
           };
         }),
