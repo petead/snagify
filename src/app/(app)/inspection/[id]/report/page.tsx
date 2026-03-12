@@ -26,7 +26,7 @@ export default async function ReportPage({
         id, name, condition, order_index,
         photos (id, url, ai_analysis, damage_tags, notes)
       ),
-      signatures (signer_type, otp_verified, signed_at)
+      signatures (signer_type, otp_verified, signed_at, signature_data)
     `
     )
     .eq("id", id)
@@ -73,6 +73,7 @@ export type Signature = {
   signer_type: string | null;
   otp_verified: boolean | null;
   signed_at: string | null;
+  signature_data: string | null;
 };
 
 export type PropertyRelation = {

@@ -257,6 +257,17 @@ export async function buildPdfAndUpload(
           })),
         };
       }),
+    signatures: ((row.signatures ?? []) as {
+      signer_type?: string;
+      signed_at?: string | null;
+      signature_data?: string | null;
+      otp_verified?: boolean;
+    }[]).map((s) => ({
+      signer_type: s.signer_type ?? "",
+      signed_at: s.signed_at ?? null,
+      signature_data: s.signature_data ?? null,
+      otp_verified: s.otp_verified ?? false,
+    })),
   };
 
   const dataString = JSON.stringify({

@@ -151,13 +151,16 @@ export async function POST(request: Request) {
         aiSummary = fallbackSummary(inspectionContext);
       }
 
+      const updatePayload: Record<string, string> = {
+        executive_summary: aiSummary,
+        completed_at: new Date().toISOString(),
+      };
+      if (inspection.status !== "signed") {
+        updatePayload.status = "completed";
+      }
       const { error: updateErr } = await supabase
         .from("inspections")
-        .update({
-          executive_summary: aiSummary,
-          status: "completed",
-          completed_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq("id", inspectionId);
 
       if (updateErr) {

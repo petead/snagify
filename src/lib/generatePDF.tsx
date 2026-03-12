@@ -232,6 +232,13 @@ interface ReportData {
   recommendations: string[];
 }
 
+interface SignatureEntry {
+  signer_type: string;
+  signed_at?: string | null;
+  signature_data?: string | null;
+  otp_verified?: boolean;
+}
+
 interface InspectionMeta {
   inspection: {
     id: string;
@@ -267,6 +274,7 @@ interface InspectionMeta {
       taken_at?: string;
     }[];
   }[];
+  signatures?: SignatureEntry[];
 }
 
 function InspectionReport({
@@ -609,16 +617,47 @@ function InspectionReport({
           </Text>
 
           <View style={s.sigGrid}>
-            <View style={s.sigBox}>
-              <Text style={s.sigRole}>Landlord</Text>
-              <Text style={s.sigName}>{meta.inspection.landlord_name || "—"}</Text>
-              <Text style={s.sigPending}>Pending Signature</Text>
-            </View>
-            <View style={s.sigBox}>
-              <Text style={s.sigRole}>Tenant</Text>
-              <Text style={s.sigName}>{meta.inspection.tenant_name || "—"}</Text>
-              <Text style={s.sigPending}>Pending Signature</Text>
-            </View>
+            {(["landlord", "tenant"] as const).map((role) => {
+              const sig = (meta.signatures ?? []).find((s) => s.signer_type === role);
+              const signed = !!(sig?.otp_verified || sig?.signed_at);
+              const name = role === "landlord"
+                ? (meta.inspection.landlord_name || "—")
+                : (meta.inspection.tenant_name || "—");
+              return (
+                <View key={role} style={s.sigBox}>
+                  <Text style={s.sigRole}>{role}</Text>
+                  <Text style={s.sigName}>{name}</Text>
+                  {signed && sig?.signature_data ? (
+                    <View style={{ alignItems: "center" }}>
+                      {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                      <Image
+                        src={sig.signature_data}
+                        style={{ width: 160, height: 60, objectFit: "contain", marginBottom: 6 }}
+                      />
+                      <View style={{ width: "100%", height: 1, backgroundColor: "#E5E7EB", marginBottom: 4 }} />
+                      {sig.signed_at && (
+                        <Text style={{ fontSize: 8, color: "#999" }}>
+                          Signed on {formatDate(sig.signed_at)}
+                        </Text>
+                      )}
+                    </View>
+                  ) : signed ? (
+                    <View style={{ alignItems: "center" }}>
+                      <Text style={{ fontSize: 10, color: "#2e7d32", fontFamily: "Helvetica-Bold", marginBottom: 4 }}>
+                        ✓ Signed
+                      </Text>
+                      {sig?.signed_at && (
+                        <Text style={{ fontSize: 8, color: "#999" }}>
+                          Signed on {formatDate(sig.signed_at)}
+                        </Text>
+                      )}
+                    </View>
+                  ) : (
+                    <Text style={s.sigPending}>Pending Signature</Text>
+                  )}
+                </View>
+              );
+            })}
           </View>
 
           <View style={s.disclaimerWrap}>
