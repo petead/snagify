@@ -12,13 +12,13 @@ export default function BottomNav() {
     { icon: Building2, label: "Properties", path: "/properties" },
     { icon: Plus, label: null, path: "/inspection/new" }, // center button
     { icon: FileText, label: "Reports", path: "/reports" },
-    { icon: User, label: "Profile", path: "/profile" },
+    { icon: User, label: "Profile", path: "/dashboard/profile" },
   ];
 
   return (
     <nav
       id="bottom-nav"
-      className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100"
+      className="fixed bottom-0 left-0 right-0 z-50 w-full bg-white border-t border-gray-100"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
