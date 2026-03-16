@@ -467,7 +467,7 @@ export async function buildPdfAndUpload(
           landlord_email: tenancy?.landlord_email ?? undefined,
         },
         rooms: roomsWithDelta,
-        signatures: meta.signatures.map((s) => ({
+        signatures: (meta.signatures ?? []).map((s) => ({
           signer_type: s.signer_type,
           signer_name: undefined,
           signature_data: s.signature_data ?? undefined,
