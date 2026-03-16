@@ -114,12 +114,9 @@ export async function POST(request: Request) {
     const useCheckoutCompare =
       Boolean(isCheckout && checkinPhotoUrl && typeof checkinPhotoUrl === "string");
 
-    type ImageBlock = {
-      type: "image";
-      source: { type: "base64"; media_type: string; data: string };
-    };
-    type TextBlock = { type: "text"; text: string };
-    let content: (TextBlock | ImageBlock)[];
+    type AllowedMediaType = "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+    const normalizedMediaType = (imageMediaType ?? "image/jpeg") as AllowedMediaType;
+    let contentBlocks: Anthropic.MessageParam["content"];
 
     if (useCheckoutCompare) {
       // Fetch check-in image and convert to base64 for comparison
@@ -135,58 +132,58 @@ export async function POST(request: Request) {
       }
 
       if (checkinBase64) {
-        content = [
-          { type: "text" as const, text: checkoutComparePrompt },
+        contentBlocks = [
+          { type: "text", text: checkoutComparePrompt },
           {
-            type: "image" as const,
+            type: "image",
             source: {
-              type: "base64" as const,
-              media_type: "image/jpeg" as const,
+              type: "base64",
+              media_type: "image/jpeg" as AllowedMediaType,
               data: checkinBase64,
             },
           },
           {
-            type: "image" as const,
+            type: "image",
             source: {
-              type: "base64" as const,
-              media_type: imageMediaType as "image/jpeg" | "image/png" | "image/webp" | "image/gif",
+              type: "base64",
+              media_type: normalizedMediaType,
               data: imageBase64,
             },
           },
-        ];
+        ] as Anthropic.MessageParam["content"];
       } else {
-        content = [
+        contentBlocks = [
           {
-            type: "image" as const,
+            type: "image",
             source: {
-              type: "base64" as const,
-              media_type: imageMediaType as "image/jpeg" | "image/png" | "image/webp" | "image/gif",
+              type: "base64",
+              media_type: normalizedMediaType,
               data: imageBase64,
             },
           },
           {
-            type: "text" as const,
+            type: "text",
             text: `This photo was taken in the following room: "${roomName ?? "Unknown room"}". 
 Analyze the property condition visible in this photo only.`,
           },
-        ];
+        ] as Anthropic.MessageParam["content"];
       }
     } else {
-      content = [
+      contentBlocks = [
         {
-          type: "image" as const,
+          type: "image",
           source: {
-            type: "base64" as const,
-            media_type: imageMediaType as "image/jpeg" | "image/png" | "image/webp" | "image/gif",
+            type: "base64",
+            media_type: normalizedMediaType,
             data: imageBase64,
           },
         },
         {
-          type: "text" as const,
+          type: "text",
           text: `This photo was taken in the following room: "${roomName ?? "Unknown room"}". 
 Analyze the property condition visible in this photo only.`,
         },
-      ];
+      ] as Anthropic.MessageParam["content"];
     }
 
     const response = await anthropic.messages.create({
@@ -196,7 +193,7 @@ Analyze the property condition visible in this photo only.`,
       messages: [
         {
           role: "user",
-          content,
+          content: contentBlocks,
         },
       ],
     });
