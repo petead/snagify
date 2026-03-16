@@ -92,7 +92,7 @@ export default function GhostCamera({
             : (checkinPhotos[activeGhostIndex]?.id ?? null);
           onPhotoTaken(blob, linkedId, isAdditionalMode);
           if (linkedId) {
-            setCoveredCheckinIds((prev) => new Set([...prev, linkedId]));
+            setCoveredCheckinIds((prev) => new Set(Array.from(prev).concat(linkedId)));
           }
           if (isAdditionalMode) {
             setIsAdditionalMode(false);
