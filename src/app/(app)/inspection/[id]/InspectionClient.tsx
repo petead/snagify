@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
@@ -150,15 +151,15 @@ function PhotoCard({
             display: "flex", flexDirection: "column",
             gap: 16, overflowY: "auto",
           }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photo.url}
-              alt=""
-              style={{
-                width: "100%", borderRadius: 16,
-                objectFit: "cover", maxHeight: 280,
-              }}
-            />
+            <div style={{ position: "relative", width: "100%", maxHeight: 280, aspectRatio: "4/3", borderRadius: 16, overflow: "hidden" }}>
+              <Image
+                src={photo.url}
+                alt=""
+                fill
+                sizes="100vw"
+                style={{ objectFit: "cover", borderRadius: 16 }}
+              />
+            </div>
 
             {/* AI Notes */}
             {photo.notes && !isAnalyzing && (
@@ -259,15 +260,13 @@ function PhotoCard({
             background: "#1a1a2e",
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={photo.url}
             alt=""
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
+            fill
+            sizes="(max-width: 768px) 50vw, 25vw"
             style={{
-              width: "100%", height: "100%", objectFit: "cover",
+              objectFit: "cover",
               opacity: photo.isUploading ? 0.35 : 1,
               transition: "opacity 0.25s",
             }}
@@ -1475,18 +1474,13 @@ export function InspectionClient({
                           ? "1.5px solid rgba(255,110,64,0.3)"
                           : "1.5px solid #f0f0f0",
                       }}>
-                        <div style={{ position: "relative", marginBottom: 8 }}>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
+                        <div style={{ position: "relative", marginBottom: 8, width: "100%", aspectRatio: "4/3", borderRadius: 12, overflow: "hidden" }}>
+                          <Image
                             src={photo.url}
                             alt=""
-                            style={{
-                              width: "100%",
-                              aspectRatio: "4/3",
-                              objectFit: "cover",
-                              borderRadius: 12,
-                              display: "block",
-                            }}
+                            fill
+                            sizes="(max-width: 768px) 100vw, 50vw"
+                            style={{ objectFit: "cover", borderRadius: 12 }}
                           />
 
                           {/* Delete button top-right */}

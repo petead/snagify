@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 
 export type GhostPhoto = {
   id: string;
@@ -188,7 +189,9 @@ export default function GhostCamera({
         />
 
         {activeGhost && ghostOpacity > 0 && (
-          <img
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
             src={activeGhost.url}
             alt="Check-in ghost"
             style={{
@@ -202,6 +205,7 @@ export default function GhostCamera({
               mixBlendMode: "normal",
             }}
           />
+          </>
         )}
 
         {activeGhost && (
@@ -292,6 +296,7 @@ export default function GhostCamera({
                 onClick={() => setActiveGhostIndex(idx)}
                 style={{
                   flexShrink: 0,
+                  position: "relative",
                   width: 52,
                   height: 52,
                   borderRadius: 8,
@@ -305,10 +310,12 @@ export default function GhostCamera({
                   cursor: "pointer",
                 }}
               >
-                <img
+                <Image
                   src={photo.url}
                   alt=""
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  fill
+                  sizes="52px"
+                  style={{ objectFit: "cover" }}
                 />
               </button>
             ))}
