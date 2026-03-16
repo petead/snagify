@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/alt-text */
 import {
   Document,
   Page,
@@ -980,7 +981,7 @@ function InspectionReport({
             <View style={s.coverLogoLeft}>
               <View style={[s.coverLogoIconBox, { marginRight: 8 }]}>
                 {agencyLogoUrl ? (
-                  <Image src={agencyLogoUrl} style={{ width: 20, height: 20 }} alt="" />
+                  <Image src={agencyLogoUrl} style={{ width: 20, height: 20 }} />
                 ) : (
                   <View style={{ width: 14, height: 14, backgroundColor: "rgba(255,255,255,0.7)", borderRadius: 3 }} />
                 )}
@@ -1285,7 +1286,7 @@ function InspectionReport({
                       style={[s.photoCard, ...(pair.indexOf(photo) === 0 && pair.length > 1 ? [{ marginRight: 8 }] : [])]}
                     >
                       {photo.url && photo.url.startsWith("http") ? (
-                        <Image src={photo.url} style={s.photoImg} alt="" />
+                        <Image src={photo.url} style={s.photoImg} />
                       ) : null}
                       {photo.damage_tags && photo.damage_tags.length > 0 && (
                         <View style={s.photoTagsRow}>
@@ -1355,7 +1356,7 @@ function InspectionReport({
           {qrDataUrl && (
             <View style={s.qrRow}>
               <View style={[s.qrBox, { marginRight: 14 }]}>
-                <Image src={qrDataUrl} style={s.qrImage} alt="" />
+                <Image src={qrDataUrl} style={s.qrImage} />
               </View>
               <View style={s.qrTextWrap}>
                 <Text style={s.qrTextTitle}>Scan to verify this report</Text>
@@ -1381,7 +1382,7 @@ function InspectionReport({
                   <Text style={s.sigPartyName}>{party.name ?? "—"}</Text>
                   <View style={s.sigSignArea}>
                     {sig?.signature_data ? (
-                      <Image src={sig.signature_data} style={s.sigSignImage} alt="" />
+                      <Image src={sig.signature_data} style={s.sigSignImage} />
                     ) : (
                       <Text style={s.sigSignPending}>Pending Signature</Text>
                     )}
@@ -1409,9 +1410,9 @@ function InspectionReport({
                 <View style={s.sigInspectorRight}>
                   <View style={s.sigInspectorSignBox}>
                     {inspectorSig?.signature_data ? (
-                      <Image src={inspectorSig.signature_data} style={s.sigSignImage} alt="" />
+                      <Image src={inspectorSig.signature_data} style={s.sigSignImage} />
                     ) : profile?.signature_image_url ? (
-                      <Image src={profile.signature_image_url} style={s.sigSignImage} alt="" />
+                      <Image src={profile.signature_image_url} style={s.sigSignImage} />
                     ) : (
                       <Text style={s.sigSignPending}>—</Text>
                     )}
