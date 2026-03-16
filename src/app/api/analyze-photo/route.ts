@@ -73,8 +73,10 @@ export async function POST(request: Request) {
       mimeType = "image/jpeg",
       photoId,
       roomName,
-      checkinPhotoUrl,
+      checkinPhotoUrl: checkinPhotoUrlFromBody,
       isCheckout,
+      checkinPhotoId,
+      isAdditional,
     } = body as {
       image?: string;
       base64?: string;
@@ -83,6 +85,8 @@ export async function POST(request: Request) {
       roomName?: string;
       checkinPhotoUrl?: string | null;
       isCheckout?: boolean;
+      checkinPhotoId?: string | null;
+      isAdditional?: boolean;
     };
     const base64Data = base64 ?? image;
 
@@ -111,15 +115,35 @@ export async function POST(request: Request) {
 
     const anthropic = new Anthropic({ apiKey, timeout: 60000 });
 
-    const useCheckoutCompare =
-      Boolean(isCheckout && checkinPhotoUrl && typeof checkinPhotoUrl === "string");
+    const supabaseAdmin =
+      process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+        ? createServiceClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            process.env.SUPABASE_SERVICE_ROLE_KEY
+          )
+        : null;
+
+    let checkinPhotoUrl: string | null = checkinPhotoUrlFromBody ?? null;
+    if (checkinPhotoId && supabaseAdmin) {
+      const { data: checkinPhoto } = await supabaseAdmin
+        .from("photos")
+        .select("url")
+        .eq("id", checkinPhotoId)
+        .single();
+      if (checkinPhoto?.url) checkinPhotoUrl = checkinPhoto.url;
+    }
+
+    const useCheckoutCompare = Boolean(
+      (checkinPhotoId || (isCheckout && checkinPhotoUrl)) &&
+        checkinPhotoUrl &&
+        typeof checkinPhotoUrl === "string"
+    );
 
     type AllowedMediaType = "image/jpeg" | "image/png" | "image/webp" | "image/gif";
     const normalizedMediaType = (imageMediaType ?? "image/jpeg") as AllowedMediaType;
     let contentBlocks: Anthropic.MessageParam["content"];
 
     if (useCheckoutCompare) {
-      // Fetch check-in image and convert to base64 for comparison
       let checkinBase64: string | null = null;
       try {
         const checkinRes = await fetch(checkinPhotoUrl as string);
@@ -168,6 +192,25 @@ Analyze the property condition visible in this photo only.`,
           },
         ] as Anthropic.MessageParam["content"];
       }
+    } else if (isAdditional) {
+      contentBlocks = [
+        {
+          type: "text",
+          text: `You are a professional property inspector in Dubai.
+This photo documents a NEW finding at check-out with NO entry reference.
+Describe the damage or condition issue observed.
+Be specific: location, type of damage, estimated severity.
+Keep response under 60 words.`,
+        },
+        {
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: normalizedMediaType,
+            data: imageBase64,
+          },
+        },
+      ] as Anthropic.MessageParam["content"];
     } else {
       contentBlocks = [
         {

@@ -277,9 +277,14 @@ interface InspectionMeta {
       notes?: string;
       damage_tags?: string[];
       taken_at?: string;
+      checkin_photo_id?: string | null;
+      is_additional?: boolean;
+      ai_analysis?: string | null;
     }[];
   }[];
   signatures?: SignatureEntry[];
+  checkinPhotoMap?: Record<string, { id: string; url: string; damage_tags?: string[]; ai_analysis?: string | null }>;
+  checkinRooms?: { name: string; photos: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }[] }[];
 }
 
 function isValidHex(s: string | undefined): boolean {
@@ -564,6 +569,23 @@ function InspectionReport({
         const rc = conditionColor(roomCondition);
         const photosWithIssues = r.photosWithIssues;
         const roomInspectionDate = r.roomInspectionDate;
+        const isCheckoutRoom =
+          (meta.inspection.type ?? "").toLowerCase().includes("check-out") &&
+          meta.checkinPhotoMap &&
+          meta.checkinRooms;
+        const checkinRoom = meta.checkinRooms?.find(
+          (cr) => cr.name.toLowerCase() === room.name.toLowerCase()
+        );
+        const checkinRoomPhotos = checkinRoom?.photos ?? [];
+        const pairedPhotos = validPhotos.filter(
+          (p) => (p as { checkin_photo_id?: string | null; is_additional?: boolean }).checkin_photo_id && !(p as { is_additional?: boolean }).is_additional
+        );
+        const additionalPhotos = validPhotos.filter(
+          (p) => (p as { is_additional?: boolean }).is_additional
+        );
+        const uncoveredCheckinPhotos = checkinRoomPhotos.filter(
+          (cp) => !pairedPhotos.some((p) => (p as { checkin_photo_id?: string | null }).checkin_photo_id === cp.id)
+        );
 
         return (
           <Page key={ri} size="A4" style={s.page}>
@@ -583,7 +605,130 @@ function InspectionReport({
 
             <Text style={s.roomSummary}>{room.summary}</Text>
 
-            {validPhotos.length > 0 && (
+            {isCheckoutRoom ? (
+              <View style={{ marginTop: 14 }}>
+                {/* Section 1 — Entry vs Exit paired */}
+                {pairedPhotos.length > 0 && (
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: DARK, marginBottom: 8 }}>
+                      Entry vs Exit
+                    </Text>
+                    {pairedPhotos.map((p) => {
+                      const checkinId = (p as { checkin_photo_id?: string | null }).checkin_photo_id;
+                      const checkinPhoto = checkinId ? meta.checkinPhotoMap?.[checkinId] : null;
+                      return (
+                        <View key={p.id} style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                          <View style={{ flex: 1 }}>
+                            {checkinPhoto?.url && (
+                              <>
+                                {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                                <Image
+                                  src={checkinPhoto.url}
+                                  style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 6, marginBottom: 4 }}
+                                />
+                                {checkinPhoto.damage_tags && checkinPhoto.damage_tags.length > 0 && (
+                                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 2 }}>
+                                    {checkinPhoto.damage_tags.map((tag) => (
+                                      <Text key={tag} style={{ fontSize: 6, color: "#666" }}>{tag}</Text>
+                                    ))}
+                                  </View>
+                                )}
+                                <Text style={{ fontSize: 7, color: "#888", marginTop: 2 }}>Entry</Text>
+                              </>
+                            )}
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                            <Image
+                              src={p.url!}
+                              style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 6, marginBottom: 4 }}
+                            />
+                            {p.damage_tags && p.damage_tags.length > 0 && (
+                              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 2 }}>
+                                {p.damage_tags.map((tag) => (
+                                  <Text key={tag} style={{ fontSize: 6, color: "#ef4444" }}>{tag}</Text>
+                                ))}
+                              </View>
+                            )}
+                            <Text style={{ fontSize: 7, color: "#888", marginTop: 2 }}>Exit</Text>
+                            {(p as { ai_analysis?: string | null }).ai_analysis && (
+                              <Text style={{ fontSize: 7, color: "#444", marginTop: 4, lineHeight: 1.3 }}>
+                                {(p as { ai_analysis?: string | null }).ai_analysis}
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+                {/* Section 2 — Entry photos not re-inspected */}
+                {uncoveredCheckinPhotos.length > 0 && (
+                  <View style={{ marginBottom: 16 }}>
+                    <View style={{ backgroundColor: "#E5E7EB", padding: 8, borderRadius: 6, marginBottom: 8 }}>
+                      <Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold", color: "#555" }}>
+                      ⚠️ {uncoveredCheckinPhotos.length} entry photo(s) not re-documented at check-out
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                      {uncoveredCheckinPhotos.map((cp) => (
+                        <View key={cp.id} style={{ width: "30%", position: "relative" }}>
+                          {cp.url && (
+                            <>
+                              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                              <Image
+                                src={cp.url}
+                                style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 6 }}
+                              />
+                              <View style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 6, alignItems: "center", justifyContent: "center" }}>
+                                <Text style={{ fontSize: 14, color: "white", fontFamily: "Helvetica-Bold" }}>⚠️</Text>
+                              </View>
+                            </>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+                {/* Section 3 — New findings */}
+                {additionalPhotos.length > 0 && (
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: "#FF8A65", marginBottom: 8 }}>
+                      New findings — no entry reference
+                    </Text>
+                    {chunkArray(additionalPhotos, 2).map((pair, rowIdx) => (
+                      <View key={rowIdx} style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                        {pair.map((photo) => (
+                          <View key={photo.id} style={{ flex: 1 }}>
+                            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                            <Image
+                              src={photo.url!}
+                              style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 6, marginBottom: 4 }}
+                            />
+                            {photo.damage_tags && photo.damage_tags.length > 0 && (
+                              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 3 }}>
+                                {photo.damage_tags.map((tag) => (
+                                  <Text key={tag} style={{ fontSize: 6, color: "#ef4444", fontFamily: "Helvetica-Bold" }}>{tag}</Text>
+                                ))}
+                              </View>
+                            )}
+                            {(photo as { ai_analysis?: string | null }).ai_analysis && (
+                              <Text style={{ fontSize: 7, color: "#444", marginTop: 2, lineHeight: 1.3 }}>
+                                {(photo as { ai_analysis?: string | null }).ai_analysis}
+                              </Text>
+                            )}
+                          </View>
+                        ))}
+                        {pair.length === 1 && <View style={{ flex: 1 }} />}
+                      </View>
+                    ))}
+                  </View>
+                )}
+                {pairedPhotos.length === 0 && uncoveredCheckinPhotos.length === 0 && additionalPhotos.length === 0 && validPhotos.length > 0 && (
+                  <Text style={s.roomMetaLine}>No paired or additional photos in this room.</Text>
+                )}
+              </View>
+            ) : validPhotos.length > 0 ? (
               <View style={{ marginTop: 14 }}>
                 <Text style={s.roomMetaLine}>
                   {validPhotos.length} photo{validPhotos.length > 1 ? "s" : ""} captured
@@ -591,14 +736,12 @@ function InspectionReport({
                     ? ` · ${photosWithIssues} issue${photosWithIssues > 1 ? "s" : ""} flagged`
                     : ""}
                 </Text>
-                {/* 2-column grid */}
                 {chunkArray(validPhotos, 2).map((pair, rowIdx) => (
                   <View key={rowIdx} style={{
                     flexDirection: "row", gap: 10, marginBottom: 12,
                   }}>
                     {pair.map((photo) => (
                       <View key={photo.id} style={{ flex: 1 }}>
-                        {/* Photo */}
                         {/* eslint-disable-next-line jsx-a11y/alt-text */}
                         <Image
                           src={photo.url!}
@@ -610,7 +753,6 @@ function InspectionReport({
                             marginBottom: 5,
                           }}
                         />
-                        {/* Damage tags */}
                         {photo.damage_tags && photo.damage_tags.length > 0 && (
                           <View style={{
                             flexDirection: "row", flexWrap: "wrap", gap: 3, marginBottom: 4,
@@ -633,7 +775,6 @@ function InspectionReport({
                             ))}
                           </View>
                         )}
-                        {/* Notes (with coherence check vs damage_tags) */}
                         <Text style={{
                           fontSize: 8,
                           color: photoDisplayNote(photo) !== "General view" ? "#444" : "#9ca3af",
@@ -644,12 +785,11 @@ function InspectionReport({
                         </Text>
                       </View>
                     ))}
-                    {/* Fill empty slot if odd number of photos */}
                     {pair.length === 1 && <View style={{ flex: 1 }} />}
                   </View>
                 ))}
               </View>
-            )}
+            ) : null}
 
             {room.recommendations.length > 0 && (
               <View style={s.recsBox}>

@@ -29,6 +29,8 @@ type PhotoItem = {
   notes: string;
   isUploading: boolean;
   uploadFailed: boolean;
+  checkin_photo_id?: string | null;
+  is_additional?: boolean;
 };
 
 type GeoCoords = { lat: number; lng: number };
@@ -393,6 +395,7 @@ export function InspectionClient({
   // Report generation (review screen)
   const [generating, setGenerating] = useState(false);
   const [navigating, setNavigating] = useState(false);
+  const [showCompletenessWarning, setShowCompletenessWarning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const notesTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -451,7 +454,7 @@ export function InspectionClient({
       const roomIds = liveRooms.map((r) => r.id);
       const { data } = await supabase
         .from("photos")
-        .select("id, room_id, url, damage_tags, notes")
+        .select("id, room_id, url, damage_tags, notes, checkin_photo_id, is_additional")
         .in("room_id", roomIds)
         .order("taken_at", { ascending: true });
       if (data) {
@@ -472,6 +475,8 @@ export function InspectionClient({
                 notes: local ? local.notes : (p.notes ?? ""),
                 isUploading: false,
                 uploadFailed: false,
+                checkin_photo_id: (p as { checkin_photo_id?: string | null }).checkin_photo_id ?? null,
+                is_additional: (p as { is_additional?: boolean }).is_additional ?? false,
               };
             });
         });
@@ -594,7 +599,8 @@ export function InspectionClient({
     base64: string,
     roomId: string,
     roomName: string,
-    checkinPhotoUrl?: string | null
+    checkinPhotoId?: string | null,
+    isAdditional: boolean = false
   ) => {
     const localBase64 = base64;
     const localRoomId = roomId;
@@ -649,6 +655,8 @@ export function InspectionClient({
           taken_at: new Date().toISOString(),
           gps_lat: coords?.lat ?? null,
           gps_lng: coords?.lng ?? null,
+          checkin_photo_id: checkinPhotoId ?? null,
+          is_additional: isAdditional,
         })
         .select("id")
         .single();
@@ -672,8 +680,8 @@ export function InspectionClient({
             base64: localBase64,
             photoId: realPhotoId,
             roomName: localRoomName,
-            checkinPhotoUrl: checkinPhotoUrl ?? null,
-            isCheckout: !!checkinPhotoUrl,
+            checkinPhotoId: checkinPhotoId ?? null,
+            isAdditional,
           }),
         });
 
@@ -721,7 +729,7 @@ export function InspectionClient({
       const roomIds = liveRooms.map((r) => r.id);
       const { data } = await supabase
         .from("photos")
-        .select("id, room_id, url, damage_tags, notes")
+        .select("id, room_id, url, damage_tags, notes, checkin_photo_id, is_additional")
         .in("room_id", roomIds)
         .order("taken_at", { ascending: true });
       if (data && data.length > 0) {
@@ -743,6 +751,8 @@ export function InspectionClient({
                 notes: local ? local.notes : (p.notes ?? ""),
                 isUploading: false,
                 uploadFailed: false,
+                checkin_photo_id: (p as { checkin_photo_id?: string | null }).checkin_photo_id ?? null,
+                is_additional: (p as { is_additional?: boolean }).is_additional ?? false,
               };
             });
         });
@@ -876,6 +886,29 @@ export function InspectionClient({
       });
     }, 500);
   };
+
+  const checkCompleteness = (): string[] => {
+    const issues: string[] = [];
+    liveRooms.forEach((room) => {
+      const checkinPhotos = checkinGhostMap[room.name.toLowerCase().trim()] ?? [];
+      if (checkinPhotos.length === 0) return;
+      const checkoutPhotos = photos.filter((p) => p.room_id === room.id);
+      const coveredCheckinIds = new Set(
+        checkoutPhotos.map((p) => p.checkin_photo_id).filter(Boolean) as string[]
+      );
+      const uncovered = checkinPhotos.filter((p) => !coveredCheckinIds.has(p.id));
+      if (checkoutPhotos.length === 0) {
+        issues.push(`❌ ${room.name}: no check-out photos taken`);
+      } else if (uncovered.length > 0) {
+        issues.push(`⚠️ ${room.name}: ${uncovered.length} entry photo(s) not covered`);
+      }
+    });
+    return issues;
+  };
+
+  const completenessIssues =
+    inspectionType === "check-out" ? checkCompleteness() : [];
+  const hasBlockingIssues = completenessIssues.some((i) => i.startsWith("❌"));
 
   // ── Generate report (from review screen)
   const handleGenerateReport = async () => {
@@ -1271,7 +1304,7 @@ export function InspectionClient({
               roomName={currentRoom.name}
               isCheckout={true}
               onClose={() => setIsCameraOpen(false)}
-              onPhotoTaken={async (blob, activeGhostUrl) => {
+              onPhotoTaken={async (blob, linkedCheckinPhotoId, isAdditional) => {
                 setIsCameraOpen(false);
                 const base64: string = await new Promise((res, rej) => {
                   const reader = new FileReader();
@@ -1280,7 +1313,7 @@ export function InspectionClient({
                   reader.readAsDataURL(blob);
                 });
                 if (base64.startsWith("data:image")) {
-                  await handlePhotoCapture(base64, currentRoom.id, currentRoom.name, activeGhostUrl);
+                  await handlePhotoCapture(base64, currentRoom.id, currentRoom.name, linkedCheckinPhotoId, isAdditional);
                 }
               }}
             />
@@ -1701,9 +1734,71 @@ export function InspectionClient({
               ))}
             </div>
 
+            {showCompletenessWarning && completenessIssues.length > 0 && (
+              <div
+                style={{
+                  background: "#FFF8F0",
+                  border: "1px solid #FF8A65",
+                  borderRadius: 12,
+                  padding: 16,
+                  margin: "12px 16px",
+                }}
+              >
+                <p style={{ fontWeight: 700, color: "#FF8A65", marginBottom: 8 }}>
+                  Incomplete Inspection
+                </p>
+                {completenessIssues.map((issue, i) => (
+                  <p key={i} style={{ fontSize: 13, color: "#555", margin: "4px 0" }}>
+                    {issue}
+                  </p>
+                ))}
+                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                  {!hasBlockingIssues && (
+                    <button
+                      type="button"
+                      onClick={handleGenerateReport}
+                      style={{
+                        flex: 1,
+                        padding: "10px",
+                        borderRadius: 10,
+                        background: "#FF8A65",
+                        color: "white",
+                        border: "none",
+                        fontWeight: 700,
+                        fontSize: 14,
+                      }}
+                    >
+                      Generate anyway
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowCompletenessWarning(false)}
+                    style={{
+                      flex: 1,
+                      padding: "10px",
+                      borderRadius: 10,
+                      background: "#f0f0f0",
+                      color: "#333",
+                      border: "none",
+                      fontWeight: 700,
+                      fontSize: 14,
+                    }}
+                  >
+                    Complete inspection
+                  </button>
+                </div>
+              </div>
+            )}
             <button
               type="button"
-              onClick={handleGenerateReport}
+              onClick={() => {
+                if (inspectionType === "check-out" && completenessIssues.length > 0) {
+                  setShowCompletenessWarning(true);
+                } else {
+                  handleGenerateReport();
+                }
+              }}
               disabled={generating || navigating}
               style={{
                 width: "100%", height: 52, borderRadius: 14, border: "none",

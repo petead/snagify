@@ -13,7 +13,7 @@ export type GhostPhoto = {
 
 export interface GhostCameraProps {
   checkinPhotos: GhostPhoto[];
-  onPhotoTaken: (blob: Blob, activeGhostUrl?: string | null) => void;
+  onPhotoTaken: (blob: Blob, linkedCheckinPhotoId: string | null, isAdditional: boolean) => void;
   onClose: () => void;
   roomName: string;
   isCheckout: boolean;
@@ -34,6 +34,8 @@ export default function GhostCamera({
   const [activeGhostIndex, setActiveGhostIndex] = useState(0);
   const [capturing, setCapturing] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [coveredCheckinIds, setCoveredCheckinIds] = useState<Set<string>>(new Set());
+  const [isAdditionalMode, setIsAdditionalMode] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -85,8 +87,17 @@ export default function GhostCamera({
     canvas.toBlob(
       (blob) => {
         if (blob) {
-          const activeGhost = checkinPhotos[activeGhostIndex];
-          onPhotoTaken(blob, activeGhost?.url ?? null);
+          const linkedId = isAdditionalMode
+            ? null
+            : (checkinPhotos[activeGhostIndex]?.id ?? null);
+          onPhotoTaken(blob, linkedId, isAdditionalMode);
+          if (linkedId) {
+            setCoveredCheckinIds((prev) => new Set([...prev, linkedId]));
+          }
+          if (isAdditionalMode) {
+            setIsAdditionalMode(false);
+            setGhostOpacity(0.35);
+          }
         }
         setCapturing(false);
       },
@@ -188,7 +199,7 @@ export default function GhostCamera({
           }}
         />
 
-        {activeGhost && ghostOpacity > 0 && (
+        {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -208,7 +219,7 @@ export default function GhostCamera({
           </>
         )}
 
-        {activeGhost && (
+        {activeGhost && !isAdditionalMode && (
           <div
             style={{
               position: "absolute",
@@ -221,6 +232,22 @@ export default function GhostCamera({
           >
             <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: 600, margin: 0 }}>
               👻 Entry photo
+            </p>
+          </div>
+        )}
+        {isAdditionalMode && (
+          <div
+            style={{
+              position: "absolute",
+              top: 64,
+              left: 12,
+              background: "rgba(255,138,101,0.7)",
+              borderRadius: 8,
+              padding: "4px 10px",
+            }}
+          >
+            <p style={{ color: "white", fontSize: 11, fontWeight: 600, margin: 0 }}>
+              📸 New finding — no entry reference
             </p>
           </div>
         )}
@@ -280,46 +307,94 @@ export default function GhostCamera({
           </div>
         )}
 
-        {checkinPhotos.length > 1 && (
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              overflowX: "auto",
-              paddingBottom: 4,
-            }}
-          >
-            {checkinPhotos.map((photo, idx) => (
-              <button
-                key={photo.id}
-                type="button"
-                onClick={() => setActiveGhostIndex(idx)}
+        {checkinPhotos.length > 0 && (
+          <>
+            {(() => {
+              const coveredCount = coveredCheckinIds.size;
+              const totalRequired = checkinPhotos.length;
+              const allCovered = coveredCount >= totalRequired;
+              return (
+                <div
+                  style={{
+                    padding: "4px 12px",
+                    borderRadius: 20,
+                    background: allCovered ? "rgba(34,197,94,0.2)" : "rgba(255,138,101,0.2)",
+                    marginBottom: 8,
+                    alignSelf: "center",
+                  }}
+                >
+                  <p
+                    style={{
+                      color: allCovered ? "#22c55e" : "#FF8A65",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      margin: 0,
+                    }}
+                  >
+                    {allCovered
+                      ? `✓ All ${totalRequired} entry photos covered`
+                      : `${coveredCount}/${totalRequired} entry photos covered`}
+                  </p>
+                </div>
+              );
+            })()}
+            {checkinPhotos.length > 1 && (
+              <div
                 style={{
-                  flexShrink: 0,
-                  position: "relative",
-                  width: 52,
-                  height: 52,
-                  borderRadius: 8,
-                  overflow: "hidden",
-                  padding: 0,
-                  border:
-                    idx === activeGhostIndex
-                      ? "2.5px solid #9A88FD"
-                      : "2.5px solid transparent",
-                  opacity: idx === activeGhostIndex ? 1 : 0.55,
-                  cursor: "pointer",
+                  display: "flex",
+                  gap: 8,
+                  overflowX: "auto",
+                  paddingBottom: 4,
                 }}
               >
-                <Image
-                  src={photo.url}
-                  alt=""
-                  fill
-                  sizes="52px"
-                  style={{ objectFit: "cover" }}
-                />
-              </button>
-            ))}
-          </div>
+                {checkinPhotos.map((photo, idx) => (
+                  <button
+                    key={photo.id}
+                    type="button"
+                    onClick={() => setActiveGhostIndex(idx)}
+                    style={{
+                      flexShrink: 0,
+                      position: "relative",
+                      width: 52,
+                      height: 52,
+                      borderRadius: 8,
+                      overflow: "hidden",
+                      padding: 0,
+                      border:
+                        idx === activeGhostIndex
+                          ? "2.5px solid #9A88FD"
+                          : "2.5px solid transparent",
+                      opacity: idx === activeGhostIndex ? 1 : 0.55,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Image
+                      src={photo.url}
+                      alt=""
+                      fill
+                      sizes="52px"
+                      style={{ objectFit: "cover" }}
+                    />
+                    {coveredCheckinIds.has(photo.id) && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          background: "rgba(34,197,94,0.45)",
+                          borderRadius: 8,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <span style={{ color: "white", fontSize: 18, fontWeight: 800 }}>✓</span>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         <div
@@ -338,7 +413,7 @@ export default function GhostCamera({
               width: 72,
               height: 72,
               borderRadius: "50%",
-              border: "4px solid white",
+              border: isAdditionalMode ? "4px solid #FF8A65" : "4px solid white",
               background: capturing ? "#9A88FD" : "rgba(255,255,255,0.15)",
               cursor: capturing ? "default" : "pointer",
               display: "flex",
@@ -358,6 +433,29 @@ export default function GhostCamera({
             />
           </button>
         </div>
+
+        {isCheckout && (
+          <button
+            type="button"
+            onClick={() => {
+              setGhostOpacity(0);
+              setIsAdditionalMode(true);
+            }}
+            style={{
+              marginTop: 8,
+              padding: "8px 20px",
+              borderRadius: 20,
+              border: "1.5px solid rgba(255,138,101,0.6)",
+              background: "transparent",
+              color: "#FF8A65",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            ＋ New finding
+          </button>
+        )}
 
         {cameraError && (
           <p style={{ color: "#FF8A65", fontSize: 12, textAlign: "center", margin: 0 }}>

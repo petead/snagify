@@ -126,6 +126,8 @@ type RoomRow = {
     damage_tags?: string[];
     notes?: string | null;
     taken_at?: string | null;
+    checkin_photo_id?: string | null;
+    is_additional?: boolean;
   }[];
 };
 
@@ -173,7 +175,9 @@ const INSPECTION_SELECT = `
       ai_analysis,
       damage_tags,
       notes,
-      taken_at
+      taken_at,
+      checkin_photo_id,
+      is_additional
     )
   ),
   signatures (
@@ -204,6 +208,34 @@ export async function buildPdfAndUpload(
   const row = inspection as InspectionRow;
   const executiveSummary = row.executive_summary?.trim() || fallbackExecutiveSummary(row);
   const reportData = buildReportDataFromInspection(row, executiveSummary);
+
+  let checkinPhotoMap: Record<string, { id: string; url: string; damage_tags?: string[]; ai_analysis?: string | null }> = {};
+  let checkinRooms: { name: string; photos: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }[] }[] = [];
+  const isCheckout = (row.type ?? "").toLowerCase().includes("check-out");
+  if (isCheckout && row.property_id) {
+    const { data: checkinInspection } = await supabase
+      .from("inspections")
+      .select("id")
+      .eq("property_id", row.property_id)
+      .eq("type", "check-in")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (checkinInspection) {
+      const { data: checkinRoomsData } = await supabase
+        .from("rooms")
+        .select("id, name, order_index, photos (id, url, damage_tags, ai_analysis)")
+        .eq("inspection_id", checkinInspection.id);
+      (checkinRoomsData ?? []).forEach((room: { name: string; photos?: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }[] }) => {
+        if (room.photos?.length) {
+          checkinRooms.push({ name: room.name, photos: room.photos });
+          room.photos.forEach((p: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }) => {
+            if (p.url) checkinPhotoMap[p.id] = { id: p.id, url: p.url, damage_tags: p.damage_tags, ai_analysis: p.ai_analysis };
+          });
+        }
+      });
+    }
+  }
 
   const prop = Array.isArray(row.properties) ? row.properties[0] : row.properties;
   const tenancy = Array.isArray(row.tenancies) ? row.tenancies[0] : row.tenancies;
@@ -265,9 +297,14 @@ export async function buildPdfAndUpload(
             notes: p.notes ?? undefined,
             damage_tags: p.damage_tags ?? [],
             taken_at: p.taken_at ?? undefined,
+            checkin_photo_id: p.checkin_photo_id ?? undefined,
+            is_additional: p.is_additional ?? false,
+            ai_analysis: p.ai_analysis ?? undefined,
           })),
         };
       }),
+    checkinPhotoMap: isCheckout ? checkinPhotoMap : undefined,
+    checkinRooms: isCheckout ? checkinRooms : undefined,
     signatures: ((row.signatures ?? []) as {
       signer_type?: string;
       signed_at?: string | null;
