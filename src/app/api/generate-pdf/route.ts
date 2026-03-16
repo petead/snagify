@@ -6,6 +6,11 @@ import {
   type ReportData,
   type InspectionMeta,
 } from "@/lib/generatePDF";
+import {
+  renderCheckoutPDFToBuffer,
+  type CheckoutPDFProps,
+} from "@/lib/generateCheckoutPDF";
+import { getBrandTokens } from "@/lib/pdf/brandTokens";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
@@ -88,6 +93,7 @@ type InspectionRow = {
   key_handover?: { item: string; qty: number }[] | null;
   checkin_key_handover?: { item: string; qty: number }[] | null;
   property_id?: string | null;
+  tenancy_id?: string | null;
   inspection_type?: string | null;
   properties?: PropRow | PropRow[] | null;
   tenancies?: TenancyRow | TenancyRow[] | null;
@@ -112,6 +118,7 @@ type TenancyRow = {
   ejari_ref?: string | null;
   contract_from?: string | null;
   contract_to?: string | null;
+  actual_end_date?: string | null;
   annual_rent?: number | null;
   security_deposit?: number | null;
 };
@@ -130,6 +137,8 @@ type RoomRow = {
     damage_tags?: string[];
     notes?: string | null;
     taken_at?: string | null;
+    checkin_photo_id?: string | null;
+    is_additional?: boolean;
   }[];
 };
 
@@ -143,6 +152,7 @@ const INSPECTION_SELECT = `
   created_at,
   executive_summary,
   key_handover,
+  checkin_key_handover,
   agent_id,
   property_id,
   tenancy_id,
@@ -162,6 +172,7 @@ const INSPECTION_SELECT = `
     ejari_ref,
     contract_from,
     contract_to,
+    actual_end_date,
     annual_rent,
     security_deposit
   ),
@@ -178,7 +189,9 @@ const INSPECTION_SELECT = `
       ai_analysis,
       damage_tags,
       notes,
-      taken_at
+      taken_at,
+      checkin_photo_id,
+      is_additional
     )
   ),
   signatures (
@@ -226,39 +239,59 @@ export async function buildPdfAndUpload(
         return typeof rec.item === "string" && typeof rec.qty === "number";
       });
 
-    let checkinPhotoMap: Record<string, { id: string; url: string; damage_tags?: string[]; ai_analysis?: string | null }> = {};
-    let checkinRooms: { name: string; photos: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }[] }[] = [];
     const inspectionType = (
       (row as Record<string, unknown>).inspection_type ??
       (row as Record<string, unknown>).type ??
       ""
     ) as string;
-    const propertyId = (
-      (row as Record<string, unknown>).property_id ?? null
-    ) as string | null;
     const isCheckout = inspectionType.toLowerCase().includes("check-out");
 
-    if (isCheckout && propertyId) {
+    let checkinInspectionForPdf: { id: string; created_at: string; document_hash?: string } | null = null;
+    let checkinPhotosById: Map<string, { id: string; url: string; damage_tags?: string[]; ai_analysis?: string | null; width?: number | null; height?: number | null }> = new Map();
+    let checkinRoomConditionsByName: Map<string, string> = new Map();
+
+    if (isCheckout && row.tenancy_id) {
       const { data: checkinInspection } = await supabase
         .from("inspections")
-        .select("id")
-        .eq("property_id", propertyId)
+        .select("id, created_at, document_hash")
+        .eq("tenancy_id", row.tenancy_id)
         .eq("type", "check-in")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+
       if (checkinInspection) {
-        const { data: checkinRoomsData } = await supabase
-          .from("rooms")
-          .select("id, name, order_index, photos (id, url, damage_tags, ai_analysis)")
-          .eq("inspection_id", checkinInspection.id);
-        (checkinRoomsData ?? []).forEach((room: { name: string; photos?: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }[] }) => {
-          if (room.photos?.length) {
-            checkinRooms.push({ name: room.name, photos: room.photos });
-            room.photos.forEach((p: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }) => {
-              if (p.url) checkinPhotoMap[p.id] = { id: p.id, url: p.url, damage_tags: p.damage_tags, ai_analysis: p.ai_analysis };
+        checkinInspectionForPdf = {
+          id: checkinInspection.id,
+          created_at: String(checkinInspection.created_at ?? ""),
+          document_hash: checkinInspection.document_hash ?? undefined,
+        };
+
+        const checkinPhotoIds = (row.rooms ?? [])
+          .flatMap((r) => (r.photos ?? []).map((p) => p.checkin_photo_id).filter(Boolean)) as string[];
+        if (checkinPhotoIds.length > 0) {
+          const { data: checkinPhotos } = await supabase
+            .from("photos")
+            .select("id, url, damage_tags, ai_analysis, width, height")
+            .in("id", checkinPhotoIds);
+          (checkinPhotos ?? []).forEach((p) => {
+            checkinPhotosById.set(p.id, {
+              id: p.id,
+              url: p.url ?? "",
+              damage_tags: p.damage_tags ?? undefined,
+              ai_analysis: p.ai_analysis ?? undefined,
+              width: p.width ?? undefined,
+              height: p.height ?? undefined,
             });
-          }
+          });
+        }
+
+        const { data: checkinRooms } = await supabase
+          .from("rooms")
+          .select("name, condition")
+          .eq("inspection_id", checkinInspection.id);
+        (checkinRooms ?? []).forEach((r: { name: string; condition?: string | null }) => {
+          if (r.name) checkinRoomConditionsByName.set(r.name, r.condition ?? "");
         });
       }
     }
@@ -345,8 +378,8 @@ export async function buildPdfAndUpload(
             })),
           };
         }),
-      checkinPhotoMap: isCheckout ? checkinPhotoMap : undefined,
-      checkinRooms: isCheckout ? checkinRooms : undefined,
+      checkinPhotoMap: undefined,
+      checkinRooms: undefined,
       signatures: ((row.signatures ?? []) as {
         signer_type?: string;
         signed_at?: string | null;
@@ -374,7 +407,89 @@ export async function buildPdfAndUpload(
       .update({ document_hash: documentHash })
       .eq("id", inspectionId);
 
-    const pdfBuffer = await generateInspectionPDFBuffer(reportData, meta, documentHash);
+    let pdfBuffer: Buffer;
+    if (isCheckout) {
+      const primaryColor = (agentData as { company_primary_color?: string } | null)?.company_primary_color ?? "#6366F1";
+      const tokens = getBrandTokens(primaryColor);
+      const sortedRooms = (row.rooms ?? []).sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+      const roomsWithDelta: CheckoutPDFProps["rooms"] = sortedRooms.map((room) => {
+        const photos = (room.photos ?? [])
+          .filter((p) => p.url && p.url.startsWith("https://"))
+          .map((p) => ({
+            id: p.id,
+            url: p.url!,
+            damage_tags: p.damage_tags,
+            ai_analysis: p.ai_analysis ?? undefined,
+            width: p.width ?? null,
+            height: p.height ?? null,
+            checkin_photo_id: p.checkin_photo_id ?? null,
+            is_additional: p.is_additional ?? false,
+            checkin_photo: p.checkin_photo_id ? (checkinPhotosById.get(p.checkin_photo_id) ?? null) : null,
+          }));
+        return {
+          id: room.id,
+          name: room.name ?? "Room",
+          order_index: room.order_index ?? 0,
+          condition: room.condition ?? undefined,
+          checkin_condition: checkinRoomConditionsByName.get(room.name ?? "") ?? undefined,
+          photos,
+        };
+      });
+
+      const keyHandoverForPdf = keyHandoverSafe.map((k) => ({ label: k.item, quantity: k.qty }));
+      const checkinKeyHandoverForPdf = checkinKeyHandoverSafe.map((k) => ({ label: k.item, quantity: k.qty }));
+
+      const checkoutProps: CheckoutPDFProps = {
+        inspection: {
+          id: row.id,
+          type: row.type ?? "check-out",
+          created_at: String(row.created_at ?? ""),
+          completed_at: row.completed_at != null ? String(row.completed_at) : undefined,
+          executive_summary: executiveSummary,
+          document_hash: documentHash,
+          key_handover: keyHandoverForPdf,
+          checkin_key_handover: checkinKeyHandoverForPdf,
+        },
+        checkinInspection: checkinInspectionForPdf,
+        property: {
+          address: prop?.address ?? "",
+          building_name: prop?.building_name ?? undefined,
+          unit_number: prop?.unit_number ?? undefined,
+          property_type: prop?.property_type ?? undefined,
+        },
+        tenancy: {
+          contract_from: tenancy?.contract_from != null ? String(tenancy.contract_from) : undefined,
+          contract_to: tenancy?.contract_to != null ? String(tenancy.contract_to) : undefined,
+          actual_end_date: tenancy?.actual_end_date != null ? String(tenancy.actual_end_date) : undefined,
+          tenant_name: tenancy?.tenant_name ?? "",
+          tenant_email: tenancy?.tenant_email ?? undefined,
+          landlord_name: tenancy?.landlord_name ?? undefined,
+          landlord_email: tenancy?.landlord_email ?? undefined,
+        },
+        rooms: roomsWithDelta,
+        signatures: meta.signatures.map((s) => ({
+          signer_type: s.signer_type,
+          signer_name: undefined,
+          signature_data: s.signature_data ?? undefined,
+        })),
+        profile: agentData
+          ? {
+              full_name: agentData.full_name,
+              rera_number: (agentData as { rera_number?: string }).rera_number,
+              signature_image_url: (agentData as { signature_image_url?: string }).signature_image_url,
+            }
+          : undefined,
+        agencyName: agentData?.agency_name ?? "Agency",
+        agencyWebsite: (agentData as { company_website?: string }).company_website ?? "",
+        agencyLogoUrl: (agentData as { company_logo_url?: string }).company_logo_url ?? null,
+        tokens,
+        qrCodeDataUrl: undefined,
+      };
+
+      pdfBuffer = await renderCheckoutPDFToBuffer(checkoutProps);
+    } else {
+      pdfBuffer = await generateInspectionPDFBuffer(reportData, meta, documentHash);
+    }
 
     const fileName = `report_${inspectionId}.pdf`;
     console.log("[generate-pdf] PDF buffer size:", pdfBuffer.length);
