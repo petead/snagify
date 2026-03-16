@@ -995,11 +995,12 @@ export function InspectionClient({
       router.push(`/inspection/${inspectionId}/report`);
       return;
     } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to generate report";
       console.error(
         "[handleGenerateReport] ERROR:",
         err instanceof Error ? err.message : String(err)
       );
-      showToast("❌ Error generating report");
+      showToast(`❌ ${message}`);
       setGenerating(false);
       setNavigating(false);
     }

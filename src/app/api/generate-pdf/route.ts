@@ -128,8 +128,6 @@ type RoomRow = {
     damage_tags?: string[];
     notes?: string | null;
     taken_at?: string | null;
-    checkin_photo_id?: string | null;
-    is_additional?: boolean;
   }[];
 };
 
@@ -177,9 +175,7 @@ const INSPECTION_SELECT = `
       ai_analysis,
       damage_tags,
       notes,
-      taken_at,
-      checkin_photo_id,
-      is_additional
+      taken_at
     )
   ),
   signatures (
@@ -202,7 +198,7 @@ export async function buildPdfAndUpload(
     .from("inspections")
     .select(INSPECTION_SELECT)
     .eq("id", inspectionId)
-    .single();
+    .maybeSingle();
 
   if (inspErr || !inspection) {
     throw new Error(inspErr?.message || "Inspection not found");
@@ -258,7 +254,7 @@ export async function buildPdfAndUpload(
         .from("profiles")
         .select("full_name, agency_name, company_logo_url, company_primary_color, rera_number, signature_image_url")
         .eq("id", agentId)
-        .single()
+        .maybeSingle()
     : { data: null };
 
   const meta: InspectionMeta = {
@@ -309,8 +305,6 @@ export async function buildPdfAndUpload(
             notes: p.notes ?? undefined,
             damage_tags: p.damage_tags ?? [],
             taken_at: p.taken_at ?? undefined,
-            checkin_photo_id: p.checkin_photo_id ?? undefined,
-            is_additional: p.is_additional ?? false,
             ai_analysis: p.ai_analysis ?? undefined,
           })),
         };
@@ -385,14 +379,20 @@ export async function buildPdfAndUpload(
 }
 
 export async function POST(request: NextRequest) {
+  let step = "init";
   try {
+    step = "parse body";
     const { inspectionId } = (await request.json()) as { inspectionId?: string };
     if (!inspectionId) {
       return NextResponse.json({ error: "Missing inspectionId" }, { status: 400 });
     }
+    console.log("[generate-pdf] START — inspectionId:", inspectionId);
 
+    step = "buildPdfAndUpload";
     const { report_url: _reportUrl, buffer } = await buildPdfAndUpload(inspectionId);
+    console.log("[generate-pdf] PDF rendered — size:", buffer.length);
 
+    step = "return pdf response";
     return new NextResponse(Buffer.from(buffer), {
       headers: {
         "Content-Type": "application/pdf",
@@ -402,10 +402,10 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : "";
-    console.error("[generate-pdf] FATAL ERROR:", msg);
+    console.error(`[generate-pdf] CRASH at step="${step}":`, msg);
     console.error("[generate-pdf] STACK:", stack);
     return NextResponse.json(
-      { error: msg || "PDF generation failed" },
+      { error: `Failed at step: ${step} — ${msg || "PDF generation failed"}` },
       { status: 500 }
     );
   }

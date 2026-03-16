@@ -638,11 +638,15 @@ function InspectionReport({
                             )}
                           </View>
                           <View style={{ flex: 1 }}>
-                            {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                            <Image
-                              src={p.url!}
-                              style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 6, marginBottom: 4 }}
-                            />
+                            {p.url ? (
+                              <>
+                                {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                                <Image
+                                  src={p.url}
+                                  style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 6, marginBottom: 4 }}
+                                />
+                              </>
+                            ) : null}
                             {p.damage_tags && p.damage_tags.length > 0 && (
                               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 2 }}>
                                 {p.damage_tags.map((tag) => (
@@ -700,11 +704,15 @@ function InspectionReport({
                       <View key={rowIdx} style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
                         {pair.map((photo) => (
                           <View key={photo.id} style={{ flex: 1 }}>
-                            {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                            <Image
-                              src={photo.url!}
-                              style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 6, marginBottom: 4 }}
-                            />
+                            {photo.url ? (
+                              <>
+                                {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                                <Image
+                                  src={photo.url}
+                                  style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 6, marginBottom: 4 }}
+                                />
+                              </>
+                            ) : null}
                             {photo.damage_tags && photo.damage_tags.length > 0 && (
                               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 3 }}>
                                 {photo.damage_tags.map((tag) => (
@@ -742,17 +750,21 @@ function InspectionReport({
                   }}>
                     {pair.map((photo) => (
                       <View key={photo.id} style={{ flex: 1 }}>
-                        {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                        <Image
-                          src={photo.url!}
-                          style={{
-                            width: "100%",
-                            height: 140,
-                            objectFit: "cover",
-                            borderRadius: 6,
-                            marginBottom: 5,
-                          }}
-                        />
+                        {photo.url ? (
+                          <>
+                            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                            <Image
+                              src={photo.url}
+                              style={{
+                                width: "100%",
+                                height: 140,
+                                objectFit: "cover",
+                                borderRadius: 6,
+                                marginBottom: 5,
+                              }}
+                            />
+                          </>
+                        ) : null}
                         {photo.damage_tags && photo.damage_tags.length > 0 && (
                           <View style={{
                             flexDirection: "row", flexWrap: "wrap", gap: 3, marginBottom: 4,
@@ -851,22 +863,20 @@ function InspectionReport({
                 <View key={role} style={s.sigBox}>
                   <Text style={[s.sigRole, { color: accentColor }]}>{role}</Text>
                   <Text style={s.sigName}>{name}</Text>
-                  {signed && sig?.signature_data ? (
+                  {signed ? (
                     <View style={{ alignItems: "center" }}>
-                      {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                      <Image
-                        src={sig.signature_data}
-                        style={{ width: 160, height: 60, objectFit: "contain", marginBottom: 6 }}
-                      />
-                      <View style={{ width: "100%", height: 1, backgroundColor: "#E5E7EB", marginBottom: 4 }} />
-                      {sig.signed_at && (
-                        <Text style={{ fontSize: 8, color: "#999" }}>
-                          Signed on {formatDate(sig.signed_at)}
-                        </Text>
+                      {sig?.signature_data ? (
+                        <>
+                          {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                          <Image
+                            src={sig.signature_data}
+                            style={{ width: 160, height: 60, objectFit: "contain", marginBottom: 6 }}
+                          />
+                          <View style={{ width: "100%", height: 1, backgroundColor: "#E5E7EB", marginBottom: 4 }} />
+                        </>
+                      ) : (
+                        <View style={{ height: 60 }} />
                       )}
-                    </View>
-                  ) : signed ? (
-                    <View style={{ alignItems: "center" }}>
                       <Text style={{ fontSize: 10, color: "#2e7d32", fontFamily: "Helvetica-Bold", marginBottom: 4 }}>
                         ✓ Signed
                       </Text>

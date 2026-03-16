@@ -36,7 +36,9 @@ function getRoomCondition(photos: { damage_tags?: string[] }[]): string {
 
 export async function POST(request: Request) {
   let inspectionId: string | undefined;
+  let step = "init";
   try {
+    step = "parse body";
     const body = (await request.json()) as { inspectionId?: string };
     inspectionId = body.inspectionId;
     if (!inspectionId) {
@@ -45,42 +47,56 @@ export async function POST(request: Request) {
 
     console.log("[generate-report] Starting for inspection:", inspectionId);
 
+    step = "fetch inspection";
     const supabase = await createClient();
 
     const { data: inspection, error: inspErr } = await supabase
       .from("inspections")
       .select("id, type, status, created_at, property_id, agent_id, tenancy_id, executive_summary, report_url")
       .eq("id", inspectionId)
-      .single();
+      .maybeSingle();
 
     if (inspErr || !inspection) {
       return NextResponse.json({ error: "Inspection not found" }, { status: 404 });
     }
+    console.log("[generate-report] inspection fetched");
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
+      step = "fetch tenancy";
       let tenancy: { contract_from?: string | null; contract_to?: string | null } | null = null;
       if (inspection.tenancy_id) {
         const { data: t } = await supabase
           .from("tenancies")
           .select("contract_from, contract_to")
           .eq("id", inspection.tenancy_id)
-          .single();
+          .maybeSingle();
         tenancy = t ?? null;
       }
 
+      step = "fetch property";
       const { data: property } = await supabase
         .from("properties")
         .select("building_name, unit_number, address")
         .eq("id", inspection.property_id)
-        .single();
+        .maybeSingle();
 
+      step = "fetch rooms";
       const { data: rooms } = await supabase
         .from("rooms")
         .select("id, name, order_index")
         .eq("inspection_id", inspectionId)
         .order("order_index", { ascending: true });
+      console.log("[generate-report] inspection fetched — rooms:", rooms?.length ?? 0);
 
+      step = "fetch signatures";
+      const { data: signatures } = await supabase
+        .from("signatures")
+        .select("id")
+        .eq("inspection_id", inspectionId);
+      console.log("[generate-report] signatures:", signatures?.length ?? 0);
+
+      step = "fetch room photos";
       const roomIds = (rooms ?? []).map((r) => r.id);
       const roomPhotos: Record<string, { damage_tags: string[] }[]> = {};
 
@@ -99,6 +115,7 @@ export async function POST(request: Request) {
       const totalPhotos = allPhotos.length;
       const photosWithIssues = allPhotos.filter((p) => (p.damage_tags?.length ?? 0) > 0).length;
 
+      step = "update room conditions";
       for (const room of rooms ?? []) {
         const photos = roomPhotos[room.id] ?? [];
         const condition = getRoomCondition(photos);
@@ -132,6 +149,7 @@ export async function POST(request: Request) {
         }),
       };
 
+      step = "build executive summary";
       let aiSummary: string;
       if (apiKey) {
         try {
@@ -157,6 +175,7 @@ export async function POST(request: Request) {
         aiSummary = fallbackSummary(inspectionContext);
       }
 
+      step = "save executive summary";
       const updatePayload: Record<string, string> = {
         executive_summary: aiSummary,
         completed_at: new Date().toISOString(),
@@ -177,6 +196,7 @@ export async function POST(request: Request) {
     let report_url: string | null = null;
     let pdfBuffer: Uint8Array | null = null;
     try {
+      step = "buildPdfAndUpload";
       const fileName = `report_${inspectionId}.pdf`;
       console.log("[generate-report] Upload path:", fileName);
       const pdfResult = await buildPdfAndUpload(inspectionId);
@@ -184,11 +204,14 @@ export async function POST(request: Request) {
       pdfBuffer = pdfResult.buffer;
       console.log("[generate-report] PDF buffer size:", pdfBuffer?.length ?? 0);
       console.log("[generate-report] Public URL:", report_url ?? "null");
+      console.log("[generate-report] uploaded to storage OK");
+      console.log("[generate-report] report_url saved OK");
     } catch (pdfErr) {
       console.error("[generate-report] PDF build/upload failed:", pdfErr);
       throw pdfErr;
     }
 
+    step = "return response";
     const wantsPdf = (request.headers.get("Accept") ?? "").includes("application/pdf");
     if (wantsPdf && pdfBuffer) {
       return new NextResponse(Buffer.from(pdfBuffer), {
@@ -208,10 +231,10 @@ export async function POST(request: Request) {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     const stack = err instanceof Error ? err.stack : "";
-    console.error("[generate-report] FATAL ERROR:", message);
+    console.error(`[generate-report] CRASH at step="${step}":`, message);
     console.error("[generate-report] STACK:", stack);
     return NextResponse.json(
-      { error: message },
+      { error: `Failed at step: ${step} — ${message}` },
       { status: 500 }
     );
   }
