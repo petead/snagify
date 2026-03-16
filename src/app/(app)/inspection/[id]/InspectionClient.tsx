@@ -596,13 +596,14 @@ export function InspectionClient({
   };
 
   const handlePhotoCapture = async (
-    base64: string,
+    imageInput: string | Blob,
     roomId: string,
     roomName: string,
     checkinPhotoId?: string | null,
     isAdditional: boolean = false
   ) => {
-    const localBase64 = base64;
+    const localPreviewUrl =
+      typeof imageInput === "string" ? imageInput : URL.createObjectURL(imageInput);
     const localRoomId = roomId;
     const localRoomName = roomName;
     const tempId = `temp_${Date.now()}`;
@@ -611,7 +612,7 @@ export function InspectionClient({
     setPhotos((prev) => [...prev, {
       id: tempId,
       room_id: localRoomId,
-      url: localBase64,
+      url: localPreviewUrl,
       damage_tags: [],
       notes: "Uploading...",
       isUploading: true,
@@ -621,13 +622,31 @@ export function InspectionClient({
     try {
       // ── STEP 2: Upload to Supabase Storage
       const fileName = `inspections/${inspectionId}/${localRoomId}/${Date.now()}.jpg`;
-      const base64Clean = localBase64.replace(/^data:image\/\w+;base64,/, "");
-      const byteCharacters = atob(base64Clean);
-      const byteArray = new Uint8Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteArray[i] = byteCharacters.charCodeAt(i);
+      let blob: Blob;
+      let localBase64: string;
+
+      if (typeof imageInput === "string") {
+        if (!imageInput.startsWith("data:image")) {
+          throw new Error("Invalid image data URL");
+        }
+        const base64Clean = imageInput.replace(/^data:image\/\w+;base64,/, "");
+        const byteCharacters = atob(base64Clean);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        blob = new Blob([byteArray], { type: "image/jpeg" });
+        localBase64 = imageInput;
+      } else {
+        blob = imageInput;
+        localBase64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
       }
-      const blob = new Blob([byteArray], { type: "image/jpeg" });
 
       const { error: storageError } = await supabase.storage
         .from("inspection-photos")
@@ -645,31 +664,63 @@ export function InspectionClient({
 
       // ── STEP 3: Insert photo in DB
       const coords = await getGeoCoords();
-      const { data: newPhoto, error: dbError } = await supabase
+      const insertPayload = {
+        room_id: localRoomId,
+        url: publicUrl,
+        damage_tags: [],
+        notes: "",
+        taken_at: new Date().toISOString(),
+        gps_lat: coords?.lat ?? null,
+        gps_lng: coords?.lng ?? null,
+        checkin_photo_id: checkinPhotoId ?? null,
+        is_additional: isAdditional,
+      };
+      let { data: newPhoto, error: dbError } = await supabase
         .from("photos")
-        .insert({
-          room_id: localRoomId,
-          url: publicUrl,
-          damage_tags: [],
-          notes: "",
-          taken_at: new Date().toISOString(),
-          gps_lat: coords?.lat ?? null,
-          gps_lng: coords?.lng ?? null,
-          checkin_photo_id: checkinPhotoId ?? null,
-          is_additional: isAdditional,
-        })
+        .insert(insertPayload)
         .select("id")
         .single();
 
-      if (dbError) throw new Error(`DB: ${dbError.message}`);
+      if (dbError) {
+        console.error("[photos insert] DB ERROR:", dbError.message, dbError.details);
+        const missingNewColumns =
+          /checkin_photo_id|is_additional/i.test(dbError.message ?? "");
+        if (missingNewColumns) {
+          console.warn(
+            "[photos insert] Missing columns in DB. Run migration for checkin_photo_id/is_additional."
+          );
+          const fallbackInsert = await supabase
+            .from("photos")
+            .insert({
+              room_id: localRoomId,
+              url: publicUrl,
+              damage_tags: [],
+              notes: "",
+              taken_at: new Date().toISOString(),
+              gps_lat: coords?.lat ?? null,
+              gps_lng: coords?.lng ?? null,
+            })
+            .select("id")
+            .single();
+          newPhoto = fallbackInsert.data;
+          dbError = fallbackInsert.error;
+        }
+      }
+
+      if (dbError || !newPhoto?.id) {
+        throw new Error(`DB insert failed: ${dbError?.message ?? "Unknown DB error"}`);
+      }
       const realPhotoId = newPhoto.id;
 
       // ── STEP 4: Replace temp with real URL, show "Analyzing..."
       setPhotos((prev) => prev.map((p) =>
         p.id === tempId
-          ? { ...p, id: realPhotoId, url: publicUrl, isUploading: false, notes: "Analyzing..." }
+          ? { ...p, id: realPhotoId, url: publicUrl, isUploading: false, uploadFailed: false, notes: "Analyzing..." }
           : p
       ));
+      if (localPreviewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(localPreviewUrl);
+      }
 
       // ── STEP 5: Call AI — await it so notes update right after
       try {
@@ -712,11 +763,18 @@ export function InspectionClient({
       }
 
     } catch (err) {
-      console.error("Photo capture error:", err);
+      console.error("[handlePhotoUpload] FULL ERROR:", err);
+      console.error(
+        "[handlePhotoUpload] Error message:",
+        err instanceof Error ? err.message : String(err)
+      );
+      if (localPreviewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(localPreviewUrl);
+      }
       // Keep photo visible but mark upload failed
       setPhotos((prev) => prev.map((p) =>
         p.id === tempId
-          ? { ...p, isUploading: false, notes: "Upload failed" }
+          ? { ...p, isUploading: false, uploadFailed: true, notes: "Upload failed" }
           : p
       ));
     }
@@ -767,18 +825,7 @@ export function InspectionClient({
     const fileArray = Array.from(files);
 
     for (const file of fileArray) {
-      const base64: string = await new Promise((res) => {
-        const reader = new FileReader();
-        reader.onload = () => res(reader.result as string);
-        reader.readAsDataURL(file);
-      });
-
-      if (!base64.startsWith("data:image")) {
-        console.error("Invalid base64:", base64.substring(0, 50));
-        return;
-      }
-
-      await handlePhotoCapture(base64, currentRoom.id, currentRoom.name);
+      await handlePhotoCapture(file, currentRoom.id, currentRoom.name, null, false);
     }
 
     const input = document.querySelector('input[type="file"][accept="image/*"]') as HTMLInputElement;
@@ -938,13 +985,20 @@ export function InspectionClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ inspectionId }),
       });
-      if (!res.ok) throw new Error("Generation failed");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(errBody.error ?? "Generation failed");
+      }
 
       setNavigating(true);
       router.refresh();
       router.push(`/inspection/${inspectionId}/report`);
       return;
-    } catch {
+    } catch (err) {
+      console.error(
+        "[handleGenerateReport] ERROR:",
+        err instanceof Error ? err.message : String(err)
+      );
       showToast("❌ Error generating report");
       setGenerating(false);
       setNavigating(false);
@@ -1306,15 +1360,13 @@ export function InspectionClient({
               onClose={() => setIsCameraOpen(false)}
               onPhotoTaken={async (blob, linkedCheckinPhotoId, isAdditional) => {
                 setIsCameraOpen(false);
-                const base64: string = await new Promise((res, rej) => {
-                  const reader = new FileReader();
-                  reader.onload = () => res(reader.result as string);
-                  reader.onerror = rej;
-                  reader.readAsDataURL(blob);
-                });
-                if (base64.startsWith("data:image")) {
-                  await handlePhotoCapture(base64, currentRoom.id, currentRoom.name, linkedCheckinPhotoId, isAdditional);
-                }
+                await handlePhotoCapture(
+                  blob,
+                  currentRoom.id,
+                  currentRoom.name,
+                  linkedCheckinPhotoId,
+                  isAdditional
+                );
               }}
             />
           )}

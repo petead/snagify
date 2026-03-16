@@ -58,9 +58,6 @@ export async function POST(request: Request) {
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (!apiKey) {
-        return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
-      }
 
       let tenancy: { contract_from?: string | null; contract_to?: string | null } | null = null;
       if (inspection.tenancy_id) {
@@ -136,22 +133,27 @@ export async function POST(request: Request) {
       };
 
       let aiSummary: string;
-      try {
-        const anthropic = new Anthropic({ apiKey, timeout: 60000 });
-        const response = await anthropic.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 512,
-          system: EXEC_SUMMARY_SYSTEM,
-          messages: [{ role: "user", content: JSON.stringify(inspectionContext) }],
-        });
-        const text = response.content
-          .filter((block): block is { type: "text"; text: string } => block.type === "text")
-          .map((block) => block.text)
-          .join("")
-          .trim();
-        aiSummary = text || fallbackSummary(inspectionContext);
-      } catch (err) {
-        console.error("generate-report AI summary failed:", err);
+      if (apiKey) {
+        try {
+          const anthropic = new Anthropic({ apiKey, timeout: 60000 });
+          const response = await anthropic.messages.create({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 512,
+            system: EXEC_SUMMARY_SYSTEM,
+            messages: [{ role: "user", content: JSON.stringify(inspectionContext) }],
+          });
+          const text = response.content
+            .filter((block): block is { type: "text"; text: string } => block.type === "text")
+            .map((block) => block.text)
+            .join("")
+            .trim();
+          aiSummary = text || fallbackSummary(inspectionContext);
+        } catch (err) {
+          console.error("generate-report AI summary failed:", err);
+          aiSummary = fallbackSummary(inspectionContext);
+        }
+      } else {
+        console.warn("[generate-report] ANTHROPIC_API_KEY missing, using fallback summary.");
         aiSummary = fallbackSummary(inspectionContext);
       }
 
@@ -175,6 +177,8 @@ export async function POST(request: Request) {
     let report_url: string | null = null;
     let pdfBuffer: Uint8Array | null = null;
     try {
+      const fileName = `report_${inspectionId}.pdf`;
+      console.log("[generate-report] Upload path:", fileName);
       const pdfResult = await buildPdfAndUpload(inspectionId);
       report_url = pdfResult.report_url;
       pdfBuffer = pdfResult.buffer;
@@ -185,7 +189,7 @@ export async function POST(request: Request) {
       throw pdfErr;
     }
 
-    const wantsPdf = request.headers.get("Accept") === "application/pdf";
+    const wantsPdf = (request.headers.get("Accept") ?? "").includes("application/pdf");
     if (wantsPdf && pdfBuffer) {
       return new NextResponse(Buffer.from(pdfBuffer), {
         headers: {
@@ -203,7 +207,9 @@ export async function POST(request: Request) {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("[generate-report] ERROR:", message);
+    const stack = err instanceof Error ? err.stack : "";
+    console.error("[generate-report] FATAL ERROR:", message);
+    console.error("[generate-report] STACK:", stack);
     return NextResponse.json(
       { error: message },
       { status: 500 }

@@ -195,6 +195,7 @@ const INSPECTION_SELECT = `
 export async function buildPdfAndUpload(
   inspectionId: string
 ): Promise<{ report_url: string | null; buffer: Uint8Array }> {
+  console.log("[generate-pdf] START inspectionId:", inspectionId);
   const supabase = await createServerClient();
 
   const { data: inspection, error: inspErr } = await supabase
@@ -379,6 +380,7 @@ export async function buildPdfAndUpload(
     }
   }
 
+  console.log("[generate-pdf] Done OK");
   return { report_url: reportUrl, buffer: new Uint8Array(pdfBuffer) };
 }
 
@@ -398,9 +400,12 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (err) {
-    console.error("generate-pdf error:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : "";
+    console.error("[generate-pdf] FATAL ERROR:", msg);
+    console.error("[generate-pdf] STACK:", stack);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "PDF generation failed" },
+      { error: msg || "PDF generation failed" },
       { status: 500 }
     );
   }
