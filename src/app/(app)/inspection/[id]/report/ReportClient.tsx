@@ -221,6 +221,15 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   const handover = Array.isArray(inspection.key_handover)
     ? inspection.key_handover.filter((k) => k && typeof k.item === "string" && typeof k.qty === "number")
     : [];
+  const checkinHandover = Array.isArray((inspection as { checkin_key_handover?: { item: string; qty: number }[] }).checkin_key_handover)
+    ? (inspection as { checkin_key_handover: { item: string; qty: number }[] }).checkin_key_handover.filter((k) => k && typeof k.item === "string" && typeof k.qty === "number")
+    : [];
+  const isCheckout = (inspection.type ?? "").toLowerCase().includes("check-out");
+  const keysMissingCount =
+    isCheckout && checkinHandover.length > 0
+      ? checkinHandover.reduce((sum, c) => sum + Math.max(0, c.qty - (handover.find((h) => h.item === c.item)?.qty ?? 0)), 0)
+      : 0;
+  const keysAllReturned = isCheckout && checkinHandover.length > 0 && keysMissingCount === 0;
 
   const handleDownloadPDF = async () => {
     setDownloadLoading(true);
@@ -466,6 +475,43 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
             </div>
           ))}
         </div>
+
+        {/* Keys status (check-out only) */}
+        {isCheckout && handover.length > 0 && (
+          <div
+            className={loaded ? "fade-up" : ""}
+            style={{
+              padding: "14px 24px 0",
+              animationDelay: "0.12s",
+            }}
+          >
+            <div
+              style={{
+                background: keysAllReturned ? "#dcfce7" : "#fff7ed",
+                border: `1px solid ${keysAllReturned ? "rgba(34,197,94,0.3)" : "rgba(230,81,0,0.3)"}`,
+                borderRadius: 14,
+                padding: 14,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <span style={{ fontSize: 20 }}>🔑</span>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: keysAllReturned ? "#166534" : "#c2410c",
+                }}
+              >
+                {keysAllReturned
+                  ? "All keys returned"
+                  : `${keysMissingCount} key(s) missing — recorded in report`}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* AI Summary */}
         {execSummary && (

@@ -86,6 +86,7 @@ type InspectionRow = {
   executive_summary?: string | null;
   document_hash?: string | null;
   key_handover?: { item: string; qty: number }[] | null;
+  checkin_key_handover?: { item: string; qty: number }[] | null;
   properties?: PropRow | PropRow[] | null;
   tenancies?: TenancyRow | TenancyRow[] | null;
   rooms?: RoomRow[] | null;
@@ -138,6 +139,7 @@ const INSPECTION_SELECT = `
   created_at,
   executive_summary,
   key_handover,
+  checkin_key_handover,
   agent_id,
   property_id,
   tenancy_id,
@@ -229,6 +231,7 @@ export async function buildPdfAndUpload(
       contract_from: tenancy?.contract_from != null ? String(tenancy.contract_from) : undefined,
       contract_to: tenancy?.contract_to != null ? String(tenancy.contract_to) : undefined,
       key_handover: Array.isArray(row.key_handover) ? row.key_handover : undefined,
+      checkin_key_handover: Array.isArray(row.checkin_key_handover) ? row.checkin_key_handover : undefined,
     },
     property: prop
       ? {

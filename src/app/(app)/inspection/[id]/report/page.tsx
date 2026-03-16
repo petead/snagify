@@ -108,6 +108,7 @@ export type InspectionWithRelations = {
   property_id: string | null;
   tenancy_id: string | null;
   key_handover?: { item: string; qty: number }[] | null;
+  checkin_key_handover?: { item: string; qty: number }[] | null;
   report_data?: {
     executive_summary?: string;
   } | null;

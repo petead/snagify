@@ -61,6 +61,11 @@ export default async function InspectionPage({
     ? keyHandover.filter((k) => k && typeof k.item === "string" && typeof k.qty === "number")
     : [];
 
+  const checkinKeyHandover = (inspection as { checkin_key_handover?: { item: string; qty: number }[] }).checkin_key_handover;
+  const initialCheckinKeyHandover = Array.isArray(checkinKeyHandover)
+    ? checkinKeyHandover.filter((k) => k && typeof k.item === "string" && typeof k.qty === "number")
+    : [];
+
   const propertyId = (inspection as { property_id?: string }).property_id ?? "";
 
   return (
@@ -72,6 +77,7 @@ export default async function InspectionPage({
       unitNumber={prop?.unit_number ?? ""}
       rooms={rooms}
       initialKeyHandover={initialKeyHandover}
+      initialCheckinKeyHandover={initialCheckinKeyHandover}
     />
   );
 }

@@ -64,6 +64,7 @@ interface Props {
   unitNumber: string;
   rooms: RoomData[];
   initialKeyHandover?: { item: string; qty: number }[];
+  initialCheckinKeyHandover?: { item: string; qty: number }[];
 }
 
 // ─── Constants ───────────────────────────────────
@@ -362,6 +363,7 @@ export function InspectionClient({
   unitNumber,
   rooms: initialRooms,
   initialKeyHandover = [],
+  initialCheckinKeyHandover = [],
 }: Props) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -891,7 +893,11 @@ export function InspectionClient({
     try {
       await supabase
         .from("inspections")
-        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          key_handover: keyHandover.length > 0 ? keyHandover : [],
+        })
         .eq("id", inspectionId);
 
       const res = await fetch("/api/generate-report", {
@@ -1574,7 +1580,75 @@ export function InspectionClient({
                     </button>
                   </div>
                 )}
-              {keyHandover.length > 0 && (
+              {inspectionType === "check-out" && initialCheckinKeyHandover.length > 0 ? (
+                  <div style={{ margin: "16px 0" }}>
+                    <p style={{ fontWeight: 700, fontSize: 11, marginBottom: 4, fontFamily: "'Poppins', sans-serif", color: "#1a1a2e", textTransform: "uppercase", letterSpacing: 1 }}>
+                      Key Return
+                    </p>
+                    <p style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Verify keys returned by tenant</p>
+                    {initialCheckinKeyHandover.map((checkinItem) => {
+                      const returnedQty = keyHandover.find((k) => k.item === checkinItem.item)?.qty ?? checkinItem.qty;
+                      const missing = checkinItem.qty - returnedQty;
+                      const statusBadge =
+                        returnedQty === checkinItem.qty
+                          ? { text: "✅ All returned", bg: "#dcfce7", color: "#166534" }
+                          : returnedQty > 0
+                            ? { text: `⚠️ ${missing} missing`, bg: "#fff7ed", color: "#c2410c" }
+                            : { text: "❌ Not returned", bg: "#fee2e2", color: "#b91c1c" };
+                      const setReturned = (delta: number) => {
+                        const maxQty = checkinItem.qty;
+                        setKeyHandover((prev) => {
+                          const rest = prev.filter((k) => k.item !== checkinItem.item);
+                          const current = prev.find((k) => k.item === checkinItem.item)?.qty ?? checkinItem.qty;
+                          const newQty = Math.max(0, Math.min(maxQty, current + delta));
+                          rest.push({ item: checkinItem.item, qty: newQty });
+                          return rest;
+                        });
+                      };
+                      return (
+                        <div
+                          key={checkinItem.item}
+                          style={{
+                            background: "#fff",
+                            borderRadius: 12,
+                            padding: 14,
+                            marginBottom: 10,
+                            border: "1px solid #f0f0f0",
+                          }}
+                        >
+                          <p style={{ fontWeight: 700, fontSize: 14, margin: "0 0 4px", color: "#1a1a2e" }}>🔑 {checkinItem.item}</p>
+                          <p style={{ fontSize: 12, color: "#999", margin: "0 0 10px" }}>Given at entry: {checkinItem.qty}</p>
+                          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                            <button type="button" onClick={() => setReturned(-1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid #e0e0e0", background: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                            <span style={{ fontSize: 16, fontWeight: 600, minWidth: 24, textAlign: "center" }}>{returnedQty}</span>
+                            <button type="button" onClick={() => setReturned(1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid #9A88FD", background: "#F3F0FF", color: "#9A88FD", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 100, background: statusBadge.bg, color: statusBadge.color }}>{statusBadge.text}</span>
+                        </div>
+                      );
+                    })}
+                    {(() => {
+                      const fullReturn = initialCheckinKeyHandover.filter((c) => (keyHandover.find((k) => k.item === c.item)?.qty ?? c.qty) === c.qty).length;
+                      const partialReturn = initialCheckinKeyHandover.filter((c) => { const r = keyHandover.find((k) => k.item === c.item)?.qty ?? 0; return r > 0 && r < c.qty; }).length;
+                      const notReturned = initialCheckinKeyHandover.filter((c) => (keyHandover.find((k) => k.item === c.item)?.qty ?? 0) === 0).length;
+                      const anyMissing = partialReturn > 0 || notReturned > 0;
+                      return (
+                        <div style={{ background: anyMissing ? "#FFF8F0" : "#F0FFF4", border: `1px solid ${anyMissing ? "rgba(230,81,0,0.2)" : "rgba(34,197,94,0.2)"}`, borderRadius: 12, padding: 14, marginTop: 8 }}>
+                          <p style={{ fontWeight: 700, fontSize: 11, marginBottom: 8, color: "#1a1a2e", textTransform: "uppercase", letterSpacing: 0.5 }}>Key return summary</p>
+                          {fullReturn > 0 && <p style={{ fontSize: 13, color: "#166534", margin: "0 0 4px" }}>✅ {fullReturn} item(s) returned in full</p>}
+                          {partialReturn > 0 && <p style={{ fontSize: 13, color: "#c2410c", margin: "0 0 4px" }}>⚠️ {partialReturn} partial return</p>}
+                          {notReturned > 0 && <p style={{ fontSize: 13, color: "#b91c1c", margin: 0 }}>❌ {notReturned} item(s) missing</p>}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : inspectionType === "check-out" && initialCheckinKeyHandover.length === 0 ? (
+                  <div style={{ margin: "16px 0", padding: 16, borderRadius: 14, background: "#FAFAFA", border: "1px solid #f0f0f0" }}>
+                    <p style={{ fontWeight: 700, fontSize: 11, marginBottom: 8, fontFamily: "'Poppins', sans-serif", color: "#1a1a2e", textTransform: "uppercase", letterSpacing: 1 }}>Key Handover</p>
+                    <p style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>No keys were recorded at check-in — record what&apos;s being returned</p>
+                    {keyHandover.length > 0 && <p style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>{keyHandover.map((k) => `${k.item} x${k.qty}`).join(" · ")}</p>}
+                  </div>
+                ) : keyHandover.length > 0 ? (
                   <div
                     style={{
                       margin: "16px 0", padding: 16, borderRadius: 14,
@@ -1592,7 +1666,7 @@ export function InspectionClient({
                       {keyHandover.map((k) => `${k.item} x${k.qty}`).join(" · ")}
                     </p>
                   </div>
-                )}
+                ) : null}
 
               </div>
             );

@@ -253,6 +253,7 @@ interface InspectionMeta {
     contract_from?: string;
     contract_to?: string;
     key_handover?: { item: string; qty: number }[];
+    checkin_key_handover?: { item: string; qty: number }[];
   };
   property: {
     building_name?: string;
@@ -479,25 +480,73 @@ function InspectionReport({
           Total: {roomStats.length} rooms · {totalPhotos} photos · {totalIssues} issues
         </Text>
 
-        {meta.inspection.key_handover && meta.inspection.key_handover.length > 0 && (
-          <View style={{ marginTop: 20 }}>
-            <Text style={{ fontSize: 16, fontWeight: 700, fontFamily: "Helvetica-Bold", marginBottom: 12, color: "#1a1a2e" }}>
-              Key Handover
-            </Text>
-            <View style={s.tableWrap}>
-              <View style={s.tableHeaderRow}>
-                <Text style={[s.tableHeaderCell, { width: "80%" }]}>Item</Text>
-                <Text style={[s.tableHeaderCell, { width: "20%", textAlign: "center" }]}>Qty</Text>
-              </View>
-              {meta.inspection.key_handover.map((k, i) => (
-                <View key={`${k.item}-${i}`} style={s.tableRow}>
-                  <Text style={[s.tableCell, { width: "80%" }]}>{k.item}</Text>
-                  <Text style={[s.tableCell, { width: "20%", textAlign: "center" }]}>{k.qty}</Text>
+        {(() => {
+          const checkoutKeys = meta.inspection.key_handover ?? [];
+          const checkinKeys = meta.inspection.checkin_key_handover ?? [];
+          const isCheckout = (meta.inspection.type ?? "").toLowerCase().includes("check-out") && checkinKeys.length > 0;
+
+          if (isCheckout) {
+            let totalMissing = 0;
+            return (
+              <View style={{ marginTop: 20 }}>
+                <Text style={{ fontSize: 16, fontWeight: 700, fontFamily: "Helvetica-Bold", marginBottom: 12, color: "#1a1a2e" }}>
+                  Key Return
+                </Text>
+                <View style={s.tableWrap}>
+                  <View style={s.tableHeaderRow}>
+                    <Text style={[s.tableHeaderCell, { width: "40%" }]}>Item</Text>
+                    <Text style={[s.tableHeaderCell, { width: "20%", textAlign: "center" }]}>Given (Check-in)</Text>
+                    <Text style={[s.tableHeaderCell, { width: "20%", textAlign: "center" }]}>Returned</Text>
+                    <Text style={[s.tableHeaderCell, { width: "20%", textAlign: "center" }]}>Status</Text>
+                  </View>
+                  {checkinKeys.map((c, i) => {
+                    const returnedQty = checkoutKeys.find((k) => k.item === c.item)?.qty ?? 0;
+                    const diff = c.qty - returnedQty;
+                    totalMissing += Math.max(0, diff);
+                    const status = diff === 0 ? "✓ OK" : diff > 0 ? `⚠ -${diff}` : "✓ OK";
+                    const statusColor = diff === 0 ? "#2e7d32" : "#e65100";
+                    return (
+                      <View key={`${c.item}-${i}`} style={s.tableRow}>
+                        <Text style={[s.tableCell, { width: "40%" }]}>{c.item}</Text>
+                        <Text style={[s.tableCell, { width: "20%", textAlign: "center" }]}>{c.qty}</Text>
+                        <Text style={[s.tableCell, { width: "20%", textAlign: "center" }]}>{returnedQty}</Text>
+                        <Text style={[s.tableCell, { width: "20%", textAlign: "center", color: statusColor }]}>{status}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
-              ))}
-            </View>
-          </View>
-        )}
+                <Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", marginTop: 8, color: "#1a1a2e" }}>
+                  {totalMissing === 0
+                    ? "All keys returned ✓"
+                    : `⚠ ${totalMissing} key(s) not returned — may be subject to deduction`}
+                </Text>
+              </View>
+            );
+          }
+
+          if (meta.inspection.key_handover && meta.inspection.key_handover.length > 0) {
+            return (
+              <View style={{ marginTop: 20 }}>
+                <Text style={{ fontSize: 16, fontWeight: 700, fontFamily: "Helvetica-Bold", marginBottom: 12, color: "#1a1a2e" }}>
+                  Key Handover
+                </Text>
+                <View style={s.tableWrap}>
+                  <View style={s.tableHeaderRow}>
+                    <Text style={[s.tableHeaderCell, { width: "80%" }]}>Item</Text>
+                    <Text style={[s.tableHeaderCell, { width: "20%", textAlign: "center" }]}>Qty</Text>
+                  </View>
+                  {meta.inspection.key_handover.map((k, i) => (
+                    <View key={`${k.item}-${i}`} style={s.tableRow}>
+                      <Text style={[s.tableCell, { width: "80%" }]}>{k.item}</Text>
+                      <Text style={[s.tableCell, { width: "20%", textAlign: "center" }]}>{k.qty}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            );
+          }
+          return null;
+        })()}
 
         <View style={s.footer}>
           <Text style={s.footerText}>

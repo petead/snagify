@@ -98,6 +98,7 @@ type CheckInWithRooms = {
   security_deposit?: number | null;
   property_size?: number | null;
   key_handover?: unknown;
+  checkin_key_handover?: { item: string; qty: number }[];
   rooms?: { id: string; name: string; order_index: number | null }[];
 };
 
@@ -177,6 +178,7 @@ function InspectionRow({
             security_deposit: checkin.security_deposit ?? undefined,
             property_size: checkin.property_size ?? undefined,
             key_handover: Array.isArray(checkin.key_handover) ? checkin.key_handover : [],
+            checkin_key_handover: Array.isArray(checkin.key_handover) ? checkin.key_handover : [],
           })
           .select()
           .single();
