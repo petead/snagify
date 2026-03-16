@@ -980,7 +980,7 @@ function InspectionReport({
             <View style={s.coverLogoLeft}>
               <View style={[s.coverLogoIconBox, { marginRight: 8 }]}>
                 {agencyLogoUrl ? (
-                  <Image src={agencyLogoUrl} style={{ width: 20, height: 20 }} />
+                  <Image src={agencyLogoUrl} style={{ width: 20, height: 20 }} alt="" />
                 ) : (
                   <View style={{ width: 14, height: 14, backgroundColor: "rgba(255,255,255,0.7)", borderRadius: 3 }} />
                 )}
@@ -1142,7 +1142,7 @@ function InspectionReport({
                   ? "Needs Attention"
                   : "Critical";
             const tags = r.validPhotos.flatMap((p) => p.damage_tags ?? []);
-            const uniqueTags = [...new Set(tags)].slice(0, 4).join(", ");
+            const uniqueTags = Array.from(new Set(tags)).slice(0, 4).join(", ");
             return (
               <View key={`${r.room.name}-${i}`} style={[s.roomRow, ...(i % 2 === 1 ? [s.roomRowAlt] : [])]}>
                 <Text style={[s.roomCellBold, { flex: 2 }]}>{r.room.name}</Text>
@@ -1285,7 +1285,7 @@ function InspectionReport({
                       style={[s.photoCard, ...(pair.indexOf(photo) === 0 && pair.length > 1 ? [{ marginRight: 8 }] : [])]}
                     >
                       {photo.url && photo.url.startsWith("http") ? (
-                        <Image src={photo.url} style={s.photoImg} />
+                        <Image src={photo.url} style={s.photoImg} alt="" />
                       ) : null}
                       {photo.damage_tags && photo.damage_tags.length > 0 && (
                         <View style={s.photoTagsRow}>
@@ -1355,7 +1355,7 @@ function InspectionReport({
           {qrDataUrl && (
             <View style={s.qrRow}>
               <View style={[s.qrBox, { marginRight: 14 }]}>
-                <Image src={qrDataUrl} style={s.qrImage} />
+                <Image src={qrDataUrl} style={s.qrImage} alt="" />
               </View>
               <View style={s.qrTextWrap}>
                 <Text style={s.qrTextTitle}>Scan to verify this report</Text>
@@ -1381,7 +1381,7 @@ function InspectionReport({
                   <Text style={s.sigPartyName}>{party.name ?? "—"}</Text>
                   <View style={s.sigSignArea}>
                     {sig?.signature_data ? (
-                      <Image src={sig.signature_data} style={s.sigSignImage} />
+                      <Image src={sig.signature_data} style={s.sigSignImage} alt="" />
                     ) : (
                       <Text style={s.sigSignPending}>Pending Signature</Text>
                     )}
@@ -1409,9 +1409,9 @@ function InspectionReport({
                 <View style={s.sigInspectorRight}>
                   <View style={s.sigInspectorSignBox}>
                     {inspectorSig?.signature_data ? (
-                      <Image src={inspectorSig.signature_data} style={s.sigSignImage} />
+                      <Image src={inspectorSig.signature_data} style={s.sigSignImage} alt="" />
                     ) : profile?.signature_image_url ? (
-                      <Image src={profile.signature_image_url} style={s.sigSignImage} />
+                      <Image src={profile.signature_image_url} style={s.sigSignImage} alt="" />
                     ) : (
                       <Text style={s.sigSignPending}>—</Text>
                     )}
