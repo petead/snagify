@@ -62,15 +62,27 @@ Photo of a cracked tile with water stain:
   "suggested_tags": ["crack", "stain"]
 }`;
 
+const checkoutComparePrompt = `You are a professional property inspector in Dubai. Compare these two photos of the same room: the FIRST image is from the CHECK-IN inspection (entry condition), the SECOND is from the CHECK-OUT inspection (exit condition). Identify any NEW damage, deterioration, or changes that were NOT present at check-in. Be specific about location and nature of damage. If no new damage is visible, state 'No new damage detected vs check-in.' Keep response under 60 words.`;
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { image, base64, mimeType = "image/jpeg", photoId, roomName } = body as {
+    const {
+      image,
+      base64,
+      mimeType = "image/jpeg",
+      photoId,
+      roomName,
+      checkinPhotoUrl,
+      isCheckout,
+    } = body as {
       image?: string;
       base64?: string;
       mimeType?: string;
       photoId?: string;
       roomName?: string;
+      checkinPhotoUrl?: string | null;
+      isCheckout?: boolean;
     };
     const base64Data = base64 ?? image;
 
@@ -99,6 +111,84 @@ export async function POST(request: Request) {
 
     const anthropic = new Anthropic({ apiKey, timeout: 60000 });
 
+    const useCheckoutCompare =
+      Boolean(isCheckout && checkinPhotoUrl && typeof checkinPhotoUrl === "string");
+
+    type ImageBlock = {
+      type: "image";
+      source: { type: "base64"; media_type: string; data: string };
+    };
+    type TextBlock = { type: "text"; text: string };
+    let content: (TextBlock | ImageBlock)[];
+
+    if (useCheckoutCompare) {
+      // Fetch check-in image and convert to base64 for comparison
+      let checkinBase64: string | null = null;
+      try {
+        const checkinRes = await fetch(checkinPhotoUrl as string);
+        if (checkinRes.ok) {
+          const buf = await checkinRes.arrayBuffer();
+          checkinBase64 = Buffer.from(buf).toString("base64");
+        }
+      } catch {
+        // Fall back to single-image analysis if fetch fails
+      }
+
+      if (checkinBase64) {
+        content = [
+          { type: "text" as const, text: checkoutComparePrompt },
+          {
+            type: "image" as const,
+            source: {
+              type: "base64" as const,
+              media_type: "image/jpeg" as const,
+              data: checkinBase64,
+            },
+          },
+          {
+            type: "image" as const,
+            source: {
+              type: "base64" as const,
+              media_type: imageMediaType as "image/jpeg" | "image/png" | "image/webp" | "image/gif",
+              data: imageBase64,
+            },
+          },
+        ];
+      } else {
+        content = [
+          {
+            type: "image" as const,
+            source: {
+              type: "base64" as const,
+              media_type: imageMediaType as "image/jpeg" | "image/png" | "image/webp" | "image/gif",
+              data: imageBase64,
+            },
+          },
+          {
+            type: "text" as const,
+            text: `This photo was taken in the following room: "${roomName ?? "Unknown room"}". 
+Analyze the property condition visible in this photo only.`,
+          },
+        ];
+      }
+    } else {
+      content = [
+        {
+          type: "image" as const,
+          source: {
+            type: "base64" as const,
+            media_type: imageMediaType as "image/jpeg" | "image/png" | "image/webp" | "image/gif",
+            data: imageBase64,
+          },
+        },
+        {
+          type: "text" as const,
+          text: `This photo was taken in the following room: "${roomName ?? "Unknown room"}". 
+Analyze the property condition visible in this photo only.`,
+        },
+      ];
+    }
+
     const response = await anthropic.messages.create({
       model: "claude-opus-4-5",
       max_tokens: 300,
@@ -106,21 +196,7 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "user",
-          content: [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: imageMediaType,
-                data: imageBase64,
-              },
-            },
-            {
-              type: "text",
-              text: `This photo was taken in the following room: "${roomName ?? "Unknown room"}". 
-Analyze the property condition visible in this photo only.`,
-            },
-          ],
+          content,
         },
       ],
     });

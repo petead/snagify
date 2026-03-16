@@ -9,6 +9,7 @@ import {
   Camera,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import GhostCamera from "@/components/GhostCamera";
 
 // ─── Types ───────────────────────────────────────
 type RoomData = {
@@ -52,8 +53,11 @@ function getGeoCoords(): Promise<GeoCoords | null> {
   });
 }
 
+type GhostPhoto = { id: string; url: string; damage_tags?: string[]; ai_analysis?: string | null };
+
 interface Props {
   inspectionId: string;
+  propertyId: string;
   inspectionType: string;
   buildingName: string;
   unitNumber: string;
@@ -353,6 +357,7 @@ function PhotoCard({
 // ─── Main Component ──────────────────────────────
 export function InspectionClient({
   inspectionId,
+  propertyId,
   inspectionType,
   buildingName,
   unitNumber,
@@ -372,6 +377,11 @@ export function InspectionClient({
   const [toast, setToast] = useState<string | null>(null);
 
   const [keyHandover, setKeyHandover] = useState<{ item: string; qty: number }[]>([]);
+
+  // Check-out ghost overlay: room name → check-in photos
+  const [checkinGhostMap, setCheckinGhostMap] = useState<Record<string, GhostPhoto[]>>({});
+  const [checkinInspectionId, setCheckinInspectionId] = useState<string | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   // Setup state
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -470,6 +480,55 @@ export function InspectionClient({
 // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveRooms.map((r) => r.id).join(",")]);
 
+  // Check-out: fetch linked check-in inspection and build ghost map (room name → photos)
+  useEffect(() => {
+    if (inspectionType !== "check-out" || !propertyId) return;
+    const loadCheckinGhost = async () => {
+      const { data: checkinInspection } = await supabase
+        .from("inspections")
+        .select("id")
+        .eq("property_id", propertyId)
+        .eq("type", "check-in")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!checkinInspection) return;
+
+      const { data: checkinRooms } = await supabase
+        .from("rooms")
+        .select(
+          `
+          id,
+          name,
+          photos (
+            id,
+            url,
+            damage_tags,
+            ai_analysis
+          )
+        `
+        )
+        .eq("inspection_id", checkinInspection.id);
+
+      const ghostMap: Record<string, GhostPhoto[]> = {};
+      (checkinRooms ?? []).forEach((room: { name: string; photos?: GhostPhoto[] }) => {
+        if (room.photos?.length) {
+          const key = room.name.toLowerCase().trim();
+          ghostMap[key] = room.photos.map((p) => ({
+            id: p.id,
+            url: p.url,
+            damage_tags: p.damage_tags,
+            ai_analysis: p.ai_analysis,
+          }));
+        }
+      });
+      setCheckinGhostMap(ghostMap);
+      setCheckinInspectionId(checkinInspection.id);
+    };
+    loadCheckinGhost();
+  }, [inspectionType, propertyId, supabase]);
+
   // Toast auto-dismiss
   useEffect(() => {
     if (toast) {
@@ -530,7 +589,12 @@ export function InspectionClient({
     setScreen("inspect");
   };
 
-  const handlePhotoCapture = async (base64: string, roomId: string, roomName: string) => {
+  const handlePhotoCapture = async (
+    base64: string,
+    roomId: string,
+    roomName: string,
+    checkinPhotoUrl?: string | null
+  ) => {
     const localBase64 = base64;
     const localRoomId = roomId;
     const localRoomName = roomName;
@@ -607,6 +671,8 @@ export function InspectionClient({
             base64: localBase64,
             photoId: realPhotoId,
             roomName: localRoomName,
+            checkinPhotoUrl: checkinPhotoUrl ?? null,
+            isCheckout: !!checkinPhotoUrl,
           }),
         });
 
@@ -1093,7 +1159,7 @@ export function InspectionClient({
               <button type="button" onClick={() => setScreen("review")}
                 className="text-xs font-semibold px-3 py-1.5 rounded-lg"
                 style={{
-                  background: totalPhotos > 0 ? "#9A88FD" : "rgba(255,255,255,0.1)",
+                  background: totalPhotos > 0 ? accentColor : "rgba(255,255,255,0.1)",
                   color: "white",
                 }}>
                 Review
@@ -1127,8 +1193,29 @@ export function InspectionClient({
             {/* Progress bar */}
             <div className="h-1 rounded-full overflow-hidden mt-1" style={{ background: "rgba(255,255,255,0.06)" }}>
               <div className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${progressPct}%`, background: "linear-gradient(90deg, #9A88FD, #cafe87)" }} />
+                style={{ width: `${progressPct}%`, background: inspectionType === "check-out" ? "linear-gradient(90deg, #FF8A65, #cafe87)" : "linear-gradient(90deg, #9A88FD, #cafe87)" }} />
             </div>
+
+            {/* Check-out ghost mode banner */}
+            {inspectionType === "check-out" && (
+              <div
+                style={{
+                  background: "rgba(255,138,101,0.12)",
+                  border: "1px solid rgba(255,138,101,0.3)",
+                  borderRadius: 8,
+                  padding: "6px 12px",
+                  margin: "8px 16px 0",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span style={{ fontSize: 13 }}>👻</span>
+                <p style={{ fontSize: 12, color: "#FF8A65", fontWeight: 600, margin: 0 }}>
+                  Ghost mode active — entry photos overlaid on camera
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Camera zone */}
@@ -1136,19 +1223,63 @@ export function InspectionClient({
             style={{ height: 200, background: "#1a1a2e" }}>
             <div className="absolute inset-6 rounded-xl" style={{ border: "1px solid rgba(255,255,255,0.08)" }} />
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <label className="w-16 h-16 rounded-full flex items-center justify-center cursor-pointer transition-all active:scale-90"
-                style={{ background: "rgba(255,255,255,0.08)", border: `3px solid ${accentColor}` }}>
-                <div className="w-10 h-10 rounded-full" style={{ background: accentColor }} />
-                <input type="file" accept="image/*" capture="environment" className="hidden" multiple
-                  ref={fileInputRef}
-                  onChange={async (e) => {
-                    await handlePhotoFiles(e.target.files);
-                    if (fileInputRef.current) fileInputRef.current.value = "";
-                  }} />
-              </label>
-              <p className="text-[10px] text-white/30 mt-3">Tap to capture</p>
+              {inspectionType === "check-out" ? (
+                <button
+                  type="button"
+                  onClick={() => setIsCameraOpen(true)}
+                  className="w-16 h-16 rounded-full flex items-center justify-center cursor-pointer transition-all active:scale-90"
+                  style={{ background: "rgba(255,255,255,0.08)", border: `3px solid ${accentColor}` }}
+                >
+                  <Camera size={28} style={{ color: accentColor }} />
+                </button>
+              ) : (
+                <label
+                  className="w-16 h-16 rounded-full flex items-center justify-center cursor-pointer transition-all active:scale-90"
+                  style={{ background: "rgba(255,255,255,0.08)", border: `3px solid ${accentColor}` }}
+                >
+                  <div className="w-10 h-10 rounded-full" style={{ background: accentColor }} />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    multiple
+                    ref={fileInputRef}
+                    onChange={async (e) => {
+                      await handlePhotoFiles(e.target.files);
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
+                  />
+                </label>
+              )}
+              <p className="text-[10px] text-white/30 mt-3">
+                {inspectionType === "check-out" ? "Tap for camera + ghost overlay" : "Tap to capture"}
+              </p>
             </div>
           </div>
+
+          {isCameraOpen && currentRoom && (
+            <GhostCamera
+              checkinPhotos={
+                checkinGhostMap[currentRoom.name?.toLowerCase().trim() ?? ""] ?? []
+              }
+              roomName={currentRoom.name}
+              isCheckout={true}
+              onClose={() => setIsCameraOpen(false)}
+              onPhotoTaken={async (blob, activeGhostUrl) => {
+                setIsCameraOpen(false);
+                const base64: string = await new Promise((res, rej) => {
+                  const reader = new FileReader();
+                  reader.onload = () => res(reader.result as string);
+                  reader.onerror = rej;
+                  reader.readAsDataURL(blob);
+                });
+                if (base64.startsWith("data:image")) {
+                  await handlePhotoCapture(base64, currentRoom.id, currentRoom.name, activeGhostUrl);
+                }
+              }}
+            />
+          )}
 
           {/* Photo dock — uses PhotoCard for expand/tag/notes */}
           <div

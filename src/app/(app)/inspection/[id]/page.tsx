@@ -61,9 +61,12 @@ export default async function InspectionPage({
     ? keyHandover.filter((k) => k && typeof k.item === "string" && typeof k.qty === "number")
     : [];
 
+  const propertyId = (inspection as { property_id?: string }).property_id ?? "";
+
   return (
     <InspectionClient
       inspectionId={id}
+      propertyId={propertyId}
       inspectionType={inspection.type ?? "check-in"}
       buildingName={prop?.building_name ?? "Property"}
       unitNumber={prop?.unit_number ?? ""}
