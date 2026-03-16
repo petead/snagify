@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -166,7 +167,13 @@ export function ProfileClient({
                 }}
               >
                 {profile.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <Image
+                    src={profile.avatar_url}
+                    alt=""
+                    width={72}
+                    height={72}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
                 ) : (
                   <span style={{ color: "#fff", fontSize: 24, fontWeight: 800, fontFamily: "'Poppins', sans-serif" }}>{initials}</span>
                 )}
@@ -181,9 +188,11 @@ export function ProfileClient({
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               {profile.company_logo_url && (
-                <img
+                <Image
                   src={profile.company_logo_url}
                   alt=""
+                  width={120}
+                  height={32}
                   style={{ height: 32, width: "auto", maxWidth: 120, objectFit: "contain" }}
                 />
               )}
