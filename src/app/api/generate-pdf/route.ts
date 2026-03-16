@@ -263,13 +263,27 @@ export async function buildPdfAndUpload(
     const tenancy = Array.isArray(row.tenancies) ? row.tenancies[0] : row.tenancies;
 
     const agentId = row.agent_id ?? (inspection as { agent_id?: string }).agent_id;
-    const { data: agentData } = agentId
+    const { data: agentRow } = agentId
       ? await supabase
           .from("profiles")
-          .select("full_name, agency_name, company_logo_url, company_primary_color, rera_number, signature_image_url")
+          .select("full_name, rera_number, signature_image_url, company:companies(*)")
           .eq("id", agentId)
           .maybeSingle()
       : { data: null };
+
+    const agentCompany = agentRow?.company
+      ? (Array.isArray(agentRow.company) ? agentRow.company[0] : agentRow.company)
+      : null;
+    const agentData = agentRow
+      ? {
+          full_name: agentRow.full_name,
+          agency_name: (agentCompany as { name?: string } | null)?.name ?? (agentRow as { agency_name?: string }).agency_name,
+          company_logo_url: (agentCompany as { logo_url?: string } | null)?.logo_url ?? (agentRow as { company_logo_url?: string }).company_logo_url,
+          company_primary_color: (agentCompany as { primary_color?: string } | null)?.primary_color ?? (agentRow as { company_primary_color?: string }).company_primary_color,
+          rera_number: agentRow.rera_number,
+          signature_image_url: agentRow.signature_image_url,
+        }
+      : null;
 
     const meta: InspectionMeta = {
       inspection: {

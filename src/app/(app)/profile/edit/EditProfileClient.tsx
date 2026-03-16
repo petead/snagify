@@ -4,20 +4,19 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import type { Company } from "@/types";
 
 type ProfileRow = {
+  id: string;
   full_name: string | null;
-  agency_name: string | null;
   phone: string | null;
   job_title: string | null;
   whatsapp_number: string | null;
   rera_number: string | null;
-  company_logo_url: string | null;
-  company_website: string | null;
-  company_address: string | null;
-  company_trade_license: string | null;
   avatar_url: string | null;
   signature_image_url: string | null;
+  company_id: string | null;
+  company?: Company | Company[] | null;
 };
 
 interface EditProfileClientProps {
@@ -66,12 +65,14 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
     whatsapp_number: "",
     rera_number: "",
     agency_name: "",
+    company_primary_color: "#9A88FD",
     company_website: "",
     company_address: "",
     company_trade_license: "",
   });
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(null);
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const [signatureImageUrl, setSignatureImageUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<"avatar" | "company-logo" | "signature" | null>(null);
@@ -85,7 +86,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
     const supabase = createClient();
     supabase
       .from("profiles")
-      .select("*")
+      .select("*, company:companies(*)")
       .eq("id", userId)
       .single()
       .then(({ data, error }) => {
@@ -96,20 +97,29 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
         }
         const p = data as ProfileRow | null;
         setProfile(p);
+        const company = p?.company
+          ? Array.isArray(p.company)
+            ? (p.company[0] as Company)
+            : (p.company as Company)
+          : null;
         if (p) {
+          setCompanyId(p.company_id ?? null);
           setForm({
             full_name: p.full_name ?? "",
             job_title: p.job_title ?? "",
             phone: p.phone ?? "",
             whatsapp_number: p.whatsapp_number ?? "",
             rera_number: p.rera_number ?? "",
-            agency_name: p.agency_name ?? "",
-            company_website: p.company_website ?? "",
-            company_address: p.company_address ?? "",
-            company_trade_license: p.company_trade_license ?? "",
+            agency_name: company?.name ?? (p as { agency_name?: string }).agency_name ?? "",
+            company_primary_color:
+              company?.primary_color ?? (p as { company_primary_color?: string }).company_primary_color ?? "#9A88FD",
+            company_website: company?.website ?? (p as { company_website?: string }).company_website ?? "",
+            company_address: company?.address ?? (p as { company_address?: string }).company_address ?? "",
+            company_trade_license:
+              company?.trade_license ?? (p as { company_trade_license?: string }).company_trade_license ?? "",
           });
           setAvatarUrl(p.avatar_url ?? null);
-          setCompanyLogoUrl(p.company_logo_url ?? null);
+          setCompanyLogoUrl(company?.logo_url ?? (p as { company_logo_url?: string }).company_logo_url ?? null);
           setSignatureImageUrl(p.signature_image_url ?? null);
         }
         setLoading(false);
@@ -131,9 +141,10 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
     setUploading(kind);
     const formData = new FormData();
     formData.set("file", file);
-    formData.set("kind", kind);
+    if (kind !== "company-logo") formData.set("kind", kind);
     try {
-      const res = await fetch("/api/upload-avatar", { method: "POST", body: formData });
+      const endpoint = kind === "company-logo" ? "/api/upload-logo" : "/api/upload-avatar";
+      const res = await fetch(endpoint, { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload failed");
       const url = data.url as string;
@@ -150,13 +161,18 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
   const handleSave = async () => {
     const fullName = form.full_name.trim();
     const agencyName = form.agency_name.trim();
-    if (!fullName || !agencyName) {
-      alert("Full Name and Agency Name are required.");
+    if (!fullName) {
+      alert("Full Name is required.");
+      return;
+    }
+    if (!agencyName) {
+      alert("Agency Name is required.");
       return;
     }
     setSaving(true);
     const supabase = createClient();
-    const { error } = await supabase
+
+    const { error: profileError } = await supabase
       .from("profiles")
       .update({
         full_name: fullName || null,
@@ -164,21 +180,53 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
         phone: form.phone.trim() || null,
         whatsapp_number: form.whatsapp_number.trim() || null,
         rera_number: form.rera_number.trim() || null,
-        agency_name: agencyName || null,
-        company_website: form.company_website.trim() || null,
-        company_address: form.company_address.trim() || null,
-        company_trade_license: form.company_trade_license.trim() || null,
-        company_logo_url: companyLogoUrl,
         avatar_url: avatarUrl,
         signature_image_url: signatureImageUrl,
       })
       .eq("id", userId);
 
-    setSaving(false);
-    if (error) {
-      alert(error.message);
+    if (profileError) {
+      setSaving(false);
+      alert(profileError.message);
       return;
     }
+
+    const primaryColor = form.company_primary_color.trim() || "#9A88FD";
+    const companyPayload = {
+      name: agencyName || null,
+      primary_color: primaryColor,
+      logo_url: companyLogoUrl,
+      website: form.company_website.trim() || null,
+      address: form.company_address.trim() || null,
+      trade_license: form.company_trade_license.trim() || null,
+    };
+
+    if (companyId) {
+      const { error: companyError } = await supabase
+        .from("companies")
+        .update(companyPayload)
+        .eq("id", companyId);
+      if (companyError) {
+        setSaving(false);
+        alert(companyError.message);
+        return;
+      }
+    } else {
+      const { data: newCompany, error: insertError } = await supabase
+        .from("companies")
+        .insert(companyPayload)
+        .select("id")
+        .single();
+      if (insertError) {
+        setSaving(false);
+        alert(insertError.message);
+        return;
+      }
+      await supabase.from("profiles").update({ company_id: newCompany.id }).eq("id", userId);
+      setCompanyId(newCompany.id);
+    }
+
+    setSaving(false);
     setToast("Profile updated ✓");
   };
 
@@ -328,9 +376,9 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
           </button>
         </div>
 
-        {/* ─── YOUR IDENTITY ─── */}
+        {/* ─── SECTION A: Your Profile ─── */}
         <div style={{ marginBottom: 20 }}>
-          <p style={{ ...sectionLabelStyle, marginBottom: 8 }}>Your Identity</p>
+          <p style={{ ...sectionLabelStyle, marginBottom: 8 }}>Your Profile</p>
           <div style={{ background: "#fff", borderRadius: 16, padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
@@ -390,12 +438,52 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
           </div>
         </div>
 
-        {/* ─── YOUR COMPANY ─── */}
+        {/* ─── SECTION B: Agency Settings ─── */}
         <div style={{ marginBottom: 20 }}>
-          <p style={{ ...sectionLabelStyle, marginBottom: 8 }}>Your Company</p>
+          <p style={{ ...sectionLabelStyle, marginBottom: 4 }}>Agency Settings</p>
+          <p style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
+            This branding will appear on all your inspection reports
+          </p>
           <div style={{ background: "#fff", borderRadius: 16, padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ ...sectionLabelStyle, marginBottom: 8, display: "block" }}>Company Logo</label>
+              <label style={{ ...sectionLabelStyle, marginBottom: 8, display: "block" }}>Agency Name *</label>
+              <input
+                type="text"
+                value={form.agency_name}
+                onChange={(e) => setForm((f) => ({ ...f, agency_name: e.target.value }))}
+                style={inputStyle}
+                placeholder="Your agency"
+                required
+              />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ ...sectionLabelStyle, marginBottom: 8, display: "block" }}>Primary Color</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input
+                  type="color"
+                  value={form.company_primary_color}
+                  onChange={(e) => setForm((f) => ({ ...f, company_primary_color: e.target.value }))}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    border: "2px solid #e8e8e8",
+                    padding: 2,
+                    cursor: "pointer",
+                    background: "transparent",
+                  }}
+                />
+                <input
+                  type="text"
+                  value={form.company_primary_color}
+                  onChange={(e) => setForm((f) => ({ ...f, company_primary_color: e.target.value }))}
+                  style={{ ...inputStyle, flex: 1, fontFamily: "monospace" }}
+                  placeholder="#9A88FD"
+                />
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ ...sectionLabelStyle, marginBottom: 8, display: "block" }}>Logo</label>
               <button
                 type="button"
                 onClick={() => logoInputRef.current?.click()}
@@ -447,17 +535,6 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
               )}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div>
-                <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>Agency Name *</label>
-                <input
-                  type="text"
-                  value={form.agency_name}
-                  onChange={(e) => setForm((f) => ({ ...f, agency_name: e.target.value }))}
-                  style={inputStyle}
-                  placeholder="Your agency"
-                  required
-                />
-              </div>
               <div>
                 <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>Website</label>
                 <input

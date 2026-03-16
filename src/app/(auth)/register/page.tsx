@@ -90,15 +90,27 @@ export default function RegisterPage() {
     }
 
     if (authData.user) {
+      const { data: newCompany, error: companyError } = await supabase
+        .from("companies")
+        .insert({ name: agencyName || null, primary_color: "#9A88FD" })
+        .select("id")
+        .single();
+
+      if (companyError) {
+        setError(companyError.message);
+        setLoading(false);
+        return;
+      }
+
       const { error: profileError } = await supabase
         .from("profiles")
         .upsert(
           {
             id: authData.user.id,
             full_name: fullName || null,
-            agency_name: agencyName || null,
             phone: fullPhone,
             role: "agent",
+            company_id: newCompany?.id ?? null,
           },
           { onConflict: "id" }
         );

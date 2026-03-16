@@ -38,10 +38,13 @@ export default async function ReportPage({
   if (inspection.agent_id) {
     const { data } = await supabase
       .from("profiles")
-      .select("full_name, agency_name")
+      .select("full_name, company:companies(name)")
       .eq("id", inspection.agent_id)
       .single();
-    profile = data;
+    const company = data?.company ? (Array.isArray(data.company) ? data.company[0] : data.company) : null;
+    profile = data
+      ? { full_name: data.full_name, agency_name: (company as { name?: string } | null)?.name ?? (data as { agency_name?: string }).agency_name ?? null }
+      : null;
   }
 
   return (

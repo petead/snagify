@@ -11,11 +11,11 @@ export default async function ProfilePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select(
-      "full_name, agency_name, phone, created_at, avatar_url, job_title, whatsapp_number, rera_number, company_logo_url, company_website, company_address, company_trade_license, signature_image_url, company_primary_color"
-    )
+    .select("*, company:companies(*)")
     .eq("id", user.id)
     .single();
+
+  const company = Array.isArray(profile?.company) ? profile?.company?.[0] : profile?.company;
 
   const [
     { count: propertiesCount },
@@ -38,19 +38,19 @@ export default async function ProfilePage() {
         userEmail={user.email ?? null}
         profile={{
           full_name: profile?.full_name ?? null,
-          agency_name: profile?.agency_name ?? null,
+          agency_name: (company as { name?: string } | null)?.name ?? (profile as { agency_name?: string } | null)?.agency_name ?? null,
           phone: profile?.phone ?? null,
           memberSince: profile?.created_at ?? null,
           avatar_url: profile?.avatar_url ?? null,
           job_title: profile?.job_title ?? null,
           whatsapp_number: profile?.whatsapp_number ?? null,
           rera_number: profile?.rera_number ?? null,
-          company_logo_url: profile?.company_logo_url ?? null,
-          company_website: profile?.company_website ?? null,
-          company_address: profile?.company_address ?? null,
-          company_trade_license: profile?.company_trade_license ?? null,
+          company_logo_url: (company as { logo_url?: string } | null)?.logo_url ?? (profile as { company_logo_url?: string } | null)?.company_logo_url ?? null,
+          company_website: (company as { website?: string } | null)?.website ?? (profile as { company_website?: string } | null)?.company_website ?? null,
+          company_address: (company as { address?: string } | null)?.address ?? (profile as { company_address?: string } | null)?.company_address ?? null,
+          company_trade_license: (company as { trade_license?: string } | null)?.trade_license ?? (profile as { company_trade_license?: string } | null)?.company_trade_license ?? null,
           signature_image_url: profile?.signature_image_url ?? null,
-          company_primary_color: profile?.company_primary_color ?? null,
+          company_primary_color: (company as { primary_color?: string } | null)?.primary_color ?? (profile as { company_primary_color?: string } | null)?.company_primary_color ?? null,
         }}
         stats={{
           properties: propertiesCount ?? 0,
