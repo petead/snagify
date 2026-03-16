@@ -16,16 +16,16 @@ import { getPdfImageHeight } from "@/lib/photos/getImageDimensions";
 interface CheckoutPhoto {
   id: string;
   url: string;
-  damage_tags?: string[];
-  ai_analysis?: string;
+  damage_tags?: string[] | null;
+  ai_analysis?: string | null;
   width?: number | null;
   height?: number | null;
   checkin_photo_id?: string | null;
   is_additional?: boolean;
   checkin_photo?: {
     url: string;
-    damage_tags?: string[];
-    ai_analysis?: string;
+    damage_tags?: string[] | null;
+    ai_analysis?: string | null;
     width?: number | null;
     height?: number | null;
   } | null;
