@@ -837,14 +837,20 @@ const s = StyleSheet.create({
   },
 });
 
-function tagStyle(tag: string): { bg: object; text: object } {
+type TagColors = {
+  bg: { backgroundColor: string };
+  text: { color: string };
+};
+
+function tagStyle(tag: string): TagColors {
   const t = tag.toLowerCase();
   if (["scratch", "crack", "broken", "missing"].includes(t))
-    return { bg: s.photoTagRed, text: s.photoTagTextRed };
+    return { bg: { backgroundColor: "#FEE2E2" }, text: { color: "#DC2626" } };
   if (["stain", "damp", "burn", "discoloration"].includes(t))
-    return { bg: s.photoTagOrange, text: s.photoTagTextOrange };
-  if (["mark", "wear"].includes(t)) return { bg: s.photoTagBlue, text: s.photoTagTextBlue };
-  return { bg: s.photoTagGray, text: s.photoTagTextGray };
+    return { bg: { backgroundColor: "#FEF3C7" }, text: { color: "#B45309" } };
+  if (["mark", "wear"].includes(t))
+    return { bg: { backgroundColor: "#DBEAFE" }, text: { color: "#1D4ED8" } };
+  return { bg: { backgroundColor: "#F1F5F9" }, text: { color: "#475569" } };
 }
 
 export function CheckoutPDFDocument({
