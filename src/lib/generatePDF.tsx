@@ -1020,7 +1020,7 @@ function InspectionReport({
                 value: capitalise(property.property_type || "Apartment"),
               },
             ].map((item, i) => (
-              <View key={i} style={[s.metaCell, i < 2 && s.metaCellBorder]}>
+              <View key={i} style={[s.metaCell, ...(i < 2 ? [s.metaCellBorder] : [])]}>
                 <View style={[s.metaIconBox, { backgroundColor: tokens.primaryUltraLight, marginRight: 8 }]} />
                 <View>
                   <Text style={[s.metaLabel, { color: tokens.primary }]}>{item.label}</Text>
@@ -1042,7 +1042,7 @@ function InspectionReport({
                   .slice(0, 2)
                   .join("") || "?";
               return (
-                <View key={i} style={[s.partyCard, i === 0 && { marginRight: 8 }]}>
+                <View key={i} style={[s.partyCard, ...(i === 0 ? [{ marginRight: 8 }] : [])]}>
                   <View style={[s.partyAvatar, { backgroundColor: tokens.primaryUltraLight, marginRight: 9 }]}>
                     <Text style={[s.partyAvatarText, { color: tokens.primary }]}>{initials}</Text>
                   </View>
@@ -1097,7 +1097,7 @@ function InspectionReport({
             { num: totalPhotos, label: "Photos captured" },
             { num: totalIssues, label: "Issues flagged" },
           ].map((stat, i) => (
-            <View key={i} style={[s.statCard, i < 2 && { marginRight: 10 }]}>
+            <View key={i} style={[s.statCard, ...(i < 2 ? [{ marginRight: 10 }] : [])]}>
               <View style={[s.statIconBox, { backgroundColor: tokens.primaryUltraLight }]}>
                 <View
                   style={{
@@ -1144,7 +1144,7 @@ function InspectionReport({
             const tags = r.validPhotos.flatMap((p) => p.damage_tags ?? []);
             const uniqueTags = [...new Set(tags)].slice(0, 4).join(", ");
             return (
-              <View key={`${r.room.name}-${i}`} style={[s.roomRow, i % 2 === 1 && s.roomRowAlt]}>
+              <View key={`${r.room.name}-${i}`} style={[s.roomRow, ...(i % 2 === 1 ? [s.roomRowAlt] : [])]}>
                 <Text style={[s.roomCellBold, { flex: 2 }]}>{r.room.name}</Text>
                 <Text style={[s.roomCell, { flex: 0.8 }]}>{r.validPhotos.length}</Text>
                 <Text style={[s.roomCell, { flex: 0.8 }]}>{r.photosWithIssues}</Text>
@@ -1282,7 +1282,7 @@ function InspectionReport({
                   {pair.map((photo) => (
                     <View
                       key={photo.id}
-                      style={[s.photoCard, pair.indexOf(photo) === 0 && pair.length > 1 && { marginRight: 8 }]}
+                      style={[s.photoCard, ...(pair.indexOf(photo) === 0 && pair.length > 1 ? [{ marginRight: 8 }] : [])]}
                     >
                       {photo.url && photo.url.startsWith("http") ? (
                         <Image src={photo.url} style={s.photoImg} />
@@ -1374,7 +1374,7 @@ function InspectionReport({
             ].map((party, i) => {
               const sig = (meta.signatures ?? []).find((s) => s.signer_type === party.sigType);
               return (
-                <View key={i} style={[s.sigPartyCard, i === 0 && { marginRight: 8 }]}>
+                <View key={i} style={[s.sigPartyCard, ...(i === 0 ? [{ marginRight: 8 }] : [])]}>
                   <Text style={[s.sigPartyRole, { color: tokens.primary }]}>
                     {party.role.toUpperCase()}
                   </Text>
