@@ -87,6 +87,8 @@ type InspectionRow = {
   document_hash?: string | null;
   key_handover?: { item: string; qty: number }[] | null;
   checkin_key_handover?: { item: string; qty: number }[] | null;
+  property_id?: string | null;
+  inspection_type?: string | null;
   properties?: PropRow | PropRow[] | null;
   tenancies?: TenancyRow | TenancyRow[] | null;
   rooms?: RoomRow[] | null;
@@ -211,12 +213,21 @@ export async function buildPdfAndUpload(
 
   let checkinPhotoMap: Record<string, { id: string; url: string; damage_tags?: string[]; ai_analysis?: string | null }> = {};
   let checkinRooms: { name: string; photos: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }[] }[] = [];
-  const isCheckout = (row.type ?? "").toLowerCase().includes("check-out");
-  if (isCheckout && row.property_id) {
+  const inspectionType = (
+    (row as Record<string, unknown>).inspection_type ??
+    (row as Record<string, unknown>).type ??
+    ""
+  ) as string;
+  const propertyId = (
+    (row as Record<string, unknown>).property_id ?? null
+  ) as string | null;
+  const isCheckout = inspectionType.toLowerCase().includes("check-out");
+
+  if (isCheckout && propertyId) {
     const { data: checkinInspection } = await supabase
       .from("inspections")
       .select("id")
-      .eq("property_id", row.property_id)
+      .eq("property_id", propertyId)
       .eq("type", "check-in")
       .order("created_at", { ascending: false })
       .limit(1)
@@ -334,7 +345,10 @@ export async function buildPdfAndUpload(
 
   const pdfBuffer = await generateInspectionPDFBuffer(reportData, meta, documentHash);
 
-  const filePath = `${inspectionId}/${inspectionId}.pdf`;
+  const fileName = `report_${inspectionId}.pdf`;
+  console.log("[generate-pdf] PDF buffer size:", pdfBuffer.length);
+  console.log("[generate-pdf] Upload path:", fileName);
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const storageClient =
@@ -342,23 +356,26 @@ export async function buildPdfAndUpload(
 
   const { error: uploadError } = await storageClient.storage
     .from("reports")
-    .upload(filePath, pdfBuffer, {
+    .upload(fileName, pdfBuffer, {
       contentType: "application/pdf",
       upsert: true,
     });
 
   let reportUrl: string | null = null;
   if (uploadError) {
-    console.error("PDF upload to storage FAILED:", uploadError.message);
+    console.error("[generate-pdf] PDF upload to storage FAILED:", uploadError.message);
   } else {
-    const { data: urlData } = storageClient.storage.from("reports").getPublicUrl(filePath);
-    reportUrl = urlData.publicUrl;
+    const { data: urlData } = storageClient.storage.from("reports").getPublicUrl(fileName);
+    const bustUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+    console.log("[generate-pdf] Public URL (with cache-bust):", bustUrl);
     const { error: updateErr } = await storageClient
       .from("inspections")
-      .update({ report_url: reportUrl })
+      .update({ report_url: bustUrl })
       .eq("id", inspectionId);
     if (updateErr) {
-      console.error("Failed to save report_url:", updateErr.message);
+      console.error("[generate-pdf] Failed to save report_url:", updateErr.message);
+    } else {
+      reportUrl = bustUrl;
     }
   }
 

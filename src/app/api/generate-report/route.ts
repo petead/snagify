@@ -35,11 +35,15 @@ function getRoomCondition(photos: { damage_tags?: string[] }[]): string {
 }
 
 export async function POST(request: Request) {
+  let inspectionId: string | undefined;
   try {
-    const { inspectionId } = (await request.json()) as { inspectionId: string };
+    const body = (await request.json()) as { inspectionId?: string };
+    inspectionId = body.inspectionId;
     if (!inspectionId) {
       return NextResponse.json({ error: "Missing inspectionId" }, { status: 400 });
     }
+
+    console.log("[generate-report] Starting for inspection:", inspectionId);
 
     const supabase = await createClient();
 
@@ -169,11 +173,27 @@ export async function POST(request: Request) {
       }
 
     let report_url: string | null = null;
+    let pdfBuffer: Uint8Array | null = null;
     try {
       const pdfResult = await buildPdfAndUpload(inspectionId);
       report_url = pdfResult.report_url;
+      pdfBuffer = pdfResult.buffer;
+      console.log("[generate-report] PDF buffer size:", pdfBuffer?.length ?? 0);
+      console.log("[generate-report] Public URL:", report_url ?? "null");
     } catch (pdfErr) {
-      console.error("generate-report PDF build/upload failed:", pdfErr);
+      console.error("[generate-report] PDF build/upload failed:", pdfErr);
+      throw pdfErr;
+    }
+
+    const wantsPdf = request.headers.get("Accept") === "application/pdf";
+    if (wantsPdf && pdfBuffer) {
+      return new NextResponse(Buffer.from(pdfBuffer), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="Snagify_Report_${inspectionId}.pdf"`,
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+      });
     }
 
     return NextResponse.json({
@@ -181,10 +201,11 @@ export async function POST(request: Request) {
       report_url: report_url ?? undefined,
       executive_summary: aiSummary,
     });
-  } catch (err) {
-    console.error("generate-report error:", err);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[generate-report] ERROR:", message);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Report generation failed" },
+      { error: message },
       { status: 500 }
     );
   }

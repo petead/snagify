@@ -300,6 +300,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
             {uploading === "avatar" ? (
               <span style={{ fontSize: 18, color: "#fff" }}>…</span>
             ) : avatarUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img src={avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
               <span style={{ color: "#fff", fontSize: 28, fontWeight: 800 }}>{initials}</span>
@@ -417,6 +418,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
                 {uploading === "company-logo" ? (
                   <span style={{ fontSize: 13, color: "#999" }}>Uploading…</span>
                 ) : companyLogoUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
                   <img src={companyLogoUrl} alt="Logo" style={{ maxHeight: 64, maxWidth: "100%", objectFit: "contain" }} />
                 ) : (
                   <>
@@ -533,6 +535,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
                       background: "#fff",
                     }}
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={signatureImageUrl} alt="Signature" style={{ maxWidth: 160, maxHeight: 70, objectFit: "contain" }} />
                   </div>
                   <div style={{ marginTop: 8, display: "flex", gap: 12 }}>

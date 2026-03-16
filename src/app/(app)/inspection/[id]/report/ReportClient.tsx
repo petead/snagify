@@ -234,37 +234,35 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   const handleDownloadPDF = async () => {
     setDownloadLoading(true);
     try {
-      const res = await fetch("/api/generate-report", {
+      const response = await fetch("/api/generate-report", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/pdf",
+        },
         body: JSON.stringify({ inspectionId: inspection.id }),
       });
-      const data = (await res.json()) as {
-        report_url?: string;
-        executive_summary?: string;
-        error?: string;
-      };
-      if (!res.ok) throw new Error(data?.error ?? "PDF generation failed");
-      if (data.report_url) {
-        setReportUrl(data.report_url);
-        if (data.executive_summary) setExecSummary(data.executive_summary);
-        router.refresh();
-        const bustUrl = `${data.report_url}?t=${Date.now()}`;
-        const response = await fetch(bustUrl, { cache: "no-store" });
-        if (!response.ok) throw new Error("Failed to fetch PDF");
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `snagify-report-${inspection.id}.pdf`;
-        a.click();
-        URL.revokeObjectURL(url);
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(err?.error ?? "Failed to generate PDF");
       }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Snagify_Report_${inspection.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      router.refresh();
     } catch (err) {
-      console.error("Generate report failed:", err);
-      alert(
-        `Could not generate PDF: ${err instanceof Error ? err.message : "Please try again."}`
-      );
+      console.error("Download failed:", err);
+      alert("Could not download PDF. Please try again.");
     } finally {
       setDownloadLoading(false);
     }
@@ -1041,7 +1039,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
-          {downloadLoading ? "Generating PDF..." : "Download PDF"}
+          {downloadLoading ? "Generating PDF…" : "⬇ Download PDF"}
         </button>
 
         <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
