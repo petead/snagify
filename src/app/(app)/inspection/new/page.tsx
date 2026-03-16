@@ -260,7 +260,6 @@ function NewInspectionContent() {
   const searchParams = useSearchParams();
   const existingPropertyId = searchParams.get("propertyId");
   const urlTenancyId = searchParams.get("tenancyId");
-  const urlType = searchParams.get("type");
 
   const router = useRouter();
   const supabase = createClient();
@@ -290,13 +289,6 @@ function NewInspectionContent() {
     setSelectedRooms((prev) =>
       prev.includes(room) ? prev.filter((r) => r !== room) : [...prev, room]
     );
-
-  // Pre-fill inspection type from URL
-  useEffect(() => {
-    if (urlType === "check-in" || urlType === "check-out") {
-      setFormData((d) => ({ ...d, inspectionType: urlType }));
-    }
-  }, [urlType]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -568,7 +560,7 @@ function NewInspectionContent() {
           property_id: propertyId,
           tenancy_id: tenancy.id,
           agent_id: user.id,
-          type: formData.inspectionType,
+          type: "check-in",
           status: "draft",
           key_handover: keyHandover.length > 0 ? keyHandover : [],
         })
@@ -873,25 +865,6 @@ function NewInspectionContent() {
               {saveError}
             </div>
           )}
-
-          {/* Inspection type */}
-          <SectionHeader title="Inspection Type" />
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            {(["check-in", "check-out"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => set("inspectionType", t)}
-                className={`h-12 rounded-xl font-semibold text-sm border-2 transition-all ${
-                  formData.inspectionType === t
-                    ? "bg-[#9A88FD] border-[#9A88FD] text-white"
-                    : "bg-white border-gray-200 text-gray-600"
-                }`}
-              >
-                {t === "check-in" ? "Check-In" : "Check-Out"}
-              </button>
-            ))}
-          </div>
 
           {/* Property */}
           <SectionHeader title="Property" />

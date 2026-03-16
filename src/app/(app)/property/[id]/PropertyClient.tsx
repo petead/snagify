@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 
 type InspectionSignature = {
@@ -77,6 +78,29 @@ function inspectionDisplayStatus(status: string | null): "draft" | "signed" {
   return "draft";
 }
 
+type CheckInWithRooms = {
+  id: string;
+  property_id: string;
+  agent_id: string | null;
+  tenancy_id?: string | null;
+  type: string | null;
+  status: string | null;
+  landlord_name: string | null;
+  landlord_email: string | null;
+  landlord_phone?: string | null;
+  tenant_name: string | null;
+  tenant_email: string | null;
+  tenant_phone?: string | null;
+  ejari_ref?: string | null;
+  contract_from?: string | null;
+  contract_to?: string | null;
+  annual_rent?: number | null;
+  security_deposit?: number | null;
+  property_size?: number | null;
+  key_handover?: unknown;
+  rooms?: { id: string; name: string; order_index: number | null }[];
+};
+
 function InspectionRow({
   label,
   data,
@@ -90,6 +114,7 @@ function InspectionRow({
   onRemove,
   onRollback,
   signatures,
+  sourceCheckInId,
 }: {
   label: string;
   data: { date: string; status: string } | null;
@@ -103,11 +128,83 @@ function InspectionRow({
   onRemove?: () => void;
   onRollback?: () => void;
   signatures?: InspectionSignature[];
+  sourceCheckInId?: string;
 }) {
   const router = useRouter();
+  const [preparingCheckOut, setPreparingCheckOut] = useState(false);
 
-  const handleStart = () => {
-    const params = new URLSearchParams({ propertyId, type: inspectionType });
+  const handleStart = async () => {
+    if (inspectionType === "check-out" && sourceCheckInId) {
+      setPreparingCheckOut(true);
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setPreparingCheckOut(false);
+          return;
+        }
+        const { data: checkinInspection, error: fetchErr } = await supabase
+          .from("inspections")
+          .select("*, rooms (id, name, order_index)")
+          .eq("id", sourceCheckInId)
+          .single();
+
+        if (fetchErr || !checkinInspection) {
+          alert(fetchErr?.message ?? "Could not load check-in");
+          setPreparingCheckOut(false);
+          return;
+        }
+        const checkin = checkinInspection as CheckInWithRooms;
+
+        const { data: newInspection, error: insertErr } = await supabase
+          .from("inspections")
+          .insert({
+            property_id: checkin.property_id,
+            tenancy_id: checkin.tenancy_id ?? undefined,
+            agent_id: user.id,
+            type: "check-out",
+            status: "in_progress",
+            landlord_name: checkin.landlord_name,
+            landlord_email: checkin.landlord_email,
+            landlord_phone: checkin.landlord_phone ?? undefined,
+            tenant_name: checkin.tenant_name,
+            tenant_email: checkin.tenant_email,
+            tenant_phone: checkin.tenant_phone ?? undefined,
+            ejari_ref: checkin.ejari_ref ?? undefined,
+            contract_from: checkin.contract_from ?? undefined,
+            contract_to: checkin.contract_to ?? undefined,
+            annual_rent: checkin.annual_rent ?? undefined,
+            security_deposit: checkin.security_deposit ?? undefined,
+            property_size: checkin.property_size ?? undefined,
+            key_handover: Array.isArray(checkin.key_handover) ? checkin.key_handover : [],
+          })
+          .select()
+          .single();
+
+        if (insertErr) {
+          alert(insertErr.message);
+          setPreparingCheckOut(false);
+          return;
+        }
+
+        if (checkin.rooms?.length) {
+          const roomsToInsert = checkin.rooms.map((r) => ({
+            inspection_id: newInspection.id,
+            name: r.name,
+            order_index: r.order_index ?? 0,
+          }));
+          await supabase.from("rooms").insert(roomsToInsert);
+        }
+
+        router.push(`/inspection/${newInspection.id}`);
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "Failed to start check-out");
+        setPreparingCheckOut(false);
+      }
+      return;
+    }
+
+    const params = new URLSearchParams({ propertyId, type: "check-in" });
     if (tenancyId) params.set("tenancyId", tenancyId);
     router.push(`/inspection/new?${params.toString()}`);
   };
@@ -207,10 +304,27 @@ function InspectionRow({
               </div>
             )}
           </>
+        ) : !canStart && inspectionType === "check-out" ? (
+          <span
+            title="Complete the check-in first"
+            style={{
+              background: "#E5E7EB",
+              color: "#9CA3AF",
+              padding: "6px 14px",
+              borderRadius: 10,
+              fontSize: 12,
+              fontWeight: 600,
+              opacity: 0.4,
+              cursor: "not-allowed",
+            }}
+          >
+            Complete the check-in first
+          </span>
         ) : canStart ? (
           <button
             type="button"
-            onClick={handleStart}
+            onClick={() => void handleStart()}
+            disabled={preparingCheckOut}
             style={{
               background: accentLabel ? "#9A88FD" : "#1A1A1A",
               color: "#fff",
@@ -219,10 +333,11 @@ function InspectionRow({
               fontSize: 12,
               fontWeight: 600,
               border: "none",
-              cursor: "pointer",
+              cursor: preparingCheckOut ? "wait" : "pointer",
+              opacity: preparingCheckOut ? 0.9 : 1,
             }}
           >
-            Start
+            {preparingCheckOut ? "Preparing Check-out…" : "Start"}
           </button>
         ) : (
           <span style={{ fontSize: 12, color: "#DDD" }}>—</span>
@@ -578,6 +693,7 @@ export function PropertyClient({
                       onRemove={checkOut ? () => removeInspectionFromList(checkOut.id) : undefined}
                       onRollback={rollbackGroups}
                       signatures={checkOut?.signatures}
+                      sourceCheckInId={checkIn?.id}
                     />
                   </div>
                 </div>
