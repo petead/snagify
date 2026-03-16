@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GhostCamera from "@/components/GhostCamera";
+import { getImageDimensions } from "@/lib/photos/getImageDimensions";
 
 // ─── Types ───────────────────────────────────────
 type RoomData = {
@@ -25,6 +26,8 @@ type PhotoItem = {
   id: string;
   room_id: string;
   url: string;
+  width: number | null;
+  height: number | null;
   damage_tags: string[];
   notes: string;
   isUploading: boolean;
@@ -454,7 +457,7 @@ export function InspectionClient({
       const roomIds = liveRooms.map((r) => r.id);
       const { data } = await supabase
         .from("photos")
-        .select("id, room_id, url, damage_tags, notes, checkin_photo_id, is_additional")
+        .select("id, room_id, url, width, height, damage_tags, notes, checkin_photo_id, is_additional")
         .in("room_id", roomIds)
         .order("taken_at", { ascending: true });
       if (data) {
@@ -469,6 +472,8 @@ export function InspectionClient({
                 id: p.id,
                 room_id: p.room_id,
                 url: p.url,
+                width: (p as { width?: number | null }).width ?? null,
+                height: (p as { height?: number | null }).height ?? null,
                 damage_tags: local
                   ? local.damage_tags
                   : Array.isArray(p.damage_tags) ? p.damage_tags : [],
@@ -613,6 +618,8 @@ export function InspectionClient({
       id: tempId,
       room_id: localRoomId,
       url: localPreviewUrl,
+      width: null,
+      height: null,
       damage_tags: [],
       notes: "Uploading...",
       isUploading: true,
@@ -648,6 +655,8 @@ export function InspectionClient({
         });
       }
 
+      const dimensions = await getImageDimensions(blob);
+
       const { error: storageError } = await supabase.storage
         .from("inspection-photos")
         .upload(fileName, blob, { contentType: "image/jpeg", upsert: false });
@@ -667,6 +676,8 @@ export function InspectionClient({
       const insertPayload = {
         room_id: localRoomId,
         url: publicUrl,
+        width: dimensions?.width ?? null,
+        height: dimensions?.height ?? null,
         damage_tags: [],
         notes: "",
         taken_at: new Date().toISOString(),
@@ -694,6 +705,8 @@ export function InspectionClient({
             .insert({
               room_id: localRoomId,
               url: publicUrl,
+              width: dimensions?.width ?? null,
+              height: dimensions?.height ?? null,
               damage_tags: [],
               notes: "",
               taken_at: new Date().toISOString(),
@@ -715,7 +728,7 @@ export function InspectionClient({
       // ── STEP 4: Replace temp with real URL, show "Analyzing..."
       setPhotos((prev) => prev.map((p) =>
         p.id === tempId
-          ? { ...p, id: realPhotoId, url: publicUrl, isUploading: false, uploadFailed: false, notes: "Analyzing..." }
+          ? { ...p, id: realPhotoId, url: publicUrl, width: dimensions?.width ?? null, height: dimensions?.height ?? null, isUploading: false, uploadFailed: false, notes: "Analyzing..." }
           : p
       ));
       if (localPreviewUrl.startsWith("blob:")) {

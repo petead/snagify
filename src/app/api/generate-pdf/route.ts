@@ -124,6 +124,8 @@ type RoomRow = {
   photos?: {
     id: string;
     url: string;
+    width?: number | null;
+    height?: number | null;
     ai_analysis?: string | null;
     damage_tags?: string[];
     notes?: string | null;
@@ -171,6 +173,8 @@ const INSPECTION_SELECT = `
     photos (
       id,
       url,
+      width,
+      height,
       ai_analysis,
       damage_tags,
       notes,
@@ -332,6 +336,8 @@ export async function buildPdfAndUpload(
             photos: sortedPhotos.map((p) => ({
               id: p.id,
               url: p.url,
+              width: p.width ?? undefined,
+              height: p.height ?? undefined,
               notes: p.notes ?? undefined,
               damage_tags: p.damage_tags ?? [],
               taken_at: p.taken_at ?? undefined,

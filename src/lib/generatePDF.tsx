@@ -11,6 +11,7 @@ import {
 } from "@react-pdf/renderer";
 import QRCode from "qrcode";
 import { getBrandTokens } from "@/lib/pdf/brandTokens";
+import { getPdfImageHeight } from "@/lib/photos/getImageDimensions";
 
 const PURPLE = "#9A88FD";
 const GREEN = "#cafe87";
@@ -893,6 +894,8 @@ interface InspectionMeta {
     photos: {
       id: string;
       url?: string;
+      width?: number | null;
+      height?: number | null;
       notes?: string;
       damage_tags?: string[];
       taken_at?: string;
@@ -1278,41 +1281,67 @@ function InspectionReport({
             </View>
 
             <View style={s.roomBody}>
-              {photoPairs.map((pair, pairIdx) => (
-                <View key={pairIdx} style={s.photosGrid}>
-                  {pair.map((photo) => (
-                    <View
-                      key={photo.id}
-                      style={[s.photoCard, ...(pair.indexOf(photo) === 0 && pair.length > 1 ? [{ marginRight: 8 }] : [])]}
-                    >
-                      {photo.url && photo.url.startsWith("http") ? (
-                        <Image src={photo.url} style={s.photoImg} />
-                      ) : null}
-                      {photo.damage_tags && photo.damage_tags.length > 0 && (
-                        <View style={s.photoTagsRow}>
-                          {photo.damage_tags.map((tag, ti) => {
-                            const ts = tagStyle(tag);
-                            return (
-                              <View key={ti} style={[s.photoTag, ts.bg, { marginRight: 3, marginBottom: 2 }]}>
-                                <Text style={[s.photoTagText, ts.text]}>{tag}</Text>
+              {photoPairs.map((pair, pairIdx) => {
+                const isSingleAny = pair.length === 1;
+                const PAGE_INNER_WIDTH = 515;
+                const COL_WIDTH_2 = (PAGE_INNER_WIDTH - 8) / 2;
+                const COL_WIDTH_1 = PAGE_INNER_WIDTH;
+
+                return (
+                  <View
+                    key={pairIdx}
+                    style={isSingleAny ? { marginBottom: 8 } : [s.photosGrid, { marginBottom: 8 }]}
+                  >
+                    {pair.map((photo) => {
+                      const useFull = isSingleAny;
+                      const colW = useFull ? COL_WIDTH_1 : COL_WIDTH_2;
+                      const imgH = getPdfImageHeight(colW, photo.width, photo.height);
+
+                      return (
+                        <View
+                          key={photo.id}
+                          style={useFull ? s.photoCardFull : s.photoCard}
+                        >
+                          {photo.url && photo.url.startsWith("http") ? (
+                            <Image
+                              src={photo.url}
+                              style={{
+                                width: "100%",
+                                height: imgH,
+                                objectFit: "contain",
+                                backgroundColor: "#F8F8FC",
+                              }}
+                            />
+                          ) : null}
+                          {photo.damage_tags && photo.damage_tags.length > 0 && (
+                            <View style={s.photoTagsRow}>
+                              {photo.damage_tags.map((tag, ti) => {
+                                const ts = tagStyle(tag);
+                                return (
+                                  <View key={ti} style={[s.photoTag, ts.bg, { marginRight: 3, marginBottom: 2 }]}>
+                                    <Text style={[s.photoTagText, ts.text]}>{tag}</Text>
+                                  </View>
+                                );
+                              })}
+                            </View>
+                          )}
+                          {photo.ai_analysis && (
+                            <>
+                              <View style={s.photoAiDivider} />
+                              <View style={s.photoAiWrap}>
+                                <Text style={[s.photoAiLabel, { color: tokens.primary }]}>
+                                  AI Analysis
+                                </Text>
+                                <Text style={s.photoAiText}>{photo.ai_analysis}</Text>
                               </View>
-                            );
-                          })}
+                            </>
+                          )}
                         </View>
-                      )}
-                      {photo.ai_analysis && (
-                        <>
-                          <View style={s.photoAiDivider} />
-                          <View style={s.photoAiWrap}>
-                            <Text style={[s.photoAiLabel, { color: tokens.primary }]}>AI Analysis</Text>
-                            <Text style={s.photoAiText}>{photo.ai_analysis}</Text>
-                          </View>
-                        </>
-                      )}
-                    </View>
-                  ))}
-                </View>
-              ))}
+                      );
+                    })}
+                  </View>
+                );
+              })}
             </View>
 
             <View style={[s.pdfFooter, { backgroundColor: tokens.primaryDark }]} fixed>
