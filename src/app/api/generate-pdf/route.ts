@@ -141,7 +141,6 @@ const INSPECTION_SELECT = `
   created_at,
   executive_summary,
   key_handover,
-  checkin_key_handover,
   agent_id,
   property_id,
   tenancy_id,
@@ -191,191 +190,211 @@ const INSPECTION_SELECT = `
 export async function buildPdfAndUpload(
   inspectionId: string
 ): Promise<{ report_url: string | null; buffer: Uint8Array }> {
-  console.log("[generate-pdf] START inspectionId:", inspectionId);
-  const supabase = await createServerClient();
+  try {
+    console.log("[generate-pdf] START inspectionId:", inspectionId);
+    const supabase = await createServerClient();
 
-  const { data: inspection, error: inspErr } = await supabase
-    .from("inspections")
-    .select(INSPECTION_SELECT)
-    .eq("id", inspectionId)
-    .maybeSingle();
-
-  if (inspErr || !inspection) {
-    throw new Error(inspErr?.message || "Inspection not found");
-  }
-
-  const row = inspection as InspectionRow;
-  const executiveSummary = row.executive_summary?.trim() || fallbackExecutiveSummary(row);
-  const reportData = buildReportDataFromInspection(row, executiveSummary);
-
-  let checkinPhotoMap: Record<string, { id: string; url: string; damage_tags?: string[]; ai_analysis?: string | null }> = {};
-  let checkinRooms: { name: string; photos: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }[] }[] = [];
-  const inspectionType = (
-    (row as Record<string, unknown>).inspection_type ??
-    (row as Record<string, unknown>).type ??
-    ""
-  ) as string;
-  const propertyId = (
-    (row as Record<string, unknown>).property_id ?? null
-  ) as string | null;
-  const isCheckout = inspectionType.toLowerCase().includes("check-out");
-
-  if (isCheckout && propertyId) {
-    const { data: checkinInspection } = await supabase
+    const { data: inspection, error: inspErr } = await supabase
       .from("inspections")
-      .select("id")
-      .eq("property_id", propertyId)
-      .eq("type", "check-in")
-      .order("created_at", { ascending: false })
-      .limit(1)
+      .select(INSPECTION_SELECT)
+      .eq("id", inspectionId)
       .maybeSingle();
-    if (checkinInspection) {
-      const { data: checkinRoomsData } = await supabase
-        .from("rooms")
-        .select("id, name, order_index, photos (id, url, damage_tags, ai_analysis)")
-        .eq("inspection_id", checkinInspection.id);
-      (checkinRoomsData ?? []).forEach((room: { name: string; photos?: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }[] }) => {
-        if (room.photos?.length) {
-          checkinRooms.push({ name: room.name, photos: room.photos });
-          room.photos.forEach((p: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }) => {
-            if (p.url) checkinPhotoMap[p.id] = { id: p.id, url: p.url, damage_tags: p.damage_tags, ai_analysis: p.ai_analysis };
-          });
-        }
+
+    if (inspErr || !inspection) {
+      throw new Error(inspErr?.message || "Inspection not found");
+    }
+
+    const row = inspection as InspectionRow;
+    const executiveSummary = row.executive_summary?.trim() || fallbackExecutiveSummary(row);
+    const reportData = buildReportDataFromInspection(row, executiveSummary);
+    const keyHandoverRaw =
+      ((inspection as Record<string, unknown>).key_handover as unknown[] | null) ?? [];
+    const keyHandoverSafe = keyHandoverRaw
+      .filter((k): k is { item: string; qty: number } => {
+        const rec = k as Record<string, unknown>;
+        return typeof rec.item === "string" && typeof rec.qty === "number";
       });
+    const checkinKeyHandoverRaw =
+      ((inspection as Record<string, unknown>).checkin_key_handover as unknown[] | null) ?? [];
+    const checkinKeyHandoverSafe = checkinKeyHandoverRaw
+      .filter((k): k is { item: string; qty: number } => {
+        const rec = k as Record<string, unknown>;
+        return typeof rec.item === "string" && typeof rec.qty === "number";
+      });
+
+    let checkinPhotoMap: Record<string, { id: string; url: string; damage_tags?: string[]; ai_analysis?: string | null }> = {};
+    let checkinRooms: { name: string; photos: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }[] }[] = [];
+    const inspectionType = (
+      (row as Record<string, unknown>).inspection_type ??
+      (row as Record<string, unknown>).type ??
+      ""
+    ) as string;
+    const propertyId = (
+      (row as Record<string, unknown>).property_id ?? null
+    ) as string | null;
+    const isCheckout = inspectionType.toLowerCase().includes("check-out");
+
+    if (isCheckout && propertyId) {
+      const { data: checkinInspection } = await supabase
+        .from("inspections")
+        .select("id")
+        .eq("property_id", propertyId)
+        .eq("type", "check-in")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (checkinInspection) {
+        const { data: checkinRoomsData } = await supabase
+          .from("rooms")
+          .select("id, name, order_index, photos (id, url, damage_tags, ai_analysis)")
+          .eq("inspection_id", checkinInspection.id);
+        (checkinRoomsData ?? []).forEach((room: { name: string; photos?: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }[] }) => {
+          if (room.photos?.length) {
+            checkinRooms.push({ name: room.name, photos: room.photos });
+            room.photos.forEach((p: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }) => {
+              if (p.url) checkinPhotoMap[p.id] = { id: p.id, url: p.url, damage_tags: p.damage_tags, ai_analysis: p.ai_analysis };
+            });
+          }
+        });
+      }
     }
-  }
 
-  const prop = Array.isArray(row.properties) ? row.properties[0] : row.properties;
-  const tenancy = Array.isArray(row.tenancies) ? row.tenancies[0] : row.tenancies;
+    const prop = Array.isArray(row.properties) ? row.properties[0] : row.properties;
+    const tenancy = Array.isArray(row.tenancies) ? row.tenancies[0] : row.tenancies;
 
-  const agentId = row.agent_id ?? (inspection as { agent_id?: string }).agent_id;
-  const { data: agentData } = agentId
-    ? await supabase
-        .from("profiles")
-        .select("full_name, agency_name, company_logo_url, company_primary_color, rera_number, signature_image_url")
-        .eq("id", agentId)
-        .maybeSingle()
-    : { data: null };
+    const agentId = row.agent_id ?? (inspection as { agent_id?: string }).agent_id;
+    const { data: agentData } = agentId
+      ? await supabase
+          .from("profiles")
+          .select("full_name, agency_name, company_logo_url, company_primary_color, rera_number, signature_image_url")
+          .eq("id", agentId)
+          .maybeSingle()
+      : { data: null };
 
-  const meta: InspectionMeta = {
-    inspection: {
-      id: row.id,
-      type: row.type ?? undefined,
-      created_at: row.created_at ?? undefined,
-      report_url: row.report_url ?? undefined,
-      landlord_name: tenancy?.landlord_name ?? undefined,
-      landlord_email: tenancy?.landlord_email ?? undefined,
-      tenant_name: tenancy?.tenant_name ?? undefined,
-      tenant_email: tenancy?.tenant_email ?? undefined,
-      ejari_ref: tenancy?.ejari_ref ?? undefined,
-      contract_from: tenancy?.contract_from != null ? String(tenancy.contract_from) : undefined,
-      contract_to: tenancy?.contract_to != null ? String(tenancy.contract_to) : undefined,
-      key_handover: Array.isArray(row.key_handover) ? row.key_handover : undefined,
-      checkin_key_handover: Array.isArray(row.checkin_key_handover) ? row.checkin_key_handover : undefined,
-    },
-    property: prop
-      ? {
-          building_name: prop.building_name ?? undefined,
-          unit_number: prop.unit_number ?? undefined,
-          address: prop.address ?? undefined,
-          property_type: prop.property_type ?? undefined,
-        }
-      : null,
-    agent: agentData
-      ? {
-          full_name: agentData.full_name ?? undefined,
-          agency_name: agentData.agency_name ?? undefined,
-          company_logo_url: (agentData as { company_logo_url?: string }).company_logo_url ?? undefined,
-          company_primary_color: (agentData as { company_primary_color?: string }).company_primary_color ?? undefined,
-          rera_number: (agentData as { rera_number?: string }).rera_number ?? undefined,
-          signature_image_url: (agentData as { signature_image_url?: string }).signature_image_url ?? undefined,
-        }
-      : null,
-    rooms: (row.rooms ?? [])
-      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-      .map((room) => {
-        const sortedPhotos = [...(room.photos ?? [])]
-          .filter((p) => p.url && p.url.startsWith("https://"))
-          .sort((a, b) => (a.damage_tags?.length ?? 0) - (b.damage_tags?.length ?? 0));
-        return {
-          name: room.name,
-          photos: sortedPhotos.map((p) => ({
-            id: p.id,
-            url: p.url,
-            notes: p.notes ?? undefined,
-            damage_tags: p.damage_tags ?? [],
-            taken_at: p.taken_at ?? undefined,
-            ai_analysis: p.ai_analysis ?? undefined,
-          })),
-        };
-      }),
-    checkinPhotoMap: isCheckout ? checkinPhotoMap : undefined,
-    checkinRooms: isCheckout ? checkinRooms : undefined,
-    signatures: ((row.signatures ?? []) as {
-      signer_type?: string;
-      signed_at?: string | null;
-      signature_data?: string | null;
-      otp_verified?: boolean;
-    }[]).map((s) => ({
-      signer_type: s.signer_type ?? "",
-      signed_at: s.signed_at ?? null,
-      signature_data: s.signature_data ?? null,
-      otp_verified: s.otp_verified ?? false,
-    })),
-  };
+    const meta: InspectionMeta = {
+      inspection: {
+        id: row.id,
+        type: row.type ?? undefined,
+        created_at: row.created_at ?? undefined,
+        report_url: row.report_url ?? undefined,
+        landlord_name: tenancy?.landlord_name ?? undefined,
+        landlord_email: tenancy?.landlord_email ?? undefined,
+        tenant_name: tenancy?.tenant_name ?? undefined,
+        tenant_email: tenancy?.tenant_email ?? undefined,
+        ejari_ref: tenancy?.ejari_ref ?? undefined,
+        contract_from: tenancy?.contract_from != null ? String(tenancy.contract_from) : undefined,
+        contract_to: tenancy?.contract_to != null ? String(tenancy.contract_to) : undefined,
+        key_handover: keyHandoverSafe,
+        checkin_key_handover: checkinKeyHandoverSafe,
+      },
+      property: prop
+        ? {
+            building_name: prop.building_name ?? undefined,
+            unit_number: prop.unit_number ?? undefined,
+            address: prop.address ?? undefined,
+            property_type: prop.property_type ?? undefined,
+          }
+        : null,
+      agent: agentData
+        ? {
+            full_name: agentData.full_name ?? undefined,
+            agency_name: agentData.agency_name ?? undefined,
+            company_logo_url: (agentData as { company_logo_url?: string }).company_logo_url ?? undefined,
+            company_primary_color: (agentData as { company_primary_color?: string }).company_primary_color ?? undefined,
+            rera_number: (agentData as { rera_number?: string }).rera_number ?? undefined,
+            signature_image_url: (agentData as { signature_image_url?: string }).signature_image_url ?? undefined,
+          }
+        : null,
+      rooms: (row.rooms ?? [])
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+        .map((room) => {
+          const sortedPhotos = [...(room.photos ?? [])]
+            .filter((p) => p.url && p.url.startsWith("https://"))
+            .sort((a, b) => (a.damage_tags?.length ?? 0) - (b.damage_tags?.length ?? 0));
+          return {
+            name: room.name,
+            photos: sortedPhotos.map((p) => ({
+              id: p.id,
+              url: p.url,
+              notes: p.notes ?? undefined,
+              damage_tags: p.damage_tags ?? [],
+              taken_at: p.taken_at ?? undefined,
+              ai_analysis: p.ai_analysis ?? undefined,
+            })),
+          };
+        }),
+      checkinPhotoMap: isCheckout ? checkinPhotoMap : undefined,
+      checkinRooms: isCheckout ? checkinRooms : undefined,
+      signatures: ((row.signatures ?? []) as {
+        signer_type?: string;
+        signed_at?: string | null;
+        signature_data?: string | null;
+        otp_verified?: boolean;
+      }[]).map((s) => ({
+        signer_type: s.signer_type ?? "",
+        signed_at: s.signed_at ?? null,
+        signature_data: s.signature_data ?? null,
+        otp_verified: s.otp_verified ?? false,
+      })),
+    };
 
-  const dataString = JSON.stringify({
-    inspectionId,
-    rooms: reportData.rooms,
-    photos: meta.rooms,
-    keyHandover: meta.inspection.key_handover ?? [],
-    generatedAt: new Date().toISOString(),
-  });
-  const documentHash = createHash("sha256").update(dataString).digest("hex");
-
-  await supabase
-    .from("inspections")
-    .update({ document_hash: documentHash })
-    .eq("id", inspectionId);
-
-  const pdfBuffer = await generateInspectionPDFBuffer(reportData, meta, documentHash);
-
-  const fileName = `report_${inspectionId}.pdf`;
-  console.log("[generate-pdf] PDF buffer size:", pdfBuffer.length);
-  console.log("[generate-pdf] Upload path:", fileName);
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const storageClient =
-    supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : supabase;
-
-  const { error: uploadError } = await storageClient.storage
-    .from("reports")
-    .upload(fileName, pdfBuffer, {
-      contentType: "application/pdf",
-      upsert: true,
+    const dataString = JSON.stringify({
+      inspectionId,
+      rooms: reportData.rooms,
+      photos: meta.rooms,
+      keyHandover: meta.inspection.key_handover ?? [],
+      generatedAt: new Date().toISOString(),
     });
+    const documentHash = createHash("sha256").update(dataString).digest("hex");
 
-  let reportUrl: string | null = null;
-  if (uploadError) {
-    console.error("[generate-pdf] PDF upload to storage FAILED:", uploadError.message);
-  } else {
-    const { data: urlData } = storageClient.storage.from("reports").getPublicUrl(fileName);
-    const bustUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-    console.log("[generate-pdf] Public URL (with cache-bust):", bustUrl);
-    const { error: updateErr } = await storageClient
+    await supabase
       .from("inspections")
-      .update({ report_url: bustUrl })
+      .update({ document_hash: documentHash })
       .eq("id", inspectionId);
-    if (updateErr) {
-      console.error("[generate-pdf] Failed to save report_url:", updateErr.message);
-    } else {
-      reportUrl = bustUrl;
-    }
-  }
 
-  console.log("[generate-pdf] Done OK");
-  return { report_url: reportUrl, buffer: new Uint8Array(pdfBuffer) };
+    const pdfBuffer = await generateInspectionPDFBuffer(reportData, meta, documentHash);
+
+    const fileName = `report_${inspectionId}.pdf`;
+    console.log("[generate-pdf] PDF buffer size:", pdfBuffer.length);
+    console.log("[generate-pdf] Upload path:", fileName);
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const storageClient =
+      supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : supabase;
+
+    const { error: uploadError } = await storageClient.storage
+      .from("reports")
+      .upload(fileName, pdfBuffer, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+
+    let reportUrl: string | null = null;
+    if (uploadError) {
+      console.error("[generate-pdf] PDF upload to storage FAILED:", uploadError.message);
+    } else {
+      const { data: urlData } = storageClient.storage.from("reports").getPublicUrl(fileName);
+      const bustUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+      console.log("[generate-pdf] Public URL (with cache-bust):", bustUrl);
+      const { error: updateErr } = await storageClient
+        .from("inspections")
+        .update({ report_url: bustUrl })
+        .eq("id", inspectionId);
+      if (updateErr) {
+        console.error("[generate-pdf] Failed to save report_url:", updateErr.message);
+      } else {
+        reportUrl = bustUrl;
+      }
+    }
+
+    console.log("[generate-pdf] Done OK");
+    return { report_url: reportUrl, buffer: new Uint8Array(pdfBuffer) };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[buildPdfAndUpload] CRASH:", msg);
+    throw new Error(`buildPdfAndUpload — ${msg}`);
+  }
 }
 
 export async function POST(request: NextRequest) {
