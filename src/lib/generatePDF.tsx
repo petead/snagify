@@ -680,7 +680,7 @@ function InspectionReport({
                                 src={cp.url}
                                 style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 6 }}
                               />
-                              <View style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 6, alignItems: "center", justifyContent: "center" }}>
+                              <View style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 6, alignItems: "center", justifyContent: "center" }}>
                                 <Text style={{ fontSize: 14, color: "white", fontFamily: "Helvetica-Bold" }}>⚠️</Text>
                               </View>
                             </>
