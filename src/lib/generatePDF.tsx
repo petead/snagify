@@ -9,6 +9,7 @@ import {
   renderToBuffer,
 } from "@react-pdf/renderer";
 import QRCode from "qrcode";
+import { getBrandTokens } from "@/lib/pdf/brandTokens";
 
 const PURPLE = "#9A88FD";
 const GREEN = "#cafe87";
@@ -55,6 +56,617 @@ const s = StyleSheet.create({
     textTransform: "uppercase",
   },
   divider: { height: 2, backgroundColor: PURPLE, marginVertical: 20, borderRadius: 1 },
+
+  /* Hero cover (Page 1 redesign) */
+  coverHero: {
+    backgroundColor: PURPLE,
+    padding: 32,
+    paddingBottom: 28,
+    position: "relative",
+  },
+  coverHeroGeoCircle: {
+    position: "absolute",
+    top: -40,
+    right: -40,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    borderWidth: 20,
+    borderColor: "rgba(255,255,255,0.10)",
+    borderStyle: "solid",
+  },
+  coverHeroGeoCircle2: {
+    position: "absolute",
+    top: -15,
+    right: -15,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 12,
+    borderColor: "rgba(255,255,255,0.06)",
+    borderStyle: "solid",
+  },
+  coverHeroGeoRect: {
+    position: "absolute",
+    bottom: -20,
+    left: 20,
+    width: 70,
+    height: 70,
+    borderRadius: 14,
+    borderWidth: 14,
+    borderColor: "rgba(255,255,255,0.07)",
+    borderStyle: "solid",
+    transform: "rotate(15deg)",
+  },
+  coverLogoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 24,
+  },
+  coverLogoLeft: { flexDirection: "row", alignItems: "center" },
+  coverLogoIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  coverLogoText: {
+    fontSize: 16,
+    fontFamily: "Helvetica-Bold",
+    color: "#FFFFFF",
+    letterSpacing: -0.5,
+  },
+  coverLogoSub: {
+    fontSize: 6,
+    color: "rgba(255,255,255,0.65)",
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
+  coverTypeBadge: {
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
+    backgroundColor: "rgba(255,255,255,0.15)",
+  },
+  coverTypeBadgeText: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    color: "#FFFFFF",
+    letterSpacing: 1,
+  },
+  coverAddressMain: {
+    fontSize: 20,
+    fontFamily: "Helvetica-Bold",
+    color: "#FFFFFF",
+    letterSpacing: -0.5,
+    lineHeight: 1.25,
+  },
+  coverAddressSub: {
+    fontSize: 8,
+    color: "rgba(255,255,255,0.65)",
+    marginTop: 4,
+  },
+  coverBodyNew: { paddingHorizontal: 28, paddingVertical: 20 },
+  metaStrip: {
+    flexDirection: "row",
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: "#EEECFF",
+    overflow: "hidden",
+    marginBottom: 14,
+  },
+  metaCell: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: 10,
+  },
+  metaCellBorder: {
+    borderRightWidth: 0.5,
+    borderRightColor: "#EEECFF",
+  },
+  metaIconBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  metaLabel: {
+    fontSize: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    color: "#9B9BA8",
+    marginBottom: 2,
+  },
+  metaValue: {
+    fontSize: 8,
+    fontFamily: "Helvetica-Bold",
+    color: "#1A1A2E",
+  },
+  partiesRow: { flexDirection: "row", marginBottom: 14 },
+  partyCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: "#EEECFF",
+    padding: 10,
+  },
+  partyAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  partyAvatarText: { fontSize: 9, fontFamily: "Helvetica-Bold" },
+  partyRole: {
+    fontSize: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    marginBottom: 3,
+  },
+  partyName: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
+  partyEmail: { fontSize: 7, color: "#9B9BA8", marginTop: 1 },
+  summaryCard: {
+    borderRadius: 8,
+    padding: 12,
+  },
+  summaryLabelRow: { flexDirection: "row", alignItems: "center", marginBottom: 5 },
+  summaryDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
+  summaryLabel: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  summaryTextNew: { fontSize: 7.5, color: "#374151", lineHeight: 1.65 },
+  pdfFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 28,
+    paddingVertical: 7,
+  },
+  footerLeft: { flexDirection: "row", alignItems: "center" },
+  footerAgency: { fontSize: 6.5, fontFamily: "Helvetica-Bold", color: "rgba(255,255,255,0.8)" },
+  footerDivider: {
+    width: 1,
+    height: 8,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    marginHorizontal: 6,
+  },
+  footerUrl: { fontSize: 6, color: "rgba(255,255,255,0.5)" },
+  footerRight: { fontSize: 6, color: "rgba(255,255,255,0.5)" },
+
+  /* Page 2 overview redesign */
+  overviewHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+  },
+  overviewTitleNew: { fontSize: 13, fontFamily: "Helvetica-Bold", color: "#FFFFFF" },
+  overviewSub: { fontSize: 7, color: "rgba(255,255,255,0.65)", marginTop: 2 },
+  overviewHeaderIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statRow: { flexDirection: "row", paddingHorizontal: 28, marginTop: 16 },
+  statCard: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 0.5,
+    borderColor: "#EEECFF",
+    padding: 12,
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  statIconBox: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  statNum: { fontSize: 22, fontFamily: "Helvetica-Bold", lineHeight: 1 },
+  statLbl: {
+    fontSize: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    color: "#9B9BA8",
+    marginTop: 4,
+  },
+  sectionHd: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 28,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  sectionHdText: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginRight: 8 },
+  sectionHdLine: { flex: 1, height: 0.5, backgroundColor: "#EEECFF" },
+  roomTable: { marginHorizontal: 28, borderRadius: 8, overflow: "hidden", borderWidth: 0.5, borderColor: "#EEECFF" },
+  roomThead: { flexDirection: "row", paddingHorizontal: 10, paddingVertical: 7 },
+  roomTheadCell: {
+    fontSize: 6,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    color: "#FFFFFF",
+  },
+  roomRow: {
+    flexDirection: "row",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    alignItems: "center",
+    borderTopWidth: 0.5,
+    borderTopColor: "#F3F3F8",
+  },
+  roomRowAlt: { backgroundColor: "#FAFBFF" },
+  roomCell: { fontSize: 7, color: "#374151" },
+  roomCellBold: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
+  condBadgeNew: { borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
+  condBadgeTextNew: { fontSize: 6, fontFamily: "Helvetica-Bold" },
+  keysCard: {
+    marginHorizontal: 28,
+    backgroundColor: "#FAFBFF",
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: "#EEECFF",
+    padding: 12,
+  },
+  keysGrid: { flexDirection: "row", justifyContent: "space-around" },
+  keyItem: { alignItems: "center" },
+  keyIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  keyLabel: { fontSize: 6.5, color: "#9B9BA8", textAlign: "center" },
+  keyQty: { fontSize: 10, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
+
+  /* Room hero (pages 3–N) */
+  roomHero: {
+    paddingHorizontal: 28,
+    paddingTop: 20,
+    paddingBottom: 22,
+    position: "relative",
+    overflow: "hidden",
+  },
+  roomHeroDecoOuter: {
+    position: "absolute",
+    right: -24,
+    bottom: -24,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 18,
+    borderStyle: "solid",
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+  roomHeroDecoInner: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 11,
+    borderStyle: "solid",
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  roomHeroTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  roomNumber: {
+    fontSize: 7,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    color: "rgba(255,255,255,0.55)",
+    marginBottom: 4,
+  },
+  roomTitle: {
+    fontSize: 20,
+    fontFamily: "Helvetica-Bold",
+    color: "#FFFFFF",
+    letterSpacing: -0.5,
+  },
+  roomDate: {
+    fontSize: 7,
+    color: "rgba(255,255,255,0.6)",
+    marginTop: 3,
+  },
+  roomCondBadgeGood: {
+    backgroundColor: "#DCFCE7",
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+  },
+  roomCondBadgeWarn: {
+    backgroundColor: "#FEF9C3",
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+  },
+  roomCondBadgeCritical: {
+    backgroundColor: "#FEE2E2",
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+  },
+  roomCondTextGood: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#15803D" },
+  roomCondTextWarn: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#A16207" },
+  roomCondTextCritical: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#DC2626" },
+  roomStatsRow: { flexDirection: "row", marginTop: 14 },
+  roomStatItem: { flexDirection: "row", alignItems: "center" },
+  roomStatDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "rgba(255,255,255,0.45)",
+  },
+  roomStatText: { fontSize: 7, color: "rgba(255,255,255,0.65)" },
+
+  /* Room body */
+  roomBody: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 8 },
+  photosGrid: { flexDirection: "row", marginBottom: 8 },
+  photoCard: {
+    flex: 1,
+    borderRadius: 8,
+    overflow: "hidden",
+    borderWidth: 0.5,
+    borderColor: "#EEECFF",
+  },
+  photoCardFull: {
+    borderRadius: 8,
+    overflow: "hidden",
+    borderWidth: 0.5,
+    borderColor: "#EEECFF",
+    marginBottom: 8,
+  },
+  photoImg: {
+    width: "100%",
+    height: 110,
+    objectFit: "cover",
+  },
+  photoImgFull: {
+    width: "100%",
+    height: 130,
+    objectFit: "cover",
+  },
+  photoTagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    padding: 6,
+    paddingBottom: 4,
+  },
+  photoTag: {
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  photoTagText: {
+    fontSize: 5.5,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  photoTagRed: { backgroundColor: "#FEE2E2" },
+  photoTagOrange: { backgroundColor: "#FEF3C7" },
+  photoTagBlue: { backgroundColor: "#DBEAFE" },
+  photoTagGray: { backgroundColor: "#F1F5F9" },
+  photoTagTextRed: { color: "#DC2626" },
+  photoTagTextOrange: { color: "#B45309" },
+  photoTagTextBlue: { color: "#1D4ED8" },
+  photoTagTextGray: { color: "#475569" },
+  photoAiDivider: { height: 0.5, backgroundColor: "#F3F3F8" },
+  photoAiWrap: { padding: 7, paddingTop: 6 },
+  photoAiLabel: {
+    fontSize: 5.5,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 3,
+  },
+  photoAiText: { fontSize: 6.5, color: "#6B7280", lineHeight: 1.55 },
+
+  /* Signature page */
+  sigHero: {
+    paddingHorizontal: 28,
+    paddingTop: 20,
+    paddingBottom: 22,
+    position: "relative",
+    overflow: "hidden",
+  },
+  sigHeroDeco: {
+    position: "absolute",
+    right: -20,
+    top: -20,
+    width: 90,
+    height: 90,
+    borderRadius: 18,
+    borderWidth: 16,
+    borderStyle: "solid",
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  sigHeroTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 16,
+  },
+  sigLogoText: {
+    fontSize: 15,
+    fontFamily: "Helvetica-Bold",
+    color: "#FFFFFF",
+    letterSpacing: -0.4,
+  },
+  sigLogoSub: { fontSize: 6.5, color: "rgba(255,255,255,0.55)", marginTop: 2 },
+  sigVerifiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  sigVerifiedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#4ADE80",
+  },
+  sigVerifiedText: { fontSize: 6.5, fontFamily: "Helvetica-Bold", color: "#FFFFFF", letterSpacing: 0.3 },
+  sigTitle: {
+    fontSize: 13,
+    fontFamily: "Helvetica-Bold",
+    color: "#FFFFFF",
+    lineHeight: 1.35,
+  },
+  sigSubtitle: { fontSize: 7.5, color: "rgba(255,255,255,0.6)", marginTop: 4 },
+
+  sigBody: { paddingHorizontal: 22, paddingTop: 14 },
+
+  qrRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FAFBFF",
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: "#EEECFF",
+    padding: 12,
+    marginBottom: 12,
+  },
+  qrBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 6,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 0.5,
+    borderColor: "#EEECFF",
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qrImage: { width: 48, height: 48 },
+  qrTextWrap: { flex: 1 },
+  qrTextTitle: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginBottom: 4 },
+  qrTextBody: { fontSize: 7, color: "#6B7280", lineHeight: 1.6 },
+
+  sigPartiesRow: { flexDirection: "row", marginBottom: 10 },
+  sigPartyCard: {
+    flex: 1,
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: "#EEECFF",
+    padding: 11,
+  },
+  sigPartyRole: {
+    fontSize: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 4,
+  },
+  sigPartyName: { fontSize: 8.5, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginBottom: 8 },
+  sigSignArea: {
+    height: 38,
+    borderRadius: 5,
+    borderWidth: 0.5,
+    borderStyle: "dashed",
+    borderColor: "#CCCCDD",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sigSignPending: { fontSize: 6.5, color: "#9B9BA8", fontFamily: "Helvetica-Oblique" },
+  sigSignImage: { width: 80, height: 32, objectFit: "contain" },
+
+  sigInspectorCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: "#EEECFF",
+    padding: 11,
+    marginBottom: 10,
+  },
+  sigInspectorLeft: { flex: 1 },
+  sigInspectorRole: {
+    fontSize: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 4,
+  },
+  sigInspectorName: { fontSize: 8.5, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginBottom: 2 },
+  sigInspectorAgency: { fontSize: 7, color: "#6B7280" },
+  sigInspectorRight: { width: 80 },
+  sigInspectorSignBox: {
+    height: 38,
+    borderRadius: 5,
+    borderWidth: 0.5,
+    borderColor: "#EEECFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 3,
+  },
+  sigInspectorSignLabel: { fontSize: 5.5, color: "#9B9BA8", textAlign: "center" },
+
+  hashCard: {
+    backgroundColor: "#F8F8FC",
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: "#EEECFF",
+    padding: 9,
+    marginBottom: 10,
+  },
+  hashLabel: {
+    fontSize: 5.5,
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    color: "#9B9BA8",
+    marginBottom: 4,
+  },
+  hashRow: { flexDirection: "row", alignItems: "center" },
+  hashIconBox: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  hashValue: { fontSize: 6.5, color: "#374151", fontFamily: "Courier", lineHeight: 1.4 },
+
+  disclaimer: {
+    fontSize: 6,
+    color: "#9B9BA8",
+    lineHeight: 1.65,
+    textAlign: "center",
+    paddingHorizontal: 10,
+    marginBottom: 8,
+  },
 
   /* Executive summary */
   summaryBox: {
@@ -219,6 +831,11 @@ function formatDate(dateStr?: string | null) {
   }
 }
 
+function capitalise(s: string) {
+  if (!s) return "";
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
 interface ReportData {
   executive_summary: string;
   rooms: {
@@ -266,6 +883,7 @@ interface InspectionMeta {
     agency_name?: string;
     company_logo_url?: string;
     company_primary_color?: string;
+    company_website?: string;
     rera_number?: string;
     signature_image_url?: string;
   } | null;
@@ -306,10 +924,22 @@ function InspectionReport({
   const inspType = (meta.inspection.type ?? "check-in").toUpperCase();
   const shortHash = `${documentHash.slice(0, 16)}...${documentHash.slice(-16)}`;
   const totalPages = 3 + report.rooms.length;
-  const accentColor = isValidHex(meta.agent?.company_primary_color)
-    ? meta.agent!.company_primary_color!.trim()
-    : PURPLE;
-  const generatedBy = meta.agent?.agency_name?.trim() || "Snagify";
+  const tokens = getBrandTokens(meta.agent?.company_primary_color);
+  const accentColor = tokens.primary;
+  const agencyName = meta.agent?.agency_name?.trim() || meta.agent?.full_name?.trim() || "MULKEEF";
+  const agencyWebsite = meta.agent?.company_website?.trim() || "snagify.net";
+  const agencyLogoUrl = meta.agent?.company_logo_url || null;
+  const generatedBy = agencyName;
+  const property = meta.property ?? {};
+  const inspection = meta.inspection;
+  const tenancy = {
+    landlord_name: meta.inspection.landlord_name,
+    landlord_email: meta.inspection.landlord_email,
+    tenant_name: meta.inspection.tenant_name,
+    tenant_email: meta.inspection.tenant_email,
+    contract_from: meta.inspection.contract_from,
+    contract_to: meta.inspection.contract_to,
+  };
   const roomStats = report.rooms.map((room) => {
     const matchingMeta = meta.rooms.find(
       (mr) => mr.name.toLowerCase() === room.name.toLowerCase()
@@ -339,604 +969,492 @@ function InspectionReport({
 
   return (
     <Document>
-      {/* PAGE 1 — COVER */}
-      <Page size="A4" style={s.page}>
-        <View style={[s.coverHeader, { backgroundColor: accentColor }]}>
-          {meta.agent?.company_logo_url ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 8 }}>
-              {/* eslint-disable-next-line jsx-a11y/alt-text */}
-              <Image
-                src={meta.agent.company_logo_url}
-                style={{ height: 44, width: "auto", maxWidth: 160, objectFit: "contain" }}
-              />
+      {/* PAGE 1 — COVER (hero + body + footer) */}
+      <Page size="A4">
+        <View style={[s.coverHero, { backgroundColor: tokens.primary }]}>
+          <View style={s.coverHeroGeoCircle} />
+          <View style={s.coverHeroGeoCircle2} />
+          <View style={s.coverHeroGeoRect} />
+
+          <View style={s.coverLogoRow}>
+            <View style={s.coverLogoLeft}>
+              <View style={[s.coverLogoIconBox, { marginRight: 8 }]}>
+                {agencyLogoUrl ? (
+                  <Image src={agencyLogoUrl} style={{ width: 20, height: 20 }} />
+                ) : (
+                  <View style={{ width: 14, height: 14, backgroundColor: "rgba(255,255,255,0.7)", borderRadius: 3 }} />
+                )}
+              </View>
               <View>
-                <Text style={s.coverTitle}>{generatedBy}</Text>
-                <Text style={s.coverSubtitle}>Property Inspection Report</Text>
+                <Text style={s.coverLogoText}>{agencyName}</Text>
+                <Text style={s.coverLogoSub}>PROPERTY INSPECTION REPORT</Text>
               </View>
             </View>
-          ) : (
-            <>
-              <Text style={s.coverTitle}>Snagify</Text>
-              <Text style={s.coverSubtitle}>Property Inspection Report</Text>
-            </>
-          )}
-          <View style={s.typeBadge}>
-            <Text style={s.typeBadgeText}>{inspType}</Text>
+            <View style={s.coverTypeBadge}>
+              <Text style={s.coverTypeBadgeText}>
+                {inspection.type === "check-out" ? "CHECK-OUT" : "CHECK-IN"}
+              </Text>
+            </View>
           </View>
-        </View>
 
-        <View style={s.coverBody}>
-          <Text style={s.coverAddress}>
-            {meta.property?.address ?? (meta.property?.building_name && meta.property?.unit_number
-              ? `${meta.property.building_name}, Unit ${meta.property.unit_number}`
+          <Text style={s.coverAddressMain}>
+            {property.address ?? (property.building_name && property.unit_number
+              ? `${property.building_name}, Unit ${property.unit_number}`
               : "Property Address")}
           </Text>
+          <Text style={s.coverAddressSub}>
+            {[property.building_name, property.unit_number, property.property_type].filter(Boolean).join(" · ")}
+          </Text>
+        </View>
 
-          <View style={s.coverRow}>
-            <Text style={s.coverLabel}>Date of Inspection</Text>
-            <Text style={s.coverValue}>{formatDate(meta.inspection.created_at)}</Text>
-          </View>
-          {meta.inspection?.ejari_ref && (
-            <View style={s.coverRow}>
-              <Text style={s.coverLabel}>Ejari Reference</Text>
-              <Text style={s.coverValue}>{meta.inspection.ejari_ref}</Text>
-            </View>
-          )}
-          {(meta.inspection?.contract_from || meta.inspection?.contract_to) && (
-            <View style={s.coverRow}>
-              <Text style={s.coverLabel}>Contract Period</Text>
-              <Text style={s.coverValue}>
-                {[meta.inspection.contract_from, meta.inspection.contract_to].filter(Boolean).map(formatDate).join(" – ")}
-              </Text>
-            </View>
-          )}
-          {meta.property?.property_type && (
-            <View style={s.coverRow}>
-              <Text style={s.coverLabel}>Property Type</Text>
-              <Text style={s.coverValue}>{meta.property.property_type}</Text>
-            </View>
-          )}
-
-          <View style={s.twoCol}>
-            <View style={s.colHalf}>
-              <Text style={s.colTitle}>Landlord</Text>
-              <Text>{meta.inspection.landlord_name || "—"}</Text>
-              <Text style={{ fontSize: 9, color: "#666", marginTop: 2 }}>
-                {meta.inspection.landlord_email || ""}
-              </Text>
-            </View>
-            <View style={s.colHalf}>
-              <Text style={s.colTitle}>Tenant</Text>
-              <Text>{meta.inspection.tenant_name || "—"}</Text>
-              <Text style={{ fontSize: 9, color: "#666", marginTop: 2 }}>
-                {meta.inspection.tenant_email || ""}
-              </Text>
-            </View>
-          </View>
-
-          {meta.agent && (
-            <View style={{ marginTop: 12 }}>
-              <View style={s.coverRow}>
-                <Text style={s.coverLabel}>Inspector</Text>
-                <Text style={s.coverValue}>{meta.agent.full_name ?? "—"}</Text>
+        <View style={s.coverBodyNew}>
+          <View style={s.metaStrip}>
+            {[
+              { label: "Date of inspection", value: formatDate(inspection.created_at) },
+              {
+                label: "Contract period",
+                value: `${formatDate(tenancy.contract_from)} – ${formatDate(tenancy.contract_to)}`,
+              },
+              {
+                label: "Property type",
+                value: capitalise(property.property_type || "Apartment"),
+              },
+            ].map((item, i) => (
+              <View key={i} style={[s.metaCell, i < 2 && s.metaCellBorder]}>
+                <View style={[s.metaIconBox, { backgroundColor: tokens.primaryUltraLight, marginRight: 8 }]} />
+                <View>
+                  <Text style={[s.metaLabel, { color: tokens.primary }]}>{item.label}</Text>
+                  <Text style={s.metaValue}>{item.value}</Text>
+                </View>
               </View>
-              {meta.agent.agency_name && (
-                <View style={s.coverRow}>
-                  <Text style={s.coverLabel}>Agency</Text>
-                  <Text style={s.coverValue}>{meta.agent.agency_name}</Text>
+            ))}
+          </View>
+
+          <View style={s.partiesRow}>
+            {[
+              { role: "Landlord", name: tenancy.landlord_name, email: tenancy.landlord_email },
+              { role: "Tenant", name: tenancy.tenant_name, email: tenancy.tenant_email },
+            ].map((p, i) => {
+              const initials =
+                p.name
+                  ?.split(" ")
+                  .map((w) => w[0])
+                  .slice(0, 2)
+                  .join("") || "?";
+              return (
+                <View key={i} style={[s.partyCard, i === 0 && { marginRight: 8 }]}>
+                  <View style={[s.partyAvatar, { backgroundColor: tokens.primaryUltraLight, marginRight: 9 }]}>
+                    <Text style={[s.partyAvatarText, { color: tokens.primary }]}>{initials}</Text>
+                  </View>
+                  <View>
+                    <Text style={[s.partyRole, { color: tokens.primary }]}>{p.role.toUpperCase()}</Text>
+                    <Text style={s.partyName}>{p.name ?? "—"}</Text>
+                    <Text style={s.partyEmail}>{p.email ?? ""}</Text>
+                  </View>
                 </View>
-              )}
-              {meta.agent.rera_number && (
-                <View style={s.coverRow}>
-                  <Text style={s.coverLabel}>RERA License</Text>
-                  <Text style={s.coverValue}>{meta.agent.rera_number}</Text>
-                </View>
-              )}
+              );
+            })}
+          </View>
+
+          <View style={[s.summaryCard, { backgroundColor: tokens.primaryUltraLight }]}>
+            <View style={s.summaryLabelRow}>
+              <View style={[s.summaryDot, { backgroundColor: tokens.primary }]} />
+              <Text style={[s.summaryLabel, { color: tokens.primary }]}>Executive Summary</Text>
             </View>
-          )}
-
-          <View style={[s.divider, { backgroundColor: accentColor }]} />
-
-          <View style={[s.summaryBox, { borderLeftWidth: 4, borderLeftColor: accentColor }]}>
-            <Text style={[s.summaryTitle, { color: accentColor }]}>Executive Summary</Text>
-            <Text style={s.summaryText}>{report.executive_summary}</Text>
+            <Text style={s.summaryTextNew}>{report.executive_summary}</Text>
           </View>
         </View>
 
-        <View style={s.footer}>
-          <Text style={s.footerText}>
-            Page 1 of {totalPages} · Generated by {generatedBy} — snagify.net
+        <View style={[s.pdfFooter, { backgroundColor: tokens.primaryDark }]} fixed>
+          <View style={s.footerLeft}>
+            <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
+            <View style={s.footerDivider} />
+            <Text style={s.footerUrl}>{agencyWebsite}</Text>
+          </View>
+          <Text style={s.footerRight}>
+            SHA-256: {documentHash.slice(0, 8)}…{documentHash.slice(-8)} · Page 1
           </Text>
-          <Text style={s.hashText}>SHA-256: {shortHash}</Text>
         </View>
       </Page>
 
       {/* PAGE 2 — INSPECTION OVERVIEW */}
-      <Page size="A4" style={s.page}>
-        <Text style={s.overviewTitle}>Inspection Overview</Text>
+      <Page size="A4">
+        <View style={[s.overviewHeader, { backgroundColor: tokens.primary }]}>
+          <View>
+            <Text style={s.overviewTitleNew}>Inspection Overview</Text>
+            <Text style={s.overviewSub}>
+              {property.address ?? "Property"} · {formatDate(inspection.created_at)}
+            </Text>
+          </View>
+          <View style={s.overviewHeaderIcon}>
+            <View style={{ width: 16, height: 16, backgroundColor: "rgba(255,255,255,0.6)", borderRadius: 3 }} />
+          </View>
+        </View>
 
-        <View style={s.tableWrap}>
-          <View style={s.tableHeaderRow}>
-            <Text style={[s.tableHeaderCell, { width: "24%" }]}>Room</Text>
-            <Text style={[s.tableHeaderCell, { width: "11%", textAlign: "center" }]}>Photos</Text>
-            <Text style={[s.tableHeaderCell, { width: "11%", textAlign: "center" }]}>Issues</Text>
-            <Text style={[s.tableHeaderCell, { width: "18%" }]}>Condition</Text>
-            <Text style={[s.tableHeaderCell, { width: "36%" }]}>Key Findings</Text>
+        <View style={s.statRow}>
+          {[
+            { num: roomStats.length, label: "Rooms inspected" },
+            { num: totalPhotos, label: "Photos captured" },
+            { num: totalIssues, label: "Issues flagged" },
+          ].map((stat, i) => (
+            <View key={i} style={[s.statCard, i < 2 && { marginRight: 10 }]}>
+              <View style={[s.statIconBox, { backgroundColor: tokens.primaryUltraLight }]}>
+                <View
+                  style={{
+                    width: 14,
+                    height: 14,
+                    backgroundColor: tokens.primaryLight,
+                    borderRadius: 3,
+                  }}
+                />
+              </View>
+              <Text style={[s.statNum, { color: tokens.primary }]}>{stat.num}</Text>
+              <Text style={s.statLbl}>{stat.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={s.sectionHd}>
+          <Text style={s.sectionHdText}>Room breakdown</Text>
+          <View style={s.sectionHdLine} />
+        </View>
+
+        <View style={s.roomTable}>
+          <View style={[s.roomThead, { backgroundColor: tokens.primary }]}>
+            <Text style={[s.roomTheadCell, { flex: 2 }]}>Room</Text>
+            <Text style={[s.roomTheadCell, { flex: 0.8 }]}>Photos</Text>
+            <Text style={[s.roomTheadCell, { flex: 0.8 }]}>Issues</Text>
+            <Text style={[s.roomTheadCell, { flex: 1.4 }]}>Condition</Text>
+            <Text style={[s.roomTheadCell, { flex: 2 }]}>Key findings</Text>
           </View>
           {roomStats.map((r, i) => {
-            const c = conditionColor(r.roomCondition);
+            const cond = r.roomCondition?.toLowerCase() || "good";
+            const condStyle =
+              cond === "good" || cond === "excellent"
+                ? { bg: "#DCFCE7", text: "#15803D" }
+                : cond === "needs attention" || cond === "fair"
+                  ? { bg: "#FEF9C3", text: "#A16207" }
+                  : { bg: "#FEE2E2", text: "#DC2626" };
+            const condLabel =
+              cond === "good" || cond === "excellent"
+                ? "Good"
+                : cond === "needs attention" || cond === "fair"
+                  ? "Needs Attention"
+                  : "Critical";
+            const tags = r.validPhotos.flatMap((p) => p.damage_tags ?? []);
+            const uniqueTags = [...new Set(tags)].slice(0, 4).join(", ");
             return (
-              <View key={`${r.room.name}-${i}`} style={s.tableRow}>
-                <Text style={[s.tableCell, { width: "24%" }]}>{r.room.name}</Text>
-                <Text style={[s.tableCell, { width: "11%", textAlign: "center" }]}>{r.validPhotos.length}</Text>
-                <Text style={[s.tableCell, { width: "11%", textAlign: "center" }]}>{r.photosWithIssues}</Text>
-                <Text style={[s.tableCell, { width: "18%", color: c.bg === "#F44336" ? "#F44336" : c.bg }]}>
-                  {r.roomCondition}
-                </Text>
-                <Text style={[s.tableCell, { width: "36%" }]}>
-                  {r.keyFindings.length > 0 ? r.keyFindings.join(", ") : "—"}
+              <View key={`${r.room.name}-${i}`} style={[s.roomRow, i % 2 === 1 && s.roomRowAlt]}>
+                <Text style={[s.roomCellBold, { flex: 2 }]}>{r.room.name}</Text>
+                <Text style={[s.roomCell, { flex: 0.8 }]}>{r.validPhotos.length}</Text>
+                <Text style={[s.roomCell, { flex: 0.8 }]}>{r.photosWithIssues}</Text>
+                <View style={{ flex: 1.4 }}>
+                  <View style={[s.condBadgeNew, { backgroundColor: condStyle.bg }]}>
+                    <Text style={[s.condBadgeTextNew, { color: condStyle.text }]}>{condLabel}</Text>
+                  </View>
+                </View>
+                <Text style={[s.roomCell, { flex: 2, color: "#9B9BA8", fontSize: 6.5 }]}>
+                  {uniqueTags || "—"}
                 </Text>
               </View>
             );
           })}
         </View>
 
-        <Text style={s.tableSummary}>
-          Total: {roomStats.length} rooms · {totalPhotos} photos · {totalIssues} issues
-        </Text>
+        <View style={s.sectionHd}>
+          <Text style={s.sectionHdText}>Key handover</Text>
+          <View style={s.sectionHdLine} />
+        </View>
 
-        {(() => {
-          const checkoutKeys = meta.inspection.key_handover ?? [];
-          const checkinKeys = meta.inspection.checkin_key_handover ?? [];
-          const isCheckout = (meta.inspection.type ?? "").toLowerCase().includes("check-out") && checkinKeys.length > 0;
-
-          if (isCheckout) {
-            let totalMissing = 0;
-            return (
-              <View style={{ marginTop: 20 }}>
-                <Text style={{ fontSize: 16, fontWeight: 700, fontFamily: "Helvetica-Bold", marginBottom: 12, color: "#1a1a2e" }}>
-                  Key Return
-                </Text>
-                <View style={s.tableWrap}>
-                  <View style={s.tableHeaderRow}>
-                    <Text style={[s.tableHeaderCell, { width: "40%" }]}>Item</Text>
-                    <Text style={[s.tableHeaderCell, { width: "20%", textAlign: "center" }]}>Given (Check-in)</Text>
-                    <Text style={[s.tableHeaderCell, { width: "20%", textAlign: "center" }]}>Returned</Text>
-                    <Text style={[s.tableHeaderCell, { width: "20%", textAlign: "center" }]}>Status</Text>
+        <View style={s.keysCard}>
+          <View style={s.keysGrid}>
+            {(meta.inspection.checkin_key_handover ?? meta.inspection.key_handover ?? []).map(
+              (item: { item?: string; label?: string; name?: string; qty?: number; quantity?: number }, i: number) => (
+                <View key={i} style={s.keyItem}>
+                  <View style={[s.keyIconBox, { backgroundColor: tokens.primaryUltraLight }]}>
+                    <View
+                      style={{
+                        width: 14,
+                        height: 14,
+                        backgroundColor: tokens.primaryLight,
+                        borderRadius: 3,
+                      }}
+                    />
                   </View>
-                  {checkinKeys.map((c, i) => {
-                    const returnedQty = checkoutKeys.find((k) => k.item === c.item)?.qty ?? 0;
-                    const diff = c.qty - returnedQty;
-                    totalMissing += Math.max(0, diff);
-                    const status = diff === 0 ? "✓ OK" : diff > 0 ? `⚠ -${diff}` : "✓ OK";
-                    const statusColor = diff === 0 ? "#2e7d32" : "#e65100";
-                    return (
-                      <View key={`${c.item}-${i}`} style={s.tableRow}>
-                        <Text style={[s.tableCell, { width: "40%" }]}>{c.item}</Text>
-                        <Text style={[s.tableCell, { width: "20%", textAlign: "center" }]}>{c.qty}</Text>
-                        <Text style={[s.tableCell, { width: "20%", textAlign: "center" }]}>{returnedQty}</Text>
-                        <Text style={[s.tableCell, { width: "20%", textAlign: "center", color: statusColor }]}>{status}</Text>
-                      </View>
-                    );
-                  })}
+                  <Text style={s.keyLabel}>{item.label ?? item.item ?? item.name ?? "Item"}</Text>
+                  <Text style={s.keyQty}>×{item.quantity ?? item.qty ?? 1}</Text>
                 </View>
-                <Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", marginTop: 8, color: "#1a1a2e" }}>
-                  {totalMissing === 0
-                    ? "All keys returned ✓"
-                    : `⚠ ${totalMissing} key(s) not returned — may be subject to deduction`}
-                </Text>
-              </View>
-            );
-          }
+              )
+            )}
+          </View>
+        </View>
 
-          if (meta.inspection.key_handover && meta.inspection.key_handover.length > 0) {
-            return (
-              <View style={{ marginTop: 20 }}>
-                <Text style={{ fontSize: 16, fontWeight: 700, fontFamily: "Helvetica-Bold", marginBottom: 12, color: "#1a1a2e" }}>
-                  Key Handover
-                </Text>
-                <View style={s.tableWrap}>
-                  <View style={s.tableHeaderRow}>
-                    <Text style={[s.tableHeaderCell, { width: "80%" }]}>Item</Text>
-                    <Text style={[s.tableHeaderCell, { width: "20%", textAlign: "center" }]}>Qty</Text>
-                  </View>
-                  {meta.inspection.key_handover.map((k, i) => (
-                    <View key={`${k.item}-${i}`} style={s.tableRow}>
-                      <Text style={[s.tableCell, { width: "80%" }]}>{k.item}</Text>
-                      <Text style={[s.tableCell, { width: "20%", textAlign: "center" }]}>{k.qty}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            );
-          }
-          return null;
-        })()}
-
-        <View style={s.footer}>
-          <Text style={s.footerText}>
-            Page 2 of {totalPages} · Generated by {generatedBy} — snagify.net
+        <View style={[s.pdfFooter, { backgroundColor: tokens.primaryDark }]} fixed>
+          <View style={s.footerLeft}>
+            <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
+            <View style={s.footerDivider} />
+            <Text style={s.footerUrl}>{agencyWebsite}</Text>
+          </View>
+          <Text style={s.footerRight}>
+            SHA-256: {documentHash.slice(0, 8)}…{documentHash.slice(-8)} · Page 2
           </Text>
-          <Text style={s.hashText}>SHA-256: {shortHash}</Text>
         </View>
       </Page>
 
       {/* ROOM PAGES */}
-      {roomStats.map((r, ri) => {
+      {roomStats.map((r, roomIndex) => {
         const room = r.room;
-        const validPhotos = r.validPhotos;
-        const roomCondition = r.roomCondition;
-        const rc = conditionColor(roomCondition);
-        const photosWithIssues = r.photosWithIssues;
-        const roomInspectionDate = r.roomInspectionDate;
-        const isCheckoutRoom =
-          (meta.inspection.type ?? "").toLowerCase().includes("check-out") &&
-          meta.checkinPhotoMap &&
-          meta.checkinRooms;
-        const checkinRoom = meta.checkinRooms?.find(
-          (cr) => cr.name.toLowerCase() === room.name.toLowerCase()
-        );
-        const checkinRoomPhotos = checkinRoom?.photos ?? [];
-        const pairedPhotos = validPhotos.filter(
-          (p) => (p as { checkin_photo_id?: string | null; is_additional?: boolean }).checkin_photo_id && !(p as { is_additional?: boolean }).is_additional
-        );
-        const additionalPhotos = validPhotos.filter(
-          (p) => (p as { is_additional?: boolean }).is_additional
-        );
-        const uncoveredCheckinPhotos = checkinRoomPhotos.filter(
-          (cp) => !pairedPhotos.some((p) => (p as { checkin_photo_id?: string | null }).checkin_photo_id === cp.id)
-        );
+        const photos = r.validPhotos;
+        const cond = (r.roomCondition || "good").toLowerCase().replace(/\s+/g, "_");
+        const condBadgeStyle =
+          cond === "good" || cond === "excellent"
+            ? s.roomCondBadgeGood
+            : cond === "needs_attention" || cond === "fair"
+              ? s.roomCondBadgeWarn
+              : s.roomCondBadgeCritical;
+        const condTextStyle =
+          cond === "good" || cond === "excellent"
+            ? s.roomCondTextGood
+            : cond === "needs_attention" || cond === "fair"
+              ? s.roomCondTextWarn
+              : s.roomCondTextCritical;
+        const condLabel =
+          cond === "good" || cond === "excellent"
+            ? "Good"
+            : cond === "needs_attention" || cond === "fair"
+              ? "Needs Attention"
+              : "Critical";
+        const totalIssuesRoom = photos.filter((p) => (p.damage_tags?.length ?? 0) > 0).length;
+
+        const tagStyle = (tag: string) => {
+          const t = tag.toLowerCase();
+          if (["scratch", "crack", "broken", "missing"].includes(t))
+            return { bg: s.photoTagRed, text: s.photoTagTextRed };
+          if (["stain", "damp", "burn", "discoloration"].includes(t))
+            return { bg: s.photoTagOrange, text: s.photoTagTextOrange };
+          if (["mark", "wear"].includes(t)) return { bg: s.photoTagBlue, text: s.photoTagTextBlue };
+          return { bg: s.photoTagGray, text: s.photoTagTextGray };
+        };
+
+        const photoPairs: (typeof photos)[] = [];
+        for (let i = 0; i < photos.length; i += 2) {
+          photoPairs.push(photos.slice(i, i + 2));
+        }
 
         return (
-          <Page key={ri} size="A4" style={s.page}>
-            <View style={[s.roomHeader, { backgroundColor: accentColor }]}>
-              <View>
-                <Text style={s.roomName}>{room.name}</Text>
-                {roomInspectionDate && (
-                  <Text style={{ fontSize: 8, color: "rgba(255,255,255,0.85)", marginTop: 2 }}>
-                    Inspected on {formatDate(roomInspectionDate)}
+          <Page key={roomIndex} size="A4">
+            <View style={[s.roomHero, { backgroundColor: tokens.primary }]}>
+              <View style={s.roomHeroDecoOuter} />
+              <View style={s.roomHeroDecoInner} />
+              <View style={s.roomHeroTop}>
+                <View>
+                  <Text style={s.roomNumber}>
+                    Room {String(roomIndex + 1).padStart(2, "0")} of {String(roomStats.length).padStart(2, "0")}
                   </Text>
-                )}
+                  <Text style={s.roomTitle}>{room.name}</Text>
+                  <Text style={s.roomDate}>
+                    Inspected on {formatDate(inspection.created_at)}
+                  </Text>
+                </View>
+                <View style={condBadgeStyle}>
+                  <Text style={condTextStyle}>{condLabel}</Text>
+                </View>
               </View>
-              <View style={[s.roomCondBadge, { backgroundColor: rc.bg }]}>
-                <Text style={[s.roomCondText, { color: rc.text }]}>{roomCondition}</Text>
+              <View style={s.roomStatsRow}>
+                <View style={[s.roomStatItem, { marginRight: 16 }]}>
+                  <View style={[s.roomStatDot, { marginRight: 5 }]} />
+                  <Text style={s.roomStatText}>
+                    {photos.length} photo{photos.length !== 1 ? "s" : ""} captured
+                  </Text>
+                </View>
+                <View style={s.roomStatItem}>
+                  <View style={[s.roomStatDot, { marginRight: 5 }]} />
+                  <Text style={s.roomStatText}>
+                    {totalIssuesRoom} issue{totalIssuesRoom !== 1 ? "s" : ""} flagged
+                  </Text>
+                </View>
               </View>
             </View>
 
-            <Text style={s.roomSummary}>{room.summary}</Text>
-
-            {isCheckoutRoom ? (
-              <View style={{ marginTop: 14 }}>
-                {/* Section 1 — Entry vs Exit paired */}
-                {pairedPhotos.length > 0 && (
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: DARK, marginBottom: 8 }}>
-                      Entry vs Exit
-                    </Text>
-                    {pairedPhotos.map((p) => {
-                      const checkinId = (p as { checkin_photo_id?: string | null }).checkin_photo_id;
-                      const checkinPhoto = checkinId ? meta.checkinPhotoMap?.[checkinId] : null;
-                      return (
-                        <View key={p.id} style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
-                          <View style={{ flex: 1 }}>
-                            {checkinPhoto?.url && (
-                              <>
-                                {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                                <Image
-                                  src={checkinPhoto.url}
-                                  style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 6, marginBottom: 4 }}
-                                />
-                                {checkinPhoto.damage_tags && checkinPhoto.damage_tags.length > 0 && (
-                                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 2 }}>
-                                    {checkinPhoto.damage_tags.map((tag) => (
-                                      <Text key={tag} style={{ fontSize: 6, color: "#666" }}>{tag}</Text>
-                                    ))}
-                                  </View>
-                                )}
-                                <Text style={{ fontSize: 7, color: "#888", marginTop: 2 }}>Entry</Text>
-                              </>
-                            )}
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            {p.url ? (
-                              <>
-                                {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                                <Image
-                                  src={p.url}
-                                  style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 6, marginBottom: 4 }}
-                                />
-                              </>
-                            ) : null}
-                            {p.damage_tags && p.damage_tags.length > 0 && (
-                              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 2 }}>
-                                {p.damage_tags.map((tag) => (
-                                  <Text key={tag} style={{ fontSize: 6, color: "#ef4444" }}>{tag}</Text>
-                                ))}
+            <View style={s.roomBody}>
+              {photoPairs.map((pair, pairIdx) => (
+                <View key={pairIdx} style={s.photosGrid}>
+                  {pair.map((photo) => (
+                    <View
+                      key={photo.id}
+                      style={[s.photoCard, pair.indexOf(photo) === 0 && pair.length > 1 && { marginRight: 8 }]}
+                    >
+                      {photo.url && photo.url.startsWith("http") ? (
+                        <Image src={photo.url} style={s.photoImg} />
+                      ) : null}
+                      {photo.damage_tags && photo.damage_tags.length > 0 && (
+                        <View style={s.photoTagsRow}>
+                          {photo.damage_tags.map((tag, ti) => {
+                            const ts = tagStyle(tag);
+                            return (
+                              <View key={ti} style={[s.photoTag, ts.bg, { marginRight: 3, marginBottom: 2 }]}>
+                                <Text style={[s.photoTagText, ts.text]}>{tag}</Text>
                               </View>
-                            )}
-                            <Text style={{ fontSize: 7, color: "#888", marginTop: 2 }}>Exit</Text>
-                            {(p as { ai_analysis?: string | null }).ai_analysis && (
-                              <Text style={{ fontSize: 7, color: "#444", marginTop: 4, lineHeight: 1.3 }}>
-                                {(p as { ai_analysis?: string | null }).ai_analysis}
-                              </Text>
-                            )}
-                          </View>
+                            );
+                          })}
                         </View>
-                      );
-                    })}
-                  </View>
-                )}
-                {/* Section 2 — Entry photos not re-inspected */}
-                {uncoveredCheckinPhotos.length > 0 && (
-                  <View style={{ marginBottom: 16 }}>
-                    <View style={{ backgroundColor: "#E5E7EB", padding: 8, borderRadius: 6, marginBottom: 8 }}>
-                      <Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold", color: "#555" }}>
-                      ⚠️ {uncoveredCheckinPhotos.length} entry photo(s) not re-documented at check-out
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                      {uncoveredCheckinPhotos.map((cp) => (
-                        <View key={cp.id} style={{ width: "30%", position: "relative" }}>
-                          {cp.url && (
-                            <>
-                              {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                              <Image
-                                src={cp.url}
-                                style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 6 }}
-                              />
-                              <View style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 6, alignItems: "center", justifyContent: "center" }}>
-                                <Text style={{ fontSize: 14, color: "white", fontFamily: "Helvetica-Bold" }}>⚠️</Text>
-                              </View>
-                            </>
-                          )}
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                )}
-                {/* Section 3 — New findings */}
-                {additionalPhotos.length > 0 && (
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: "#FF8A65", marginBottom: 8 }}>
-                      New findings — no entry reference
-                    </Text>
-                    {chunkArray(additionalPhotos, 2).map((pair, rowIdx) => (
-                      <View key={rowIdx} style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
-                        {pair.map((photo) => (
-                          <View key={photo.id} style={{ flex: 1 }}>
-                            {photo.url ? (
-                              <>
-                                {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                                <Image
-                                  src={photo.url}
-                                  style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 6, marginBottom: 4 }}
-                                />
-                              </>
-                            ) : null}
-                            {photo.damage_tags && photo.damage_tags.length > 0 && (
-                              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 3 }}>
-                                {photo.damage_tags.map((tag) => (
-                                  <Text key={tag} style={{ fontSize: 6, color: "#ef4444", fontFamily: "Helvetica-Bold" }}>{tag}</Text>
-                                ))}
-                              </View>
-                            )}
-                            {(photo as { ai_analysis?: string | null }).ai_analysis && (
-                              <Text style={{ fontSize: 7, color: "#444", marginTop: 2, lineHeight: 1.3 }}>
-                                {(photo as { ai_analysis?: string | null }).ai_analysis}
-                              </Text>
-                            )}
+                      )}
+                      {photo.ai_analysis && (
+                        <>
+                          <View style={s.photoAiDivider} />
+                          <View style={s.photoAiWrap}>
+                            <Text style={[s.photoAiLabel, { color: tokens.primary }]}>AI Analysis</Text>
+                            <Text style={s.photoAiText}>{photo.ai_analysis}</Text>
                           </View>
-                        ))}
-                        {pair.length === 1 && <View style={{ flex: 1 }} />}
-                      </View>
-                    ))}
-                  </View>
-                )}
-                {pairedPhotos.length === 0 && uncoveredCheckinPhotos.length === 0 && additionalPhotos.length === 0 && validPhotos.length > 0 && (
-                  <Text style={s.roomMetaLine}>No paired or additional photos in this room.</Text>
-                )}
-              </View>
-            ) : validPhotos.length > 0 ? (
-              <View style={{ marginTop: 14 }}>
-                <Text style={s.roomMetaLine}>
-                  {validPhotos.length} photo{validPhotos.length > 1 ? "s" : ""} captured
-                  {photosWithIssues > 0
-                    ? ` · ${photosWithIssues} issue${photosWithIssues > 1 ? "s" : ""} flagged`
-                    : ""}
-                </Text>
-                {chunkArray(validPhotos, 2).map((pair, rowIdx) => (
-                  <View key={rowIdx} style={{
-                    flexDirection: "row", gap: 10, marginBottom: 12,
-                  }}>
-                    {pair.map((photo) => (
-                      <View key={photo.id} style={{ flex: 1 }}>
-                        {photo.url ? (
-                          <>
-                            {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                            <Image
-                              src={photo.url}
-                              style={{
-                                width: "100%",
-                                height: 140,
-                                objectFit: "cover",
-                                borderRadius: 6,
-                                marginBottom: 5,
-                              }}
-                            />
-                          </>
-                        ) : null}
-                        {photo.damage_tags && photo.damage_tags.length > 0 && (
-                          <View style={{
-                            flexDirection: "row", flexWrap: "wrap", gap: 3, marginBottom: 4,
-                          }}>
-                            {photo.damage_tags.map((tag) => (
-                              <View key={tag} style={{
-                                backgroundColor: "#fff0f0",
-                                borderRadius: 3,
-                                paddingHorizontal: 5,
-                                paddingVertical: 2,
-                              }}>
-                                <Text style={{
-                                  fontSize: 7,
-                                  color: "#ef4444",
-                                  fontFamily: "Helvetica-Bold",
-                                }}>
-                                  {tag.toUpperCase()}
-                                </Text>
-                              </View>
-                            ))}
-                          </View>
-                        )}
-                        <Text style={{
-                          fontSize: 8,
-                          color: photoDisplayNote(photo) !== "General view" ? "#444" : "#9ca3af",
-                          lineHeight: 1.4,
-                          fontStyle: photoDisplayNote(photo) !== "General view" ? "normal" : "italic",
-                        }}>
-                          {photoDisplayNote(photo)}
-                        </Text>
-                      </View>
-                    ))}
-                    {pair.length === 1 && <View style={{ flex: 1 }} />}
-                  </View>
-                ))}
-              </View>
-            ) : null}
+                        </>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </View>
 
-            {room.recommendations.length > 0 && (
-              <View style={s.recsBox}>
-                <Text style={s.recsTitle}>Recommendations</Text>
-                {room.recommendations.map((rec, ri2) => (
-                  <Text key={ri2} style={s.recItem}>• {rec}</Text>
-                ))}
+            <View style={[s.pdfFooter, { backgroundColor: tokens.primaryDark }]} fixed>
+              <View style={s.footerLeft}>
+                <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
+                <View style={s.footerDivider} />
+                <Text style={s.footerUrl}>{agencyWebsite}</Text>
               </View>
-            )}
-
-            <View style={s.footer}>
-              <Text style={s.footerText}>
-                Page {ri + 3} of {totalPages} · Generated by {generatedBy} — snagify.net
+              <Text style={s.footerRight}>
+                SHA-256: {documentHash.slice(0, 8)}…{documentHash.slice(-8)} · Page {roomIndex + 3} of{" "}
+                {roomStats.length + 3}
               </Text>
-              <Text style={s.hashText}>SHA-256: {shortHash}</Text>
             </View>
           </Page>
         );
       })}
 
-      {/* LEGAL + RECOMMENDATIONS + SIGNATURES PAGE */}
-      <Page size="A4" style={s.page}>
-        {qrDataUrl && (
-          <View style={s.qrWrap}>
-            {/* eslint-disable-next-line jsx-a11y/alt-text */}
-            <Image src={qrDataUrl} style={{ width: 80, height: 80 }} />
-            <Text style={s.qrLabel}>Scan to view report online</Text>
+      {/* SIGNATURE PAGE */}
+      <Page size="A4">
+        <View style={[s.sigHero, { backgroundColor: tokens.primary }]}>
+          <View style={s.sigHeroDeco} />
+          <View style={s.sigHeroTop}>
+            <View>
+              <Text style={s.sigLogoText}>{agencyName}</Text>
+              <Text style={s.sigLogoSub}>PROPERTY INSPECTION REPORT</Text>
+            </View>
+            <View style={s.sigVerifiedBadge}>
+              <View style={[s.sigVerifiedDot, { marginRight: 5 }]} />
+              <Text style={s.sigVerifiedText}>Verified Document</Text>
+            </View>
           </View>
-        )}
-        {report.legal_notes && (
-          <View style={s.legalBox}>
-            <Text style={s.legalTitle}>Legal Notes (RERA / Dubai Law)</Text>
-            <Text style={s.legalText}>{report.legal_notes}</Text>
-          </View>
-        )}
-
-        {report.recommendations.length > 0 && (
-          <View style={s.recsBox}>
-            <Text style={s.recsTitle}>Overall Recommendations</Text>
-            {report.recommendations.map((rec, i) => (
-              <Text key={i} style={s.recItem}>• {rec}</Text>
-            ))}
-          </View>
-        )}
-
-        <View style={s.sigSection}>
-          <Text style={s.sigStatement}>
-            This report has been reviewed and agreed upon by all parties.
+          <Text style={s.sigTitle}>
+            This report has been reviewed{"\n"}and agreed upon by all parties.
           </Text>
+          <Text style={s.sigSubtitle}>
+            {property.address ?? "Property"} · {formatDate(inspection.created_at)}
+          </Text>
+        </View>
 
-          <View style={s.sigGrid}>
-            {(["landlord", "tenant"] as const).map((role) => {
-              const sig = (meta.signatures ?? []).find((s) => s.signer_type === role);
-              const signed = !!(sig?.otp_verified || sig?.signed_at);
-              const name = role === "landlord"
-                ? (meta.inspection.landlord_name || "—")
-                : (meta.inspection.tenant_name || "—");
+        <View style={s.sigBody}>
+          {qrDataUrl && (
+            <View style={s.qrRow}>
+              <View style={[s.qrBox, { marginRight: 14 }]}>
+                <Image src={qrDataUrl} style={s.qrImage} />
+              </View>
+              <View style={s.qrTextWrap}>
+                <Text style={s.qrTextTitle}>Scan to verify this report</Text>
+                <Text style={s.qrTextBody}>
+                  View the original online version, verify document authenticity, and access the full digital record.
+                  This QR code links directly to the inspection report on {agencyWebsite}.
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <View style={s.sigPartiesRow}>
+            {[
+              { role: "Landlord", name: tenancy.landlord_name, sigType: "landlord" },
+              { role: "Tenant", name: tenancy.tenant_name, sigType: "tenant" },
+            ].map((party, i) => {
+              const sig = (meta.signatures ?? []).find((s) => s.signer_type === party.sigType);
               return (
-                <View key={role} style={s.sigBox}>
-                  <Text style={[s.sigRole, { color: accentColor }]}>{role}</Text>
-                  <Text style={s.sigName}>{name}</Text>
-                  {signed ? (
-                    <View style={{ alignItems: "center" }}>
-                      {sig?.signature_data ? (
-                        <>
-                          {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                          <Image
-                            src={sig.signature_data}
-                            style={{ width: 160, height: 60, objectFit: "contain", marginBottom: 6 }}
-                          />
-                          <View style={{ width: "100%", height: 1, backgroundColor: "#E5E7EB", marginBottom: 4 }} />
-                        </>
-                      ) : (
-                        <View style={{ height: 60 }} />
-                      )}
-                      <Text style={{ fontSize: 10, color: "#2e7d32", fontFamily: "Helvetica-Bold", marginBottom: 4 }}>
-                        ✓ Signed
-                      </Text>
-                      {sig?.signed_at && (
-                        <Text style={{ fontSize: 8, color: "#999" }}>
-                          Signed on {formatDate(sig.signed_at)}
-                        </Text>
-                      )}
-                    </View>
-                  ) : (
-                    <Text style={s.sigPending}>Pending Signature</Text>
-                  )}
+                <View key={i} style={[s.sigPartyCard, i === 0 && { marginRight: 8 }]}>
+                  <Text style={[s.sigPartyRole, { color: tokens.primary }]}>
+                    {party.role.toUpperCase()}
+                  </Text>
+                  <Text style={s.sigPartyName}>{party.name ?? "—"}</Text>
+                  <View style={s.sigSignArea}>
+                    {sig?.signature_data ? (
+                      <Image src={sig.signature_data} style={s.sigSignImage} />
+                    ) : (
+                      <Text style={s.sigSignPending}>Pending Signature</Text>
+                    )}
+                  </View>
                 </View>
               );
             })}
           </View>
 
-          {meta.agent && (
-            <View style={{ marginTop: 20, alignItems: "center" }}>
-              <Text style={[s.sigRole, { color: accentColor, marginBottom: 8 }]}>Inspector</Text>
-              <Text style={s.sigName}>{meta.agent.full_name ?? "—"}</Text>
-              {meta.agent.signature_image_url ? (
-                <View style={{ alignItems: "center", marginTop: 8 }}>
-                  {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                  <Image
-                    src={meta.agent.signature_image_url}
-                    style={{ width: 160, height: 60, objectFit: "contain", marginBottom: 4 }}
-                  />
-                  <View style={{ width: "100%", height: 1, backgroundColor: "#E5E7EB" }} />
+          {(() => {
+            const inspectorSig = (meta.signatures ?? []).find(
+              (s) => s.signer_type === "agent" || s.signer_type === "inspector"
+            );
+            const profile = meta.agent;
+            return (
+              <View style={s.sigInspectorCard}>
+                <View style={[s.sigInspectorLeft, { marginRight: 12 }]}>
+                  <Text style={[s.sigInspectorRole, { color: tokens.primary }]}>INSPECTOR</Text>
+                  <Text style={s.sigInspectorName}>{profile?.full_name ?? "—"}</Text>
+                  <Text style={s.sigInspectorAgency}>
+                    {agencyName}
+                    {profile?.rera_number ? ` · RERA #${profile.rera_number}` : ""}
+                  </Text>
                 </View>
-              ) : (
-                <Text style={[s.sigPending, { marginTop: 4 }]}>Inspector signature</Text>
-              )}
+                <View style={s.sigInspectorRight}>
+                  <View style={s.sigInspectorSignBox}>
+                    {inspectorSig?.signature_data ? (
+                      <Image src={inspectorSig.signature_data} style={s.sigSignImage} />
+                    ) : profile?.signature_image_url ? (
+                      <Image src={profile.signature_image_url} style={s.sigSignImage} />
+                    ) : (
+                      <Text style={s.sigSignPending}>—</Text>
+                    )}
+                  </View>
+                  <Text style={s.sigInspectorSignLabel}>Inspector signature</Text>
+                </View>
+              </View>
+            );
+          })()}
+
+          <View style={s.hashCard}>
+            <Text style={s.hashLabel}>Document integrity — SHA-256 hash</Text>
+            <View style={s.hashRow}>
+              <View style={[s.hashIconBox, { backgroundColor: tokens.primaryUltraLight, marginRight: 6 }]}>
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    backgroundColor: tokens.primaryLight,
+                    borderRadius: 2,
+                  }}
+                />
+              </View>
+              <Text style={s.hashValue}>{documentHash}</Text>
             </View>
-          )}
-
-          <View style={s.disclaimerWrap}>
-            <Text style={s.disclaimerText}>
-              This report documents the condition of the property as observed at the time of inspection.
-              It is based on a visual assessment only and does not constitute a structural, electrical,
-              or plumbing survey. All parties are advised to review this report carefully. By signing,
-              each party acknowledges the findings recorded herein. This document is generated
-              electronically and verified by SHA-256 hash.
-            </Text>
           </View>
 
-          <View style={s.coverRow}>
-            <Text style={s.coverLabel}>Date</Text>
-            <Text style={s.coverValue}>{formatDate(new Date().toISOString())}</Text>
-          </View>
-          <View style={[s.coverRow, { marginTop: 4 }]}>
-            <Text style={s.coverLabel}>Timestamp</Text>
-            <Text style={s.coverValue}>{new Date().toISOString()}</Text>
-          </View>
+          <Text style={s.disclaimer}>
+            This report documents the condition of the property as observed at the time of inspection. It is based on
+            a visual assessment only and does not constitute a structural, electrical, or plumbing survey. All parties
+            are advised to review this report carefully. By signing, each party acknowledges the findings recorded
+            herein. This document is generated electronically and verified by SHA-256 hash.
+          </Text>
         </View>
 
-        <View style={s.footer}>
-          <Text style={s.hashText}>Document Hash (SHA-256): {documentHash}</Text>
-          <Text style={[s.footerText, { marginTop: 4 }]}>
-            Page {totalPages} of {totalPages} · Generated by {generatedBy} — snagify.net
+        <View style={[s.pdfFooter, { backgroundColor: tokens.primaryDark }]} fixed>
+          <View style={s.footerLeft}>
+            <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
+            <View style={s.footerDivider} />
+            <Text style={s.footerUrl}>{agencyWebsite}</Text>
+          </View>
+          <Text style={s.footerRight}>
+            {formatDate(inspection.created_at)} · Page {roomStats.length + 3} of {roomStats.length + 3}
           </Text>
         </View>
       </Page>

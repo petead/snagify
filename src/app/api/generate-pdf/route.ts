@@ -280,6 +280,7 @@ export async function buildPdfAndUpload(
           agency_name: (agentCompany as { name?: string } | null)?.name ?? (agentRow as { agency_name?: string }).agency_name,
           company_logo_url: (agentCompany as { logo_url?: string } | null)?.logo_url ?? (agentRow as { company_logo_url?: string }).company_logo_url,
           company_primary_color: (agentCompany as { primary_color?: string } | null)?.primary_color ?? (agentRow as { company_primary_color?: string }).company_primary_color,
+          company_website: (agentCompany as { website?: string } | null)?.website ?? undefined,
           rera_number: agentRow.rera_number,
           signature_image_url: agentRow.signature_image_url,
         }
@@ -315,6 +316,7 @@ export async function buildPdfAndUpload(
             agency_name: agentData.agency_name ?? undefined,
             company_logo_url: (agentData as { company_logo_url?: string }).company_logo_url ?? undefined,
             company_primary_color: (agentData as { company_primary_color?: string }).company_primary_color ?? undefined,
+            company_website: (agentData as { company_website?: string }).company_website ?? undefined,
             rera_number: (agentData as { rera_number?: string }).rera_number ?? undefined,
             signature_image_url: (agentData as { signature_image_url?: string }).signature_image_url ?? undefined,
           }
