@@ -800,7 +800,7 @@ export function InspectionClient({
       const roomIds = liveRooms.map((r) => r.id);
       const { data } = await supabase
         .from("photos")
-        .select("id, room_id, url, damage_tags, notes, checkin_photo_id, is_additional")
+        .select("id, room_id, url, width, height, damage_tags, notes, checkin_photo_id, is_additional")
         .in("room_id", roomIds)
         .order("taken_at", { ascending: true });
       if (data && data.length > 0) {
@@ -824,6 +824,8 @@ export function InspectionClient({
                 uploadFailed: false,
                 checkin_photo_id: (p as { checkin_photo_id?: string | null }).checkin_photo_id ?? null,
                 is_additional: (p as { is_additional?: boolean }).is_additional ?? false,
+                width: (p as { width?: number | null }).width ?? null,
+                height: (p as { height?: number | null }).height ?? null,
               };
             });
         });
