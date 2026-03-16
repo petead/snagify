@@ -413,9 +413,12 @@ export async function POST(request: NextRequest) {
 
     step = "return pdf response";
     return new NextResponse(Buffer.from(buffer), {
+      status: 200,
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="Snagify_Report_${inspectionId}.pdf"`,
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        "Content-Length": buffer.length.toString(),
       },
     });
   } catch (err) {

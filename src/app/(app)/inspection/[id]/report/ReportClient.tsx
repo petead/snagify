@@ -156,6 +156,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   const [execSummary, setExecSummary] = useState<string | null>(
     inspection.executive_summary ?? inspection.report_data?.executive_summary ?? null
   );
+  const inspectionId = inspection.id;
 
   useEffect(() => {
     setLoaded(true);
@@ -232,37 +233,49 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   const keysAllReturned = isCheckout && checkinHandover.length > 0 && keysMissingCount === 0;
 
   const handleDownloadPDF = async () => {
+    if (downloadLoading) return;
     setDownloadLoading(true);
+
     try {
-      const response = await fetch("/api/generate-report", {
+      const response = await fetch("/api/generate-pdf", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/pdf",
-        },
-        body: JSON.stringify({ inspectionId: inspection.id }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inspectionId }),
       });
 
       if (!response.ok) {
-        const err = await response.json().catch(() => ({})) as { error?: string };
-        throw new Error(err?.error ?? "Failed to generate PDF");
+        let errMsg = "Failed to generate PDF";
+        try {
+          const errData = await response.json() as { error?: string };
+          errMsg = errData.error ?? errMsg;
+        } catch {}
+        throw new Error(errMsg);
       }
 
+      // Get the binary PDF blob
       const blob = await response.blob();
+      if (blob.size === 0) {
+        throw new Error("PDF is empty — please try again");
+      }
+
+      // Create a temporary object URL and trigger download
       const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Snagify_Report_${inspectionId}.pdf`;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
 
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Snagify_Report_${inspection.id}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      router.refresh();
+      // Cleanup after short delay
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 1000);
     } catch (err) {
-      console.error("Download failed:", err);
-      alert("Could not download PDF. Please try again.");
+      const msg = err instanceof Error ? err.message : "Download failed";
+      console.error("[DownloadPDF]", msg);
+      alert(msg);
     } finally {
       setDownloadLoading(false);
     }
@@ -1022,24 +1035,11 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
             fontFamily: "'Poppins', sans-serif",
             width: "100%",
             border: "none",
-            cursor: downloadLoading ? "default" : "pointer",
-            opacity: downloadLoading ? 0.8 : 1,
+            cursor: downloadLoading ? "not-allowed" : "pointer",
+            opacity: downloadLoading ? 0.7 : 1,
           }}
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          >
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          {downloadLoading ? "Generating PDF…" : "⬇ Download PDF"}
+          {downloadLoading ? "Generating…" : "Download PDF"}
         </button>
 
         <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
