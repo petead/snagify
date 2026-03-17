@@ -29,7 +29,7 @@ export async function middleware(request: NextRequest) {
   const isAuthenticated = data?.claims?.role === "authenticated";
 
   const path = request.nextUrl.pathname;
-  const isAuthRoute = path === "/login" || path === "/register";
+  const isAuthRoute = path === "/login" || path === "/register" || path === "/signup";
   const isAppRoute =
     path.startsWith("/dashboard") ||
     path.startsWith("/inspection") ||
@@ -55,5 +55,6 @@ export const config = {
     "/inspection/:path*",
     "/login",
     "/register",
+    "/signup",
   ],
 };

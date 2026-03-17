@@ -60,6 +60,7 @@ interface DashboardClientProps {
   fullName: string | null;
   userEmail: string | null;
   profileLoading?: boolean;
+  showProUpgradeBanner?: boolean;
   properties: PropertyRow[];
   alerts?: AlertItem[];
   recentInspections?: RecentInspectionRow[];
@@ -104,6 +105,7 @@ export function DashboardClient({
   fullName,
   userEmail,
   profileLoading = false,
+  showProUpgradeBanner = false,
   properties: initialProperties,
   alerts = [],
   recentInspections: initialRecentInspections = [],
@@ -343,6 +345,32 @@ export function DashboardClient({
           Dubai Property Inspections
         </p>
       </div>
+
+      {/* Pro upgrade banner */}
+      {showProUpgradeBanner && (
+        <div
+          className="mx-6 mt-4 rounded-xl flex items-start gap-3 p-4"
+          style={{
+            background: "#EDE9FF",
+            borderLeft: "3px solid #9A88FD",
+          }}
+        >
+          <span className="text-lg flex-shrink-0" aria-hidden>
+            ✨
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-body text-sm text-[#1A1A2E] leading-relaxed">
+              You&apos;re on the free plan. Upgrade to start generating check-out reports and unlock your white-label branding.
+            </p>
+            <Link
+              href="/settings/billing"
+              className="inline-block mt-3 font-semibold text-sm text-[#9A88FD] hover:text-[#7B65FC] hover:underline"
+            >
+              View plans →
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Alerts */}
       {alerts.length > 0 && (

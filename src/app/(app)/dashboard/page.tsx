@@ -10,10 +10,11 @@ export default async function DashboardPage() {
   let fullName: string | null = null;
   let profileLoading = false;
   let profileNeedsOnboardingFix = false;
+  let showProUpgradeBanner = false;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("full_name, onboarding_completed")
+      .select("full_name, onboarding_completed, account_type, company_id")
       .eq("id", user.id)
       .single();
     if (!profile) {
@@ -22,6 +23,19 @@ export default async function DashboardPage() {
       fullName = profile?.full_name ?? null;
       if (profile && (profile as { onboarding_completed?: boolean }).onboarding_completed === false) {
         profileNeedsOnboardingFix = true;
+      }
+      const accountType = (profile as { account_type?: string }).account_type;
+      const companyId = (profile as { company_id?: string }).company_id;
+      if (accountType === "pro" && companyId) {
+        const { data: company } = await supabase
+          .from("companies")
+          .select("plan")
+          .eq("id", companyId)
+          .single();
+        const plan = (company as { plan?: string } | null)?.plan;
+        if (plan === "free" || plan == null) {
+          showProUpgradeBanner = true;
+        }
       }
     }
   }
@@ -210,6 +224,7 @@ export default async function DashboardPage() {
         fullName={fullName}
         userEmail={user?.email ?? null}
         profileLoading={profileLoading}
+        showProUpgradeBanner={showProUpgradeBanner}
         properties={propertiesData}
         alerts={alerts}
         recentInspections={recentInspections}
