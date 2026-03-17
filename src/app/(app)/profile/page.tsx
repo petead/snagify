@@ -15,6 +15,14 @@ export default async function ProfilePage() {
     .eq("id", user.id)
     .single();
 
+  // One-time fix: set onboarding_completed = true for existing accounts
+  if (profile && (profile as { onboarding_completed?: boolean }).onboarding_completed === false) {
+    await supabase
+      .from("profiles")
+      .update({ onboarding_completed: true })
+      .eq("id", user.id);
+  }
+
   const company = Array.isArray(profile?.company) ? profile?.company?.[0] : profile?.company;
 
   const [

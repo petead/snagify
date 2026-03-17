@@ -59,6 +59,7 @@ interface DashboardClientProps {
   displayName: string;
   fullName: string | null;
   userEmail: string | null;
+  profileLoading?: boolean;
   properties: PropertyRow[];
   alerts?: AlertItem[];
   recentInspections?: RecentInspectionRow[];
@@ -102,6 +103,7 @@ export function DashboardClient({
   displayName,
   fullName,
   userEmail,
+  profileLoading = false,
   properties: initialProperties,
   alerts = [],
   recentInspections: initialRecentInspections = [],
@@ -298,7 +300,11 @@ export function DashboardClient({
               letterSpacing: -0.5,
             }}
           >
-            {displayName}
+            {profileLoading ? (
+              <span style={{ color: "#9B9BA8", fontWeight: 600 }}>Loading...</span>
+            ) : (
+              displayName || "there"
+            )}
           </h1>
           <Link
             href="/inspection/new"

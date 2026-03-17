@@ -71,28 +71,38 @@ export default function RegisterPage() {
 
     const fullPhone = phone ? UAE_PHONE_PREFIX + phone.replace(/\s/g, "") : null;
 
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          agency_name: agencyName,
-          phone: fullPhone,
+    try {
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            agency_name: agencyName,
+            phone: fullPhone,
+          },
         },
-      },
-    });
+      });
 
-    if (signUpError) {
-      setError(signUpError.message);
-      setLoading(false);
-      return;
-    }
+      if (signUpError) {
+        setError(signUpError.message);
+        setLoading(false);
+        return;
+      }
 
-    if (authData.user) {
-      const { data: newCompany, error: companyError } = await supabase
+      if (!authData.user) {
+        setError("Account could not be created. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      // 1. Create company first
+      const { data: company, error: companyError } = await supabase
         .from("companies")
-        .insert({ name: agencyName || null, primary_color: "#9A88FD" })
+        .insert({
+          name: agencyName || null,
+          primary_color: "#9A88FD",
+        })
         .select("id")
         .single();
 
@@ -102,15 +112,24 @@ export default function RegisterPage() {
         return;
       }
 
+      if (!company?.id) {
+        setError("Company could not be created. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Create or update profile with company_id and onboarding_completed
       const { error: profileError } = await supabase
         .from("profiles")
         .upsert(
           {
             id: authData.user.id,
             full_name: fullName || null,
+            email: authData.user.email,
             phone: fullPhone,
             role: "agent",
-            company_id: newCompany?.id ?? null,
+            company_id: company.id,
+            onboarding_completed: true,
           },
           { onConflict: "id" }
         );
@@ -120,14 +139,18 @@ export default function RegisterPage() {
         setLoading(false);
         return;
       }
-    }
 
-    setSuccess(true);
-    setLoading(false);
-    setTimeout(() => {
-      router.push("/dashboard");
-      router.refresh();
-    }, 800);
+      setSuccess(true);
+      setTimeout(() => {
+        router.push("/dashboard");
+        router.refresh();
+      }, 800);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg || "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   const inputClass =

@@ -8,13 +8,30 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
 
   let fullName: string | null = null;
+  let profileLoading = false;
+  let profileNeedsOnboardingFix = false;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("full_name")
+      .select("full_name, onboarding_completed")
       .eq("id", user.id)
       .single();
-    fullName = profile?.full_name ?? null;
+    if (!profile) {
+      profileLoading = true;
+    } else {
+      fullName = profile?.full_name ?? null;
+      if (profile && (profile as { onboarding_completed?: boolean }).onboarding_completed === false) {
+        profileNeedsOnboardingFix = true;
+      }
+    }
+  }
+
+  // One-time fix: set onboarding_completed = true for existing accounts
+  if (user && profileNeedsOnboardingFix) {
+    await supabase
+      .from("profiles")
+      .update({ onboarding_completed: true })
+      .eq("id", user.id);
   }
 
   const displayName =
@@ -192,6 +209,7 @@ export default async function DashboardPage() {
         displayName={displayName}
         fullName={fullName}
         userEmail={user?.email ?? null}
+        profileLoading={profileLoading}
         properties={propertiesData}
         alerts={alerts}
         recentInspections={recentInspections}
