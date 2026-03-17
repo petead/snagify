@@ -69,73 +69,33 @@ export default function RegisterPage() {
     setLoading(true);
     setSuccess(false);
 
-    const fullPhone = phone ? UAE_PHONE_PREFIX + phone.replace(/\s/g, "") : null;
-
     try {
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            agency_name: agencyName,
-            phone: fullPhone,
-          },
-        },
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          fullName: fullName.trim(),
+          accountType: agencyName.trim() ? "pro" : "individual",
+          agencyName: agencyName.trim() || "",
+          primaryColor: "#9A88FD",
+        }),
       });
 
-      if (signUpError) {
-        setError(signUpError.message);
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setError(data.error || "Signup failed");
         setLoading(false);
         return;
       }
 
-      if (!authData.user) {
-        setError("Account could not be created. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      // 1. Create company first
-      const { data: company, error: companyError } = await supabase
-        .from("companies")
-        .insert({
-          name: agencyName || null,
-          primary_color: "#9A88FD",
-        })
-        .select("id")
-        .single();
-
-      if (companyError) {
-        setError(companyError.message);
-        setLoading(false);
-        return;
-      }
-
-      if (!company?.id) {
-        setError("Company could not be created. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      // 2. Create or update profile with company_id and onboarding_completed
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .upsert(
-          {
-            id: authData.user.id,
-            full_name: fullName || null,
-            email: authData.user.email,
-            phone: fullPhone,
-            role: "agent",
-            company_id: company.id,
-            onboarding_completed: true,
-          },
-          { onConflict: "id" }
-        );
-
-      if (profileError) {
-        setError(profileError.message);
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInError) {
+        setError(signInError.message);
         setLoading(false);
         return;
       }

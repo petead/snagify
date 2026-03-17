@@ -76,42 +76,27 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          fullName: fullName.trim(),
+          accountType: accountType ?? "individual",
+          agencyName: accountType === "pro" ? agencyName.trim() : "",
+          primaryColor: accountType === "pro" ? primaryColor : "#9A88FD",
+        }),
+      });
+
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error || "Signup failed");
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: { data: { full_name: fullName.trim() } },
       });
-      if (authError) throw authError;
-      const userId = authData.user?.id;
-      if (!userId) throw new Error("User creation failed");
-
-      const companyName = accountType === "pro" ? agencyName.trim() || fullName.trim() : fullName.trim();
-      const companyColor = accountType === "pro" ? primaryColor : "#9A88FD";
-
-      const { data: company, error: companyError } = await supabase
-        .from("companies")
-        .insert({
-          name: companyName || null,
-          primary_color: companyColor,
-        })
-        .select("id")
-        .single();
-      if (companyError) throw companyError;
-      if (!company?.id) throw new Error("Company could not be created");
-
-      const { error: profileError } = await supabase.from("profiles").upsert(
-        {
-          id: userId,
-          full_name: fullName.trim() || null,
-          email: email,
-          account_type: accountType ?? "individual",
-          company_id: company.id,
-          onboarding_completed: true,
-          role: "agent",
-        },
-        { onConflict: "id" }
-      );
-      if (profileError) throw profileError;
+      if (signInError) throw signInError;
 
       router.push("/dashboard");
       router.refresh();
