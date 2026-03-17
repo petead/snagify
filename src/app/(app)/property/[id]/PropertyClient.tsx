@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
+import { useCredits } from "@/hooks/useCredits";
+import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
 
 type InspectionSignature = {
   signer_type: string;
@@ -116,6 +118,10 @@ function InspectionRow({
   onRollback,
   signatures,
   sourceCheckInId,
+  creditsBalance,
+  creditsPlan,
+  creditsAccountType,
+  refreshCredits,
 }: {
   label: string;
   data: { date: string; status: string } | null;
@@ -130,14 +136,36 @@ function InspectionRow({
   onRollback?: () => void;
   signatures?: InspectionSignature[];
   sourceCheckInId?: string;
+  creditsBalance: number;
+  creditsPlan: string;
+  creditsAccountType: "individual" | "pro";
+  refreshCredits: () => Promise<void>;
 }) {
   const router = useRouter();
   const [preparingCheckOut, setPreparingCheckOut] = useState(false);
+  const [showBuyCredits, setShowBuyCredits] = useState(false);
 
   const handleStart = async () => {
     if (inspectionType === "check-out" && sourceCheckInId) {
       setPreparingCheckOut(true);
       try {
+        const debitRes = await fetch("/api/credits/debit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ inspection_id: null }),
+        });
+        const debitData = (await debitRes.json()) as { error?: string };
+        if (debitRes.status === 402) {
+          setShowBuyCredits(true);
+          setPreparingCheckOut(false);
+          return;
+        }
+        if (!debitRes.ok) {
+          alert(debitData.error || "Something went wrong");
+          setPreparingCheckOut(false);
+          return;
+        }
+
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
@@ -198,6 +226,7 @@ function InspectionRow({
           await supabase.from("rooms").insert(roomsToInsert);
         }
 
+        await refreshCredits();
         router.push(`/inspection/${newInspection.id}`);
       } catch (e) {
         alert(e instanceof Error ? e.message : "Failed to start check-out");
@@ -339,12 +368,27 @@ function InspectionRow({
               opacity: preparingCheckOut ? 0.9 : 1,
             }}
           >
-            {preparingCheckOut ? "Preparing Check-out…" : "Start"}
+            {preparingCheckOut
+              ? "Starting..."
+              : inspectionType === "check-out"
+                ? "Start Check-out"
+                : "Start"}
           </button>
         ) : (
           <span style={{ fontSize: 12, color: "#DDD" }}>—</span>
         )}
       </div>
+      <BuyCreditsModal
+        isOpen={showBuyCredits}
+        onClose={() => setShowBuyCredits(false)}
+        currentBalance={creditsBalance}
+        accountType={creditsAccountType}
+        plan={creditsPlan}
+        onPurchaseSuccess={async () => {
+          await refreshCredits();
+          setShowBuyCredits(false);
+        }}
+      />
     </div>
   );
 }
@@ -354,6 +398,7 @@ export function PropertyClient({
   tenancyGroups: initialTenancyGroups,
   totalInspections,
 }: PropertyClientProps) {
+  const { balance, plan, accountType, refresh: refreshCredits } = useCredits();
   const [loaded, setLoaded] = useState(false);
   const [tenancyGroups, setTenancyGroups] = useState(initialTenancyGroups);
   const groupsRollbackRef = useRef<TenancyGroup[]>([]);
@@ -680,6 +725,10 @@ export function PropertyClient({
                       onRemove={checkIn ? () => removeInspectionFromList(checkIn.id) : undefined}
                       onRollback={rollbackGroups}
                       signatures={checkIn?.signatures}
+                      creditsBalance={balance}
+                      creditsPlan={plan}
+                      creditsAccountType={accountType as "individual" | "pro"}
+                      refreshCredits={refreshCredits}
                     />
                     <div style={{ height: 1, background: "#F0EFEC" }} />
                     <InspectionRow
@@ -696,6 +745,10 @@ export function PropertyClient({
                       onRollback={rollbackGroups}
                       signatures={checkOut?.signatures}
                       sourceCheckInId={checkIn?.id}
+                      creditsBalance={balance}
+                      creditsPlan={plan}
+                      creditsAccountType={accountType as "individual" | "pro"}
+                      refreshCredits={refreshCredits}
                     />
                   </div>
                 </div>

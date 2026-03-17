@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 import { PenLine, AlertTriangle } from "lucide-react";
+import { useCredits } from "@/hooks/useCredits";
+import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
 
 type InspectionRow = {
   id: string;
@@ -110,6 +112,8 @@ export function DashboardClient({
   alerts = [],
   recentInspections: initialRecentInspections = [],
 }: DashboardClientProps) {
+  const { balance, plan, accountType } = useCredits();
+  const [showBuyCredits, setShowBuyCredits] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [properties] = useState(() => normalizeProperties(initialProperties));
@@ -493,7 +497,7 @@ export function DashboardClient({
         </div>
       )}
 
-      {/* 3 Stat Cards */}
+      {/* Stat Cards */}
       <div
         className={loaded ? "fade-up" : ""}
         style={{
@@ -562,6 +566,26 @@ export function DashboardClient({
             ),
             href: "/reports",
           },
+          {
+            label: "Credits",
+            value: String(balance),
+            icon: (
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#9A88FD"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="2" y="6" width="20" height="12" rx="3" />
+                <path d="M2 10h20" />
+                <circle cx="17" cy="14" r="1" />
+              </svg>
+            ),
+          },
         ].map((stat) => {
           const Wrapper = stat.href ? Link : "div";
           return (
@@ -578,6 +602,11 @@ export function DashboardClient({
                 textDecoration: "none",
                 color: "inherit",
               }}
+              onClick={
+                stat.label === "Credits" && balance === 0 && plan === "free"
+                  ? () => setShowBuyCredits(true)
+                  : undefined
+              }
             >
               <div
                 style={{
@@ -615,6 +644,29 @@ export function DashboardClient({
               >
                 {stat.label}
               </p>
+              {stat.label === "Credits" && balance === 0 && plan === "free" && (
+                <button
+                  type="button"
+                  onClick={() => setShowBuyCredits(true)}
+                  style={{
+                    marginTop: 6,
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    fontSize: 11,
+                    color: "#9A88FD",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Buy credits →
+                </button>
+              )}
+              {stat.label === "Credits" && plan !== "free" && (
+                <p style={{ margin: "6px 0 0", fontSize: 11, color: "#9CA3AF", fontWeight: 500 }}>
+                  Resets monthly
+                </p>
+              )}
             </Wrapper>
           );
         })}
@@ -963,6 +1015,13 @@ export function DashboardClient({
           )}
         </div>
       </div>
+      <BuyCreditsModal
+        isOpen={showBuyCredits}
+        onClose={() => setShowBuyCredits(false)}
+        currentBalance={balance}
+        accountType={(accountType as "individual" | "pro") || "individual"}
+        plan={plan}
+      />
     </div>
   );
 }
