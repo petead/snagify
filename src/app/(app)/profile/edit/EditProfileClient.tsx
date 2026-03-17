@@ -16,7 +16,8 @@ type ProfileRow = {
   avatar_url: string | null;
   signature_image_url: string | null;
   company_id: string | null;
-  company?: Company | Company[] | null;
+  account_type?: "individual" | "pro" | null;
+  company?: (Company & { plan?: string | null }) | (Company & { plan?: string | null })[] | null;
 };
 
 interface EditProfileClientProps {
@@ -160,29 +161,36 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
 
   const handleSave = async () => {
     const fullName = form.full_name.trim();
-    const agencyName = form.agency_name.trim();
     if (!fullName) {
-      alert("Full Name is required.");
+      alert("Full name is required.");
       return;
     }
-    if (!agencyName) {
-      alert("Agency Name is required.");
-      return;
+    const isPro = profile?.account_type === "pro";
+    if (isPro) {
+      const agencyName = form.agency_name.trim();
+      if (!agencyName) {
+        alert("Agency name is required.");
+        return;
+      }
     }
     setSaving(true);
     const supabase = createClient();
 
+    const profilePayload: Record<string, unknown> = {
+      full_name: fullName || null,
+      phone: form.phone.trim() || null,
+      whatsapp_number: form.whatsapp_number.trim() || null,
+      avatar_url: avatarUrl,
+    };
+    if (isPro) {
+      profilePayload.job_title = form.job_title.trim() || null;
+      profilePayload.rera_number = form.rera_number.trim() || null;
+      profilePayload.signature_image_url = signatureImageUrl;
+    }
+
     const { error: profileError } = await supabase
       .from("profiles")
-      .update({
-        full_name: fullName || null,
-        job_title: form.job_title.trim() || null,
-        phone: form.phone.trim() || null,
-        whatsapp_number: form.whatsapp_number.trim() || null,
-        rera_number: form.rera_number.trim() || null,
-        avatar_url: avatarUrl,
-        signature_image_url: signatureImageUrl,
-      })
+      .update(profilePayload)
       .eq("id", userId);
 
     if (profileError) {
@@ -191,39 +199,24 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
       return;
     }
 
-    const primaryColor = form.company_primary_color.trim() || "#9A88FD";
-    const companyPayload = {
-      name: agencyName || null,
-      primary_color: primaryColor,
-      logo_url: companyLogoUrl,
-      website: form.company_website.trim() || null,
-      address: form.company_address.trim() || null,
-      trade_license: form.company_trade_license.trim() || null,
-    };
-
-    if (companyId) {
+    if (isPro && companyId) {
+      const primaryColor = form.company_primary_color.trim() || "#9A88FD";
       const { error: companyError } = await supabase
         .from("companies")
-        .update(companyPayload)
+        .update({
+          name: form.agency_name.trim() || null,
+          primary_color: primaryColor,
+          logo_url: companyLogoUrl,
+          website: form.company_website.trim() || null,
+          address: form.company_address.trim() || null,
+          trade_license: form.company_trade_license.trim() || null,
+        })
         .eq("id", companyId);
       if (companyError) {
         setSaving(false);
         alert(companyError.message);
         return;
       }
-    } else {
-      const { data: newCompany, error: insertError } = await supabase
-        .from("companies")
-        .insert(companyPayload)
-        .select("id")
-        .single();
-      if (insertError) {
-        setSaving(false);
-        alert(insertError.message);
-        return;
-      }
-      await supabase.from("profiles").update({ company_id: newCompany.id }).eq("id", userId);
-      setCompanyId(newCompany.id);
     }
 
     setSaving(false);
@@ -238,6 +231,14 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
     );
   }
 
+  const isPro = profile?.account_type === "pro";
+  const isIndividual = !isPro;
+  const company = profile?.company
+    ? Array.isArray(profile.company)
+      ? profile.company[0]
+      : profile.company
+    : null;
+  const planName = (company as { plan?: string | null })?.plan ?? "Free plan";
   const initials = getInitials((form.full_name || profile?.full_name) ?? null, userEmail);
 
   return (
@@ -374,12 +375,38 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
           >
             Change Photo
           </button>
+          {/* Account type badge */}
+          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+            <span
+              style={{
+                display: "inline-block",
+                padding: "4px 10px",
+                borderRadius: 100,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: 0.3,
+                ...(isPro
+                  ? { background: "#EDE9FF", color: "#6D28D9" }
+                  : { background: "#F3F4F6", color: "#6B7280" }),
+              }}
+            >
+              {isPro ? `Pro · ${planName}` : "Property Owner"}
+            </span>
+            {isIndividual && (
+              <Link
+                href="/settings/billing"
+                style={{ fontSize: 12, fontWeight: 600, color: "#9A88FD", textDecoration: "none" }}
+              >
+                Switch to Pro account →
+              </Link>
+            )}
+          </div>
         </div>
 
-        {/* ─── SECTION A: Your Profile ─── */}
+        {/* ─── SECTION: YOUR PROFILE ─── */}
         <div style={{ marginBottom: 20 }}>
-          <p style={{ ...sectionLabelStyle, marginBottom: 8 }}>Your Profile</p>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+          <p style={{ ...sectionLabelStyle, marginBottom: 8 }}>YOUR PROFILE</p>
+          <div style={{ background: "#fff", borderRadius: 12, padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>Full Name *</label>
@@ -392,16 +419,18 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
                   required
                 />
               </div>
-              <div>
-                <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>Job Title</label>
-                <input
-                  type="text"
-                  value={form.job_title}
-                  onChange={(e) => setForm((f) => ({ ...f, job_title: e.target.value }))}
-                  style={inputStyle}
-                  placeholder="Property Agent"
-                />
-              </div>
+              {isPro && (
+                <div>
+                  <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>Job Title</label>
+                  <input
+                    type="text"
+                    value={form.job_title}
+                    onChange={(e) => setForm((f) => ({ ...f, job_title: e.target.value }))}
+                    style={inputStyle}
+                    placeholder="Property Inspector"
+                  />
+                </div>
+              )}
               <div>
                 <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>Phone</label>
                 <input
@@ -413,7 +442,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
                 />
               </div>
               <div>
-                <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>WhatsApp</label>
+                <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>WhatsApp number</label>
                 <input
                   type="tel"
                   value={form.whatsapp_number}
@@ -421,155 +450,170 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
                   style={inputStyle}
                   placeholder="+971 50 000 0000"
                 />
-                <p style={{ fontSize: 10, color: "#999", marginTop: 4, marginBottom: 0 }}>Used to share reports</p>
+                <p style={{ fontSize: 10, color: "#999", marginTop: 4, marginBottom: 0 }}>
+                  Used to share inspection reports
+                </p>
               </div>
-              <div>
-                <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>RERA Number</label>
-                <input
-                  type="text"
-                  value={form.rera_number}
-                  onChange={(e) => setForm((f) => ({ ...f, rera_number: e.target.value }))}
-                  style={inputStyle}
-                  placeholder="RERA License No."
-                />
-                <p style={{ fontSize: 10, color: "#999", marginTop: 4, marginBottom: 0 }}>Your Dubai real estate license</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ─── SECTION B: Agency Settings ─── */}
-        <div style={{ marginBottom: 20 }}>
-          <p style={{ ...sectionLabelStyle, marginBottom: 4 }}>Agency Settings</p>
-          <p style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
-            This branding will appear on all your inspection reports
-          </p>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ ...sectionLabelStyle, marginBottom: 8, display: "block" }}>Agency Name *</label>
-              <input
-                type="text"
-                value={form.agency_name}
-                onChange={(e) => setForm((f) => ({ ...f, agency_name: e.target.value }))}
-                style={inputStyle}
-                placeholder="Your agency"
-                required
-              />
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ ...sectionLabelStyle, marginBottom: 8, display: "block" }}>Primary Color</label>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <input
-                  type="color"
-                  value={form.company_primary_color}
-                  onChange={(e) => setForm((f) => ({ ...f, company_primary_color: e.target.value }))}
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 12,
-                    border: "2px solid #e8e8e8",
-                    padding: 2,
-                    cursor: "pointer",
-                    background: "transparent",
-                  }}
-                />
-                <input
-                  type="text"
-                  value={form.company_primary_color}
-                  onChange={(e) => setForm((f) => ({ ...f, company_primary_color: e.target.value }))}
-                  style={{ ...inputStyle, flex: 1, fontFamily: "monospace" }}
-                  placeholder="#9A88FD"
-                />
-              </div>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ ...sectionLabelStyle, marginBottom: 8, display: "block" }}>Logo</label>
-              <button
-                type="button"
-                onClick={() => logoInputRef.current?.click()}
-                disabled={!!uploading}
-                style={{
-                  width: "100%",
-                  height: 80,
-                  borderRadius: 12,
-                  border: "2px dashed #e0e0e0",
-                  background: companyLogoUrl ? "transparent" : "#fafafa",
-                  cursor: uploading === "company-logo" ? "wait" : "pointer",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  overflow: "hidden",
-                  padding: 8,
-                }}
-              >
-                {uploading === "company-logo" ? (
-                  <span style={{ fontSize: 13, color: "#999" }}>Uploading…</span>
-                ) : companyLogoUrl ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={companyLogoUrl} alt="Logo" style={{ maxHeight: 64, maxWidth: "100%", objectFit: "contain" }} />
-                ) : (
-                  <>
-                    <span style={{ fontSize: 13, color: "#666", marginBottom: 2 }}>📎 Tap to upload your logo</span>
-                    <span style={{ fontSize: 11, color: "#999" }}>PNG or JPG · Used in PDF reports</span>
-                  </>
-                )}
-              </button>
-              {companyLogoUrl && (
-                <button
-                  type="button"
-                  onClick={() => setCompanyLogoUrl(null)}
-                  style={{
-                    marginTop: 6,
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    fontSize: 12,
-                    color: "#dc2626",
-                    fontWeight: 600,
-                  }}
-                >
-                  Remove
-                </button>
+              {isPro && (
+                <div>
+                  <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>RERA number</label>
+                  <input
+                    type="text"
+                    value={form.rera_number}
+                    onChange={(e) => setForm((f) => ({ ...f, rera_number: e.target.value }))}
+                    style={inputStyle}
+                    placeholder="RERA License No."
+                  />
+                  <p style={{ fontSize: 10, color: "#999", marginTop: 4, marginBottom: 0 }}>
+                    Your Dubai real estate license
+                  </p>
+                </div>
               )}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div>
-                <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>Website</label>
-                <input
-                  type="url"
-                  value={form.company_website}
-                  onChange={(e) => setForm((f) => ({ ...f, company_website: e.target.value }))}
-                  style={inputStyle}
-                  placeholder="https://yourcompany.com"
-                />
-              </div>
-              <div>
-                <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>Address</label>
-                <input
-                  type="text"
-                  value={form.company_address}
-                  onChange={(e) => setForm((f) => ({ ...f, company_address: e.target.value }))}
-                  style={inputStyle}
-                  placeholder="Dubai, UAE"
-                />
-              </div>
-              <div>
-                <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>Trade License</label>
-                <input
-                  type="text"
-                  value={form.company_trade_license}
-                  onChange={(e) => setForm((f) => ({ ...f, company_trade_license: e.target.value }))}
-                  style={inputStyle}
-                  placeholder="DED Trade License No."
-                />
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* ─── SIGNATURE (collapsible) ─── */}
+        {/* ─── SECTION: AGENCY SETTINGS (Pro only) ─── */}
+        {isPro && (
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ ...sectionLabelStyle, marginBottom: 4 }}>AGENCY SETTINGS</p>
+            <p style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
+              This branding will appear on all your inspection reports
+            </p>
+            <div style={{ background: "#fff", borderRadius: 12, padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ ...sectionLabelStyle, marginBottom: 8, display: "block" }}>Agency name *</label>
+                <input
+                  type="text"
+                  value={form.agency_name}
+                  onChange={(e) => setForm((f) => ({ ...f, agency_name: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="MULKEEF Real Estate"
+                  required
+                />
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ ...sectionLabelStyle, marginBottom: 8, display: "block" }}>Primary color</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input
+                    type="color"
+                    value={form.company_primary_color}
+                    onChange={(e) => setForm((f) => ({ ...f, company_primary_color: e.target.value }))}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 12,
+                      border: "2px solid #e8e8e8",
+                      padding: 2,
+                      cursor: "pointer",
+                      background: "transparent",
+                    }}
+                  />
+                  <input
+                    type="text"
+                    value={form.company_primary_color}
+                    onChange={(e) => setForm((f) => ({ ...f, company_primary_color: e.target.value }))}
+                    style={{ ...inputStyle, flex: 1, fontFamily: "monospace" }}
+                    placeholder="#9A88FD"
+                  />
+                </div>
+                <p style={{ fontSize: 10, color: "#999", marginTop: 4, marginBottom: 0 }}>
+                  Used on PDF report headers
+                </p>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ ...sectionLabelStyle, marginBottom: 8, display: "block" }}>Logo</label>
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={!!uploading}
+                  style={{
+                    width: "100%",
+                    height: 80,
+                    borderRadius: 12,
+                    border: "2px dashed #e0e0e0",
+                    background: companyLogoUrl ? "transparent" : "#fafafa",
+                    cursor: uploading === "company-logo" ? "wait" : "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                    padding: 8,
+                  }}
+                >
+                  {uploading === "company-logo" ? (
+                    <span style={{ fontSize: 13, color: "#999" }}>Uploading…</span>
+                  ) : companyLogoUrl ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={companyLogoUrl} alt="Logo" style={{ maxHeight: 64, maxWidth: "100%", objectFit: "contain" }} />
+                      <span style={{ fontSize: 12, color: "#9A88FD", fontWeight: 600, marginTop: 4 }}>Change</span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: 13, color: "#666", marginBottom: 2 }}>Tap to upload your logo</span>
+                      <span style={{ fontSize: 11, color: "#999" }}>PNG or JPG · Max 2MB · Used in PDF reports</span>
+                    </>
+                  )}
+                </button>
+                {companyLogoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setCompanyLogoUrl(null)}
+                    style={{
+                      marginTop: 6,
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      fontSize: 12,
+                      color: "#dc2626",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div>
+                  <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>Website</label>
+                  <input
+                    type="url"
+                    value={form.company_website}
+                    onChange={(e) => setForm((f) => ({ ...f, company_website: e.target.value }))}
+                    style={inputStyle}
+                    placeholder="https://yourcompany.com"
+                  />
+                </div>
+                <div>
+                  <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>Address</label>
+                  <input
+                    type="text"
+                    value={form.company_address}
+                    onChange={(e) => setForm((f) => ({ ...f, company_address: e.target.value }))}
+                    style={inputStyle}
+                    placeholder="Dubai, UAE"
+                  />
+                </div>
+                <div>
+                  <label style={{ ...sectionLabelStyle, marginBottom: 6, display: "block" }}>Trade license</label>
+                  <input
+                    type="text"
+                    value={form.company_trade_license}
+                    onChange={(e) => setForm((f) => ({ ...f, company_trade_license: e.target.value }))}
+                    style={inputStyle}
+                    placeholder="DED Trade License No."
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── INSPECTOR SIGNATURE (Pro only, collapsible) ─── */}
+        {isPro && (
         <div style={{ marginBottom: 20 }}>
           <button
             type="button"
@@ -655,6 +699,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Sticky Save button */}
