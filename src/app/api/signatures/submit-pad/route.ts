@@ -59,22 +59,26 @@ export async function POST(req: NextRequest) {
     notifyAllPartiesSigned(inspectionId),
   ]).catch((err) => console.error('[Push] signature notification error:', err))
 
-  // Check if all parties have signed → update inspection status
+  // Fetch ALL signatures for this inspection
   const { data: allSigs } = await supabaseAdmin
     .from('signatures')
-    .select('signed_at, signer_type')
+    .select('signer_type, signed_at, signature_data')
     .eq('inspection_id', inspectionId)
 
-  // Check if ALL REQUIRED parties (landlord + tenant) have signed
-  // Inspector does not sign — filter to only required signer types
-  const requiredSignerTypes = ['landlord', 'tenant']
-  const requiredSigs = allSigs?.filter(
-    s => requiredSignerTypes.includes(s.signer_type)
-  ) || []
+  // Required parties: landlord AND tenant must BOTH exist AND be signed
+  // Inspector does not sign
+  const landlordSig = allSigs?.find(s => s.signer_type === 'landlord')
+  const tenantSig = allSigs?.find(s => s.signer_type === 'tenant')
 
+  // allSigned = true ONLY when:
+  // 1. Both landlord and tenant signature ROWS exist in DB
+  // 2. Both have a non-null signed_at
+  // 3. Both have non-null signature_data (pad was actually submitted)
   const allSigned =
-    requiredSigs.length >= 2 &&
-    requiredSigs.every(s => s.signed_at != null)
+    !!landlordSig?.signed_at &&
+    !!landlordSig?.signature_data &&
+    !!tenantSig?.signed_at &&
+    !!tenantSig?.signature_data
 
   if (allSigned) {
     const now = new Date().toISOString()

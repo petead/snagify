@@ -81,14 +81,21 @@ export async function notifyAllPartiesSigned(inspectionId: string) {
   try {
     const { data: allSigs } = await supabase
       .from('signatures')
-      .select('id, signed_at, signer_type')
+      .select('id, signed_at, signer_type, signature_data')
       .eq('inspection_id', inspectionId);
 
     if (!allSigs?.length) return;
     
-    const requiredSignerTypes = ['landlord', 'tenant'];
-    const requiredSigs = allSigs.filter(s => requiredSignerTypes.includes(s.signer_type));
-    const allSigned = requiredSigs.length >= 2 && requiredSigs.every((s) => !!s.signed_at);
+    // Explicit check: BOTH landlord AND tenant must exist and have signed
+    const landlordSig = allSigs.find(s => s.signer_type === 'landlord');
+    const tenantSig = allSigs.find(s => s.signer_type === 'tenant');
+    
+    const allSigned =
+      !!landlordSig?.signed_at &&
+      !!landlordSig?.signature_data &&
+      !!tenantSig?.signed_at &&
+      !!tenantSig?.signature_data;
+    
     if (!allSigned) return;
 
     const inspection = await getInspectionContext(inspectionId);

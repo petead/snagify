@@ -103,21 +103,44 @@ export default async function DashboardPage() {
       const daysLeft = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       return daysLeft <= 30 && daysLeft >= 0;
     });
+    // Fetch inspections that have a report but aren't fully signed yet
     const { data: pendingSignature } = await supabase
       .from("inspections")
       .select("id, property_id, property(building_name, unit_number)")
       .eq("agent_id", user.id)
-      .eq("status", "completed");
+      .not("report_url", "is", null)
+      .neq("status", "signed");
     const pendingList = pendingSignature ?? [];
-    const signedInspectionIds = new Set<string>();
+    
+    // For alerts, we want inspections where at least one party hasn't signed
+    // Fetch all signatures for these inspections to determine truly pending
+    const fullySignedInspectionIds = new Set<string>();
     if (pendingList.length > 0) {
+      const inspectionIds = pendingList.map((i: { id: string }) => i.id);
       const { data: sigs } = await supabase
         .from("signatures")
-        .select("inspection_id")
-        .not("signed_at", "is", null);
-      (sigs ?? []).forEach((s: { inspection_id: string }) => signedInspectionIds.add(s.inspection_id));
+        .select("inspection_id, signer_type, signed_at")
+        .in("inspection_id", inspectionIds);
+      
+      // Group signatures by inspection and check if BOTH landlord AND tenant signed
+      const sigsByInspection = new Map<string, { landlord?: boolean; tenant?: boolean }>();
+      (sigs ?? []).forEach((s: { inspection_id: string; signer_type: string; signed_at: string | null }) => {
+        if (!sigsByInspection.has(s.inspection_id)) {
+          sigsByInspection.set(s.inspection_id, {});
+        }
+        const entry = sigsByInspection.get(s.inspection_id)!;
+        if (s.signer_type === 'landlord' && s.signed_at) entry.landlord = true;
+        if (s.signer_type === 'tenant' && s.signed_at) entry.tenant = true;
+      });
+      
+      // Only mark as fully signed if BOTH parties have signed
+      sigsByInspection.forEach((entry, inspId) => {
+        if (entry.landlord && entry.tenant) {
+          fullySignedInspectionIds.add(inspId);
+        }
+      });
     }
-    const trulyPending = pendingList.filter((i: { id: string }) => !signedInspectionIds.has(i.id));
+    const trulyPending = pendingList.filter((i: { id: string }) => !fullySignedInspectionIds.has(i.id));
 
     const propObj = (x: unknown): { building_name?: string | null; unit_number?: string | null } | null => {
       if (x == null) return null;

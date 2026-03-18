@@ -45,8 +45,15 @@ function tenantInitials(name: string | null | undefined): string {
 }
 
 function isSigned(report: ReportRow): boolean {
+  // Fully signed = status is 'signed' AND both landlord + tenant have signed
   if (report.status === "signed") return true;
-  return (report.signatures ?? []).some((s) => !!s.signed_at);
+  
+  // Also check signatures directly: BOTH landlord AND tenant must have signed_at
+  const sigs = report.signatures ?? [];
+  const landlordSig = sigs.find(s => s.signer_type === 'landlord');
+  const tenantSig = sigs.find(s => s.signer_type === 'tenant');
+  
+  return !!landlordSig?.signed_at && !!tenantSig?.signed_at;
 }
 
 function formatDate(dateStr: string): string {
