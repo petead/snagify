@@ -34,9 +34,9 @@ export async function DELETE(request: Request) {
     otp_verified: boolean;
     signed_at: string | null;
   }[];
-  const signedCount = sigs.filter((s) => s.otp_verified).length;
+  const signedCount = sigs.filter((s) => !!s.signed_at).length;
   if (signedCount > 0) {
-    const signerName = sigs.find((s) => s.otp_verified)?.signer_type;
+    const signerName = sigs.find((s) => !!s.signed_at)?.signer_type;
     return Response.json(
       { error: "SIGNED", signerType: signerName, signedCount },
       { status: 403 }

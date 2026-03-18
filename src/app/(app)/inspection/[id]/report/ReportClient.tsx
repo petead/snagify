@@ -256,8 +256,8 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   const signatures = inspection.signatures ?? [];
   const landlordSig = signatures.find((s) => s.signer_type === "landlord");
   const tenantSig = signatures.find((s) => s.signer_type === "tenant");
-  const landlordSigned = !!(landlordSig?.otp_verified || landlordSig?.signed_at);
-  const tenantSigned = !!(tenantSig?.otp_verified || tenantSig?.signed_at);
+  const landlordSigned = !!landlordSig?.signed_at;
+  const tenantSigned = !!tenantSig?.signed_at;
   const bothSigned = landlordSigned && tenantSigned;
   const isCheckIn = (inspection.type ?? "").toLowerCase().includes("check-in") || (inspection.type ?? "").toLowerCase() === "check_in";
   const typeLabel = isCheckIn ? "Check-in" : "Check-out";
@@ -955,7 +955,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
         <Section delay="0.46s" loaded={loaded} icon={iconSign} title="Signatures">
           {(["landlord", "tenant"] as const).map((type, i) => {
             const sig = signatures.find((s) => s.signer_type === type);
-            const signed = !!(sig?.otp_verified ?? sig?.signed_at);
+            const signed = !!sig?.signed_at;
             return (
               <div
                 key={type}

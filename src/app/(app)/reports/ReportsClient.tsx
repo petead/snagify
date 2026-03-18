@@ -46,7 +46,7 @@ function tenantInitials(name: string | null | undefined): string {
 
 function isSigned(report: ReportRow): boolean {
   if (report.status === "signed") return true;
-  return (report.signatures ?? []).some((s) => s.otp_verified || !!s.signed_at);
+  return (report.signatures ?? []).some((s) => !!s.signed_at);
 }
 
 function formatDate(dateStr: string): string {

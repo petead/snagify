@@ -252,7 +252,7 @@ export default function DeleteInspectionButton({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [modal]);
 
-  const signedSigs = signatures.filter((s) => s.otp_verified);
+  const signedSigs = signatures.filter((s) => !!s.signed_at);
   const isSignedLocally = signedSigs.length > 0 || status === "signed";
 
   const handlePress = () => {

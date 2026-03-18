@@ -53,10 +53,10 @@ export async function POST(request: Request) {
   // Check if both signed
   const { data: allSigs } = await supabase
     .from("signatures")
-    .select("signer_type, otp_verified")
+    .select("signer_type, signed_at")
     .eq("inspection_id", inspectionId);
 
-  const bothSigned = allSigs?.every((s) => s.otp_verified) ?? false;
+  const bothSigned = allSigs?.every((s) => !!s.signed_at) ?? false;
 
   if (bothSigned) {
     await supabase
