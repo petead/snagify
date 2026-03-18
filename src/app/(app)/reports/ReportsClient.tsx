@@ -346,9 +346,6 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                 : pending
                   ? "#EEEDE9"
                   : "rgba(254,222,128,0.3)";
-              const iconColor = signed ? "#9A88FD" : "#BBB";
-              const iconBg = signed ? "rgba(154,136,253,0.1)" : "#EEEDE9";
-
               return (
                 <div
                   key={report.id}
@@ -369,17 +366,50 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                     <div
                       style={{
                         width: 50, height: 50, borderRadius: 15,
-                        background: iconBg,
+                        background: "#EDE9FF",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         flexShrink: 0,
                       }}
                     >
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="1.8" strokeLinecap="round">
-                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                        <line x1="16" y1="13" x2="8" y2="13" />
-                        <line x1="16" y1="17" x2="8" y2="17" />
-                      </svg>
+                      {report.type === "check-in" ? (
+                        // Arrow entering — check-in
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"
+                            stroke="#9A88FD" strokeWidth="1.8"
+                            strokeLinecap="round" strokeLinejoin="round"
+                          />
+                          <path
+                            d="M10 17l5-5-5-5"
+                            stroke="#9A88FD" strokeWidth="1.8"
+                            strokeLinecap="round" strokeLinejoin="round"
+                          />
+                          <path
+                            d="M15 12H3"
+                            stroke="#9A88FD" strokeWidth="1.8"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      ) : (
+                        // Arrow leaving — check-out
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"
+                            stroke="#9A88FD" strokeWidth="1.8"
+                            strokeLinecap="round" strokeLinejoin="round"
+                          />
+                          <path
+                            d="M16 17l5-5-5-5"
+                            stroke="#9A88FD" strokeWidth="1.8"
+                            strokeLinecap="round" strokeLinejoin="round"
+                          />
+                          <path
+                            d="M21 12H9"
+                            stroke="#9A88FD" strokeWidth="1.8"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      )}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
