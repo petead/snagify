@@ -53,9 +53,11 @@ export function CheckoutReportView({
   tenancy,
   signatures,
 }: Props) {
+  const hasCheckinData = checkinData !== null
+
   const stats = useMemo(
-    () => getComparisonStats(checkinData, inspection),
-    [checkinData, inspection]
+    () => hasCheckinData ? getComparisonStats(checkinData, inspection) : null,
+    [checkinData, inspection, hasCheckinData]
   )
 
   const keyDelta = useMemo(
@@ -148,7 +150,10 @@ export function CheckoutReportView({
   const property = inspection.property
 
   return (
-    <div className="pb-32">
+    <div
+      className="min-h-screen bg-[#F3F2EF]"
+      style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom) + 150px)' }}
+    >
       {/* ── HERO — identical structure to check-in ── */}
       <div className="mx-4 mt-4 rounded-3xl bg-[#1A1A2E] px-5 pt-5 pb-7 relative overflow-hidden">
         {/* Deco circles — same as check-in */}
@@ -260,72 +265,107 @@ export function CheckoutReportView({
             <span className="text-[14px] font-bold text-[#1A1A2E]">Check-in vs Check-out</span>
           </div>
 
-          {/* Two column cards */}
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            {/* Check-in */}
-            <div className="bg-[#F8F7F4] rounded-xl p-3">
-              <div className="text-[10px] font-bold text-[#9B9BA8] uppercase tracking-wide mb-2">
-                Check-in
-              </div>
-              {[
-                { label: 'Photos', val: stats.ciPhotos },
-                { label: 'Issues', val: stats.ciIssues },
-                { label: 'Rooms', val: stats.ciRooms },
-              ].map(row => (
-                <div key={row.label} className="flex justify-between items-center mb-1">
-                  <span className="text-[12px] text-[#6B7280]">{row.label}</span>
-                  <span className="text-[12px] font-bold text-[#1A1A2E]">{row.val}</span>
+          {!hasCheckinData ? (
+            /* Skeleton loader when checkinData is not available */
+            <div className="animate-pulse">
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="bg-[#F8F7F4] rounded-xl p-3">
+                  <div className="h-3 bg-gray-200 rounded w-16 mb-3" />
+                  <div className="space-y-2">
+                    <div className="h-3 bg-gray-200 rounded w-full" />
+                    <div className="h-3 bg-gray-200 rounded w-full" />
+                    <div className="h-3 bg-gray-200 rounded w-full" />
+                  </div>
                 </div>
-              ))}
+                <div className="bg-[#EDE9FF]/30 rounded-xl p-3 border border-[#EDE9FF]">
+                  <div className="h-3 bg-[#EDE9FF] rounded w-16 mb-3" />
+                  <div className="space-y-2">
+                    <div className="h-3 bg-[#EDE9FF] rounded w-full" />
+                    <div className="h-3 bg-[#EDE9FF] rounded w-full" />
+                    <div className="h-3 bg-[#EDE9FF] rounded w-full" />
+                  </div>
+                </div>
+              </div>
+              <div className="bg-[#FEF3C7] rounded-xl p-3 flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+                  <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                    stroke="#D97706" strokeWidth="1.8" strokeLinecap="round"/>
+                </svg>
+                <span className="text-[12px] text-[#92400E] font-medium">
+                  No check-in report found for this property
+                </span>
+              </div>
             </div>
+          ) : stats && (
+            <>
+              {/* Two column cards */}
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {/* Check-in */}
+                <div className="bg-[#F8F7F4] rounded-xl p-3">
+                  <div className="text-[10px] font-bold text-[#9B9BA8] uppercase tracking-wide mb-2">
+                    Check-in
+                  </div>
+                  {[
+                    { label: 'Photos', val: stats.ciPhotos },
+                    { label: 'Issues', val: stats.ciIssues },
+                    { label: 'Rooms', val: stats.ciRooms },
+                  ].map(row => (
+                    <div key={row.label} className="flex justify-between items-center mb-1">
+                      <span className="text-[12px] text-[#6B7280]">{row.label}</span>
+                      <span className="text-[12px] font-bold text-[#1A1A2E]">{row.val}</span>
+                    </div>
+                  ))}
+                </div>
 
-            {/* Check-out */}
-            <div className="bg-[#EDE9FF]/30 rounded-xl p-3 border border-[#EDE9FF]">
-              <div className="text-[10px] font-bold text-[#9A88FD] uppercase tracking-wide mb-2">
-                Check-out
-              </div>
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[12px] text-[#6B7280]">Photos</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-[12px] font-bold text-[#1A1A2E]">{stats.coPhotos}</span>
-                  <DeltaBadge delta={stats.photoDelta} />
+                {/* Check-out */}
+                <div className="bg-[#EDE9FF]/30 rounded-xl p-3 border border-[#EDE9FF]">
+                  <div className="text-[10px] font-bold text-[#9A88FD] uppercase tracking-wide mb-2">
+                    Check-out
+                  </div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[12px] text-[#6B7280]">Photos</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[12px] font-bold text-[#1A1A2E]">{stats.coPhotos}</span>
+                      <DeltaBadge delta={stats.photoDelta} />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[12px] text-[#6B7280]">Issues</span>
+                    <div className="flex items-center gap-1">
+                      <span
+                        className={`text-[12px] font-bold ${
+                          stats.issueDelta > 0 ? 'text-red-600' : 'text-[#1A1A2E]'
+                        }`}
+                      >
+                        {stats.coIssues}
+                      </span>
+                      <DeltaBadge delta={stats.issueDelta} invert />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[12px] text-[#6B7280]">Rooms</span>
+                    <span className="text-[12px] font-bold text-[#16A34A]">{stats.coRooms}</span>
+                  </div>
                 </div>
               </div>
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[12px] text-[#6B7280]">Issues</span>
-                <div className="flex items-center gap-1">
-                  <span
-                    className={`text-[12px] font-bold ${
-                      stats.issueDelta > 0 ? 'text-red-600' : 'text-[#1A1A2E]'
-                    }`}
-                  >
-                    {stats.coIssues}
-                  </span>
-                  <DeltaBadge delta={stats.issueDelta} invert />
-                </div>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-[12px] text-[#6B7280]">Rooms</span>
-                <span className="text-[12px] font-bold text-[#16A34A]">{stats.coRooms}</span>
-              </div>
-            </div>
-          </div>
 
-          {/* AI delta summary */}
-          {inspection.executive_summary && (
-            <div className="bg-[#F8F7F4] rounded-xl p-3 flex gap-2">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-shrink-0 mt-0.5">
-                <path
-                  d="M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707M12 21v-1M6.343 17.657l-.707.707M17.657 17.657l.707.707M9.663 17h4.673"
-                  stroke="#9A88FD"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <p className="text-[12px] text-[#6B7280] leading-relaxed">
-                {inspection.executive_summary}
-              </p>
-            </div>
+              {/* AI delta summary */}
+              {inspection.executive_summary && (
+                <div className="bg-[#F8F7F4] rounded-xl p-3 flex gap-2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-shrink-0 mt-0.5">
+                    <path
+                      d="M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707M12 21v-1M6.343 17.657l-.707.707M17.657 17.657l.707.707M9.663 17h4.673"
+                      stroke="#9A88FD"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <p className="text-[12px] text-[#6B7280] leading-relaxed">
+                    {inspection.executive_summary}
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -341,16 +381,18 @@ export function CheckoutReportView({
               />
               <path d="M9 20v-6h6v6" stroke="#9A88FD" strokeWidth="1.8" strokeLinejoin="round" />
             </svg>
-            <span className="text-[14px] font-bold text-[#1A1A2E]">Room Comparison</span>
+            <span className="text-[14px] font-bold text-[#1A1A2E]">
+              {hasCheckinData ? 'Room Comparison' : 'Rooms'}
+            </span>
           </div>
 
           {inspection.rooms?.map(room => {
-            const ciRoom = findCheckinRoom(checkinData?.rooms, room.name)
+            const ciRoom = hasCheckinData ? findCheckinRoom(checkinData?.rooms, room.name) : null
             const ciPhotos = ciRoom?.photos?.length ?? 0
             const coPhotos = room.photos?.length ?? 0
             const ciIssues = countIssues(ciRoom?.photos ?? [])
             const coIssues = countIssues(room.photos ?? [])
-            const verdict = getRoomVerdict(ciIssues, coIssues)
+            const verdict = hasCheckinData ? getRoomVerdict(ciIssues, coIssues) : { label: '—', color: '#6B7280', bg: '#F3F3F8' }
 
             const ciPhoto = ciRoom?.photos?.[0]
             const coPhoto = room.photos?.[0]
@@ -366,12 +408,14 @@ export function CheckoutReportView({
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[14px] font-bold text-[#1A1A2E]">{room.name}</span>
-                    <span
-                      className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: verdict.bg, color: verdict.color }}
-                    >
-                      {verdict.label}
-                    </span>
+                    {hasCheckinData && (
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                        style={{ background: verdict.bg, color: verdict.color }}
+                      >
+                        {verdict.label}
+                      </span>
+                    )}
                   </div>
 
                   {/* Stats chips */}
@@ -382,35 +426,44 @@ export function CheckoutReportView({
                         <circle cx="12" cy="12" r="3" stroke="#6B7280" strokeWidth="1.8" />
                       </svg>
                       <span className="text-[11px] text-[#6B7280] font-medium">
-                        {ciPhotos} → {coPhotos} photos
+                        {hasCheckinData ? `${ciPhotos} → ${coPhotos} photos` : `${coPhotos} photos`}
                       </span>
                     </div>
                     <div
                       className={`flex items-center gap-1 rounded-lg px-2 py-1 ${
-                        coIssues > ciIssues
-                          ? 'bg-[#FEE2E2]'
-                          : coIssues < ciIssues
-                            ? 'bg-[#DCFCE7]'
-                            : 'bg-[#F3F3F8]'
+                        hasCheckinData
+                          ? coIssues > ciIssues
+                            ? 'bg-[#FEE2E2]'
+                            : coIssues < ciIssues
+                              ? 'bg-[#DCFCE7]'
+                              : 'bg-[#F3F3F8]'
+                          : coIssues > 0
+                            ? 'bg-[#FEE2E2]'
+                            : 'bg-[#DCFCE7]'
                       }`}
                     >
                       <span
                         className={`text-[11px] font-medium ${
-                          coIssues > ciIssues
-                            ? 'text-[#DC2626]'
-                            : coIssues < ciIssues
-                              ? 'text-[#16A34A]'
-                              : 'text-[#6B7280]'
+                          hasCheckinData
+                            ? coIssues > ciIssues
+                              ? 'text-[#DC2626]'
+                              : coIssues < ciIssues
+                                ? 'text-[#16A34A]'
+                                : 'text-[#6B7280]'
+                            : coIssues > 0
+                              ? 'text-[#DC2626]'
+                              : 'text-[#16A34A]'
                         }`}
                       >
-                        {coIssues > ciIssues ? '⚠' : coIssues < ciIssues ? '✓' : '='} Issues: {ciIssues}{' '}
-                        → {coIssues}
+                        {hasCheckinData
+                          ? `${coIssues > ciIssues ? '⚠' : coIssues < ciIssues ? '✓' : '='} Issues: ${ciIssues} → ${coIssues}`
+                          : `${coIssues > 0 ? '⚠' : '✓'} ${coIssues} issues`}
                       </span>
                     </div>
                   </div>
 
-                  {/* Photo side-by-side */}
-                  {(ciPhoto || coPhoto) && (
+                  {/* Photo side-by-side (only show comparison if checkin data exists) */}
+                  {hasCheckinData && (ciPhoto || coPhoto) && (
                     <div className="flex items-center gap-2">
                       <div className="text-[9px] text-[#9B9BA8] w-8">Entry</div>
                       {ciPhoto ? (
@@ -454,6 +507,20 @@ export function CheckoutReportView({
                             ? 'New damage'
                             : 'No change'}
                       </span>
+                    </div>
+                  )}
+
+                  {/* Show just checkout photo if no checkin data */}
+                  {!hasCheckinData && coPhoto && (
+                    <div className="flex items-center gap-2">
+                      <Image
+                        src={coPhoto.url}
+                        alt="check-out"
+                        width={44}
+                        height={44}
+                        className="w-11 h-11 rounded-lg object-cover border-2 border-[#9A88FD]"
+                      />
+                      <span className="text-[9px] text-[#9B9BA8]">Check-out photo</span>
                     </div>
                   )}
                 </div>
