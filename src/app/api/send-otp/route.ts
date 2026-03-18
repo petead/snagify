@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
     const appUrl =
-      process.env.NEXT_PUBLIC_APP_URL || "https://snagify.vercel.app";
+      process.env.NEXT_PUBLIC_APP_URL || "https://app.snagify.net";
     const signUrl = `${appUrl}/sign?inspectionId=${inspectionId}&signerType=${signerType}&email=${encodeURIComponent(email)}`;
 
     console.log("Generated OTP:", otp, "Sign URL:", signUrl);

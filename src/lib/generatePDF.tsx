@@ -1764,9 +1764,10 @@ export async function generateInspectionPDFBuffer(
 }
 
 async function buildReportQrDataUrl(meta: InspectionMeta): Promise<string | undefined> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.snagify.net";
   const reportUrl =
     meta.inspection.report_url ??
-    `https://snagify.vercel.app/report/${meta.inspection.id}`;
+    `${appUrl}/report/${meta.inspection.id}`;
   try {
     return await QRCode.toDataURL(reportUrl, {
       width: 200,
