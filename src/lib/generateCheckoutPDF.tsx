@@ -192,16 +192,6 @@ function buildPhotoPairs(checkoutRoom: CheckoutRoom, checkinPhotosMap?: Map<stri
   return pairs;
 }
 
-function getPhotoStyle(photo: { width?: number | null; height?: number | null } | null | undefined, maxWidth: number): { width: number; height: number } {
-  if (photo?.width && photo?.height && photo.width > 0 && photo.height > 0) {
-    const aspectRatio = photo.height / photo.width;
-    const displayWidth = maxWidth;
-    const displayHeight = Math.min(displayWidth * aspectRatio, 280);
-    return { width: displayWidth, height: displayHeight };
-  }
-  return { width: maxWidth, height: maxWidth * 0.75 };
-}
-
 function getKeyLabel(item: KeyHandoverItem): string {
   return item.label || item.name || item.item || "Key";
 }
@@ -1519,22 +1509,20 @@ export function CheckoutPDFDocument({
                         </Text>
                       </View>
 
-                      {/* Full-width checkout photo — natural aspect ratio */}
-                      {pair.coPhoto.url && pair.coPhoto.url.startsWith("http") && (() => {
-                        const photoStyle = getPhotoStyle(pair.coPhoto, 490);
-                        return (
+                      {/* Full-width checkout photo */}
+                      {pair.coPhoto.url && pair.coPhoto.url.startsWith("http") && (
+                        <View style={{ width: "100%", height: 200, borderRadius: 6, overflow: "hidden" }}>
                           <Image
                             src={pair.coPhoto.url}
                             style={{
-                              width: photoStyle.width,
-                              height: photoStyle.height,
-                              objectFit: "contain",
-                              borderRadius: 6,
-                              backgroundColor: "#F8F7F4",
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                              objectPosition: "center",
                             }}
                           />
-                        );
-                      })()}
+                        </View>
+                      )}
 
                       {/* Damage tags */}
                       {pair.coPhoto.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
@@ -1584,23 +1572,21 @@ export function CheckoutPDFDocument({
                           </Text>
                         </View>
 
-                        {pair.ciPhoto?.url ? (() => {
-                          const photoStyle = getPhotoStyle(pair.ciPhoto, 238);
-                          return (
+                        {pair.ciPhoto?.url ? (
+                          <View style={{ width: "100%", height: 160, borderRadius: 6, overflow: "hidden" }}>
                             <Image
                               src={pair.ciPhoto.url}
                               style={{
-                                width: photoStyle.width,
-                                height: photoStyle.height,
-                                objectFit: "contain",
-                                borderRadius: 6,
-                                backgroundColor: "#F8F7F4",
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                objectPosition: "center",
                               }}
                             />
-                          );
-                        })() : (
+                          </View>
+                        ) : (
                           <View style={{
-                            width: "100%", height: 140,
+                            width: "100%", height: 160,
                             backgroundColor: "#F3F3F8", borderRadius: 6,
                             alignItems: "center", justifyContent: "center",
                           }}>
@@ -1652,23 +1638,22 @@ export function CheckoutPDFDocument({
                           </Text>
                         </View>
 
-                        {pair.coPhoto.url && pair.coPhoto.url.startsWith("http") && (() => {
-                          const photoStyle = getPhotoStyle(pair.coPhoto, 238);
-                          return (
+                        {pair.coPhoto.url && pair.coPhoto.url.startsWith("http") && (
+                          <View style={{
+                            width: "100%", height: 160, borderRadius: 6, overflow: "hidden",
+                            borderWidth: 1.5, borderColor: tokens.primary,
+                          }}>
                             <Image
                               src={pair.coPhoto.url}
                               style={{
-                                width: photoStyle.width,
-                                height: photoStyle.height,
-                                objectFit: "contain",
-                                borderRadius: 6,
-                                backgroundColor: "#F8F7F4",
-                                borderWidth: 1.5,
-                                borderColor: tokens.primary,
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                objectPosition: "center",
                               }}
                             />
-                          );
-                        })()}
+                          </View>
+                        )}
 
                         {/* Check-out damage tags */}
                         {pair.coPhoto.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
