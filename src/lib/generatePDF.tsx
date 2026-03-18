@@ -74,7 +74,7 @@ const s = StyleSheet.create({
     height: 130,
     borderRadius: 65,
     borderWidth: 20,
-    borderColor: "rgba(255,255,255,0.10)",
+    borderColor: "#B5A8FE",
     borderStyle: "solid",
   },
   coverHeroGeoCircle2: {
@@ -85,7 +85,7 @@ const s = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     borderWidth: 12,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: "#C4B8FE",
     borderStyle: "solid",
   },
   coverHeroGeoRect: {
@@ -96,7 +96,7 @@ const s = StyleSheet.create({
     height: 70,
     borderRadius: 14,
     borderWidth: 14,
-    borderColor: "rgba(255,255,255,0.07)",
+    borderColor: "#C0B5FE",
     borderStyle: "solid",
     transform: "rotate(15deg)",
   },
@@ -111,7 +111,7 @@ const s = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 7,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "#A49AFD",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -132,8 +132,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.4)",
-    backgroundColor: "rgba(255,255,255,0.15)",
+    borderColor: "#8070F0",
+    backgroundColor: "#A99CFD",
   },
   coverTypeBadgeText: {
     fontSize: 7,
@@ -264,7 +264,7 @@ const s = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "#A99CFD",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -363,7 +363,7 @@ const s = StyleSheet.create({
     borderRadius: 55,
     borderWidth: 18,
     borderStyle: "solid",
-    borderColor: "rgba(255,255,255,0.09)",
+    borderColor: "#B8ABFE",
   },
   roomHeroDecoInner: {
     position: "absolute",
@@ -374,7 +374,7 @@ const s = StyleSheet.create({
     borderRadius: 34,
     borderWidth: 11,
     borderStyle: "solid",
-    borderColor: "rgba(255,255,255,0.05)",
+    borderColor: "#C9BFFE",
   },
   roomHeroTop: {
     flexDirection: "row",
@@ -510,7 +510,7 @@ const s = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 16,
     borderStyle: "solid",
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "#BDB0FE",
   },
   sigHeroTop: {
     flexDirection: "row",
@@ -528,7 +528,7 @@ const s = StyleSheet.create({
   sigVerifiedBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "#A99CFD",
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -1007,7 +1007,10 @@ function InspectionReport({
               : "Property Address")}
           </Text>
           <Text style={s.coverAddressSub}>
-            {[property.building_name, property.unit_number, property.property_type].filter(Boolean).join(" · ")}
+            {[
+              property.unit_number ? `Unit ${property.unit_number}` : null,
+              capitalise(property.property_type || ""),
+            ].filter(Boolean).join(" · ")}
           </Text>
         </View>
 
@@ -1171,26 +1174,36 @@ function InspectionReport({
         </View>
 
         <View style={s.keysCard}>
-          <View style={s.keysGrid}>
-            {(meta.inspection.checkin_key_handover ?? meta.inspection.key_handover ?? []).map(
-              (item: { item?: string; label?: string; name?: string; qty?: number; quantity?: number }, i: number) => (
-                <View key={i} style={s.keyItem}>
-                  <View style={[s.keyIconBox, { backgroundColor: tokens.primaryUltraLight }]}>
-                    <View
-                      style={{
-                        width: 14,
-                        height: 14,
-                        backgroundColor: tokens.primaryLight,
-                        borderRadius: 3,
-                      }}
-                    />
+          {(() => {
+            const keyItems = (meta.inspection.key_handover as any[] ?? []);
+            if (keyItems.length === 0) {
+              return (
+                <Text style={{ fontSize: 8, color: '#9B9BA8', fontFamily: 'Helvetica-Oblique' }}>
+                  No items recorded
+                </Text>
+              );
+            }
+            return (
+              <View style={s.keysGrid}>
+                {keyItems.map((item: any, i: number) => (
+                  <View key={i} style={s.keyItem}>
+                    <View style={[s.keyIconBox, { backgroundColor: tokens.primaryUltraLight }]}>
+                      <View
+                        style={{
+                          width: 14,
+                          height: 14,
+                          backgroundColor: tokens.primaryLight,
+                          borderRadius: 3,
+                        }}
+                      />
+                    </View>
+                    <Text style={s.keyLabel}>{item.item || item.label || item.name}</Text>
+                    <Text style={s.keyQty}>×{item.qty ?? item.quantity ?? 1}</Text>
                   </View>
-                  <Text style={s.keyLabel}>{item.label ?? item.item ?? item.name ?? "Item"}</Text>
-                  <Text style={s.keyQty}>×{item.quantity ?? item.qty ?? 1}</Text>
-                </View>
-              )
-            )}
-          </View>
+                ))}
+              </View>
+            );
+          })()}
         </View>
 
         <View style={[s.pdfFooter, { backgroundColor: tokens.primaryDark }]} fixed>
@@ -1246,7 +1259,7 @@ function InspectionReport({
         }
 
         return (
-          <Page key={roomIndex} size="A4">
+          <Page key={roomIndex} size="A4" wrap={false}>
             <View style={[s.roomHero, { backgroundColor: tokens.primary }]}>
               <View style={s.roomHeroDecoOuter} />
               <View style={s.roomHeroDecoInner} />
@@ -1344,7 +1357,7 @@ function InspectionReport({
               })}
             </View>
 
-            <View style={[s.pdfFooter, { backgroundColor: tokens.primaryDark }]} fixed>
+            <View style={[s.pdfFooter, { backgroundColor: tokens.primaryDark }]}>
               <View style={s.footerLeft}>
                 <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
                 <View style={s.footerDivider} />
