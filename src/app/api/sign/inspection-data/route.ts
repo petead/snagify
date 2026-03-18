@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   // Security gate: verify this email is a valid signer for this inspection
   const { data: sig } = await supabaseAdmin
     .from('signatures')
-    .select('id, signed_at, otp_verified, signing_mode')
+    .select('id, signed_at, otp_verified, signing_mode, opened_at')
     .eq('inspection_id', inspectionId)
     .eq('signer_type', signerType)
     .eq('email', decodeURIComponent(email))
@@ -27,6 +27,14 @@ export async function GET(req: NextRequest) {
 
   if (!sig) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
+
+  // Set opened_at on first open (tracking when signer opens the link)
+  if (!sig.opened_at) {
+    await supabaseAdmin
+      .from('signatures')
+      .update({ opened_at: new Date().toISOString() })
+      .eq('id', sig.id)
   }
 
   // Fetch full inspection data

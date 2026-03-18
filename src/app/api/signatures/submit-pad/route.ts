@@ -7,31 +7,43 @@ const supabaseAdmin = createClient(
 )
 
 export async function POST(req: NextRequest) {
+  // Capture IP address at signature submission
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip') ||
+    '0.0.0.0'
+
   const { inspectionId, signerType, signatureData } = await req.json()
 
   if (!signatureData) {
     return NextResponse.json({ error: 'No signature data' }, { status: 400 })
   }
 
-  // Verify OTP was validated first
+  // Verify OTP was validated first (for in_person mode)
+  // For remote mode, we allow direct signature submission
   const { data: sig } = await supabaseAdmin
     .from('signatures')
-    .select('id, otp_verified')
+    .select('id, otp_verified, signing_mode')
     .eq('inspection_id', inspectionId)
     .eq('signer_type', signerType)
-    .eq('signing_mode', 'in_person')
     .single()
 
-  if (!sig?.otp_verified) {
+  if (!sig) {
+    return NextResponse.json({ error: 'Signature not found' }, { status: 404 })
+  }
+
+  // For in_person mode, OTP must be verified
+  if (sig.signing_mode === 'in_person' && !sig.otp_verified) {
     return NextResponse.json({ error: 'OTP not verified' }, { status: 403 })
   }
 
-  // Save signature
+  // Save signature with IP address
   await supabaseAdmin
     .from('signatures')
     .update({
       signature_data: signatureData,
       signed_at: new Date().toISOString(),
+      ip_address: ip,
     })
     .eq('id', sig.id)
 

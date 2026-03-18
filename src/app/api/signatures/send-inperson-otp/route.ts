@@ -9,6 +9,12 @@ const supabaseAdmin = createClient(
 )
 
 export async function POST(req: NextRequest) {
+  // Capture IP address
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip') ||
+    '0.0.0.0'
+
   const { inspectionId, signerType, email, name } = await req.json()
 
   if (!inspectionId || !signerType || !email) {
@@ -31,6 +37,11 @@ export async function POST(req: NextRequest) {
       otp_verified: false,
       expires_at: expiresAt.toISOString(),
       signing_mode: 'in_person',
+      ip_address: ip,
+      // Reset remote fields in case remote was sent before
+      sign_url: null,
+      signature_data: null,
+      signed_at: null,
     }, {
       onConflict: 'inspection_id,signer_type',
       ignoreDuplicates: false,
