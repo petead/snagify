@@ -9,9 +9,18 @@ import {
   StyleSheet,
   Image,
   renderToBuffer,
+  Svg,
+  Path,
+  Circle,
+  Rect,
+  G,
 } from "@react-pdf/renderer";
+import QRCode from "qrcode";
 import type { BrandTokens } from "@/lib/pdf/brandTokens";
 import { getPdfImageHeight } from "@/lib/photos/getImageDimensions";
+
+const AMBER = "#D97706";
+const AMBER_LIGHT = "#FEF3C7";
 
 interface CheckoutPhoto {
   id: string;
@@ -23,6 +32,7 @@ interface CheckoutPhoto {
   checkin_photo_id?: string | null;
   is_additional?: boolean;
   checkin_photo?: {
+    id?: string;
     url: string;
     damage_tags?: string[] | null;
     ai_analysis?: string | null;
@@ -43,6 +53,7 @@ interface CheckoutRoom {
 interface KeyHandoverItem {
   label?: string;
   name?: string;
+  item?: string;
   quantity?: number;
   qty?: number;
 }
@@ -77,6 +88,12 @@ export interface CheckoutPDFProps {
     tenant_email?: string;
     landlord_name?: string;
     landlord_email?: string;
+    annual_rent?: number;
+    security_deposit?: number;
+    ejari_ref?: string;
+    tenancy_type?: string;
+    property_size?: number;
+    status?: string;
   };
   rooms: CheckoutRoom[];
   signatures?: {
@@ -96,18 +113,26 @@ export interface CheckoutPDFProps {
   qrCodeDataUrl?: string;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Helper Functions
+   ───────────────────────────────────────────────────────────────────────────── */
+
 function formatDate(dateStr?: string | null): string {
   if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  try {
+    return new Date(dateStr).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
 }
 
 function capitalise(str?: string | null): string {
-  if (!str) return "—";
-  return str.charAt(0).toUpperCase() + str.slice(1);
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
 function getInitials(name?: string | null): string {
@@ -120,142 +145,247 @@ function getInitials(name?: string | null): string {
     .toUpperCase();
 }
 
-function getConditionDelta(
-  checkinCond?: string | null,
-  checkoutCond?: string | null
-): "improved" | "unchanged" | "degraded" {
-  const rank: Record<string, number> = {
-    good: 0,
-    needs_attention: 1,
-    critical: 2,
-  };
-  const a = rank[checkinCond || "good"] ?? 0;
-  const b = rank[checkoutCond || "good"] ?? 0;
-  if (b < a) return "improved";
-  if (b > a) return "degraded";
-  return "unchanged";
+function countIssues(photos: CheckoutPhoto[]): number {
+  return photos.filter((p) => (p.damage_tags?.length ?? 0) > 0).length;
+}
+
+function getRoomCondition(photos: { damage_tags?: string[] | null }[]): string {
+  const photosWithIssues = photos.filter((p) => (p.damage_tags?.length ?? 0) > 0).length;
+  if (photosWithIssues === 0) return "Excellent";
+  const severeTags = ["BROKEN", "HOLE", "WATER_DAMAGE", "MOLD"];
+  const hasSevere = photos.some((p) =>
+    (p.damage_tags ?? []).some((t) => severeTags.includes(String(t).toUpperCase()))
+  );
+  if (hasSevere) return "Needs Attention";
+  if (photos.length > 0 && photosWithIssues / photos.length >= 0.5) return "Fair";
+  return "Good";
+}
+
+function getRoomVerdict(
+  ciIssues: number,
+  coIssues: number
+): { label: string; color: string; bg: string } {
+  if (coIssues < ciIssues) return { label: "Better", color: "#16A34A", bg: "#DCFCE7" };
+  if (coIssues > ciIssues) return { label: "Worse", color: "#DC2626", bg: "#FEE2E2" };
+  return { label: "Same", color: "#6B7280", bg: "#F3F3F8" };
+}
+
+function getKeyLabel(item: KeyHandoverItem): string {
+  return item.label || item.name || item.item || "Key";
+}
+
+function getKeyQty(item: KeyHandoverItem): number {
+  return item.quantity ?? item.qty ?? 0;
 }
 
 function compareKeyHandover(
   checkin: KeyHandoverItem[],
   checkout: KeyHandoverItem[]
 ): Array<{
-  label: string;
-  checkinQty: number;
-  checkoutQty: number;
-  status: "returned" | "missing" | "extra";
-  delta: number;
+  item: string;
+  given: number;
+  returned: number;
+  missing: number;
+  ok: boolean;
 }> {
-  const allLabels = Array.from(
-    new Set([
-      ...checkin.map((i) => i.label || i.name || ""),
-      ...checkout.map((i) => i.label || i.name || ""),
-    ])
-  ).filter(Boolean);
-
-  return allLabels.map((label) => {
-    const ci = checkin.find((i) => (i.label || i.name) === label);
-    const co = checkout.find((i) => (i.label || i.name) === label);
-    const checkinQty = ci?.quantity ?? ci?.qty ?? 0;
-    const checkoutQty = co?.quantity ?? co?.qty ?? 0;
-    const delta = checkoutQty - checkinQty;
-    const status = delta === 0 ? "returned" : delta < 0 ? "missing" : "extra";
-    return { label, checkinQty, checkoutQty, status, delta };
+  return checkin.map((ck) => {
+    const label = getKeyLabel(ck);
+    const given = getKeyQty(ck);
+    const coItem = checkout.find(
+      (k) => getKeyLabel(k).toLowerCase() === label.toLowerCase()
+    );
+    const returned = coItem ? getKeyQty(coItem) : 0;
+    return {
+      item: label,
+      given,
+      returned,
+      missing: Math.max(0, given - returned),
+      ok: returned >= given,
+    };
   });
 }
 
-function countNewTags(photo: CheckoutPhoto): number {
-  if (!photo.checkin_photo) return photo.damage_tags?.length ?? 0;
-  const checkinTags = new Set(photo.checkin_photo.damage_tags ?? []);
-  return (photo.damage_tags ?? []).filter((t) => !checkinTags.has(t)).length;
+/* ─────────────────────────────────────────────────────────────────────────────
+   SVG Icon Components for PDF
+   ───────────────────────────────────────────────────────────────────────────── */
+
+const PdfIcon = ({ size, color, children }: { size: number; color: string; children: React.ReactNode }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <G fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      {children}
+    </G>
+  </Svg>
+);
+
+const IconCalendar = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Rect x="3" y="4" width="18" height="18" rx="2" />
+    <Path d="M16 2v4M8 2v4M3 10h18" />
+  </PdfIcon>
+);
+
+const IconContract = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+    <Path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+  </PdfIcon>
+);
+
+const IconHouse = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" />
+    <Path d="M9 21V12h6v9" />
+  </PdfIcon>
+);
+
+const IconCamera = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+    <Circle cx="12" cy="13" r="4" />
+  </PdfIcon>
+);
+
+const IconWarning = ({ size = 14, color = "#DC2626" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+    <Path d="M12 9v4M12 17h.01" />
+  </PdfIcon>
+);
+
+const IconKey = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Circle cx="7.5" cy="15.5" r="4.5" />
+    <Path d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2" />
+  </PdfIcon>
+);
+
+const IconCard = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Rect x="1" y="4" width="22" height="16" rx="2" />
+    <Path d="M1 10h22" />
+  </PdfIcon>
+);
+
+const IconMailbox = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+    <Path d="M22 6l-10 7L2 6" />
+  </PdfIcon>
+);
+
+const IconLock = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Rect x="3" y="11" width="18" height="11" rx="2" />
+    <Path d="M7 11V7a5 5 0 0110 0v4" />
+  </PdfIcon>
+);
+
+const IconShield = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </PdfIcon>
+);
+
+const IconLogout = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+  </PdfIcon>
+);
+
+function getKeyIcon(itemName: string, color: string) {
+  const name = (itemName || "").toLowerCase();
+  if (name.includes("door") || name.includes("key")) return <IconKey size={13} color={color} />;
+  if (name.includes("parking") || name.includes("car")) return <IconCard size={13} color={color} />;
+  if (name.includes("mailbox") || name.includes("mail")) return <IconMailbox size={13} color={color} />;
+  if (name.includes("access") || name.includes("fob")) return <IconLock size={13} color={color} />;
+  return <IconKey size={13} color={color} />;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Styles (mirroring check-in PDF structure)
+   ───────────────────────────────────────────────────────────────────────────── */
+
 const s = StyleSheet.create({
-  page: { backgroundColor: "#FFFFFF", fontFamily: "Helvetica" },
-  hero: {
-    paddingHorizontal: 28,
-    paddingTop: 20,
-    paddingBottom: 22,
+  page: { padding: 0, fontFamily: "Helvetica", fontSize: 10, color: "#1A1A1A" },
+
+  /* Cover hero */
+  coverHero: {
+    padding: 32,
+    paddingBottom: 28,
     position: "relative",
-    overflow: "hidden",
   },
-  heroDeco1: {
+  coverHeroGeoCircle: {
     position: "absolute",
-    right: -24,
-    bottom: -24,
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    borderWidth: 18,
+    top: -40,
+    right: -40,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    borderWidth: 20,
     borderStyle: "solid",
-    borderColor: "rgba(255,255,255,0.09)",
   },
-  heroDeco2: {
+  coverHeroGeoCircle2: {
     position: "absolute",
-    right: 0,
-    bottom: 0,
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    borderWidth: 11,
+    top: -15,
+    right: -15,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 12,
     borderStyle: "solid",
-    borderColor: "rgba(255,255,255,0.05)",
   },
-  heroTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  heroLogoText: {
-    fontSize: 15,
-    fontFamily: "Helvetica-Bold",
-    color: "#FFFFFF",
-    letterSpacing: -0.4,
-  },
-  heroLogoSub: { fontSize: 6, color: "rgba(255,255,255,0.55)", marginTop: 2, letterSpacing: 0.4 },
-  heroTypeBadge: {
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    backgroundColor: "rgba(255,255,255,0.9)",
-  },
-  heroTypeBadgeText: { fontSize: 7, fontFamily: "Helvetica-Bold", letterSpacing: 1 },
-  heroAddress: {
-    fontSize: 18,
-    fontFamily: "Helvetica-Bold",
-    color: "#FFFFFF",
-    letterSpacing: -0.4,
-    lineHeight: 1.25,
-    marginTop: 16,
-  },
-  heroSub: { fontSize: 7.5, color: "rgba(255,255,255,0.6)", marginTop: 4 },
-  footer: {
+  coverLogoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 28,
-    paddingVertical: 7,
+    marginBottom: 28,
   },
-  footerLeft: { flexDirection: "row", alignItems: "center" },
-  footerAgency: { fontSize: 6.5, fontFamily: "Helvetica-Bold", color: "rgba(255,255,255,0.8)" },
-  footerDivider: {
-    width: 1,
-    height: 8,
-    backgroundColor: "rgba(255,255,255,0.3)",
-    marginHorizontal: 6,
+  coverLogoLeft: { flexDirection: "row", alignItems: "center" },
+  coverLogoText: {
+    fontSize: 20,
+    fontFamily: "Helvetica-Bold",
+    color: "#FFFFFF",
+    letterSpacing: -0.5,
   },
-  footerUrl: { fontSize: 6, color: "rgba(255,255,255,0.5)" },
-  footerRight: { fontSize: 6, color: "rgba(255,255,255,0.5)" },
-  coverBody: { paddingHorizontal: 26, paddingVertical: 18 },
-  overviewBody: { paddingHorizontal: 22, paddingTop: 14 },
-  roomBody: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 8 },
+  coverLogoSub: {
+    fontSize: 8,
+    color: "rgba(255,255,255,0.65)",
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
+  coverTypeBadge: {
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderWidth: 1,
+  },
+  coverTypeBadgeText: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    letterSpacing: 1,
+  },
+  coverAddressMain: {
+    fontSize: 26,
+    fontFamily: "Helvetica-Bold",
+    color: "#FFFFFF",
+    letterSpacing: -0.5,
+    lineHeight: 1.25,
+  },
+  coverAddressSub: {
+    fontSize: 9,
+    color: "rgba(255,255,255,0.65)",
+    marginTop: 4,
+  },
+
+  /* Cover body */
+  coverBodyNew: { paddingHorizontal: 28, paddingVertical: 20 },
   metaStrip: {
     flexDirection: "row",
     borderRadius: 8,
     borderWidth: 0.5,
     borderColor: "#EEECFF",
     overflow: "hidden",
-    marginBottom: 13,
+    marginBottom: 14,
   },
   metaCell: {
     flex: 1,
@@ -263,7 +393,10 @@ const s = StyleSheet.create({
     alignItems: "flex-start",
     padding: 10,
   },
-  metaCellBorder: { borderRightWidth: 0.5, borderRightColor: "#EEECFF" },
+  metaCellBorder: {
+    borderRightWidth: 0.5,
+    borderRightColor: "#EEECFF",
+  },
   metaIconBox: {
     width: 22,
     height: 22,
@@ -271,18 +404,20 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-    marginRight: 8,
-    marginTop: 1,
   },
   metaLabel: {
-    fontSize: 6,
+    fontSize: 7.5,
     textTransform: "uppercase",
     letterSpacing: 0.7,
     color: "#9B9BA8",
     marginBottom: 2,
   },
-  metaValue: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
-  partiesRow: { flexDirection: "row", marginBottom: 13 },
+  metaValue: {
+    fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+    color: "#1A1A2E",
+  },
+  partiesRow: { flexDirection: "row", marginBottom: 14 },
   partyCard: {
     flex: 1,
     flexDirection: "row",
@@ -292,7 +427,6 @@ const s = StyleSheet.create({
     borderColor: "#EEECFF",
     padding: 10,
   },
-  partyCardMargin: { marginRight: 8 },
   partyAvatar: {
     width: 30,
     height: 30,
@@ -300,224 +434,191 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-    marginRight: 9,
   },
   partyAvatarText: { fontSize: 9, fontFamily: "Helvetica-Bold" },
-  partyRole: { fontSize: 6, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 3 },
-  partyName: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
-  partyEmail: { fontSize: 7, color: "#9B9BA8", marginTop: 1 },
-  summaryCard: { borderRadius: 8, padding: 12, marginBottom: 13 },
-  summaryLabelRow: { flexDirection: "row", alignItems: "center", marginBottom: 5 },
-  summaryDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
-  summaryLabel: {
-    fontSize: 7,
-    fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
-  summaryText: { fontSize: 7.5, color: "#374151", lineHeight: 1.65 },
-  refCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    borderRadius: 8,
-    borderWidth: 0.5,
-    borderColor: "#EEECFF",
-    padding: 10,
-  },
-  refIconBox: {
-    width: 26,
-    height: 26,
-    borderRadius: 7,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    marginRight: 10,
-  },
-  refLabel: {
-    fontSize: 6,
+  partyRole: {
+    fontSize: 7.5,
     textTransform: "uppercase",
     letterSpacing: 0.7,
     marginBottom: 3,
   },
-  refTitle: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginBottom: 2 },
-  refHash: { fontSize: 6.5, color: "#9B9BA8" },
-  ovHeader: {
+  partyName: { fontSize: 10, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
+  partyEmail: { fontSize: 8.5, color: "#9B9BA8", marginTop: 1 },
+
+  /* Summary card */
+  summaryCard: {
+    borderRadius: 8,
+    padding: 12,
+  },
+  summaryLabelRow: { flexDirection: "row", alignItems: "center", marginBottom: 5 },
+  summaryDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
+  summaryLabel: {
+    fontSize: 8.5,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  summaryTextNew: { fontSize: 9, color: "#374151", lineHeight: 1.65 },
+
+  /* Footer */
+  pdfFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 26,
-    paddingVertical: 13,
+    paddingHorizontal: 28,
+    paddingVertical: 7,
   },
-  ovTitle: { fontSize: 13, fontFamily: "Helvetica-Bold", color: "#FFFFFF" },
-  ovSub: { fontSize: 7, color: "rgba(255,255,255,0.65)", marginTop: 2 },
-  ovHeaderIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.15)",
+  footerLeft: { flexDirection: "row", alignItems: "center" },
+  footerAgency: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "rgba(255,255,255,0.8)" },
+  footerDivider: {
+    width: 1,
+    height: 8,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    marginHorizontal: 6,
+  },
+  footerUrl: { fontSize: 7.5, color: "rgba(255,255,255,0.5)" },
+  footerRight: { fontSize: 7.5, color: "rgba(255,255,255,0.5)" },
+
+  /* Page 2 overview */
+  overviewHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
+    paddingHorizontal: 28,
+    paddingVertical: 14,
   },
-  statRow: { flexDirection: "row", marginBottom: 14 },
+  overviewTitleNew: { fontSize: 16, fontFamily: "Helvetica-Bold", color: "#FFFFFF" },
+  overviewSub: { fontSize: 8.5, color: "rgba(255,255,255,0.65)", marginTop: 2 },
+  statRow: { flexDirection: "row", paddingHorizontal: 28, marginTop: 16 },
   statCard: {
     flex: 1,
     borderRadius: 10,
     borderWidth: 0.5,
     borderColor: "#EEECFF",
-    padding: 10,
+    padding: 12,
     alignItems: "center",
     backgroundColor: "#FFFFFF",
   },
-  statCardMargin: { marginRight: 8 },
   statIconBox: {
-    width: 28,
-    height: 28,
+    width: 30,
+    height: 30,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 7,
+    marginBottom: 8,
   },
-  statNum: { fontSize: 20, fontFamily: "Helvetica-Bold", lineHeight: 1 },
+  statNum: { fontSize: 26, fontFamily: "Helvetica-Bold", lineHeight: 1 },
   statLbl: {
-    fontSize: 5.5,
+    fontSize: 7,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     color: "#9B9BA8",
-    marginTop: 3,
+    marginTop: 4,
   },
-  sectionHd: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  sectionHdText: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginRight: 8 },
+  statDelta: {
+    fontSize: 8,
+    marginTop: 2,
+  },
+  sectionHd: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 28,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  sectionHdText: { fontSize: 10, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginRight: 8 },
   sectionHdLine: { flex: 1, height: 0.5, backgroundColor: "#EEECFF" },
-  sectionHdMargin: { marginTop: 14 },
-  cmpTable: {
-    borderRadius: 8,
-    overflow: "hidden",
-    borderWidth: 0.5,
-    borderColor: "#EEECFF",
-    marginBottom: 14,
-  },
-  cmpThead: { flexDirection: "row", paddingHorizontal: 9, paddingVertical: 7 },
-  cmpTheadCell: {
-    fontSize: 5.5,
+
+  /* Room table */
+  roomTable: { marginHorizontal: 28, borderRadius: 8, overflow: "hidden", borderWidth: 0.5, borderColor: "#EEECFF" },
+  roomThead: { flexDirection: "row", paddingHorizontal: 10, paddingVertical: 7 },
+  roomTheadCell: {
+    fontSize: 7.5,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     color: "#FFFFFF",
   },
-  cmpRow: {
+  roomRow: {
     flexDirection: "row",
-    paddingHorizontal: 9,
+    paddingHorizontal: 10,
     paddingVertical: 7,
     alignItems: "center",
     borderTopWidth: 0.5,
     borderTopColor: "#F3F3F8",
   },
-  cmpRowAlt: { backgroundColor: "#FAFBFF" },
-  cmpCell: { fontSize: 7, color: "#374151" },
-  cmpCellBold: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
-  deltaBadge: { borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
-  deltaBadgeText: { fontSize: 5.5, fontFamily: "Helvetica-Bold" },
-  deltaUnchanged: { backgroundColor: "#F1F5F9" },
-  deltaDegraded: { backgroundColor: "#FEE2E2" },
-  deltaImproved: { backgroundColor: "#DCFCE7" },
-  deltaUnchangedText: { color: "#475569" },
-  deltaDegradedText: { color: "#DC2626" },
-  deltaImprovedText: { color: "#15803D" },
-  condBadgeGood: {
-    backgroundColor: "#DCFCE7",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  condBadgeWarn: {
-    backgroundColor: "#FEF9C3",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  condBadgeCrit: {
-    backgroundColor: "#FEE2E2",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  condTextGood: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#15803D" },
-  condTextWarn: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#A16207" },
-  condTextCrit: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#DC2626" },
-  keyTable: {
+  roomRowAlt: { backgroundColor: "#FAFBFF" },
+  roomCell: { fontSize: 9, color: "#374151" },
+  roomCellBold: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
+  verdictBadge: { borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
+  verdictBadgeText: { fontSize: 7.5, fontFamily: "Helvetica-Bold" },
+
+  /* Key return */
+  keysCard: {
+    marginHorizontal: 28,
+    backgroundColor: "#FAFBFF",
     borderRadius: 8,
-    overflow: "hidden",
     borderWidth: 0.5,
     borderColor: "#EEECFF",
+    padding: 12,
   },
-  keyThead: { flexDirection: "row", paddingHorizontal: 9, paddingVertical: 7 },
-  keyTheadCell: {
-    fontSize: 5.5,
-    fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    color: "#FFFFFF",
-  },
-  keyRow: {
+  keyItem: {
     flexDirection: "row",
-    paddingHorizontal: 9,
-    paddingVertical: 8,
     alignItems: "center",
-    borderTopWidth: 0.5,
-    borderTopColor: "#F3F3F8",
+    paddingVertical: 6,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#F3F3F8",
   },
-  keyRowAlt: { backgroundColor: "#FAFBFF" },
+  keyItemLast: { borderBottomWidth: 0 },
   keyIconBox: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
+    width: 28,
+    height: 28,
+    borderRadius: 7,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 7,
+    marginRight: 10,
     flexShrink: 0,
   },
-  keyLabel: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
-  keyQtyOk: { fontSize: 7.5, color: "#374151" },
-  keyQtyMiss: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: "#DC2626" },
-  keyQtyExtra: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: "#15803D" },
-  keyStatusOk: {
-    backgroundColor: "#DCFCE7",
-    borderRadius: 10,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  keyStatusMiss: {
+  keyLabel: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
+  keySubLabel: { fontSize: 7, color: "#9B9BA8" },
+  keyStatus: { borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
+  keyStatusText: { fontSize: 7.5, fontFamily: "Helvetica-Bold" },
+  missingAlert: {
     backgroundColor: "#FEE2E2",
-    borderRadius: 10,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    borderRadius: 6,
+    padding: 8,
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
   },
-  keyStatusExtra: {
-    backgroundColor: "#EDE9FF",
-    borderRadius: 10,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  keyStatusTextOk: { fontSize: 6, fontFamily: "Helvetica-Bold", color: "#15803D" },
-  keyStatusTextMiss: { fontSize: 6, fontFamily: "Helvetica-Bold", color: "#DC2626" },
-  keyStatusTextExtra: { fontSize: 6, fontFamily: "Helvetica-Bold", color: "#6D28D9" },
+
+  /* Room hero (pages 3–N) */
   roomHero: {
-    paddingHorizontal: 26,
-    paddingTop: 18,
-    paddingBottom: 20,
+    paddingHorizontal: 28,
+    paddingTop: 20,
+    paddingBottom: 22,
     position: "relative",
     overflow: "hidden",
   },
-  roomHeroDeco: {
+  roomHeroDecoOuter: {
     position: "absolute",
-    right: -20,
-    bottom: -20,
-    width: 95,
-    height: 95,
-    borderRadius: 48,
-    borderWidth: 16,
+    right: -24,
+    bottom: -24,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 18,
     borderStyle: "solid",
-    borderColor: "rgba(255,255,255,0.09)",
+  },
+  roomHeroDecoInner: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 11,
+    borderStyle: "solid",
   },
   roomHeroTop: {
     flexDirection: "row",
@@ -525,54 +626,71 @@ const s = StyleSheet.create({
     alignItems: "flex-start",
   },
   roomNumber: {
-    fontSize: 6.5,
+    fontSize: 8,
     textTransform: "uppercase",
     letterSpacing: 1,
     color: "rgba(255,255,255,0.55)",
     marginBottom: 4,
   },
   roomTitle: {
-    fontSize: 18,
+    fontSize: 24,
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
   },
-  roomDate: { fontSize: 7, color: "rgba(255,255,255,0.6)", marginTop: 3 },
-  roomStatsRow: { flexDirection: "row", marginTop: 12 },
-  roomStatItem: { flexDirection: "row", alignItems: "center", marginRight: 16 },
+  roomDate: {
+    fontSize: 9,
+    color: "rgba(255,255,255,0.6)",
+    marginTop: 3,
+  },
+  roomCondBadgeGood: {
+    backgroundColor: "#DCFCE7",
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+  },
+  roomCondBadgeWarn: {
+    backgroundColor: "#FEF9C3",
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+  },
+  roomCondBadgeCritical: {
+    backgroundColor: "#FEE2E2",
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+  },
+  roomCondTextGood: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#15803D" },
+  roomCondTextWarn: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#A16207" },
+  roomCondTextCritical: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#DC2626" },
+  roomStatsRow: { flexDirection: "row", marginTop: 14 },
+  roomStatItem: { flexDirection: "row", alignItems: "center" },
   roomStatDot: {
     width: 5,
     height: 5,
     borderRadius: 2.5,
     backgroundColor: "rgba(255,255,255,0.45)",
-    marginRight: 5,
   },
-  roomStatText: { fontSize: 7, color: "rgba(255,255,255,0.65)" },
-  colLabelRow: { flexDirection: "row", marginBottom: 5 },
-  colLabel: {
+  roomStatText: { fontSize: 8.5, color: "rgba(255,255,255,0.65)" },
+
+  /* Room body */
+  roomBody: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 8 },
+  photosGrid: { flexDirection: "row", marginBottom: 8 },
+  photoCard: {
     flex: 1,
-    borderRadius: 5,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    fontSize: 6,
-    fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    textAlign: "center",
-  },
-  colLabelCheckin: { backgroundColor: "#F1F5F9", color: "#475569" },
-  colLabelCheckout: { backgroundColor: "#EDE9FF", color: "#6D28D9" },
-  colLabelMargin: { marginRight: 8 },
-  photoCmpRow: { flexDirection: "row", marginBottom: 6 },
-  photoCmpCard: {
-    flex: 1,
-    borderRadius: 7,
+    borderRadius: 8,
     overflow: "hidden",
     borderWidth: 0.5,
     borderColor: "#EEECFF",
   },
-  photoCmpCardDegraded: { borderColor: "#FECACA", borderWidth: 1 },
-  photoCmpCardMargin: { marginRight: 8 },
+  photoCardFull: {
+    borderRadius: 8,
+    overflow: "hidden",
+    borderWidth: 0.5,
+    borderColor: "#EEECFF",
+    marginBottom: 8,
+  },
   photoTagsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -581,63 +699,27 @@ const s = StyleSheet.create({
   },
   photoTag: {
     borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    marginRight: 3,
-    marginBottom: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   photoTagText: {
-    fontSize: 5,
+    fontSize: 6.5,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
-  photoTagRed: { backgroundColor: "#FEE2E2" },
-  photoTagOrange: { backgroundColor: "#FEF3C7" },
-  photoTagBlue: { backgroundColor: "#DBEAFE" },
-  photoTagGray: { backgroundColor: "#F1F5F9" },
-  photoTagTextRed: { color: "#DC2626" },
-  photoTagTextOrange: { color: "#B45309" },
-  photoTagTextBlue: { color: "#1D4ED8" },
-  photoTagTextGray: { color: "#475569" },
   photoAiDivider: { height: 0.5, backgroundColor: "#F3F3F8" },
-  photoAiWrap: { padding: 6 },
+  photoAiWrap: { padding: 7, paddingTop: 6 },
   photoAiLabel: {
-    fontSize: 5.5,
+    fontSize: 7,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
     letterSpacing: 0.6,
-    marginBottom: 2,
+    marginBottom: 3,
   },
-  photoAiText: { fontSize: 6.5, color: "#6B7280", lineHeight: 1.55 },
-  changeBadgeRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginBottom: 10,
-    marginTop: 2,
-  },
-  changeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  changeDot: { width: 5, height: 5, borderRadius: 2.5, marginRight: 5 },
-  changeBadgeText: { fontSize: 6, fontFamily: "Helvetica-Bold" },
-  changeDegraded: { backgroundColor: "#FEE2E2" },
-  changeUnchanged: { backgroundColor: "#F1F5F9" },
-  changeImproved: { backgroundColor: "#DCFCE7" },
-  changeDegradedText: { color: "#DC2626" },
-  changeUnchangedText: { color: "#475569" },
-  changeImprovedText: { color: "#15803D" },
-  additionalLabel: {
-    fontSize: 6,
-    color: "#9B9BA8",
-    fontFamily: "Helvetica-Oblique",
-    textAlign: "center",
-    marginBottom: 4,
-  },
+  photoAiText: { fontSize: 8.5, color: "#6B7280", lineHeight: 1.55 },
+
+  /* Signature page */
   sigHero: {
     paddingHorizontal: 28,
     paddingTop: 20,
@@ -654,7 +736,6 @@ const s = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 16,
     borderStyle: "solid",
-    borderColor: "rgba(255,255,255,0.08)",
   },
   sigHeroTop: {
     flexDirection: "row",
@@ -663,16 +744,15 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
   sigLogoText: {
-    fontSize: 15,
+    fontSize: 20,
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
     letterSpacing: -0.4,
   },
-  sigLogoSub: { fontSize: 6.5, color: "rgba(255,255,255,0.55)", marginTop: 2 },
+  sigLogoSub: { fontSize: 8, color: "rgba(255,255,255,0.55)", marginTop: 2 },
   sigVerifiedBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.15)",
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -682,21 +762,15 @@ const s = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: "#4ADE80",
-    marginRight: 5,
   },
-  sigVerifiedText: {
-    fontSize: 6.5,
-    fontFamily: "Helvetica-Bold",
-    color: "#FFFFFF",
-    letterSpacing: 0.3,
-  },
+  sigVerifiedText: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#FFFFFF", letterSpacing: 0.3 },
   sigTitle: {
-    fontSize: 13,
+    fontSize: 16,
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
     lineHeight: 1.35,
   },
-  sigSubtitle: { fontSize: 7.5, color: "rgba(255,255,255,0.6)", marginTop: 4 },
+  sigSubtitle: { fontSize: 9, color: "rgba(255,255,255,0.6)", marginTop: 4 },
   sigBody: { paddingHorizontal: 22, paddingTop: 14 },
   qrRow: {
     flexDirection: "row",
@@ -718,16 +792,11 @@ const s = StyleSheet.create({
     flexShrink: 0,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 14,
   },
   qrImage: { width: 48, height: 48 },
-  qrTextTitle: {
-    fontSize: 8,
-    fontFamily: "Helvetica-Bold",
-    color: "#1A1A2E",
-    marginBottom: 4,
-  },
-  qrTextBody: { fontSize: 7, color: "#6B7280", lineHeight: 1.6 },
+  qrTextWrap: { flex: 1 },
+  qrTextTitle: { fontSize: 10, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginBottom: 4 },
+  qrTextBody: { fontSize: 9, color: "#6B7280", lineHeight: 1.6 },
   sigPartiesRow: { flexDirection: "row", marginBottom: 10 },
   sigPartyCard: {
     flex: 1,
@@ -736,20 +805,14 @@ const s = StyleSheet.create({
     borderColor: "#EEECFF",
     padding: 11,
   },
-  sigPartyCardMargin: { marginRight: 8 },
   sigPartyRole: {
-    fontSize: 6,
+    fontSize: 8,
     textTransform: "uppercase",
     letterSpacing: 0.7,
     fontFamily: "Helvetica-Bold",
     marginBottom: 4,
   },
-  sigPartyName: {
-    fontSize: 8.5,
-    fontFamily: "Helvetica-Bold",
-    color: "#1A1A2E",
-    marginBottom: 8,
-  },
+  sigPartyName: { fontSize: 11, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginBottom: 8 },
   sigSignArea: {
     height: 38,
     borderRadius: 5,
@@ -759,7 +822,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  sigSignPending: { fontSize: 6.5, color: "#9B9BA8", fontFamily: "Helvetica-Oblique" },
+  sigSignPending: { fontSize: 8.5, color: "#9B9BA8", fontFamily: "Helvetica-Oblique" },
   sigSignImage: { width: 80, height: 32, objectFit: "contain" },
   sigInspectorCard: {
     flexDirection: "row",
@@ -770,7 +833,7 @@ const s = StyleSheet.create({
     padding: 11,
     marginBottom: 10,
   },
-  sigInspectorLeft: { flex: 1, marginRight: 12 },
+  sigInspectorLeft: { flex: 1 },
   sigInspectorRole: {
     fontSize: 6,
     textTransform: "uppercase",
@@ -778,13 +841,8 @@ const s = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
     marginBottom: 4,
   },
-  sigInspectorName: {
-    fontSize: 8.5,
-    fontFamily: "Helvetica-Bold",
-    color: "#1A1A2E",
-    marginBottom: 2,
-  },
-  sigInspectorAgency: { fontSize: 7, color: "#6B7280" },
+  sigInspectorName: { fontSize: 11, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginBottom: 2 },
+  sigInspectorAgency: { fontSize: 9, color: "#6B7280" },
   sigInspectorRight: { width: 80 },
   sigInspectorSignBox: {
     height: 38,
@@ -805,7 +863,7 @@ const s = StyleSheet.create({
     marginBottom: 10,
   },
   hashLabel: {
-    fontSize: 5.5,
+    fontSize: 7,
     textTransform: "uppercase",
     letterSpacing: 0.7,
     color: "#9B9BA8",
@@ -819,39 +877,56 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-    marginRight: 6,
   },
-  hashValue: {
-    fontSize: 6.5,
-    color: "#374151",
-    fontFamily: "Courier",
-    lineHeight: 1.4,
-  },
+  hashValue: { fontSize: 8.5, color: "#374151", fontFamily: "Courier", lineHeight: 1.4 },
   disclaimer: {
-    fontSize: 6,
+    fontSize: 7.5,
     color: "#9B9BA8",
     lineHeight: 1.65,
     textAlign: "center",
     paddingHorizontal: 10,
     marginBottom: 8,
   },
+
+  /* Tenancy details card */
+  tenancyCard: {
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: "#EEECFF",
+    padding: 14,
+    marginBottom: 14,
+    backgroundColor: "#FFFFFF",
+  },
+  tenancyTitle: {
+    fontSize: 7.5,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  tenancyGrid: { flexDirection: "row", flexWrap: "wrap" },
+  tenancyField: { width: "50%", marginBottom: 8 },
+  tenancyFieldLabel: {
+    fontSize: 7,
+    color: "#9B9BA8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  tenancyFieldValue: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
 });
 
-type TagColors = {
-  bg: { backgroundColor: string };
-  text: { color: string };
-};
-
-function tagStyle(tag: string): TagColors {
+function tagStyle(tag: string): { bg: string; text: string } {
   const t = tag.toLowerCase();
-  if (["scratch", "crack", "broken", "missing"].includes(t))
-    return { bg: { backgroundColor: "#FEE2E2" }, text: { color: "#DC2626" } };
-  if (["stain", "damp", "burn", "discoloration"].includes(t))
-    return { bg: { backgroundColor: "#FEF3C7" }, text: { color: "#B45309" } };
-  if (["mark", "wear"].includes(t))
-    return { bg: { backgroundColor: "#DBEAFE" }, text: { color: "#1D4ED8" } };
-  return { bg: { backgroundColor: "#F1F5F9" }, text: { color: "#475569" } };
+  if (["scratch", "crack", "broken", "missing"].includes(t)) return { bg: "#FEE2E2", text: "#DC2626" };
+  if (["stain", "damp", "burn", "discoloration"].includes(t)) return { bg: "#FEF3C7", text: "#B45309" };
+  if (["mark", "wear"].includes(t)) return { bg: "#DBEAFE", text: "#1D4ED8" };
+  return { bg: "#F1F5F9", text: "#475569" };
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Main PDF Document Component
+   ───────────────────────────────────────────────────────────────────────────── */
 
 export function CheckoutPDFDocument({
   inspection,
@@ -863,70 +938,132 @@ export function CheckoutPDFDocument({
   profile,
   agencyName,
   agencyWebsite,
-  agencyLogoUrl: _agencyLogoUrl,
+  agencyLogoUrl,
   tokens,
   qrCodeDataUrl,
 }: CheckoutPDFProps) {
   const totalPages = rooms.length + 3;
-  const keyComparison = compareKeyHandover(
-    inspection.checkin_key_handover ?? [],
-    inspection.key_handover ?? []
-  );
-  const newIssuesCount = rooms.filter(
-    (r) => getConditionDelta(r.checkin_condition, r.condition) === "degraded"
-  ).length;
-  const unchangedCount = rooms.filter(
-    (r) => getConditionDelta(r.checkin_condition, r.condition) === "unchanged"
-  ).length;
-  const totalPhotos = rooms.reduce((sum, r) => sum + r.photos.length, 0);
-  const _missingKeys = keyComparison.filter((k) => k.status === "missing").length;
+  const documentHash = inspection.document_hash || "";
+  const shortHash = `${documentHash.slice(0, 8)}…${documentHash.slice(-8)}`;
+
+  // Calculate stats
+  const checkinKeyItems = inspection.checkin_key_handover ?? [];
+  const checkoutKeyItems = inspection.key_handover ?? [];
+  const keyComparison = compareKeyHandover(checkinKeyItems, checkoutKeyItems);
+  const missingKeys = keyComparison.filter((k) => !k.ok);
+
+  // Room stats with check-in comparison
+  const roomStats = rooms.map((room) => {
+    const coPhotos = room.photos.length;
+    const coIssues = countIssues(room.photos);
+
+    // Find matching check-in room by gathering photos with checkin_photo
+    const ciPhotosFromLinked = room.photos.filter((p) => p.checkin_photo).length;
+    const ciIssuesFromLinked = room.photos.filter(
+      (p) => p.checkin_photo && (p.checkin_photo.damage_tags?.length ?? 0) > 0
+    ).length;
+
+    const roomCondition = room.condition || getRoomCondition(room.photos);
+    const verdict = getRoomVerdict(ciIssuesFromLinked, coIssues);
+
+    return {
+      room,
+      coPhotos,
+      coIssues,
+      ciPhotos: ciPhotosFromLinked,
+      ciIssues: ciIssuesFromLinked,
+      roomCondition,
+      verdict,
+    };
+  });
+
+  const totalCiPhotos = roomStats.reduce((sum, r) => sum + r.ciPhotos, 0);
+  const totalCoPhotos = roomStats.reduce((sum, r) => sum + r.coPhotos, 0);
+  const totalCiIssues = roomStats.reduce((sum, r) => sum + r.ciIssues, 0);
+  const totalCoIssues = roomStats.reduce((sum, r) => sum + r.coIssues, 0);
+
+  const photoDelta = totalCoPhotos - totalCiPhotos;
+  const issueDelta = totalCoIssues - totalCiIssues;
+
+  // Tenancy fields
+  const tenancyFields: Array<{ label: string; value: string }> = [];
+  if (tenancy.ejari_ref) tenancyFields.push({ label: "Ejari Reference", value: tenancy.ejari_ref });
+  if (tenancy.annual_rent != null) tenancyFields.push({ label: "Annual Rent", value: `AED ${Number(tenancy.annual_rent).toLocaleString("en-AE")}` });
+  if (tenancy.security_deposit != null) tenancyFields.push({ label: "Security Deposit", value: `AED ${Number(tenancy.security_deposit).toLocaleString("en-AE")}` });
+  if (tenancy.tenancy_type) tenancyFields.push({ label: "Tenancy Type", value: capitalise(tenancy.tenancy_type) });
+  if (tenancy.property_size != null) tenancyFields.push({ label: "Property Size", value: `${Number(tenancy.property_size).toLocaleString("en-AE")} sqft` });
+  if (tenancy.status) tenancyFields.push({ label: "Contract Status", value: capitalise(tenancy.status.replace(/_/g, " ")) });
 
   return (
     <Document>
+      {/* PAGE 1 — COVER */}
       <Page size="A4" style={s.page}>
-        <View style={[s.hero, { backgroundColor: tokens.primary }]}>
-          <View style={s.heroDeco1} />
-          <View style={s.heroDeco2} />
-          <View style={s.heroTop}>
-            <View>
-              <Text style={s.heroLogoText}>{agencyName}</Text>
-              <Text style={s.heroLogoSub}>PROPERTY INSPECTION REPORT</Text>
+        <View style={[s.coverHero, { backgroundColor: tokens.primary }]}>
+          <View style={[s.coverHeroGeoCircle, { borderColor: tokens.primaryDark }]} />
+          <View style={[s.coverHeroGeoCircle2, { borderColor: tokens.primaryLight }]} />
+
+          <View style={s.coverLogoRow}>
+            <View style={s.coverLogoLeft}>
+              {agencyLogoUrl ? (
+                <Image
+                  src={agencyLogoUrl}
+                  style={{ width: 70, height: 70, objectFit: "contain", borderRadius: 12, marginRight: 12 }}
+                />
+              ) : (
+                <View style={{
+                  width: 70, height: 70, borderRadius: 14,
+                  backgroundColor: "rgba(255,255,255,0.2)",
+                  alignItems: "center", justifyContent: "center",
+                  marginRight: 12,
+                }}>
+                  <View style={{ width: 36, height: 36, backgroundColor: "rgba(255,255,255,0.5)", borderRadius: 8 }} />
+                </View>
+              )}
+              <View>
+                <Text style={s.coverLogoText}>{agencyName}</Text>
+                <Text style={s.coverLogoSub}>PROPERTY INSPECTION REPORT</Text>
+              </View>
             </View>
-            <View style={s.heroTypeBadge}>
-              <Text style={[s.heroTypeBadgeText, { color: tokens.primary }]}>CHECK-OUT</Text>
+            {/* CHECK-OUT badge — amber color */}
+            <View style={[s.coverTypeBadge, { borderColor: AMBER, backgroundColor: AMBER_LIGHT }]}>
+              <Text style={[s.coverTypeBadgeText, { color: AMBER }]}>CHECK-OUT</Text>
             </View>
           </View>
-          <Text style={s.heroAddress}>{property.address}</Text>
-          <Text style={s.heroSub}>
-            {[property.building_name, property.unit_number, capitalise(property.property_type)]
-              .filter(Boolean)
-              .join(" · ")}
+
+          <Text style={s.coverAddressMain}>
+            {property.address || (property.building_name && property.unit_number
+              ? `${property.building_name}, Unit ${property.unit_number}`
+              : "Property Address")}
+          </Text>
+          <Text style={s.coverAddressSub}>
+            {[
+              property.unit_number ? `Unit ${property.unit_number}` : null,
+              capitalise(property.property_type || ""),
+            ].filter(Boolean).join(" · ")}
           </Text>
         </View>
 
-        <View style={s.coverBody}>
-          <View style={s.metaStrip}>
+        <View style={s.coverBodyNew}>
+          {/* Meta strip — 4 cells (2×2) */}
+          <View style={[s.metaStrip, { flexWrap: "wrap" }]}>
             {[
-              {
-                label: "Move-out date",
-                value: formatDate(inspection.completed_at || inspection.created_at),
-              },
-              {
-                label: "Tenancy duration",
-                value: (() => {
-                  if (!tenancy.contract_from || !tenancy.contract_to) return "—";
-                  const months = Math.round(
-                    (new Date(tenancy.contract_to).getTime() -
-                      new Date(tenancy.contract_from).getTime()) /
-                      (1000 * 60 * 60 * 24 * 30.44)
-                  );
-                  return `${months} month${months !== 1 ? "s" : ""}`;
-                })(),
-              },
-              { label: "Check-in ref", value: formatDate(checkinInspection?.created_at) },
+              { label: "Date of Inspection", value: formatDate(inspection.created_at), icon: <IconCalendar size={13} color={tokens.primary} /> },
+              { label: "Property Type", value: capitalise(property.property_type || "Apartment"), icon: <IconHouse size={13} color={tokens.primary} /> },
+              { label: "Contract Start", value: formatDate(tenancy.contract_from), icon: <IconCalendar size={13} color={tokens.primary} /> },
+              { label: "Contract End", value: formatDate(tenancy.actual_end_date || tenancy.contract_to), icon: <IconContract size={13} color={tokens.primary} /> },
             ].map((item, i) => (
-              <View key={i} style={[s.metaCell, ...(i < 2 ? [s.metaCellBorder] : [])]}>
-                <View style={[s.metaIconBox, { backgroundColor: tokens.primaryUltraLight }]} />
+              <View
+                key={i}
+                style={[
+                  s.metaCell,
+                  { width: "50%" },
+                  i % 2 === 0 ? s.metaCellBorder : {},
+                  i < 2 ? { borderBottomWidth: 0.5, borderBottomColor: "#EEECFF" } : {},
+                ]}
+              >
+                <View style={[s.metaIconBox, { backgroundColor: tokens.primaryUltraLight, marginRight: 8 }]}>
+                  {item.icon}
+                </View>
                 <View>
                   <Text style={[s.metaLabel, { color: tokens.primary }]}>{item.label}</Text>
                   <Text style={s.metaValue}>{item.value}</Text>
@@ -935,733 +1072,368 @@ export function CheckoutPDFDocument({
             ))}
           </View>
 
+          {/* Parties row */}
           <View style={s.partiesRow}>
             {[
-              {
-                role: "Landlord",
-                name: tenancy.landlord_name,
-                email: tenancy.landlord_email,
-              },
-              {
-                role: "Tenant",
-                name: tenancy.tenant_name,
-                email: tenancy.tenant_email,
-              },
+              { role: "Landlord", name: tenancy.landlord_name, email: tenancy.landlord_email },
+              { role: "Tenant", name: tenancy.tenant_name, email: tenancy.tenant_email },
             ].map((p, i) => (
-              <View key={i} style={[s.partyCard, ...(i === 0 ? [s.partyCardMargin] : [])]}>
-                <View style={[s.partyAvatar, { backgroundColor: tokens.primaryUltraLight }]}>
-                  <Text style={[s.partyAvatarText, { color: tokens.primary }]}>
-                    {getInitials(p.name)}
-                  </Text>
+              <View key={i} style={[s.partyCard, ...(i === 0 ? [{ marginRight: 8 }] : [])]}>
+                <View style={[s.partyAvatar, { backgroundColor: tokens.primaryUltraLight, marginRight: 9 }]}>
+                  <Text style={[s.partyAvatarText, { color: tokens.primary }]}>{getInitials(p.name)}</Text>
                 </View>
                 <View>
-                  <Text style={[s.partyRole, { color: tokens.primary }]}>
-                    {p.role.toUpperCase()}
-                  </Text>
-                  <Text style={s.partyName}>{p.name}</Text>
-                  <Text style={s.partyEmail}>{p.email}</Text>
+                  <Text style={[s.partyRole, { color: tokens.primary }]}>{p.role.toUpperCase()}</Text>
+                  <Text style={s.partyName}>{p.name ?? "—"}</Text>
+                  <Text style={s.partyEmail}>{p.email ?? ""}</Text>
                 </View>
               </View>
             ))}
           </View>
 
+          {/* Tenancy Details Card */}
+          {tenancyFields.length > 0 && (
+            <View style={s.tenancyCard}>
+              <Text style={[s.tenancyTitle, { color: tokens.primary }]}>Tenancy Details</Text>
+              <View style={s.tenancyGrid}>
+                {tenancyFields.map((field, i) => (
+                  <View key={i} style={[s.tenancyField, { paddingRight: i % 2 === 0 ? 10 : 0 }]}>
+                    <Text style={s.tenancyFieldLabel}>{field.label}</Text>
+                    <Text style={s.tenancyFieldValue}>{field.value}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Executive Summary */}
           <View style={[s.summaryCard, { backgroundColor: tokens.primaryUltraLight }]}>
             <View style={s.summaryLabelRow}>
               <View style={[s.summaryDot, { backgroundColor: tokens.primary }]} />
               <Text style={[s.summaryLabel, { color: tokens.primary }]}>Executive Summary</Text>
             </View>
-            <Text style={s.summaryText}>{inspection.executive_summary}</Text>
+            <Text style={s.summaryTextNew}>{inspection.executive_summary || "No summary available."}</Text>
           </View>
+        </View>
 
-          {checkinInspection && (
-            <View style={s.refCard}>
-              <View style={[s.refIconBox, { backgroundColor: tokens.primaryUltraLight }]}>
-                <View
-                  style={{
-                    width: 10,
-                    height: 10,
-                    backgroundColor: tokens.primaryLight,
-                    borderRadius: 2,
-                  }}
-                />
+        <View style={[s.pdfFooter, { backgroundColor: tokens.primary }]} fixed>
+          <View style={s.footerLeft}>
+            <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
+            <View style={s.footerDivider} />
+            <Text style={s.footerUrl}>{agencyWebsite}</Text>
+          </View>
+          <Text style={s.footerRight}>SHA-256: {shortHash} · Page 1</Text>
+        </View>
+      </Page>
+
+      {/* PAGE 2 — CHECK-OUT COMPARISON */}
+      <Page size="A4" style={s.page}>
+        <View style={[s.overviewHeader, { backgroundColor: tokens.primary }]}>
+          <View>
+            <Text style={s.overviewTitleNew}>Check-out Comparison</Text>
+            <Text style={s.overviewSub}>
+              {property.address ?? "Property"} · {formatDate(inspection.created_at)}
+            </Text>
+          </View>
+          <View style={{
+            width: 36, height: 36, borderRadius: 8,
+            backgroundColor: "rgba(255,255,255,0.15)",
+            alignItems: "center", justifyContent: "center",
+          }}>
+            <IconLogout size={18} color="#FFFFFF" />
+          </View>
+        </View>
+
+        {/* Stat cards with deltas */}
+        <View style={s.statRow}>
+          {[
+            {
+              num: roomStats.length,
+              label: "Rooms inspected",
+              icon: <IconHouse size={16} color={tokens.primary} />,
+              isIssue: false,
+              delta: null,
+            },
+            {
+              num: totalCoPhotos,
+              label: "Photos captured",
+              icon: <IconCamera size={16} color={tokens.primary} />,
+              isIssue: false,
+              delta: photoDelta,
+            },
+            {
+              num: totalCoIssues,
+              label: "Issues flagged",
+              icon: <IconWarning size={16} color="#DC2626" />,
+              isIssue: true,
+              delta: issueDelta,
+            },
+          ].map((stat, i) => {
+            const deltaColor = stat.delta != null
+              ? (stat.isIssue
+                  ? (stat.delta > 0 ? "#DC2626" : stat.delta < 0 ? "#16A34A" : "#6B7280")
+                  : (stat.delta > 0 ? "#16A34A" : stat.delta < 0 ? "#DC2626" : "#6B7280"))
+              : "#6B7280";
+            return (
+              <View key={i} style={[s.statCard, ...(i < 2 ? [{ marginRight: 10 }] : [])]}>
+                <View style={[s.statIconBox, { backgroundColor: stat.isIssue ? "#FEE2E2" : tokens.primaryUltraLight }]}>
+                  {stat.icon}
+                </View>
+                <Text style={[s.statNum, { color: stat.isIssue ? "#DC2626" : tokens.primary }]}>{stat.num}</Text>
+                <Text style={s.statLbl}>{stat.label}</Text>
+                {stat.delta != null && (
+                  <Text style={[s.statDelta, { color: deltaColor }]}>
+                    vs check-in: {stat.delta > 0 ? "+" : ""}{stat.delta}
+                  </Text>
+                )}
               </View>
-              <View>
-                <Text style={[s.refLabel, { color: tokens.primary }]}>Linked Check-In Report</Text>
-                <Text style={s.refTitle}>
-                  {property.address} · {formatDate(checkinInspection.created_at)}
-                </Text>
-                <Text style={s.refHash}>
-                  SHA-256: {checkinInspection.document_hash?.slice(0, 16)}…
-                  {checkinInspection.document_hash?.slice(-16)}
-                </Text>
+            );
+          })}
+        </View>
+
+        {/* Room comparison table */}
+        <View style={s.sectionHd}>
+          <Text style={s.sectionHdText}>Room comparison</Text>
+          <View style={s.sectionHdLine} />
+        </View>
+
+        <View style={s.roomTable}>
+          <View style={[s.roomThead, { backgroundColor: tokens.primary }]}>
+            <Text style={[s.roomTheadCell, { flex: 2.5 }]}>Room</Text>
+            <Text style={[s.roomTheadCell, { flex: 1.5 }]}>Photos</Text>
+            <Text style={[s.roomTheadCell, { flex: 1.5 }]}>Issues</Text>
+            <Text style={[s.roomTheadCell, { flex: 1.5 }]}>Verdict</Text>
+          </View>
+          {roomStats.map((r, i) => (
+            <View key={r.room.id} style={[s.roomRow, ...(i % 2 === 1 ? [s.roomRowAlt] : [])]}>
+              <Text style={[s.roomCellBold, { flex: 2.5 }]}>{r.room.name}</Text>
+              <Text style={[s.roomCell, { flex: 1.5 }]}>{r.ciPhotos} → {r.coPhotos}</Text>
+              <Text style={[s.roomCell, { flex: 1.5 }]}>{r.ciIssues} → {r.coIssues}</Text>
+              <View style={{ flex: 1.5 }}>
+                <View style={[s.verdictBadge, { backgroundColor: r.verdict.bg }]}>
+                  <Text style={[s.verdictBadgeText, { color: r.verdict.color }]}>{r.verdict.label}</Text>
+                </View>
               </View>
+            </View>
+          ))}
+        </View>
+
+        {/* Key Return comparison */}
+        <View style={s.sectionHd}>
+          <Text style={s.sectionHdText}>Key Return</Text>
+          <View style={s.sectionHdLine} />
+        </View>
+
+        <View style={s.keysCard}>
+          {keyComparison.length === 0 ? (
+            <Text style={{ fontSize: 8, color: "#9B9BA8", fontFamily: "Helvetica-Oblique" }}>
+              No key items recorded
+            </Text>
+          ) : (
+            keyComparison.map((k, i) => (
+              <View key={i} style={[s.keyItem, ...(i === keyComparison.length - 1 ? [s.keyItemLast] : [])]}>
+                <View style={[s.keyIconBox, { backgroundColor: tokens.primaryUltraLight }]}>
+                  {getKeyIcon(k.item, tokens.primary)}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.keyLabel}>{k.item}</Text>
+                  <Text style={s.keySubLabel}>Given ×{k.given} → Returned ×{k.returned}</Text>
+                </View>
+                <View style={[s.keyStatus, { backgroundColor: k.ok ? "#DCFCE7" : "#FEE2E2" }]}>
+                  <Text style={[s.keyStatusText, { color: k.ok ? "#16A34A" : "#DC2626" }]}>
+                    {k.ok ? "✓ All returned" : `Missing ×${k.missing}`}
+                  </Text>
+                </View>
+              </View>
+            ))
+          )}
+
+          {missingKeys.length > 0 && (
+            <View style={s.missingAlert}>
+              <IconWarning size={12} color="#DC2626" />
+              <Text style={{ fontSize: 8, color: "#DC2626", fontFamily: "Helvetica-Bold", marginLeft: 6 }}>
+                ⚠ Some items were not returned. Please verify with the tenant.
+              </Text>
             </View>
           )}
         </View>
 
-        <View style={[s.footer, { backgroundColor: tokens.primaryDark }]} fixed>
+        <View style={[s.pdfFooter, { backgroundColor: tokens.primary }]} fixed>
           <View style={s.footerLeft}>
             <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
             <View style={s.footerDivider} />
             <Text style={s.footerUrl}>{agencyWebsite}</Text>
           </View>
-          <Text style={s.footerRight}>
-            SHA-256: {inspection.document_hash?.slice(0, 8)}…{inspection.document_hash?.slice(-8)} ·
-            Page 1 of {totalPages}
-          </Text>
+          <Text style={s.footerRight}>SHA-256: {shortHash} · Page 2</Text>
         </View>
       </Page>
 
-      <Page size="A4" style={s.page}>
-        <View style={[s.ovHeader, { backgroundColor: tokens.primary }]}>
-          <View>
-            <Text style={s.ovTitle}>Inspection Overview</Text>
-            <Text style={s.ovSub}>
-              Check-out · {property.address} · {formatDate(inspection.created_at)}
-            </Text>
-          </View>
-          <View style={s.ovHeaderIcon}>
-            <View
-              style={{
-                width: 14,
-                height: 14,
-                backgroundColor: "rgba(255,255,255,0.6)",
-                borderRadius: 3,
-              }}
-            />
-          </View>
-        </View>
+      {/* ROOM PAGES */}
+      {roomStats.map((r, roomIndex) => {
+        const room = r.room;
+        const photos = room.photos.filter((p) => p.url && p.url.startsWith("https://"));
+        const cond = (r.roomCondition || "good").toLowerCase().replace(/\s+/g, "_");
 
-        <View style={s.overviewBody}>
-          <View style={s.statRow}>
-            {[
-              {
-                num: rooms.length,
-                label: "Rooms",
-                color: tokens.primary,
-                bg: tokens.primaryUltraLight,
-              },
-              {
-                num: totalPhotos,
-                label: "Photos",
-                color: tokens.primary,
-                bg: tokens.primaryUltraLight,
-              },
-              {
-                num: newIssuesCount,
-                label: "New issues",
-                color: newIssuesCount > 0 ? "#DC2626" : "#15803D",
-                bg: newIssuesCount > 0 ? "#FEE2E2" : "#DCFCE7",
-              },
-              {
-                num: unchangedCount,
-                label: "Unchanged",
-                color: "#15803D",
-                bg: "#DCFCE7",
-              },
-            ].map((stat, i) => (
-              <View key={i} style={[s.statCard, ...(i < 3 ? [s.statCardMargin] : [])]}>
-                <View style={[s.statIconBox, { backgroundColor: stat.bg }]}>
-                  <View
-                    style={{
-                      width: 12,
-                      height: 12,
-                      backgroundColor: stat.color,
-                      borderRadius: 3,
-                      opacity: 0.5,
-                    }}
-                  />
-                </View>
-                <Text style={[s.statNum, { color: stat.color }]}>{stat.num}</Text>
-                <Text style={s.statLbl}>{stat.label}</Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={s.sectionHd}>
-            <Text style={s.sectionHdText}>Room comparison</Text>
-            <View style={s.sectionHdLine} />
-          </View>
-          <View style={s.cmpTable}>
-            <View style={[s.cmpThead, { backgroundColor: tokens.primary }]}>
-              <Text style={[s.cmpTheadCell, { flex: 1.8 }]}>Room</Text>
-              <Text style={[s.cmpTheadCell, { flex: 1.2 }]}>Check-in</Text>
-              <Text style={[s.cmpTheadCell, { flex: 1.2 }]}>Check-out</Text>
-              <Text style={[s.cmpTheadCell, { flex: 1.2 }]}>Delta</Text>
-              <Text style={[s.cmpTheadCell, { flex: 2 }]}>New findings</Text>
-            </View>
-            {rooms.map((room, i) => {
-              const delta = getConditionDelta(room.checkin_condition, room.condition);
-              const deltaStyle =
-                delta === "degraded"
-                  ? s.deltaDegraded
-                  : delta === "improved"
-                    ? s.deltaImproved
-                    : s.deltaUnchanged;
-              const deltaTextStyle =
-                delta === "degraded"
-                  ? s.deltaDegradedText
-                  : delta === "improved"
-                    ? s.deltaImprovedText
-                    : s.deltaUnchangedText;
-              const deltaLabel =
-                delta === "degraded"
-                  ? "Degraded"
-                  : delta === "improved"
-                    ? "Improved"
-                    : "Unchanged";
-
-              const newTags = room.photos.flatMap((p) => {
-                const checkinSet = new Set(p.checkin_photo?.damage_tags ?? []);
-                return (p.damage_tags ?? []).filter((t) => !checkinSet.has(t));
-              });
-              const uniqueNewTags = Array.from(new Set(newTags)).slice(0, 3).join(", ");
-
-              const condLabel =
-                room.condition === "good"
-                  ? "Good"
-                  : room.condition === "needs_attention"
-                    ? "Needs Attention"
-                    : "Critical";
-              const ciCondLabel =
-                room.checkin_condition === "good"
-                  ? "Good"
-                  : room.checkin_condition === "needs_attention"
-                    ? "Needs Attention"
-                    : "Critical";
-              const condBadge =
-                room.condition === "good"
-                  ? s.condBadgeGood
-                  : room.condition === "needs_attention"
-                    ? s.condBadgeWarn
-                    : s.condBadgeCrit;
-              const condText =
-                room.condition === "good"
-                  ? s.condTextGood
-                  : room.condition === "needs_attention"
-                    ? s.condTextWarn
-                    : s.condTextCrit;
-              const ciCondBadge =
-                room.checkin_condition === "good"
-                  ? s.condBadgeGood
-                  : room.checkin_condition === "needs_attention"
-                    ? s.condBadgeWarn
-                    : s.condBadgeCrit;
-              const ciCondText =
-                room.checkin_condition === "good"
-                  ? s.condTextGood
-                  : room.checkin_condition === "needs_attention"
-                    ? s.condTextWarn
-                    : s.condTextCrit;
-
-              return (
-                <View key={room.id} style={[s.cmpRow, ...(i % 2 === 1 ? [s.cmpRowAlt] : [])]}>
-                  <Text style={[s.cmpCellBold, { flex: 1.8 }]}>{room.name}</Text>
-                  <View style={{ flex: 1.2 }}>
-                    <View style={ciCondBadge}>
-                      <Text style={ciCondText}>{ciCondLabel}</Text>
-                    </View>
-                  </View>
-                  <View style={{ flex: 1.2 }}>
-                    <View style={condBadge}>
-                      <Text style={condText}>{condLabel}</Text>
-                    </View>
-                  </View>
-                  <View style={{ flex: 1.2 }}>
-                    <View style={[s.deltaBadge, deltaStyle]}>
-                      <Text style={[s.deltaBadgeText, deltaTextStyle]}>{deltaLabel}</Text>
-                    </View>
-                  </View>
-                  <Text
-                    style={[
-                      s.cmpCell,
-                      {
-                        flex: 2,
-                        fontSize: 6.5,
-                        color: uniqueNewTags ? "#DC2626" : "#9B9BA8",
-                      },
-                    ]}
-                  >
-                    {uniqueNewTags || "—"}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-
-          <View style={[s.sectionHd, s.sectionHdMargin]}>
-            <Text style={s.sectionHdText}>Key handover comparison</Text>
-            <View style={s.sectionHdLine} />
-          </View>
-          <View style={s.keyTable}>
-            <View style={[s.keyThead, { backgroundColor: tokens.primary }]}>
-              <Text style={[s.keyTheadCell, { flex: 2 }]}>Item</Text>
-              <Text style={[s.keyTheadCell, { flex: 1 }]}>Check-in qty</Text>
-              <Text style={[s.keyTheadCell, { flex: 1 }]}>Check-out qty</Text>
-              <Text style={[s.keyTheadCell, { flex: 1.5 }]}>Status</Text>
-            </View>
-            {keyComparison.map((item, i) => (
-              <View key={i} style={[s.keyRow, ...(i % 2 === 1 ? [s.keyRowAlt] : [])]}>
-                <View style={{ flex: 2, flexDirection: "row", alignItems: "center" }}>
-                  <View style={[s.keyIconBox, { backgroundColor: tokens.primaryUltraLight }]}>
-                    <View
-                      style={{
-                        width: 8,
-                        height: 8,
-                        backgroundColor: tokens.primaryLight,
-                        borderRadius: 2,
-                      }}
-                    />
-                  </View>
-                  <Text style={s.keyLabel}>{item.label}</Text>
-                </View>
-                <Text style={[s.keyQtyOk, { flex: 1 }]}>×{item.checkinQty}</Text>
-                <Text
-                  style={[
-                    item.status === "missing"
-                      ? s.keyQtyMiss
-                      : item.status === "extra"
-                        ? s.keyQtyExtra
-                        : s.keyQtyOk,
-                    { flex: 1 },
-                  ]}
-                >
-                  ×{item.checkoutQty}
-                </Text>
-                <View style={{ flex: 1.5 }}>
-                  <View
-                    style={
-                      item.status === "missing"
-                        ? s.keyStatusMiss
-                        : item.status === "extra"
-                          ? s.keyStatusExtra
-                          : s.keyStatusOk
-                    }
-                  >
-                    <Text
-                      style={
-                        item.status === "missing"
-                          ? s.keyStatusTextMiss
-                          : item.status === "extra"
-                            ? s.keyStatusTextExtra
-                            : s.keyStatusTextOk
-                      }
-                    >
-                      {item.status === "missing"
-                        ? `Missing ×${Math.abs(item.delta)}`
-                        : item.status === "extra"
-                          ? `Extra ×${item.delta}`
-                          : "All returned"}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={[s.footer, { backgroundColor: tokens.primaryDark }]} fixed>
-          <View style={s.footerLeft}>
-            <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
-            <View style={s.footerDivider} />
-            <Text style={s.footerUrl}>{agencyWebsite}</Text>
-          </View>
-          <Text style={s.footerRight}>
-            SHA-256: {inspection.document_hash?.slice(0, 8)}…{inspection.document_hash?.slice(-8)}{" "}
-            · Page 2 of {totalPages}
-          </Text>
-        </View>
-      </Page>
-
-      {rooms.map((room, roomIndex) => {
-        const condBadge =
-          room.condition === "good"
-            ? s.condBadgeGood
-            : room.condition === "needs_attention"
-              ? s.condBadgeWarn
-              : s.condBadgeCrit;
-        const condText =
-          room.condition === "good"
-            ? s.condTextGood
-            : room.condition === "needs_attention"
-              ? s.condTextWarn
-              : s.condTextCrit;
+        const condBadgeStyle =
+          cond === "good" || cond === "excellent"
+            ? s.roomCondBadgeGood
+            : cond === "needs_attention" || cond === "fair"
+              ? s.roomCondBadgeWarn
+              : s.roomCondBadgeCritical;
+        const condTextStyle =
+          cond === "good" || cond === "excellent"
+            ? s.roomCondTextGood
+            : cond === "needs_attention" || cond === "fair"
+              ? s.roomCondTextWarn
+              : s.roomCondTextCritical;
         const condLabel =
-          room.condition === "good"
+          cond === "good" || cond === "excellent"
             ? "Good"
-            : room.condition === "needs_attention"
+            : cond === "needs_attention" || cond === "fair"
               ? "Needs Attention"
               : "Critical";
 
-        const newIssuesInRoom = room.photos.flatMap((p) => {
-          const checkinSet = new Set(p.checkin_photo?.damage_tags ?? []);
-          return (p.damage_tags ?? []).filter((t) => !checkinSet.has(t));
-        }).length;
+        const totalIssuesRoom = photos.filter((p) => (p.damage_tags?.length ?? 0) > 0).length;
 
-        const linkedPhotos = room.photos.filter(
-          (p) => p.checkin_photo_id && p.checkin_photo
-        );
-        const additionalPhotos = room.photos.filter(
-          (p) => !p.checkin_photo_id || !p.checkin_photo
-        );
+        const photoPairs: (typeof photos)[] = [];
+        for (let i = 0; i < photos.length; i += 2) {
+          photoPairs.push(photos.slice(i, i + 2));
+        }
 
-        const COL_W = 275;
+        const PAGE_INNER_WIDTH = 515;
+        const COL_WIDTH_2 = (PAGE_INNER_WIDTH - 8) / 2;
+        const COL_WIDTH_1 = PAGE_INNER_WIDTH;
 
         return (
-          <Page key={room.id} size="A4" style={s.page}>
+          <Page key={roomIndex} size="A4" style={s.page} wrap={false}>
             <View style={[s.roomHero, { backgroundColor: tokens.primary }]}>
-              <View style={s.roomHeroDeco} />
+              <View style={[s.roomHeroDecoOuter, { borderColor: tokens.primaryDark }]} />
+              <View style={[s.roomHeroDecoInner, { borderColor: tokens.primaryLight }]} />
               <View style={s.roomHeroTop}>
                 <View>
                   <Text style={s.roomNumber}>
-                    Room {String(roomIndex + 1).padStart(2, "0")} of{" "}
-                    {String(rooms.length).padStart(2, "0")}
+                    Room {String(roomIndex + 1).padStart(2, "0")} of {String(roomStats.length).padStart(2, "0")}
                   </Text>
                   <Text style={s.roomTitle}>{room.name}</Text>
-                  <Text style={s.roomDate}>
-                    Check-out: {formatDate(inspection.created_at)}
-                    {checkinInspection
-                      ? `  ·  Check-in ref: ${formatDate(checkinInspection.created_at)}`
-                      : ""}
-                  </Text>
+                  <Text style={s.roomDate}>Inspected on {formatDate(inspection.created_at)}</Text>
                 </View>
-                <View style={condBadge}>
-                  <Text style={condText}>{condLabel}</Text>
+                <View style={condBadgeStyle}>
+                  <Text style={condTextStyle}>{condLabel}</Text>
                 </View>
               </View>
               <View style={s.roomStatsRow}>
-                <View style={s.roomStatItem}>
-                  <View style={s.roomStatDot} />
+                <View style={[s.roomStatItem, { marginRight: 16 }]}>
+                  <View style={[s.roomStatDot, { marginRight: 5 }]} />
                   <Text style={s.roomStatText}>
-                    {room.photos.length} photo{room.photos.length !== 1 ? "s" : ""} captured
+                    {photos.length} photo{photos.length !== 1 ? "s" : ""} captured
                   </Text>
                 </View>
                 <View style={s.roomStatItem}>
-                  <View
-                    style={[
-                      s.roomStatDot,
-                      {
-                        backgroundColor:
-                          newIssuesInRoom > 0 ? "#FCA5A5" : "rgba(255,255,255,0.45)",
-                      },
-                    ]}
-                  />
+                  <View style={[s.roomStatDot, { marginRight: 5 }]} />
                   <Text style={s.roomStatText}>
-                    {newIssuesInRoom > 0
-                      ? `${newIssuesInRoom} new issue${newIssuesInRoom !== 1 ? "s" : ""} vs check-in`
-                      : "No new issues vs check-in"}
+                    {totalIssuesRoom} issue{totalIssuesRoom !== 1 ? "s" : ""} flagged
                   </Text>
                 </View>
               </View>
             </View>
 
             <View style={s.roomBody}>
-              {linkedPhotos.length > 0 && (
-                <>
-                  <View style={s.colLabelRow}>
-                    <View style={[s.colLabel, s.colLabelCheckin, s.colLabelMargin]}>
-                      <Text>Check-in · {formatDate(checkinInspection?.created_at)}</Text>
-                    </View>
-                    <View
-                      style={[
-                        s.colLabel,
-                        s.colLabelCheckout,
-                        { backgroundColor: tokens.primaryUltraLight },
-                      ]}
-                    >
-                      <Text style={{ color: tokens.primary }}>
-                        Check-out · {formatDate(inspection.created_at)}
-                      </Text>
-                    </View>
-                  </View>
+              {photoPairs.map((pair, pairIdx) => {
+                const isSingleAny = pair.length === 1;
+                return (
+                  <View
+                    key={pairIdx}
+                    style={isSingleAny ? { marginBottom: 8 } : [s.photosGrid, { marginBottom: 8 }]}
+                  >
+                    {pair.map((photo, pi) => {
+                      const useFull = isSingleAny;
+                      const colW = useFull ? COL_WIDTH_1 : COL_WIDTH_2;
+                      const imgH = getPdfImageHeight(colW, photo.width, photo.height);
 
-                  {linkedPhotos.map((photo) => {
-                    const photoDelta = getConditionDelta(
-                      photo.checkin_photo?.damage_tags?.length
-                        ? "needs_attention"
-                        : "good",
-                      photo.damage_tags?.length ? "needs_attention" : "good"
-                    );
-                    const newTags = (photo.damage_tags ?? []).filter(
-                      (t) => !new Set(photo.checkin_photo?.damage_tags ?? []).has(t)
-                    );
-                    const ciH = getPdfImageHeight(
-                      COL_W,
-                      photo.checkin_photo?.width,
-                      photo.checkin_photo?.height
-                    );
-                    const coH = getPdfImageHeight(COL_W, photo.width, photo.height);
-                    const rowH = Math.max(ciH, coH);
-
-                    return (
-                      <View key={photo.id}>
-                        <View style={s.photoCmpRow}>
-                          <View style={[s.photoCmpCard, s.photoCmpCardMargin]}>
-                            {photo.checkin_photo ? (
-                              <Image
-                                src={photo.checkin_photo.url}
-                                style={{
-                                  width: "100%",
-                                  height: rowH,
-                                  objectFit: "contain",
-                                  backgroundColor: "#F8F8FC",
-                                }}
-                              />
-                            ) : (
-                              <View
-                                style={{
-                                  width: "100%",
-                                  height: rowH,
-                                  backgroundColor: "#F8F8FC",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                }}
-                              >
-                                <Text style={{ fontSize: 7, color: "#9B9BA8" }}>
-                                  No check-in photo
-                                </Text>
-                              </View>
-                            )}
-                            {photo.checkin_photo?.damage_tags &&
-                              photo.checkin_photo.damage_tags.length > 0 && (
-                                <View style={s.photoTagsRow}>
-                                  {photo.checkin_photo.damage_tags.map((tag, ti) => {
-                                    const ts = tagStyle(tag);
-                                    return (
-                                      <View key={ti} style={[s.photoTag, ts.bg]}>
-                                        <Text style={[s.photoTagText, ts.text]}>{tag}</Text>
-                                      </View>
-                                    );
-                                  })}
-                                </View>
-                              )}
-                            {photo.checkin_photo?.ai_analysis && (
-                              <>
-                                <View style={s.photoAiDivider} />
-                                <View style={s.photoAiWrap}>
-                                  <Text
-                                    style={[s.photoAiLabel, { color: "#6B7280" }]}
-                                  >
-                                    AI Analysis
-                                  </Text>
-                                  <Text style={s.photoAiText}>
-                                    {photo.checkin_photo.ai_analysis}
-                                  </Text>
-                                </View>
-                              </>
-                            )}
-                          </View>
-
-                          <View
-                            style={[
-                              s.photoCmpCard,
-                              ...(newTags.length > 0 ? [s.photoCmpCardDegraded] : []),
-                            ]}
-                          >
+                      return (
+                        <View
+                          key={photo.id}
+                          style={[
+                            useFull ? s.photoCardFull : s.photoCard,
+                            ...(!useFull && pi === 0 ? [{ marginRight: 8 }] : []),
+                          ]}
+                        >
+                          {photo.url && photo.url.startsWith("http") ? (
                             <Image
                               src={photo.url}
                               style={{
                                 width: "100%",
-                                height: rowH,
+                                height: imgH,
                                 objectFit: "contain",
-                                backgroundColor:
-                                  newTags.length > 0 ? "#FFF8F8" : "#F8F8FC",
+                                backgroundColor: "#F8F8FC",
                               }}
                             />
-                            {photo.damage_tags && photo.damage_tags.length > 0 && (
-                              <View style={s.photoTagsRow}>
-                                {photo.damage_tags.map((tag, ti) => {
-                                  const ts = tagStyle(tag);
-                                  const isNew = !new Set(
-                                    photo.checkin_photo?.damage_tags ?? []
-                                  ).has(tag);
-                                  return (
-                                    <View
-                                      key={ti}
-                                      style={[s.photoTag, isNew ? s.photoTagRed : ts.bg]}
-                                    >
-                                      <Text
-                                        style={[
-                                          s.photoTagText,
-                                          isNew ? s.photoTagTextRed : ts.text,
-                                        ]}
-                                      >
-                                        {isNew ? `★ ${tag}` : tag}
-                                      </Text>
-                                    </View>
-                                  );
-                                })}
-                              </View>
-                            )}
-                            {photo.ai_analysis && (
-                              <>
-                                <View style={s.photoAiDivider} />
-                                <View style={s.photoAiWrap}>
-                                  <Text
-                                    style={[s.photoAiLabel, { color: tokens.primary }]}
-                                  >
-                                    AI Analysis
-                                  </Text>
-                                  <Text style={s.photoAiText}>{photo.ai_analysis}</Text>
-                                </View>
-                              </>
-                            )}
-                          </View>
-                        </View>
-
-                        <View style={s.changeBadgeRow}>
-                          <View
-                            style={[
-                              s.changeBadge,
-                              photoDelta === "degraded"
-                                ? s.changeDegraded
-                                : photoDelta === "improved"
-                                  ? s.changeImproved
-                                  : s.changeUnchanged,
-                            ]}
-                          >
-                            <View
-                              style={[
-                                s.changeDot,
-                                {
-                                  backgroundColor:
-                                    photoDelta === "degraded"
-                                      ? "#DC2626"
-                                      : photoDelta === "improved"
-                                        ? "#15803D"
-                                        : "#94A3B8",
-                                },
-                              ]}
-                            />
-                            <Text
-                              style={[
-                                s.changeBadgeText,
-                                photoDelta === "degraded"
-                                  ? s.changeDegradedText
-                                  : photoDelta === "improved"
-                                    ? s.changeImprovedText
-                                    : s.changeUnchangedText,
-                              ]}
-                            >
-                              {photoDelta === "degraded"
-                                ? `Condition degraded — ${newTags.length} new tag${newTags.length !== 1 ? "s" : ""} vs check-in`
-                                : photoDelta === "improved"
-                                  ? "Condition improved vs check-in"
-                                  : "Condition unchanged vs check-in"}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </>
-              )}
-
-              {additionalPhotos.length > 0 && (
-                <>
-                  <Text style={s.additionalLabel}>
-                    Additional photos — no check-in counterpart
-                  </Text>
-                  {(() => {
-                    const pairs: CheckoutPhoto[][] = [];
-                    for (let i = 0; i < additionalPhotos.length; i += 2) {
-                      pairs.push(additionalPhotos.slice(i, i + 2));
-                    }
-                    return pairs.map((pair, pIdx) => (
-                      <View key={pIdx} style={s.photoCmpRow}>
-                        {pair.map((photo, pi) => {
-                          const h = getPdfImageHeight(
-                            COL_W,
-                            photo.width,
-                            photo.height
-                          );
-                          return (
-                            <View
-                              key={photo.id}
-                              style={[
-                                s.photoCmpCard,
-                                ...(pi === 0 && pair.length > 1
-                                  ? [s.photoCmpCardMargin]
-                                  : []),
-                              ]}
-                            >
-                              <Image
-                                src={photo.url}
-                                style={{
-                                  width: "100%",
-                                  height: h,
-                                  objectFit: "contain",
-                                  backgroundColor: "#F8F8FC",
-                                }}
-                              />
-                              {photo.damage_tags &&
-                                photo.damage_tags.length > 0 && (
-                                  <View style={s.photoTagsRow}>
-                                    {photo.damage_tags.map((tag, ti) => {
-                                      const ts = tagStyle(tag);
-                                      return (
-                                        <View
-                                          key={ti}
-                                          style={[s.photoTag, ts.bg]}
-                                        >
-                                          <Text
-                                            style={[s.photoTagText, ts.text]}
-                                          >
-                                            {tag}
-                                          </Text>
-                                        </View>
-                                      );
-                                    })}
+                          ) : null}
+                          {photo.damage_tags && photo.damage_tags.length > 0 && (
+                            <View style={s.photoTagsRow}>
+                              {photo.damage_tags.map((tag, ti) => {
+                                const ts = tagStyle(tag);
+                                return (
+                                  <View key={ti} style={[s.photoTag, { backgroundColor: ts.bg, marginRight: 3, marginBottom: 2 }]}>
+                                    <Text style={[s.photoTagText, { color: ts.text }]}>{tag}</Text>
                                   </View>
-                                )}
-                              {photo.ai_analysis && (
-                                <>
-                                  <View style={s.photoAiDivider} />
-                                  <View style={s.photoAiWrap}>
-                                    <Text
-                                      style={[s.photoAiLabel, { color: tokens.primary }]}
-                                    >
-                                      AI Analysis
-                                    </Text>
-                                    <Text style={s.photoAiText}>{photo.ai_analysis}</Text>
-                                  </View>
-                                </>
-                              )}
+                                );
+                              })}
                             </View>
-                          );
-                        })}
-                      </View>
-                    ));
-                  })()}
-                </>
-              )}
+                          )}
+                          {photo.ai_analysis && (
+                            <>
+                              <View style={s.photoAiDivider} />
+                              <View style={s.photoAiWrap}>
+                                <Text style={[s.photoAiLabel, { color: tokens.primary }]}>AI Analysis</Text>
+                                <Text style={s.photoAiText}>{photo.ai_analysis}</Text>
+                              </View>
+                            </>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                );
+              })}
             </View>
 
-            <View style={[s.footer, { backgroundColor: tokens.primaryDark }]} fixed>
+            <View style={[s.pdfFooter, { backgroundColor: tokens.primary }]}>
               <View style={s.footerLeft}>
                 <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
                 <View style={s.footerDivider} />
                 <Text style={s.footerUrl}>{agencyWebsite}</Text>
               </View>
               <Text style={s.footerRight}>
-                SHA-256: {inspection.document_hash?.slice(0, 8)}…
-                {inspection.document_hash?.slice(-8)} · Page {roomIndex + 3} of {totalPages}
+                SHA-256: {shortHash} · Page {roomIndex + 3} of {roomStats.length + 3}
               </Text>
             </View>
           </Page>
         );
       })}
 
+      {/* SIGNATURE PAGE */}
       <Page size="A4" style={s.page}>
         <View style={[s.sigHero, { backgroundColor: tokens.primary }]}>
-          <View style={s.sigHeroDeco} />
+          <View style={[s.sigHeroDeco, { borderColor: tokens.primaryDark }]} />
           <View style={s.sigHeroTop}>
-            <View>
-              <Text style={s.sigLogoText}>{agencyName}</Text>
-              <Text style={s.sigLogoSub}>PROPERTY INSPECTION REPORT</Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              {agencyLogoUrl ? (
+                <Image
+                  src={agencyLogoUrl}
+                  style={{
+                    width: 40, height: 40, objectFit: "contain", borderRadius: 8,
+                    marginRight: 10, backgroundColor: "rgba(255,255,255,0.15)",
+                  }}
+                />
+              ) : null}
+              <View>
+                <Text style={s.sigLogoText}>{agencyName}</Text>
+                <Text style={s.sigLogoSub}>PROPERTY INSPECTION REPORT</Text>
+              </View>
             </View>
-            <View style={s.sigVerifiedBadge}>
-              <View style={s.sigVerifiedDot} />
+            <View style={[s.sigVerifiedBadge, { backgroundColor: tokens.primaryLight }]}>
+              <View style={[s.sigVerifiedDot, { marginRight: 5 }]} />
               <Text style={s.sigVerifiedText}>Verified Document</Text>
             </View>
           </View>
@@ -1669,21 +1441,21 @@ export function CheckoutPDFDocument({
             This report has been reviewed{"\n"}and agreed upon by all parties.
           </Text>
           <Text style={s.sigSubtitle}>
-            {property.address} · {formatDate(inspection.created_at)}
+            {property.address ?? "Property"} · {formatDate(inspection.created_at)}
           </Text>
         </View>
 
         <View style={s.sigBody}>
           {qrCodeDataUrl && (
             <View style={s.qrRow}>
-              <View style={s.qrBox}>
+              <View style={[s.qrBox, { marginRight: 14 }]}>
                 <Image src={qrCodeDataUrl} style={s.qrImage} />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={s.qrTextWrap}>
                 <Text style={s.qrTextTitle}>Scan to verify this report</Text>
                 <Text style={s.qrTextBody}>
-                  View the online version, verify document authenticity, and access the full digital
-                  record. This QR links directly to the inspection report on {agencyWebsite}.
+                  View the original online version, verify document authenticity, and access the full digital record.
+                  This QR code links directly to the inspection report on {agencyWebsite}.
                 </Text>
               </View>
             </View>
@@ -1694,16 +1466,11 @@ export function CheckoutPDFDocument({
               { role: "Landlord", name: tenancy.landlord_name, sigType: "landlord" },
               { role: "Tenant", name: tenancy.tenant_name, sigType: "tenant" },
             ].map((party, i) => {
-              const sig = signatures?.find((s) => s.signer_type === party.sigType);
+              const sig = (signatures ?? []).find((s) => s.signer_type === party.sigType);
               return (
-                <View
-                  key={i}
-                  style={[s.sigPartyCard, ...(i === 0 ? [s.sigPartyCardMargin] : [])]}
-                >
-                  <Text style={[s.sigPartyRole, { color: tokens.primary }]}>
-                    {party.role.toUpperCase()}
-                  </Text>
-                  <Text style={s.sigPartyName}>{party.name}</Text>
+                <View key={i} style={[s.sigPartyCard, ...(i === 0 ? [{ marginRight: 8 }] : [])]}>
+                  <Text style={[s.sigPartyRole, { color: tokens.primary }]}>{party.role.toUpperCase()}</Text>
+                  <Text style={s.sigPartyName}>{party.name ?? "—"}</Text>
                   <View style={s.sigSignArea}>
                     {sig?.signature_data ? (
                       <Image src={sig.signature_data} style={s.sigSignImage} />
@@ -1717,16 +1484,14 @@ export function CheckoutPDFDocument({
           </View>
 
           {(() => {
-            const inspectorSig = signatures?.find(
-              (s) => s.signer_type === "inspector" || s.signer_type === "agent"
+            const inspectorSig = (signatures ?? []).find(
+              (s) => s.signer_type === "agent" || s.signer_type === "inspector"
             );
             return (
               <View style={s.sigInspectorCard}>
-                <View style={s.sigInspectorLeft}>
-                  <Text style={[s.sigInspectorRole, { color: tokens.primary }]}>
-                    INSPECTOR
-                  </Text>
-                  <Text style={s.sigInspectorName}>{profile?.full_name}</Text>
+                <View style={[s.sigInspectorLeft, { marginRight: 12 }]}>
+                  <Text style={[s.sigInspectorRole, { color: tokens.primary }]}>INSPECTOR</Text>
+                  <Text style={s.sigInspectorName}>{profile?.full_name ?? "—"}</Text>
                   <Text style={s.sigInspectorAgency}>
                     {agencyName}
                     {profile?.rera_number ? ` · RERA #${profile.rera_number}` : ""}
@@ -1751,39 +1516,29 @@ export function CheckoutPDFDocument({
           <View style={s.hashCard}>
             <Text style={s.hashLabel}>Document integrity — SHA-256 hash</Text>
             <View style={s.hashRow}>
-              <View
-                style={[s.hashIconBox, { backgroundColor: tokens.primaryUltraLight }]}
-              >
-                <View
-                  style={{
-                    width: 8,
-                    height: 8,
-                    backgroundColor: tokens.primaryLight,
-                    borderRadius: 2,
-                  }}
-                />
+              <View style={[s.hashIconBox, { backgroundColor: tokens.primaryUltraLight, marginRight: 6 }]}>
+                <IconShield size={10} color={tokens.primary} />
               </View>
-              <Text style={s.hashValue}>{inspection.document_hash}</Text>
+              <Text style={s.hashValue}>{documentHash}</Text>
             </View>
           </View>
 
           <Text style={s.disclaimer}>
-            This report documents the condition of the property as observed at the time of
-            inspection. It is based on a visual assessment only and does not constitute a structural,
-            electrical, or plumbing survey. All parties are advised to review this report carefully.
-            By signing, each party acknowledges the findings recorded herein. This document is
-            generated electronically and verified by SHA-256 hash.
+            This report documents the condition of the property as observed at the time of inspection. It is based on
+            a visual assessment only and does not constitute a structural, electrical, or plumbing survey. All parties
+            are advised to review this report carefully. By signing, each party acknowledges the findings recorded
+            herein. This document is generated electronically and verified by SHA-256 hash.
           </Text>
         </View>
 
-        <View style={[s.footer, { backgroundColor: tokens.primaryDark }]} fixed>
+        <View style={[s.pdfFooter, { backgroundColor: tokens.primary }]} fixed>
           <View style={s.footerLeft}>
             <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
             <View style={s.footerDivider} />
             <Text style={s.footerUrl}>{agencyWebsite}</Text>
           </View>
           <Text style={s.footerRight}>
-            {formatDate(inspection.created_at)} · Page {totalPages} of {totalPages}
+            {formatDate(inspection.created_at)} · Page {roomStats.length + 3} of {roomStats.length + 3}
           </Text>
         </View>
       </Page>
@@ -1791,9 +1546,27 @@ export function CheckoutPDFDocument({
   );
 }
 
-export async function renderCheckoutPDFToBuffer(
-  props: CheckoutPDFProps
-): Promise<Buffer> {
-  const doc = <CheckoutPDFDocument {...props} />;
+/* ─────────────────────────────────────────────────────────────────────────────
+   Export Functions
+   ───────────────────────────────────────────────────────────────────────────── */
+
+export async function renderCheckoutPDFToBuffer(props: CheckoutPDFProps): Promise<Buffer> {
+  // Generate QR code if not provided
+  let qrCodeDataUrl = props.qrCodeDataUrl;
+  if (!qrCodeDataUrl) {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.snagify.net";
+    const reportUrl = `${appUrl}/report/${props.inspection.id}`;
+    try {
+      qrCodeDataUrl = await QRCode.toDataURL(reportUrl, {
+        width: 200,
+        margin: 1,
+        color: { dark: "#1a1a2e", light: "#FFFFFF" },
+      });
+    } catch {
+      qrCodeDataUrl = undefined;
+    }
+  }
+
+  const doc = <CheckoutPDFDocument {...props} qrCodeDataUrl={qrCodeDataUrl} />;
   return renderToBuffer(doc);
 }
