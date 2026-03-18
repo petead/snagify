@@ -8,6 +8,7 @@ export type RoomPhoto = {
   damage_tags?: string[] | null
   width?: number | null
   height?: number | null
+  checkin_photo_id?: string | null
 }
 
 export type RoomData = {

@@ -349,9 +349,9 @@ export function CheckoutReportView({
 
             // First pass: matched photos (have checkin_photo_id) + new photos
             for (const coPhoto of coPhotos) {
-              if ((coPhoto as any).checkin_photo_id) {
+              if (coPhoto.checkin_photo_id) {
                 const ciPhoto = ciPhotos.find(
-                  (p) => p.id === (coPhoto as any).checkin_photo_id
+                  (p) => p.id === coPhoto.checkin_photo_id
                 ) ?? null
                 matchedPairs.push({ ciPhoto, coPhoto, isNew: false })
               } else {
@@ -362,8 +362,8 @@ export function CheckoutReportView({
             // Second pass: check-in photos NOT referenced by any checkout photo
             const referencedCiIds = new Set(
               coPhotos
-                .filter((p) => (p as any).checkin_photo_id)
-                .map((p) => (p as any).checkin_photo_id)
+                .filter((p) => p.checkin_photo_id)
+                .map((p) => p.checkin_photo_id as string)
             )
             const unreferencedCiPhotos = ciPhotos.filter(
               (p) => !referencedCiIds.has(p.id)

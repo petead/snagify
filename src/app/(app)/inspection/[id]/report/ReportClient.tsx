@@ -464,6 +464,7 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
                   damage_tags: p.damage_tags,
                   width: null,
                   height: null,
+                  checkin_photo_id: p.checkin_photo_id ?? null,
                 })),
               })),
             }}

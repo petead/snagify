@@ -24,7 +24,7 @@ export default async function ReportPage({
       ),
       rooms (
         id, name, condition, order_index,
-        photos (id, url, ai_analysis, damage_tags, notes)
+        photos (id, url, ai_analysis, damage_tags, notes, checkin_photo_id)
       ),
       signatures (signer_type, otp_verified, signed_at, signature_data)
     `
@@ -84,6 +84,7 @@ export type RoomPhoto = {
   ai_analysis: string | null;
   damage_tags: string[];
   notes: string | null;
+  checkin_photo_id: string | null;
 };
 
 export type Room = {
