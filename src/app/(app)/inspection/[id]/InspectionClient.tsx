@@ -14,6 +14,7 @@ import GhostCamera from "@/components/GhostCamera";
 import { getImageDimensions } from "@/lib/photos/getImageDimensions";
 import { CheckoutCreditConfirmModal } from "@/components/inspection/CheckoutCreditConfirmModal";
 import { useCredits } from "@/hooks/useCredits";
+import { trackAction } from "@/lib/breadcrumb";
 
 // ─── Types ───────────────────────────────────────
 type RoomData = {
@@ -443,8 +444,9 @@ export function InspectionClient({
   // Lock body scroll
   useEffect(() => {
     document.body.style.overflow = "hidden";
+    trackAction(`Viewed Inspection ${inspectionId.slice(0, 8)}`);
     return () => { document.body.style.overflow = ""; };
-  }, []);
+  }, [inspectionId]);
 
   // Hide bottom nav on inspect screen
   useEffect(() => {
@@ -1057,6 +1059,7 @@ export function InspectionClient({
       }
 
       setNavigating(true);
+      trackAction(`Generated ${inspectionType} report`, `/inspection/${inspectionId}/review`);
       router.refresh();
       router.push(`/inspection/${inspectionId}/report`);
       return;

@@ -8,6 +8,7 @@ import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButt
 import { PenLine, AlertTriangle } from "lucide-react";
 import { useCredits } from "@/hooks/useCredits";
 import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
+import { trackAction } from "@/lib/breadcrumb";
 
 type InspectionRow = {
   id: string;
@@ -124,6 +125,7 @@ export function DashboardClient({
 
   useEffect(() => {
     setLoaded(true);
+    trackAction("Viewed Dashboard");
   }, []);
   useEffect(() => {
     if (typeof window === "undefined") return;

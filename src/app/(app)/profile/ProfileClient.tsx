@@ -8,7 +8,9 @@ import { createClient } from "@/lib/supabase/client";
 import PushNotificationToggle from "@/components/PushNotificationToggle";
 import { SubscriptionSection } from "@/components/profile/SubscriptionSection";
 import { TeamSection } from "@/components/profile/TeamSection";
+import { ReportBugModal } from "@/components/settings/ReportBugModal";
 import { Check } from "lucide-react";
+import { trackAction } from "@/lib/breadcrumb";
 
 export type ProfileData = {
   full_name: string | null;
@@ -74,6 +76,7 @@ export function ProfileClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loaded, setLoaded] = useState(false);
+  const [showBugReport, setShowBugReport] = useState(false);
   const justSubscribed = searchParams.get("subscribed") === "true";
   const isPro = accountType === "pro";
   const isOwner = role === "owner";
@@ -82,6 +85,7 @@ export function ProfileClient({
 
   useEffect(() => {
     setLoaded(true);
+    trackAction("Viewed Profile");
   }, []);
 
   useEffect(() => {
@@ -384,6 +388,41 @@ export function ProfileClient({
             {/* Push Notifications */}
             <PushNotificationToggle />
 
+            {/* Report a problem */}
+            <button
+              type="button"
+              onClick={() => setShowBugReport(true)}
+              className="setting-row"
+              style={{
+                width: "100%",
+                padding: "16px 20px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                borderBottom: "1px solid #F0EFEC",
+                background: "transparent",
+                border: "none",
+                borderTop: "1px solid #F0EFEC",
+                fontFamily: "inherit",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 12, background: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                      stroke="#EF4444" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div style={{ textAlign: "left" }}>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>Report a problem</p>
+                  <p style={{ fontSize: 11, color: "#BBB", margin: "2px 0 0" }}>Help us improve Snagify</p>
+                </div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M9 18l6-6-6-6" stroke="#C4C4C4" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
+            </button>
+
             {/* Snagify version */}
             <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -443,6 +482,11 @@ export function ProfileClient({
           </div>
         )}
       </div>
+
+      {/* Bug report modal */}
+      {showBugReport && (
+        <ReportBugModal onClose={() => setShowBugReport(false)} />
+      )}
     </div>
   );
 }
