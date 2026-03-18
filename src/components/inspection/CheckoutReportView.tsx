@@ -145,51 +145,103 @@ export function CheckoutReportView({
   }
 
   const isSigned = inspection.signed_at || inspection.status === 'signed'
+  const property = inspection.property
 
   return (
     <div className="pb-32">
-      {/* ── HERO — dark, distinct from check-in ── */}
-      <div className="bg-[#1A1A2E] px-5 pt-5 pb-7 relative overflow-hidden">
-        {/* Deco circles */}
-        <div className="absolute -right-5 -top-5 w-24 h-24 rounded-full border-[20px] border-white/5" />
-        <div className="absolute right-10 -bottom-6 w-14 h-14 rounded-full border-[12px] border-white/[0.04]" />
+      {/* ── HERO — identical structure to check-in ── */}
+      <div className="mx-4 mt-4 rounded-3xl bg-[#1A1A2E] px-5 pt-5 pb-7 relative overflow-hidden">
+        {/* Deco circles — same as check-in */}
+        <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full border-[24px] border-white/5 pointer-events-none" />
+        <div className="absolute right-8 -bottom-10 w-20 h-20 rounded-full border-[16px] border-white/[0.04] pointer-events-none" />
 
-        {/* Badge */}
-        <div className="inline-flex items-center gap-1.5 bg-white/[0.08] border border-white/10 rounded-full px-3 py-1.5 mb-3">
+        {/* CHECK-OUT REPORT badge — amber, same position as check-in badge */}
+        <div className="inline-flex items-center gap-1.5 bg-[#D97706]/20 border border-[#D97706]/30 rounded-full px-3 py-1.5 mb-4">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
             <path
               d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"
-              stroke="rgba(255,255,255,0.6)"
+              stroke="#D97706"
               strokeWidth="2"
               strokeLinecap="round"
             />
           </svg>
-          <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider">
+          <span className="text-[10px] font-bold text-[#D97706] uppercase tracking-wider">
             Check-out Report
           </span>
         </div>
 
+        {/* Property name */}
         <h1
-          className="text-[24px] font-extrabold text-white mb-1"
+          className="text-[26px] font-extrabold text-white mb-1"
           style={{ fontFamily: 'Poppins, sans-serif' }}
         >
-          {inspection.property?.building_name || inspection.property?.address || 'Property'}
+          {property?.building_name || property?.address || 'Property'}
         </h1>
+
+        {/* Unit + date */}
         <p className="text-[14px] text-white/50 mb-4">
-          {inspection.property?.unit_number ? `Unit ${inspection.property.unit_number} · ` : ''}
+          {property?.unit_number ? `Unit ${property.unit_number}` : ''}
+          {property?.unit_number ? ' · ' : ''}
           {formatDate(inspection.created_at)}
         </p>
 
-        {/* Status badge */}
+        {/* Status pill */}
         <div
           className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 ${
-            isSigned ? 'bg-green-50' : 'bg-[#FEF9C3]'
+            isSigned
+              ? 'bg-[#16A34A]/20 border border-[#16A34A]/30'
+              : 'bg-[#FEF9C3] border border-[#D97706]/20'
           }`}
         >
-          <div className={`w-1.5 h-1.5 rounded-full ${isSigned ? 'bg-green-600' : 'bg-amber-500'}`} />
-          <span className={`text-[12px] font-bold ${isSigned ? 'text-green-700' : 'text-amber-700'}`}>
+          <div className={`w-1.5 h-1.5 rounded-full ${isSigned ? 'bg-green-400' : 'bg-[#D97706]'}`} />
+          <span className={`text-[12px] font-bold ${isSigned ? 'text-green-300' : 'text-[#B45309]'}`}>
             {isSigned ? '✓ Fully Signed' : 'Awaiting Signatures'}
           </span>
+        </div>
+      </div>
+
+      {/* ── 4 STAT CARDS — identical to check-in ── */}
+      <div className="mx-4 mt-3">
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            {
+              value: property?.property_type || 'Apartment',
+              label: 'Type',
+              bold: true,
+            },
+            {
+              value: new Date(inspection.created_at || '').toLocaleDateString('en-AE', {
+                day: 'numeric',
+                month: 'short',
+              }),
+              label: 'Date',
+            },
+            {
+              value: inspection.rooms?.length ?? 0,
+              label: 'Rooms',
+            },
+            {
+              value: inspection.rooms?.reduce(
+                (acc: number, r: RoomData) => acc + (r.photos?.length ?? 0),
+                0
+              ) ?? 0,
+              label: 'Photos',
+            },
+          ].map((stat, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-2xl p-3 flex flex-col justify-between min-h-[72px] border border-[#EEECFF]/60"
+            >
+              <div
+                className={`text-[14px] leading-tight text-[#1A1A2E] ${
+                  stat.bold ? 'font-bold' : 'font-extrabold'
+                }`}
+              >
+                {stat.value}
+              </div>
+              <div className="text-[11px] text-[#9B9BA8] mt-1">{stat.label}</div>
+            </div>
+          ))}
         </div>
       </div>
 
