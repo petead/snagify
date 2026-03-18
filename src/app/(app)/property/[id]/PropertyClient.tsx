@@ -75,8 +75,9 @@ function tenantInitials(name: string | null): string {
     .toUpperCase();
 }
 
-function inspectionDisplayStatus(status: string | null): "draft" | "signed" {
-  if (status === "signed" || status === "completed") return "signed";
+function inspectionDisplayStatus(status: string | null): "draft" | "completed" | "signed" {
+  if (status === "signed") return "signed";
+  if (status === "completed") return "completed";
   return "draft";
 }
 
@@ -241,7 +242,7 @@ function InspectionRow({
   };
 
   const handleOpen = () => {
-    if (inspectionId && data?.status === "signed") {
+    if (inspectionId && (data?.status === "signed" || data?.status === "completed")) {
       router.push(`/inspection/${inspectionId}/report`);
     } else if (inspectionId) {
       router.push(`/inspection/${inspectionId}`);
@@ -301,14 +302,24 @@ function InspectionRow({
               style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: data.status === "signed" ? "#9A88FD" : "#999",
-                background: data.status === "signed" ? "rgba(154,136,253,0.1)" : "#EEEDE9",
+                color:
+                  data.status === "signed"
+                    ? "#15803D"
+                    : data.status === "completed"
+                      ? "#9A88FD"
+                      : "#999",
+                background:
+                  data.status === "signed"
+                    ? "#DCFCE7"
+                    : data.status === "completed"
+                      ? "rgba(154,136,253,0.1)"
+                      : "#EEEDE9",
                 padding: "4px 10px",
                 borderRadius: 8,
                 textTransform: "capitalize",
               }}
             >
-              {data.status}
+              {data.status === "signed" ? "Signed" : data.status === "completed" ? "Completed" : "Draft"}
             </span>
             {data.status === "draft" && inspectionId && onRemove && onRollback && signatures && (
               <div
