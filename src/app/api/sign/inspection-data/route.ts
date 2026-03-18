@@ -29,8 +29,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 
-  // Set opened_at on first open (tracking when signer opens the link)
-  if (!sig.opened_at) {
+  // Track first open — only set once, never overwrite
+  if (!sig.opened_at && !sig.signed_at) {
     await supabaseAdmin
       .from('signatures')
       .update({ opened_at: new Date().toISOString() })
