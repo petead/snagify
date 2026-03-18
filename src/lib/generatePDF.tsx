@@ -1,4 +1,5 @@
 /* eslint-disable jsx-a11y/alt-text */
+import React from "react";
 import {
   Document,
   Page,
@@ -8,6 +9,11 @@ import {
   StyleSheet,
   pdf,
   renderToBuffer,
+  Svg,
+  Path,
+  Circle,
+  Rect,
+  G,
 } from "@react-pdf/renderer";
 import QRCode from "qrcode";
 import { getBrandTokens } from "@/lib/pdf/brandTokens";
@@ -86,17 +92,6 @@ const s = StyleSheet.create({
     borderWidth: 12,
     borderStyle: "solid",
   },
-  coverHeroGeoRect: {
-    position: "absolute",
-    bottom: -20,
-    left: 20,
-    width: 70,
-    height: 70,
-    borderRadius: 14,
-    borderWidth: 14,
-    borderStyle: "solid",
-    transform: "rotate(15deg)",
-  },
   coverLogoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -130,8 +125,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: "#8070F0",
-    backgroundColor: "#A99CFD",
   },
   coverTypeBadgeText: {
     fontSize: 7,
@@ -262,7 +255,6 @@ const s = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 8,
-    backgroundColor: "#A99CFD",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -523,7 +515,6 @@ const s = StyleSheet.create({
   sigVerifiedBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#A99CFD",
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -833,6 +824,106 @@ function capitalise(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   SVG Icon Components for PDF
+   Using @react-pdf/renderer native Svg support
+   ───────────────────────────────────────────────────────────────────────────── */
+
+const PdfIcon = ({ size, color, children }: { size: number; color: string; children: React.ReactNode }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <G fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      {children}
+    </G>
+  </Svg>
+);
+
+const IconCalendar = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Rect x="3" y="4" width="18" height="18" rx="2" />
+    <Path d="M16 2v4M8 2v4M3 10h18" />
+  </PdfIcon>
+);
+
+const IconContract = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+    <Path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+  </PdfIcon>
+);
+
+const IconHouse = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" />
+    <Path d="M9 21V12h6v9" />
+  </PdfIcon>
+);
+
+const IconCamera = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+    <Circle cx="12" cy="13" r="4" />
+  </PdfIcon>
+);
+
+const IconWarning = ({ size = 14, color = "#DC2626" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+    <Path d="M12 9v4M12 17h.01" />
+  </PdfIcon>
+);
+
+const IconKey = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Circle cx="7.5" cy="15.5" r="4.5" />
+    <Path d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2" />
+  </PdfIcon>
+);
+
+const IconCard = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Rect x="1" y="4" width="22" height="16" rx="2" />
+    <Path d="M1 10h22" />
+    <Path d="M5 15h3M5 18h2" />
+  </PdfIcon>
+);
+
+const IconMailbox = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+    <Path d="M22 6l-10 7L2 6" />
+  </PdfIcon>
+);
+
+const IconRemote = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Rect x="7" y="2" width="10" height="20" rx="3" />
+    <Path d="M12 6h.01M12 10h.01M12 14h.01" />
+  </PdfIcon>
+);
+
+const IconLock = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Rect x="3" y="11" width="18" height="11" rx="2" />
+    <Path d="M7 11V7a5 5 0 0110 0v4" />
+  </PdfIcon>
+);
+
+const IconShield = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: string }) => (
+  <PdfIcon size={size} color={color}>
+    <Path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </PdfIcon>
+);
+
+function getKeyIcon(itemName: string, color: string) {
+  const name = (itemName || "").toLowerCase();
+  if (name.includes("door") || name.includes("key")) return <IconKey size={13} color={color} />;
+  if (name.includes("parking") || name.includes("car")) return <IconCard size={13} color={color} />;
+  if (name.includes("mailbox") || name.includes("mail")) return <IconMailbox size={13} color={color} />;
+  if (name.includes("access") || name.includes("fob")) return <IconLock size={13} color={color} />;
+  if (name.includes("remote") || name.includes("control")) return <IconRemote size={13} color={color} />;
+  return <IconKey size={13} color={color} />;
+}
+
 interface ReportData {
   executive_summary: string;
   rooms: {
@@ -938,6 +1029,12 @@ function InspectionReport({
     tenant_email: meta.inspection.tenant_email,
     contract_from: meta.inspection.contract_from,
     contract_to: meta.inspection.contract_to,
+    ejari_ref: (meta.inspection as any).ejari_ref,
+    annual_rent: (meta.inspection as any).annual_rent,
+    security_deposit: (meta.inspection as any).security_deposit,
+    tenancy_type: (meta.inspection as any).tenancy_type,
+    property_size: (meta.inspection as any).property_size,
+    status: (meta.inspection as any).status,
   };
   const roomStats = report.rooms.map((room) => {
     const matchingMeta = meta.rooms.find(
@@ -973,7 +1070,6 @@ function InspectionReport({
         <View style={[s.coverHero, { backgroundColor: tokens.primary }]}>
           <View style={[s.coverHeroGeoCircle, { borderColor: tokens.primaryDark }]} />
           <View style={[s.coverHeroGeoCircle2, { borderColor: tokens.primaryLight }]} />
-          <View style={[s.coverHeroGeoRect, { borderColor: tokens.primaryDark }]} />
 
           <View style={s.coverLogoRow}>
             <View style={s.coverLogoLeft}>
@@ -1001,7 +1097,7 @@ function InspectionReport({
                 <Text style={s.coverLogoSub}>PROPERTY INSPECTION REPORT</Text>
               </View>
             </View>
-            <View style={s.coverTypeBadge}>
+            <View style={[s.coverTypeBadge, { borderColor: tokens.primaryDark, backgroundColor: tokens.primaryLight }]}>
               <Text style={s.coverTypeBadgeText}>
                 {inspection.type === "check-out" ? "CHECK-OUT" : "CHECK-IN"}
               </Text>
@@ -1024,18 +1120,22 @@ function InspectionReport({
         <View style={s.coverBodyNew}>
           <View style={s.metaStrip}>
             {[
-              { label: "Date of inspection", value: formatDate(inspection.created_at) },
+              { label: "Date of inspection", value: formatDate(inspection.created_at), icon: <IconCalendar size={13} color={tokens.primary} /> },
               {
                 label: "Contract period",
                 value: `${formatDate(tenancy.contract_from)} – ${formatDate(tenancy.contract_to)}`,
+                icon: <IconContract size={13} color={tokens.primary} />,
               },
               {
                 label: "Property type",
                 value: capitalise(property.property_type || "Apartment"),
+                icon: <IconHouse size={13} color={tokens.primary} />,
               },
             ].map((item, i) => (
               <View key={i} style={[s.metaCell, ...(i < 2 ? [s.metaCellBorder] : [])]}>
-                <View style={[s.metaIconBox, { backgroundColor: tokens.primaryUltraLight, marginRight: 8 }]} />
+                <View style={[s.metaIconBox, { backgroundColor: tokens.primaryUltraLight, marginRight: 8 }]}>
+                  {item.icon}
+                </View>
                 <View>
                   <Text style={[s.metaLabel, { color: tokens.primary }]}>{item.label}</Text>
                   <Text style={s.metaValue}>{item.value}</Text>
@@ -1070,6 +1170,60 @@ function InspectionReport({
             })}
           </View>
 
+          {/* Tenancy Details Card */}
+          <View style={{
+            borderRadius: 8,
+            borderWidth: 0.5,
+            borderColor: "#EEECFF",
+            padding: 14,
+            marginBottom: 14,
+            backgroundColor: "#FFFFFF",
+          }}>
+            <Text style={{
+              fontSize: 7.5,
+              fontFamily: "Helvetica-Bold",
+              textTransform: "uppercase",
+              letterSpacing: 0.8,
+              color: tokens.primary,
+              marginBottom: 10,
+            }}>
+              Tenancy Details
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+              {[
+                { label: "Ejari Reference", value: tenancy.ejari_ref || "—" },
+                { label: "Annual Rent", value: tenancy.annual_rent ? `AED ${Number(tenancy.annual_rent).toLocaleString()}` : "—" },
+                { label: "Security Deposit", value: tenancy.security_deposit ? `AED ${Number(tenancy.security_deposit).toLocaleString()}` : "—" },
+                { label: "Tenancy Type", value: tenancy.tenancy_type ? tenancy.tenancy_type.charAt(0).toUpperCase() + tenancy.tenancy_type.slice(1) : "—" },
+                { label: "Property Size", value: tenancy.property_size ? `${Number(tenancy.property_size).toLocaleString()} sqft` : "—" },
+                { label: "Contract Status", value: tenancy.status ? tenancy.status.charAt(0).toUpperCase() + tenancy.status.slice(1).replace("_", " ") : "—" },
+              ].map((item, i) => (
+                <View key={i} style={{
+                  width: "50%",
+                  paddingRight: i % 2 === 0 ? 10 : 0,
+                  marginBottom: 8,
+                }}>
+                  <Text style={{
+                    fontSize: 7,
+                    color: "#9B9BA8",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.6,
+                    marginBottom: 2,
+                  }}>
+                    {item.label}
+                  </Text>
+                  <Text style={{
+                    fontSize: 9,
+                    fontFamily: "Helvetica-Bold",
+                    color: "#1A1A2E",
+                  }}>
+                    {item.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
           <View style={[s.summaryCard, { backgroundColor: tokens.primaryUltraLight }]}>
             <View style={s.summaryLabelRow}>
               <View style={[s.summaryDot, { backgroundColor: tokens.primary }]} />
@@ -1100,29 +1254,22 @@ function InspectionReport({
               {property.address ?? "Property"} · {formatDate(inspection.created_at)}
             </Text>
           </View>
-          <View style={s.overviewHeaderIcon}>
-            <View style={{ width: 16, height: 16, backgroundColor: "rgba(255,255,255,0.6)", borderRadius: 3 }} />
+          <View style={[s.overviewHeaderIcon, { backgroundColor: tokens.primaryLight }]}>
+            <IconShield size={16} color="#FFFFFF" />
           </View>
         </View>
 
         <View style={s.statRow}>
           {[
-            { num: roomStats.length, label: "Rooms inspected" },
-            { num: totalPhotos, label: "Photos captured" },
-            { num: totalIssues, label: "Issues flagged" },
+            { num: roomStats.length, label: "Rooms inspected", icon: <IconHouse size={16} color={tokens.primary} />, isIssue: false },
+            { num: totalPhotos, label: "Photos captured", icon: <IconCamera size={16} color={tokens.primary} />, isIssue: false },
+            { num: totalIssues, label: "Issues flagged", icon: <IconWarning size={16} color="#DC2626" />, isIssue: true },
           ].map((stat, i) => (
             <View key={i} style={[s.statCard, ...(i < 2 ? [{ marginRight: 10 }] : [])]}>
-              <View style={[s.statIconBox, { backgroundColor: tokens.primaryUltraLight }]}>
-                <View
-                  style={{
-                    width: 14,
-                    height: 14,
-                    backgroundColor: tokens.primaryLight,
-                    borderRadius: 3,
-                  }}
-                />
+              <View style={[s.statIconBox, { backgroundColor: stat.isIssue ? "#FEE2E2" : tokens.primaryUltraLight }]}>
+                {stat.icon}
               </View>
-              <Text style={[s.statNum, { color: tokens.primary }]}>{stat.num}</Text>
+              <Text style={[s.statNum, { color: stat.isIssue ? "#DC2626" : tokens.primary }]}>{stat.num}</Text>
               <Text style={s.statLbl}>{stat.label}</Text>
             </View>
           ))}
@@ -1195,14 +1342,7 @@ function InspectionReport({
                 {keyItems.map((item: any, i: number) => (
                   <View key={i} style={s.keyItem}>
                     <View style={[s.keyIconBox, { backgroundColor: tokens.primaryUltraLight }]}>
-                      <View
-                        style={{
-                          width: 14,
-                          height: 14,
-                          backgroundColor: tokens.primaryLight,
-                          borderRadius: 3,
-                        }}
-                      />
+                      {getKeyIcon(item.item || item.label || item.name || "", tokens.primary)}
                     </View>
                     <Text style={s.keyLabel}>{item.item || item.label || item.name}</Text>
                     <Text style={s.keyQty}>×{item.qty ?? item.quantity ?? 1}</Text>
@@ -1403,7 +1543,7 @@ function InspectionReport({
                 <Text style={s.sigLogoSub}>PROPERTY INSPECTION REPORT</Text>
               </View>
             </View>
-            <View style={s.sigVerifiedBadge}>
+            <View style={[s.sigVerifiedBadge, { backgroundColor: tokens.primaryLight }]}>
               <View style={[s.sigVerifiedDot, { marginRight: 5 }]} />
               <Text style={s.sigVerifiedText}>Verified Document</Text>
             </View>
@@ -1491,14 +1631,7 @@ function InspectionReport({
             <Text style={s.hashLabel}>Document integrity — SHA-256 hash</Text>
             <View style={s.hashRow}>
               <View style={[s.hashIconBox, { backgroundColor: tokens.primaryUltraLight, marginRight: 6 }]}>
-                <View
-                  style={{
-                    width: 8,
-                    height: 8,
-                    backgroundColor: tokens.primaryLight,
-                    borderRadius: 2,
-                  }}
-                />
+                <IconShield size={10} color={tokens.primary} />
               </View>
               <Text style={s.hashValue}>{documentHash}</Text>
             </View>
