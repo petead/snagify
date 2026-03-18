@@ -77,35 +77,14 @@ function tenantInitials(name: string | null): string {
     .toUpperCase();
 }
 
-function getInspectionDisplayStatus(inspection: {
-  status: string | null;
+function getInspectionState(inspection: {
+  status?: string | null;
   report_url?: string | null;
   signed_at?: string | null;
-}): {
-  label: string;
-  style: string;
-} {
-  // Signed — all parties have signed
-  if (inspection.signed_at || inspection.status === "signed") {
-    return {
-      label: "Signed",
-      style: "bg-green-50 text-green-700 border border-green-200",
-    };
-  }
-
-  // Pending Signatures — report generated, waiting for signatures
-  if (inspection.report_url) {
-    return {
-      label: "Pending Signatures",
-      style: "bg-amber-50 text-amber-700 border border-amber-200",
-    };
-  }
-
-  // Draft — inspection started but no report yet
-  return {
-    label: "Draft",
-    style: "bg-gray-100 text-gray-500 border border-gray-200",
-  };
+}): "draft" | "to_sign" | "signed" {
+  if (inspection.signed_at || inspection.status === "signed") return "signed";
+  if (inspection.report_url) return "to_sign";
+  return "draft";
 }
 
 type CheckInWithRooms = {
@@ -136,7 +115,6 @@ function InspectionRow({
   label,
   inspection,
   canStart,
-  accentLabel,
   propertyId,
   tenancyId,
   inspectionType,
@@ -151,7 +129,6 @@ function InspectionRow({
   label: string;
   inspection: InspectionInGroup | null;
   canStart: boolean;
-  accentLabel: boolean;
   propertyId: string;
   tenancyId: string | null;
   inspectionType: "check-in" | "check-out";
@@ -167,7 +144,8 @@ function InspectionRow({
   const [preparingCheckOut, setPreparingCheckOut] = useState(false);
   const [showBuyCredits, setShowBuyCredits] = useState(false);
 
-  const displayStatus = inspection ? getInspectionDisplayStatus(inspection) : null;
+  const state = inspection ? getInspectionState(inspection) : null;
+  const roomCount = inspection?.room_count ?? 0;
 
   const handleStart = async () => {
     if (inspectionType === "check-out" && sourceCheckInId) {
@@ -266,96 +244,143 @@ function InspectionRow({
 
   const handleOpen = () => {
     if (!inspection) return;
-    // Navigate to report if report exists, otherwise to inspection editor
-    if (inspection.report_url || inspection.signed_at || inspection.status === "signed" || inspection.status === "completed") {
-      router.push(`/inspection/${inspection.id}/report`);
-    } else {
+    if (state === "draft") {
       router.push(`/inspection/${inspection.id}`);
+    } else {
+      router.push(`/inspection/${inspection.id}/report`);
     }
   };
 
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "12px 0",
-      }}
-    >
-      {/* Type badge */}
-      <span
-        className={`text-[10px] font-bold px-2.5 py-1 rounded-lg tracking-wide flex-shrink-0
-          ${inspectionType === "check-in"
-            ? "text-[#9A88FD] bg-[#EDE9FF]"
-            : "text-orange-600 bg-orange-50"
-          }`}
-      >
-        {label}
-      </span>
-
-      {/* Date */}
-      {inspection ? (
-        <span className="text-sm text-[#1A1A2E] font-medium flex-1">
-          {formatDateShort(inspection.completed_at ?? inspection.created_at)}
-        </span>
-      ) : (
-        <span className="text-sm text-gray-300 flex-1">—</span>
-      )}
-
-      {/* Status badge + Actions */}
-      <div className="flex items-center gap-2 flex-shrink-0">
-        {inspection && displayStatus ? (
-          <>
-            <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${displayStatus.style}`}>
-              {displayStatus.label}
+  // Inspection exists
+  if (inspection && state) {
+    return (
+      <div className="py-3">
+        {/* Line 1: type badge + date + signed badge (if signed) */}
+        <div className="flex items-center gap-2 mb-3">
+          <span
+            className={`text-[10px] font-bold tracking-wide px-2.5 py-1 rounded-lg
+              ${inspectionType === "check-in"
+                ? "bg-[#EDE9FF] text-[#9A88FD]"
+                : "bg-amber-50 text-amber-600"
+              }`}
+          >
+            {label}
+          </span>
+          <span className="text-[13px] font-semibold text-[#1A1A2E]">
+            {formatDateShort(inspection.completed_at ?? inspection.created_at)}
+          </span>
+          {state === "signed" && (
+            <span className="text-[10px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5 ml-auto">
+              ✓ Signed
             </span>
+          )}
+        </div>
 
-            {/* Delete button for drafts */}
-            {displayStatus.label === "Draft" && onRemove && onRollback && (
-              <div
-                style={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: 8,
-                  background: "#F8F7F4",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <DeleteInspectionButton
-                  inspectionId={inspection.id}
-                  inspectionType={inspectionType}
-                  status={inspection.status ?? "draft"}
-                  signatures={inspection.signatures}
-                  redirectTo={`/property/${propertyId}`}
-                  variant="icon"
-                  onOptimisticRemove={onRemove}
-                  onRollback={onRollback}
-                />
-              </div>
-            )}
+        {/* Line 2: stats chips + action button(s) */}
+        <div className="flex items-center gap-2">
+          {/* Rooms chip */}
+          <div className="flex items-center gap-1.5 bg-[#F3F3F8] rounded-lg px-2.5 py-1.5">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+              <path d="M2 13V6l6-4 6 4v7H2z" stroke="#6B7280" strokeWidth="1.3" strokeLinejoin="round"/>
+              <path d="M6 13v-4h4v4" stroke="#6B7280" strokeWidth="1.3" strokeLinejoin="round"/>
+            </svg>
+            <span className="text-[12px] font-semibold text-[#6B7280]">{roomCount}</span>
+          </div>
 
-            {/* Open button */}
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Dynamic action button */}
+          {state === "to_sign" && (
             <button
-              type="button"
-              onClick={handleOpen}
-              className="text-xs font-semibold text-[#9A88FD] bg-[#EDE9FF]
-                px-3 py-1.5 rounded-lg hover:bg-[#DDD6FE] transition-colors
-                flex items-center gap-1 flex-shrink-0"
+              onClick={() => router.push(`/inspection/${inspection.id}/report`)}
+              className="flex items-center gap-1.5 bg-[#9A88FD] text-white rounded-xl px-4 py-2 text-[13px] font-bold"
             >
-              Open
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                <path d="M6 3l5 5-5 5" stroke="#9A88FD" strokeWidth="1.8"
-                  strokeLinecap="round" strokeLinejoin="round"/>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                <path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"
+                  stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
+              Sign
             </button>
-          </>
-        ) : !canStart && inspectionType === "check-out" ? (
+          )}
+
+          {(state === "draft" || state === "signed") && (
+            <button
+              onClick={handleOpen}
+              className="flex items-center gap-1.5 bg-[#F3F3F8] text-[#1A1A2E] rounded-xl px-4 py-2 text-[13px] font-bold"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="3" width="18" height="18" rx="3" stroke="#1A1A2E" strokeWidth="1.5"/>
+                <path d="M9 9h6M9 13h4" stroke="#1A1A2E" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              Open
+            </button>
+          )}
+
+          {/* Trash button — only in draft state */}
+          {state === "draft" && onRemove && onRollback && (
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                background: "#FEF2F2",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <DeleteInspectionButton
+                inspectionId={inspection.id}
+                inspectionType={inspectionType}
+                status={inspection.status ?? "draft"}
+                signatures={inspection.signatures}
+                redirectTo={`/property/${propertyId}`}
+                variant="icon"
+                onOptimisticRemove={onRemove}
+                onRollback={onRollback}
+              />
+            </div>
+          )}
+        </div>
+
+        <BuyCreditsModal
+          isOpen={showBuyCredits}
+          onClose={() => setShowBuyCredits(false)}
+          currentBalance={creditsBalance}
+          accountType={creditsAccountType}
+          plan={creditsPlan}
+          onPurchaseSuccess={async () => {
+            await refreshCredits();
+            setShowBuyCredits(false);
+          }}
+        />
+      </div>
+    );
+  }
+
+  // No inspection yet — show "Start" button or disabled state
+  return (
+    <div className="py-3">
+      <div className="flex items-center gap-2">
+        <span
+          className={`text-[10px] font-bold tracking-wide px-2.5 py-1 rounded-lg
+            ${inspectionType === "check-in"
+              ? "bg-[#EDE9FF] text-[#9A88FD]"
+              : "bg-[#F3F3F8] text-[#C4C4C4]"
+            }`}
+        >
+          {label}
+        </span>
+        <span className="text-[13px] text-[#C4C4C4] flex-1">
+          Not started yet
+        </span>
+
+        {!canStart && inspectionType === "check-out" ? (
           <span
             title="Complete the check-in first"
-            className="bg-gray-200 text-gray-400 px-3.5 py-1.5 rounded-lg text-xs font-semibold opacity-50 cursor-not-allowed"
+            className="bg-gray-200 text-gray-400 px-3.5 py-1.5 rounded-xl text-xs font-semibold opacity-50 cursor-not-allowed"
           >
             Complete check-in first
           </span>
@@ -364,21 +389,16 @@ function InspectionRow({
             type="button"
             onClick={() => void handleStart()}
             disabled={preparingCheckOut}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white border-none
-              ${accentLabel ? "bg-[#9A88FD] hover:bg-[#8674FC]" : "bg-[#1A1A1A] hover:bg-[#333]"}
+            className={`px-4 py-2 rounded-xl text-[13px] font-bold text-white border-none
+              ${inspectionType === "check-in" ? "bg-[#9A88FD] hover:bg-[#8674FC]" : "bg-[#1A1A2E] hover:bg-[#333]"}
               ${preparingCheckOut ? "opacity-90 cursor-wait" : "cursor-pointer"}
               transition-colors`}
           >
-            {preparingCheckOut
-              ? "Starting..."
-              : inspectionType === "check-out"
-                ? "Start Check-out"
-                : "Start"}
+            {preparingCheckOut ? "..." : "Start"}
           </button>
-        ) : (
-          <span className="text-xs text-gray-300">—</span>
-        )}
+        ) : null}
       </div>
+
       <BuyCreditsModal
         isOpen={showBuyCredits}
         onClose={() => setShowBuyCredits(false)}
@@ -697,7 +717,6 @@ export function PropertyClient({
                       label="CHECK-IN"
                       inspection={checkIn ?? null}
                       canStart={group.canStartCheckIn.allowed}
-                      accentLabel={true}
                       propertyId={property.id}
                       tenancyId={group.tenancyId}
                       inspectionType="check-in"
@@ -713,7 +732,6 @@ export function PropertyClient({
                       label="CHECK-OUT"
                       inspection={checkOut ?? null}
                       canStart={group.canStartCheckOut.allowed}
-                      accentLabel={false}
                       propertyId={property.id}
                       tenancyId={group.tenancyId}
                       inspectionType="check-out"
