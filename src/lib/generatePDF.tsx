@@ -74,7 +74,6 @@ const s = StyleSheet.create({
     height: 130,
     borderRadius: 65,
     borderWidth: 20,
-    borderColor: "#B5A8FE",
     borderStyle: "solid",
   },
   coverHeroGeoCircle2: {
@@ -85,7 +84,6 @@ const s = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     borderWidth: 12,
-    borderColor: "#C4B8FE",
     borderStyle: "solid",
   },
   coverHeroGeoRect: {
@@ -96,33 +94,33 @@ const s = StyleSheet.create({
     height: 70,
     borderRadius: 14,
     borderWidth: 14,
-    borderColor: "#C0B5FE",
     borderStyle: "solid",
     transform: "rotate(15deg)",
   },
   coverLogoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 24,
+    alignItems: "center",
+    marginBottom: 28,
   },
   coverLogoLeft: { flexDirection: "row", alignItems: "center" },
   coverLogoIconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: 7,
-    backgroundColor: "#A49AFD",
+    width: 70,
+    height: 70,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    marginRight: 12,
   },
   coverLogoText: {
-    fontSize: 16,
+    fontSize: 20,
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
     letterSpacing: -0.5,
   },
   coverLogoSub: {
-    fontSize: 6,
+    fontSize: 8,
     color: "rgba(255,255,255,0.65)",
     marginTop: 2,
     letterSpacing: 0.5,
@@ -142,14 +140,14 @@ const s = StyleSheet.create({
     letterSpacing: 1,
   },
   coverAddressMain: {
-    fontSize: 20,
+    fontSize: 26,
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
     letterSpacing: -0.5,
     lineHeight: 1.25,
   },
   coverAddressSub: {
-    fontSize: 8,
+    fontSize: 9,
     color: "rgba(255,255,255,0.65)",
     marginTop: 4,
   },
@@ -181,14 +179,14 @@ const s = StyleSheet.create({
     flexShrink: 0,
   },
   metaLabel: {
-    fontSize: 6,
+    fontSize: 7.5,
     textTransform: "uppercase",
     letterSpacing: 0.7,
     color: "#9B9BA8",
     marginBottom: 2,
   },
   metaValue: {
-    fontSize: 8,
+    fontSize: 10,
     fontFamily: "Helvetica-Bold",
     color: "#1A1A2E",
   },
@@ -212,13 +210,13 @@ const s = StyleSheet.create({
   },
   partyAvatarText: { fontSize: 9, fontFamily: "Helvetica-Bold" },
   partyRole: {
-    fontSize: 6,
+    fontSize: 7.5,
     textTransform: "uppercase",
     letterSpacing: 0.7,
     marginBottom: 3,
   },
-  partyName: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
-  partyEmail: { fontSize: 7, color: "#9B9BA8", marginTop: 1 },
+  partyName: { fontSize: 10, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
+  partyEmail: { fontSize: 8.5, color: "#9B9BA8", marginTop: 1 },
   summaryCard: {
     borderRadius: 8,
     padding: 12,
@@ -226,12 +224,12 @@ const s = StyleSheet.create({
   summaryLabelRow: { flexDirection: "row", alignItems: "center", marginBottom: 5 },
   summaryDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
   summaryLabel: {
-    fontSize: 7,
+    fontSize: 8.5,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
-  summaryTextNew: { fontSize: 7.5, color: "#374151", lineHeight: 1.65 },
+  summaryTextNew: { fontSize: 9, color: "#374151", lineHeight: 1.65 },
   pdfFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -240,15 +238,15 @@ const s = StyleSheet.create({
     paddingVertical: 7,
   },
   footerLeft: { flexDirection: "row", alignItems: "center" },
-  footerAgency: { fontSize: 6.5, fontFamily: "Helvetica-Bold", color: "rgba(255,255,255,0.8)" },
+  footerAgency: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "rgba(255,255,255,0.8)" },
   footerDivider: {
     width: 1,
     height: 8,
     backgroundColor: "rgba(255,255,255,0.3)",
     marginHorizontal: 6,
   },
-  footerUrl: { fontSize: 6, color: "rgba(255,255,255,0.5)" },
-  footerRight: { fontSize: 6, color: "rgba(255,255,255,0.5)" },
+  footerUrl: { fontSize: 7.5, color: "rgba(255,255,255,0.5)" },
+  footerRight: { fontSize: 7.5, color: "rgba(255,255,255,0.5)" },
 
   /* Page 2 overview redesign */
   overviewHeader: {
@@ -258,8 +256,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 28,
     paddingVertical: 14,
   },
-  overviewTitleNew: { fontSize: 13, fontFamily: "Helvetica-Bold", color: "#FFFFFF" },
-  overviewSub: { fontSize: 7, color: "rgba(255,255,255,0.65)", marginTop: 2 },
+  overviewTitleNew: { fontSize: 16, fontFamily: "Helvetica-Bold", color: "#FFFFFF" },
+  overviewSub: { fontSize: 8.5, color: "rgba(255,255,255,0.65)", marginTop: 2 },
   overviewHeaderIcon: {
     width: 30,
     height: 30,
@@ -286,9 +284,9 @@ const s = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 8,
   },
-  statNum: { fontSize: 22, fontFamily: "Helvetica-Bold", lineHeight: 1 },
+  statNum: { fontSize: 26, fontFamily: "Helvetica-Bold", lineHeight: 1 },
   statLbl: {
-    fontSize: 6,
+    fontSize: 7,
     textTransform: "uppercase",
     letterSpacing: 0.6,
     color: "#9B9BA8",
@@ -301,12 +299,12 @@ const s = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
-  sectionHdText: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginRight: 8 },
+  sectionHdText: { fontSize: 10, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginRight: 8 },
   sectionHdLine: { flex: 1, height: 0.5, backgroundColor: "#EEECFF" },
   roomTable: { marginHorizontal: 28, borderRadius: 8, overflow: "hidden", borderWidth: 0.5, borderColor: "#EEECFF" },
   roomThead: { flexDirection: "row", paddingHorizontal: 10, paddingVertical: 7 },
   roomTheadCell: {
-    fontSize: 6,
+    fontSize: 7.5,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
     letterSpacing: 0.6,
@@ -321,10 +319,10 @@ const s = StyleSheet.create({
     borderTopColor: "#F3F3F8",
   },
   roomRowAlt: { backgroundColor: "#FAFBFF" },
-  roomCell: { fontSize: 7, color: "#374151" },
-  roomCellBold: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
+  roomCell: { fontSize: 9, color: "#374151" },
+  roomCellBold: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
   condBadgeNew: { borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
-  condBadgeTextNew: { fontSize: 6, fontFamily: "Helvetica-Bold" },
+  condBadgeTextNew: { fontSize: 7.5, fontFamily: "Helvetica-Bold" },
   keysCard: {
     marginHorizontal: 28,
     backgroundColor: "#FAFBFF",
@@ -343,8 +341,8 @@ const s = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 4,
   },
-  keyLabel: { fontSize: 6.5, color: "#9B9BA8", textAlign: "center" },
-  keyQty: { fontSize: 10, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
+  keyLabel: { fontSize: 8, color: "#9B9BA8", textAlign: "center" },
+  keyQty: { fontSize: 12, fontFamily: "Helvetica-Bold", color: "#1A1A2E" },
 
   /* Room hero (pages 3–N) */
   roomHero: {
@@ -363,7 +361,6 @@ const s = StyleSheet.create({
     borderRadius: 55,
     borderWidth: 18,
     borderStyle: "solid",
-    borderColor: "#B8ABFE",
   },
   roomHeroDecoInner: {
     position: "absolute",
@@ -374,7 +371,6 @@ const s = StyleSheet.create({
     borderRadius: 34,
     borderWidth: 11,
     borderStyle: "solid",
-    borderColor: "#C9BFFE",
   },
   roomHeroTop: {
     flexDirection: "row",
@@ -382,20 +378,20 @@ const s = StyleSheet.create({
     alignItems: "flex-start",
   },
   roomNumber: {
-    fontSize: 7,
+    fontSize: 8,
     textTransform: "uppercase",
     letterSpacing: 1,
     color: "rgba(255,255,255,0.55)",
     marginBottom: 4,
   },
   roomTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
     letterSpacing: -0.5,
   },
   roomDate: {
-    fontSize: 7,
+    fontSize: 9,
     color: "rgba(255,255,255,0.6)",
     marginTop: 3,
   },
@@ -428,7 +424,7 @@ const s = StyleSheet.create({
     borderRadius: 2.5,
     backgroundColor: "rgba(255,255,255,0.45)",
   },
-  roomStatText: { fontSize: 7, color: "rgba(255,255,255,0.65)" },
+  roomStatText: { fontSize: 8.5, color: "rgba(255,255,255,0.65)" },
 
   /* Room body */
   roomBody: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 8 },
@@ -469,7 +465,7 @@ const s = StyleSheet.create({
     paddingVertical: 2,
   },
   photoTagText: {
-    fontSize: 5.5,
+    fontSize: 6.5,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
     letterSpacing: 0.4,
@@ -485,13 +481,13 @@ const s = StyleSheet.create({
   photoAiDivider: { height: 0.5, backgroundColor: "#F3F3F8" },
   photoAiWrap: { padding: 7, paddingTop: 6 },
   photoAiLabel: {
-    fontSize: 5.5,
+    fontSize: 7,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
     letterSpacing: 0.6,
     marginBottom: 3,
   },
-  photoAiText: { fontSize: 6.5, color: "#6B7280", lineHeight: 1.55 },
+  photoAiText: { fontSize: 8.5, color: "#6B7280", lineHeight: 1.55 },
 
   /* Signature page */
   sigHero: {
@@ -510,7 +506,6 @@ const s = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 16,
     borderStyle: "solid",
-    borderColor: "#BDB0FE",
   },
   sigHeroTop: {
     flexDirection: "row",
@@ -519,12 +514,12 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
   sigLogoText: {
-    fontSize: 15,
+    fontSize: 20,
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
     letterSpacing: -0.4,
   },
-  sigLogoSub: { fontSize: 6.5, color: "rgba(255,255,255,0.55)", marginTop: 2 },
+  sigLogoSub: { fontSize: 8, color: "rgba(255,255,255,0.55)", marginTop: 2 },
   sigVerifiedBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -539,14 +534,14 @@ const s = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: "#4ADE80",
   },
-  sigVerifiedText: { fontSize: 6.5, fontFamily: "Helvetica-Bold", color: "#FFFFFF", letterSpacing: 0.3 },
+  sigVerifiedText: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#FFFFFF", letterSpacing: 0.3 },
   sigTitle: {
-    fontSize: 13,
+    fontSize: 16,
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
     lineHeight: 1.35,
   },
-  sigSubtitle: { fontSize: 7.5, color: "rgba(255,255,255,0.6)", marginTop: 4 },
+  sigSubtitle: { fontSize: 9, color: "rgba(255,255,255,0.6)", marginTop: 4 },
 
   sigBody: { paddingHorizontal: 22, paddingTop: 14 },
 
@@ -573,8 +568,8 @@ const s = StyleSheet.create({
   },
   qrImage: { width: 48, height: 48 },
   qrTextWrap: { flex: 1 },
-  qrTextTitle: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginBottom: 4 },
-  qrTextBody: { fontSize: 7, color: "#6B7280", lineHeight: 1.6 },
+  qrTextTitle: { fontSize: 10, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginBottom: 4 },
+  qrTextBody: { fontSize: 9, color: "#6B7280", lineHeight: 1.6 },
 
   sigPartiesRow: { flexDirection: "row", marginBottom: 10 },
   sigPartyCard: {
@@ -585,13 +580,13 @@ const s = StyleSheet.create({
     padding: 11,
   },
   sigPartyRole: {
-    fontSize: 6,
+    fontSize: 8,
     textTransform: "uppercase",
     letterSpacing: 0.7,
     fontFamily: "Helvetica-Bold",
     marginBottom: 4,
   },
-  sigPartyName: { fontSize: 8.5, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginBottom: 8 },
+  sigPartyName: { fontSize: 11, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginBottom: 8 },
   sigSignArea: {
     height: 38,
     borderRadius: 5,
@@ -601,7 +596,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  sigSignPending: { fontSize: 6.5, color: "#9B9BA8", fontFamily: "Helvetica-Oblique" },
+  sigSignPending: { fontSize: 8.5, color: "#9B9BA8", fontFamily: "Helvetica-Oblique" },
   sigSignImage: { width: 80, height: 32, objectFit: "contain" },
 
   sigInspectorCard: {
@@ -621,8 +616,8 @@ const s = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
     marginBottom: 4,
   },
-  sigInspectorName: { fontSize: 8.5, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginBottom: 2 },
-  sigInspectorAgency: { fontSize: 7, color: "#6B7280" },
+  sigInspectorName: { fontSize: 11, fontFamily: "Helvetica-Bold", color: "#1A1A2E", marginBottom: 2 },
+  sigInspectorAgency: { fontSize: 9, color: "#6B7280" },
   sigInspectorRight: { width: 80 },
   sigInspectorSignBox: {
     height: 38,
@@ -644,7 +639,7 @@ const s = StyleSheet.create({
     marginBottom: 10,
   },
   hashLabel: {
-    fontSize: 5.5,
+    fontSize: 7,
     textTransform: "uppercase",
     letterSpacing: 0.7,
     color: "#9B9BA8",
@@ -659,10 +654,10 @@ const s = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
-  hashValue: { fontSize: 6.5, color: "#374151", fontFamily: "Courier", lineHeight: 1.4 },
+  hashValue: { fontSize: 8.5, color: "#374151", fontFamily: "Courier", lineHeight: 1.4 },
 
   disclaimer: {
-    fontSize: 6,
+    fontSize: 7.5,
     color: "#9B9BA8",
     lineHeight: 1.65,
     textAlign: "center",
@@ -976,19 +971,31 @@ function InspectionReport({
       {/* PAGE 1 — COVER (hero + body + footer) */}
       <Page size="A4">
         <View style={[s.coverHero, { backgroundColor: tokens.primary }]}>
-          <View style={s.coverHeroGeoCircle} />
-          <View style={s.coverHeroGeoCircle2} />
-          <View style={s.coverHeroGeoRect} />
+          <View style={[s.coverHeroGeoCircle, { borderColor: tokens.primaryDark }]} />
+          <View style={[s.coverHeroGeoCircle2, { borderColor: tokens.primaryLight }]} />
+          <View style={[s.coverHeroGeoRect, { borderColor: tokens.primaryDark }]} />
 
           <View style={s.coverLogoRow}>
             <View style={s.coverLogoLeft}>
-              <View style={[s.coverLogoIconBox, { marginRight: 8 }]}>
-                {agencyLogoUrl ? (
-                  <Image src={agencyLogoUrl} style={{ width: 20, height: 20 }} />
-                ) : (
-                  <View style={{ width: 14, height: 14, backgroundColor: "rgba(255,255,255,0.7)", borderRadius: 3 }} />
-                )}
-              </View>
+              {agencyLogoUrl ? (
+                <Image
+                  src={agencyLogoUrl}
+                  style={{ width: 70, height: 70, objectFit: "contain", borderRadius: 12, marginRight: 12 }}
+                />
+              ) : (
+                <View style={{
+                  width: 70, height: 70, borderRadius: 14,
+                  backgroundColor: "rgba(255,255,255,0.2)",
+                  alignItems: "center", justifyContent: "center",
+                  marginRight: 12,
+                }}>
+                  <View style={{
+                    width: 36, height: 36,
+                    backgroundColor: "rgba(255,255,255,0.5)",
+                    borderRadius: 8
+                  }} />
+                </View>
+              )}
               <View>
                 <Text style={s.coverLogoText}>{agencyName}</Text>
                 <Text style={s.coverLogoSub}>PROPERTY INSPECTION REPORT</Text>
@@ -1261,8 +1268,8 @@ function InspectionReport({
         return (
           <Page key={roomIndex} size="A4" wrap={false}>
             <View style={[s.roomHero, { backgroundColor: tokens.primary }]}>
-              <View style={s.roomHeroDecoOuter} />
-              <View style={s.roomHeroDecoInner} />
+              <View style={[s.roomHeroDecoOuter, { borderColor: tokens.primaryDark }]} />
+              <View style={[s.roomHeroDecoInner, { borderColor: tokens.primaryLight }]} />
               <View style={s.roomHeroTop}>
                 <View>
                   <Text style={s.roomNumber}>
@@ -1375,11 +1382,26 @@ function InspectionReport({
       {/* SIGNATURE PAGE */}
       <Page size="A4">
         <View style={[s.sigHero, { backgroundColor: tokens.primary }]}>
-          <View style={s.sigHeroDeco} />
+          <View style={[s.sigHeroDeco, { borderColor: tokens.primaryDark }]} />
           <View style={s.sigHeroTop}>
-            <View>
-              <Text style={s.sigLogoText}>{agencyName}</Text>
-              <Text style={s.sigLogoSub}>PROPERTY INSPECTION REPORT</Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              {agencyLogoUrl ? (
+                <Image
+                  src={agencyLogoUrl}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    objectFit: "contain",
+                    borderRadius: 8,
+                    marginRight: 10,
+                    backgroundColor: "rgba(255,255,255,0.15)",
+                  }}
+                />
+              ) : null}
+              <View>
+                <Text style={s.sigLogoText}>{agencyName}</Text>
+                <Text style={s.sigLogoSub}>PROPERTY INSPECTION REPORT</Text>
+              </View>
             </View>
             <View style={s.sigVerifiedBadge}>
               <View style={[s.sigVerifiedDot, { marginRight: 5 }]} />
