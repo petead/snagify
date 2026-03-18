@@ -176,11 +176,12 @@ export function InPersonSignModal({
     <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center
       justify-center p-0 sm:p-4">
       <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl
-        overflow-hidden">
+        overflow-hidden flex flex-col"
+        style={{ maxHeight: 'calc(100vh - 60px)' }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4
-          border-b border-gray-100">
+          border-b border-gray-100 flex-shrink-0">
           <div>
             <div className="text-xs font-semibold text-[#9A88FD] uppercase
               tracking-wide mb-0.5">
@@ -199,7 +200,8 @@ export function InPersonSignModal({
 
         {/* STEP: sending */}
         {step === 'sending' && (
-          <div className="px-5 py-10 text-center">
+          <div className="px-5 py-10 text-center"
+            style={{ paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom))' }}>
             <div className="w-14 h-14 bg-[#EDE9FF] rounded-2xl mx-auto mb-4
               flex items-center justify-center">
               <Loader2 size={24} className="animate-spin text-[#9A88FD]" />
@@ -218,7 +220,7 @@ export function InPersonSignModal({
 
         {/* STEP: otp */}
         {step === 'otp' && (
-          <div className="px-5 py-6">
+          <div className="px-5 py-6 overflow-y-auto flex-1">
             <div className="text-center mb-6">
               <div className="w-12 h-12 bg-[#EDE9FF] rounded-2xl mx-auto mb-3
                 flex items-center justify-center">
@@ -266,79 +268,85 @@ export function InPersonSignModal({
               </p>
             )}
 
-            <button
-              onClick={() => verifyOtp()}
-              disabled={otp.some(d => !d) || loading}
-              className="w-full py-3.5 bg-[#9A88FD] text-white font-bold
-                rounded-xl flex items-center justify-center gap-2
-                disabled:opacity-40 transition-opacity"
-            >
-              {loading
-                ? <Loader2 size={18} className="animate-spin" />
-                : 'Verify code'
-              }
-            </button>
+            <div style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}>
+              <button
+                onClick={() => verifyOtp()}
+                disabled={otp.some(d => !d) || loading}
+                className="w-full py-3.5 bg-[#9A88FD] text-white font-bold
+                  rounded-xl flex items-center justify-center gap-2
+                  disabled:opacity-40 transition-opacity"
+              >
+                {loading
+                  ? <Loader2 size={18} className="animate-spin" />
+                  : 'Verify code'
+                }
+              </button>
 
-            <button
-              onClick={sendOtp}
-              className="w-full mt-2 py-2.5 text-sm text-gray-500
-                font-medium text-center hover:text-[#9A88FD] transition-colors"
-            >
-              Resend code
-            </button>
+              <button
+                onClick={sendOtp}
+                className="w-full mt-2 py-2.5 text-sm text-gray-500
+                  font-medium text-center hover:text-[#9A88FD] transition-colors"
+              >
+                Resend code
+              </button>
+            </div>
           </div>
         )}
 
         {/* STEP: pad */}
         {step === 'pad' && (
-          <div className="px-5 py-4">
-            <div className="text-center mb-4">
-              <div className="text-[15px] font-bold text-[#1A1A2E] mb-1">
-                Sign below
-              </div>
-              <div className="text-sm text-gray-500">
-                Hand the device to {signerName.split(' ')[0]}
-              </div>
-            </div>
-
-            {/* Signature canvas */}
-            <div className="relative border-2 border-dashed border-[#9A88FD]/30
-              rounded-2xl bg-gray-50 overflow-hidden mb-3"
-              style={{ height: 200 }}>
-              <canvas
-                ref={canvasRef}
-                className="w-full h-full cursor-crosshair"
-                style={{ touchAction: 'none' }}
-                onMouseDown={startDraw}
-                onMouseMove={draw}
-                onMouseUp={endDraw}
-                onMouseLeave={endDraw}
-                onTouchStart={startDraw}
-                onTouchMove={draw}
-                onTouchEnd={endDraw}
-              />
-              {!hasDrawn && (
-                <div className="absolute inset-0 flex items-center justify-center
-                  pointer-events-none">
-                  <span className="text-sm text-gray-400">
-                    Sign here with your finger
-                  </span>
+          <div className="flex flex-col flex-1" style={{ maxHeight: 'calc(100vh - 160px)' }}>
+            {/* Scrollable pad area */}
+            <div className="px-5 pt-4 pb-2 flex-1 overflow-y-auto">
+              <div className="text-center mb-4">
+                <div className="text-[15px] font-bold text-[#1A1A2E] mb-1">
+                  Sign below
                 </div>
-              )}
+                <div className="text-sm text-gray-500">
+                  Hand the device to {signerName.split(' ')[0]}
+                </div>
+              </div>
+
+              {/* Signature canvas */}
+              <div className="relative border-2 border-dashed border-[#9A88FD]/30
+                rounded-2xl bg-gray-50 overflow-hidden"
+                style={{ height: 180 }}>
+                <canvas
+                  ref={canvasRef}
+                  className="w-full h-full cursor-crosshair touch-none"
+                  onMouseDown={startDraw}
+                  onMouseMove={draw}
+                  onMouseUp={endDraw}
+                  onMouseLeave={endDraw}
+                  onTouchStart={startDraw}
+                  onTouchMove={draw}
+                  onTouchEnd={endDraw}
+                />
+                {!hasDrawn && (
+                  <div className="absolute inset-0 flex items-center justify-center
+                    pointer-events-none">
+                    <span className="text-sm text-gray-400">
+                      Sign here with your finger
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Signature line */}
+              <div className="flex items-center gap-2 mt-3 mb-2 px-2">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs text-gray-400">signature</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
             </div>
 
-            {/* Signature line */}
-            <div className="flex items-center gap-2 mb-4 px-2">
-              <div className="flex-1 h-px bg-gray-200" />
-              <span className="text-xs text-gray-400">signature</span>
-              <div className="flex-1 h-px bg-gray-200" />
-            </div>
-
-            <div className="flex gap-2">
+            {/* Sticky action buttons — always visible above nav bar */}
+            <div className="px-5 pt-2 flex gap-2 flex-shrink-0"
+              style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
               <button
                 onClick={clearPad}
                 className="flex items-center gap-1.5 bg-gray-100 text-gray-600
-                  rounded-xl px-4 py-3 text-sm font-semibold"
+                  rounded-xl px-4 py-3 text-sm font-semibold flex-shrink-0"
               >
                 <RotateCcw size={14} />
                 Clear
@@ -364,7 +372,8 @@ export function InPersonSignModal({
 
         {/* STEP: done */}
         {step === 'done' && (
-          <div className="px-5 py-10 text-center">
+          <div className="px-5 py-10 text-center"
+            style={{ paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom))' }}>
             <div className="w-14 h-14 bg-green-50 rounded-2xl mx-auto mb-4
               flex items-center justify-center">
               <Check size={24} className="text-green-600" />
