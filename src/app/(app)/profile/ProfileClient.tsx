@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import PushNotificationToggle from "@/components/PushNotificationToggle";
 import { SubscriptionSection } from "@/components/profile/SubscriptionSection";
+import { TeamSection } from "@/components/profile/TeamSection";
 import { Check } from "lucide-react";
 
 export type ProfileData = {
@@ -30,6 +31,8 @@ export type CompanyData = {
   id: string;
   plan: string;
   credits_balance: number;
+  max_users: number;
+  name: string;
   stripe_subscription_id?: string | null;
 } | null;
 
@@ -39,6 +42,7 @@ interface ProfileClientProps {
   profile: ProfileData;
   stats: { properties: number; inspections: number; reports: number };
   accountType: "individual" | "pro";
+  role: "owner" | "inspector";
   company: CompanyData;
 }
 
@@ -64,6 +68,7 @@ export function ProfileClient({
   profile,
   stats,
   accountType,
+  role,
   company,
 }: ProfileClientProps) {
   const router = useRouter();
@@ -71,6 +76,8 @@ export function ProfileClient({
   const [loaded, setLoaded] = useState(false);
   const justSubscribed = searchParams.get("subscribed") === "true";
   const isPro = accountType === "pro";
+  const isOwner = role === "owner";
+  const canManageBilling = isPro && isOwner;
 
   useEffect(() => {
     setLoaded(true);
@@ -294,8 +301,8 @@ export function ProfileClient({
           ))}
         </div>
 
-        {/* Subscription (pro only) */}
-        {isPro && company && (
+        {/* Subscription (pro owner only) */}
+        {canManageBilling && company && (
           <div className={loaded ? "fade-up" : ""} style={{ padding: "20px 24px 0", animationDelay: "0.19s" }}>
             <p style={{ fontSize: 13, color: "#BBB", margin: "0 0 12px", fontWeight: 500, letterSpacing: 2, textTransform: "uppercase" }}>
               Subscription
@@ -304,8 +311,18 @@ export function ProfileClient({
           </div>
         )}
 
+        {/* Team (pro owner only) */}
+        {canManageBilling && company && (
+          <div className={loaded ? "fade-up" : ""} style={{ padding: "20px 24px 0", animationDelay: "0.24s" }}>
+            <p style={{ fontSize: 13, color: "#BBB", margin: "0 0 12px", fontWeight: 500, letterSpacing: 2, textTransform: "uppercase" }}>
+              Team
+            </p>
+            <TeamSection company={company} currentUserId={_userId} />
+          </div>
+        )}
+
         {/* Settings */}
-        <div className={loaded ? "fade-up" : ""} style={{ padding: "20px 24px 0", animationDelay: isPro ? "0.28s" : "0.22s" }}>
+        <div className={loaded ? "fade-up" : ""} style={{ padding: "20px 24px 0", animationDelay: canManageBilling ? "0.32s" : "0.22s" }}>
           <p style={{ fontSize: 13, color: "#BBB", margin: "0 0 12px", fontWeight: 500, letterSpacing: 2, textTransform: "uppercase" }}>
             Settings
           </p>
@@ -376,7 +393,7 @@ export function ProfileClient({
         </div>
 
         {/* Sign Out */}
-        <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: isPro ? "0.34s" : "0.28s" }}>
+        <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: canManageBilling ? "0.38s" : "0.28s" }}>
           <button
             type="button"
             className="signout-btn"
@@ -407,7 +424,7 @@ export function ProfileClient({
 
         {/* Member since */}
         {memberSince && (
-          <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", textAlign: "center", animationDelay: isPro ? "0.38s" : "0.32s" }}>
+          <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", textAlign: "center", animationDelay: canManageBilling ? "0.42s" : "0.32s" }}>
             <p style={{ fontSize: 12, color: "#CCC", fontWeight: 500 }}>
               Member since {formatMemberSince(memberSince)}
             </p>

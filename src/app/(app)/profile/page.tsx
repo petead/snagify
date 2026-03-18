@@ -41,10 +41,13 @@ export default async function ProfilePage() {
   ]);
 
   const accountType = (profile as { account_type?: string } | null)?.account_type === "pro" ? "pro" : "individual";
+  const role = (profile as { role?: string } | null)?.role === "inspector" ? "inspector" : "owner";
   const companyData = company ? {
     id: (company as { id?: string }).id ?? "",
     plan: (company as { plan?: string }).plan ?? "free",
     credits_balance: (company as { credits_balance?: number }).credits_balance ?? 0,
+    max_users: (company as { max_users?: number }).max_users ?? 1,
+    name: (company as { name?: string }).name ?? "",
     stripe_subscription_id: (company as { stripe_subscription_id?: string | null }).stripe_subscription_id ?? null,
   } : null;
 
@@ -76,6 +79,7 @@ export default async function ProfilePage() {
             reports: reportsCount ?? 0,
           }}
           accountType={accountType}
+          role={role}
           company={companyData}
         />
       </Suspense>

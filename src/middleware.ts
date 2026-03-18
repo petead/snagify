@@ -29,6 +29,17 @@ export async function middleware(request: NextRequest) {
   const isAuthenticated = data?.claims?.role === "authenticated";
 
   const path = request.nextUrl.pathname;
+  const publicRoutes = [
+    "/login",
+    "/register",
+    "/signup",
+    "/invite",
+    "/api/invite/verify",
+    "/api/invite/accept",
+  ];
+  const isPublicRoute = publicRoutes.some((route) =>
+    path === route || path.startsWith(`${route}/`)
+  );
   const isAuthRoute = path === "/login" || path === "/register" || path === "/signup";
   const isAppRoute =
     path.startsWith("/dashboard") ||
@@ -40,7 +51,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  if (!isAuthenticated && isAppRoute) {
+  if (!isAuthenticated && isAppRoute && !isPublicRoute) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -53,8 +64,11 @@ export const config = {
     "/dashboard/:path*",
     "/inspection",
     "/inspection/:path*",
+    "/invite",
     "/login",
     "/register",
     "/signup",
+    "/api/invite/verify",
+    "/api/invite/accept",
   ],
 };
