@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PenLine, Link as LinkIcon, Check } from "lucide-react";
+import { PenLine, Link as LinkIcon, Check, Mail, Users } from "lucide-react";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
+import { InPersonSignModal } from "@/components/signatures/InPersonSignModal";
 import {
   type InspectionWithRelations,
   type PropertyRelation,
@@ -156,6 +157,11 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
   const [execSummary, setExecSummary] = useState<string | null>(
     inspection.executive_summary ?? inspection.report_data?.executive_summary ?? null
   );
+  const [inPersonModal, setInPersonModal] = useState<{
+    signerType: 'landlord' | 'tenant';
+    name: string;
+    email: string;
+  } | null>(null);
   const inspectionId = inspection.id;
 
   useEffect(() => {
@@ -1252,30 +1258,71 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                   )}
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleSendOTP(
-                      "landlord",
-                      tenancy?.landlord_email ?? "",
-                      tenancy?.landlord_name ?? ""
-                    )
-                  }
-                  disabled={sent.landlord || sending}
-                  style={{
-                    width: "100%",
-                    padding: "10px 0",
-                    borderRadius: 12,
-                    border: "none",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: sent.landlord || sending ? "default" : "pointer",
-                    background: sent.landlord ? "rgba(34,197,94,0.2)" : "#9A88FD",
-                    color: sent.landlord ? "#166534" : "#fff",
-                  }}
-                >
-                  {sent.landlord ? "Email Sent" : "Send via Email"}
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {/* Remote option */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSendOTP(
+                        "landlord",
+                        tenancy?.landlord_email ?? "",
+                        tenancy?.landlord_name ?? ""
+                      )
+                    }
+                    disabled={sent.landlord || sending}
+                    style={{
+                      flex: 1,
+                      padding: "12px 8px",
+                      borderRadius: 12,
+                      border: "2px solid transparent",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: sent.landlord || sending ? "default" : "pointer",
+                      background: sent.landlord ? "rgba(34,197,94,0.15)" : "#F3F3F8",
+                      color: sent.landlord ? "#166534" : "#6B7280",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Mail size={16} color={sent.landlord ? "#166534" : "#6B7280"} />
+                    <span>{sent.landlord ? "Sent!" : "Remote"}</span>
+                    <span style={{ fontSize: 9, color: sent.landlord ? "#166534" : "#9CA3AF", fontWeight: 400 }}>
+                      Link by email
+                    </span>
+                  </button>
+                  {/* In person option */}
+                  <button
+                    type="button"
+                    onClick={() => setInPersonModal({
+                      signerType: 'landlord',
+                      name: tenancy?.landlord_name || 'Landlord',
+                      email: tenancy?.landlord_email || '',
+                    })}
+                    style={{
+                      flex: 1,
+                      padding: "12px 8px",
+                      borderRadius: 12,
+                      border: "2px solid rgba(154,136,253,0.3)",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      background: "#EDE9FF",
+                      color: "#9A88FD",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Users size={16} color="#9A88FD" />
+                    <span>In person</span>
+                    <span style={{ fontSize: 9, color: "rgba(154,136,253,0.6)", fontWeight: 400 }}>
+                      Sign on this device
+                    </span>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -1317,30 +1364,71 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                   )}
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleSendOTP(
-                      "tenant",
-                      tenancy?.tenant_email ?? "",
-                      tenancy?.tenant_name ?? ""
-                    )
-                  }
-                  disabled={sent.tenant || sending}
-                  style={{
-                    width: "100%",
-                    padding: "10px 0",
-                    borderRadius: 12,
-                    border: "none",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: sent.tenant || sending ? "default" : "pointer",
-                    background: sent.tenant ? "rgba(34,197,94,0.2)" : "#9A88FD",
-                    color: sent.tenant ? "#166534" : "#fff",
-                  }}
-                >
-                  {sent.tenant ? "Email Sent" : "Send via Email"}
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {/* Remote option */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSendOTP(
+                        "tenant",
+                        tenancy?.tenant_email ?? "",
+                        tenancy?.tenant_name ?? ""
+                      )
+                    }
+                    disabled={sent.tenant || sending}
+                    style={{
+                      flex: 1,
+                      padding: "12px 8px",
+                      borderRadius: 12,
+                      border: "2px solid transparent",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: sent.tenant || sending ? "default" : "pointer",
+                      background: sent.tenant ? "rgba(34,197,94,0.15)" : "#F3F3F8",
+                      color: sent.tenant ? "#166534" : "#6B7280",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Mail size={16} color={sent.tenant ? "#166534" : "#6B7280"} />
+                    <span>{sent.tenant ? "Sent!" : "Remote"}</span>
+                    <span style={{ fontSize: 9, color: sent.tenant ? "#166534" : "#9CA3AF", fontWeight: 400 }}>
+                      Link by email
+                    </span>
+                  </button>
+                  {/* In person option */}
+                  <button
+                    type="button"
+                    onClick={() => setInPersonModal({
+                      signerType: 'tenant',
+                      name: tenancy?.tenant_name || 'Tenant',
+                      email: tenancy?.tenant_email || '',
+                    })}
+                    style={{
+                      flex: 1,
+                      padding: "12px 8px",
+                      borderRadius: 12,
+                      border: "2px solid rgba(154,136,253,0.3)",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      background: "#EDE9FF",
+                      color: "#9A88FD",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Users size={16} color="#9A88FD" />
+                    <span>In person</span>
+                    <span style={{ fontSize: 9, color: "rgba(154,136,253,0.6)", fontWeight: 400 }}>
+                      Sign on this device
+                    </span>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -1377,6 +1465,21 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
             )}
           </div>
         </div>
+      )}
+
+      {/* In-person signing modal */}
+      {inPersonModal && (
+        <InPersonSignModal
+          inspectionId={inspectionId}
+          signerType={inPersonModal.signerType}
+          signerName={inPersonModal.name}
+          signerEmail={inPersonModal.email}
+          onSuccess={() => {
+            setInPersonModal(null);
+            router.refresh();
+          }}
+          onClose={() => setInPersonModal(null)}
+        />
       )}
     </div>
   );

@@ -74,3 +74,8 @@
     font-size: 16px !important;
   }
 }
+
+/* Prevent page scroll while drawing on signature canvas */
+canvas {
+  touch-action: none;
+}
