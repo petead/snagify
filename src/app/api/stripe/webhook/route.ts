@@ -83,10 +83,15 @@ export async function POST(req: NextRequest) {
 
       case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice;
-        if (!invoice.subscription) break;
+        // Stripe SDK v17+ uses parent.subscription_details instead of invoice.subscription
+        const subscriptionId =
+          (invoice as any).subscription ||
+          (invoice as any).parent?.subscription_details?.subscription;
+
+        if (!subscriptionId) break;
 
         const subscription = await stripe.subscriptions.retrieve(
-          invoice.subscription as string
+          subscriptionId as string
         );
         const companyId = subscription.metadata?.company_id;
         const planSlug = subscription.metadata?.plan_slug;
@@ -115,7 +120,7 @@ export async function POST(req: NextRequest) {
           .update({
             credits_balance: newBalance,
             plan: planSlug,
-            stripe_subscription_id: invoice.subscription as string,
+            stripe_subscription_id: subscriptionId as string,
             billing_cycle_reset_at: new Date().toISOString(),
           })
           .eq("id", companyId);
@@ -160,9 +165,13 @@ export async function POST(req: NextRequest) {
 
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
-        if (!invoice.subscription) break;
+        const subscriptionId =
+          (invoice as any).subscription ||
+          (invoice as any).parent?.subscription_details?.subscription;
+
+        if (!subscriptionId) break;
         const subscription = await stripe.subscriptions.retrieve(
-          invoice.subscription as string
+          subscriptionId as string
         );
         const companyId = subscription.metadata?.company_id;
         if (!companyId) break;
