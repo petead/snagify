@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { createBrowserClient } from '@supabase/ssr'
 import { Loader2, FileText, Check, RotateCcw, ShieldCheck } from 'lucide-react'
 
 type Step = 'loading' | 'overview' | 'otp' | 'pad' | 'done' | 'already_signed' | 'error'
@@ -12,10 +11,6 @@ function SignPageContent() {
   const signerType = params.get('signerType') as 'landlord' | 'tenant'
   const email = params.get('email')
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
   const [step, setStep] = useState<Step>('loading')
   const [data, setData] = useState<any>(null)
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
@@ -28,38 +23,30 @@ function SignPageContent() {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   useEffect(() => {
-    if (!inspectionId) { setStep('error'); return }
+    if (!inspectionId || !email) { setStep('error'); return }
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inspectionId])
 
   async function fetchData() {
-    const { data: insp, error } = await supabase
-      .from('inspections')
-      .select(`
-        *,
-        property:properties(address, unit_number, property_type, building_name),
-        tenancy:tenancies(
-          tenant_name, tenant_email,
-          landlord_name, landlord_email,
-          contract_from, contract_to, annual_rent
-        ),
-        agent:profiles(
-          full_name,
-          company:companies(name, logo_url, primary_color, website)
-        ),
-        signatures(signer_type, signed_at, otp_verified),
-        rooms(id)
-      `)
-      .eq('id', inspectionId)
-      .single()
+    const res = await fetch(
+      `/api/sign/inspection-data?inspectionId=${inspectionId}&signerType=${signerType}&email=${encodeURIComponent(email || '')}`
+    )
 
-    if (error || !insp) { setStep('error'); return }
+    if (!res.ok) {
+      setStep('error')
+      return
+    }
 
-    const mySig = insp.signatures?.find((s: any) => s.signer_type === signerType)
-    if (mySig?.signed_at) { setStep('already_signed'); setData(insp); return }
+    const { inspection, mySig } = await res.json()
 
-    setData(insp)
+    if (mySig?.signed_at) {
+      setData(inspection)
+      setStep('already_signed')
+      return
+    }
+
+    setData(inspection)
     setStep('overview')
   }
 
