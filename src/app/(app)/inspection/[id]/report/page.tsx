@@ -47,10 +47,32 @@ export default async function ReportPage({
       : null;
   }
 
+  // Fetch check-in data when viewing a check-out inspection
+  let checkinData: CheckinData | null = null;
+  const isCheckout = (inspection.type ?? "").toLowerCase().includes("check-out");
+  if (isCheckout && inspection.property_id) {
+    const { data } = await supabase
+      .from("inspections")
+      .select(`
+        id, created_at, executive_summary, key_handover,
+        rooms (
+          id, name, condition,
+          photos (id, url, damage_tags, width, height)
+        )
+      `)
+      .eq("property_id", inspection.property_id)
+      .eq("type", "check-in")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+    checkinData = data as CheckinData | null;
+  }
+
   return (
     <ReportClient
       inspection={inspection as InspectionWithRelations}
       profile={profile}
+      checkinData={checkinData}
     />
   );
 }
@@ -106,6 +128,7 @@ export type InspectionWithRelations = {
   status: string | null;
   report_url: string | null;
   completed_at: string | null;
+  signed_at?: string | null;
   document_hash: string | null;
   agent_id: string | null;
   property_id: string | null;
@@ -120,4 +143,23 @@ export type InspectionWithRelations = {
   tenancies?: TenancyRelation | TenancyRelation[] | null;
   rooms?: Room[] | null;
   signatures?: Signature[] | null;
+};
+
+export type CheckinData = {
+  id: string;
+  created_at: string | null;
+  executive_summary: string | null;
+  key_handover: { item: string; qty: number }[] | null;
+  rooms: Array<{
+    id: string;
+    name: string;
+    condition: string | null;
+    photos: Array<{
+      id: string;
+      url: string;
+      damage_tags: string[] | null;
+      width: number | null;
+      height: number | null;
+    }> | null;
+  }> | null;
 };

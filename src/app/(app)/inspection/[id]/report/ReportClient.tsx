@@ -11,11 +11,14 @@ import {
   type PropertyRelation,
   type TenancyRelation,
   type Room,
+  type CheckinData,
 } from "./page";
+import { CheckoutReportView } from "@/components/inspection/CheckoutReportView";
 
 interface ReportClientProps {
   inspection: InspectionWithRelations;
   profile: { full_name: string | null; agency_name: string | null } | null;
+  checkinData?: CheckinData | null;
 }
 
 const formatDate = (d: string | null | undefined) =>
@@ -187,7 +190,7 @@ const iconSign = (
   </svg>
 );
 
-export function ReportClient({ inspection, profile }: ReportClientProps) {
+export function ReportClient({ inspection, profile, checkinData }: ReportClientProps) {
   const router = useRouter();
   const [loaded, setLoaded] = useState(false);
   const [showSignModal, setShowSignModal] = useState(false);
@@ -390,6 +393,268 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
       setSending(false);
     }
   };
+
+  // Render checkout comparison view when viewing check-out inspection with checkin data
+  const isCheckoutView = (inspection.type ?? "").toLowerCase().includes("check-out") && checkinData;
+
+  if (isCheckoutView) {
+    return (
+      <div
+        style={{
+          maxWidth: 480,
+          margin: "0 auto",
+          minHeight: "100vh",
+          background: "#F3F2EF",
+          fontFamily: "'DM Sans', sans-serif",
+          position: "relative",
+        }}
+      >
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
+          .back-btn { transition: all 0.2s ease; cursor: pointer; }
+          .back-btn:active { transform: scale(0.9); }
+          .cta-btn { transition: all 0.3s cubic-bezier(0.4,0,0.2,1); cursor: pointer; }
+          .cta-btn:active { transform: scale(0.97); }
+        `}</style>
+
+        {/* Back button */}
+        <div style={{ padding: "16px 16px 0" }}>
+          <Link
+            href={inspection.property_id ? `/property/${inspection.property_id}` : "/dashboard"}
+            className="back-btn"
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 12,
+              background: "rgba(255,255,255,0.2)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              textDecoration: "none",
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </Link>
+        </div>
+
+        <CheckoutReportView
+          inspection={{
+            ...inspection,
+            property: normalizeOne(inspection.properties) as PropertyRelation | null,
+            rooms: (inspection.rooms ?? []).map(r => ({
+              id: r.id,
+              name: r.name ?? "",
+              condition: r.condition,
+              photos: r.photos?.map(p => ({
+                id: p.id,
+                url: p.url ?? "",
+                damage_tags: p.damage_tags,
+                width: null,
+                height: null,
+              })),
+            })),
+          }}
+          checkinData={{
+            ...checkinData,
+            rooms: checkinData.rooms?.map(r => ({
+              id: r.id,
+              name: r.name,
+              condition: r.condition,
+              photos: r.photos?.map(p => ({
+                id: p.id,
+                url: p.url,
+                damage_tags: p.damage_tags,
+                width: p.width,
+                height: p.height,
+              })),
+            })),
+          }}
+          tenancy={normalizeOne(inspection.tenancies) as TenancyRelation | null}
+          signatures={inspection.signatures?.map(s => ({
+            signer_type: s.signer_type ?? "",
+            signed_at: s.signed_at,
+          }))}
+        />
+
+        {/* Sticky bottom action bar */}
+        <div
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            background: "linear-gradient(to top, white 80%, rgba(255,255,255,0))",
+            padding: "24px 16px calc(16px + env(safe-area-inset-bottom))",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            maxWidth: 480,
+            margin: "0 auto",
+          }}
+        >
+          {/* Primary: Download PDF or Sign */}
+          {!reportUrl ? (
+            <button
+              className="cta-btn"
+              onClick={handleDownloadPDF}
+              disabled={downloadLoading}
+              style={{
+                width: "100%",
+                padding: "16px 24px",
+                borderRadius: 16,
+                background: downloadLoading ? "#C4C4C4" : "#1A1A2E",
+                color: "white",
+                fontWeight: 700,
+                fontSize: 15,
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
+            >
+              {downloadLoading ? (
+                <>
+                  <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2.5" opacity="0.25" />
+                    <path d="M12 2a10 10 0 0110 10" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                  </svg>
+                  Generate PDF
+                </>
+              )}
+            </button>
+          ) : bothSigned ? (
+            <button
+              className="cta-btn"
+              onClick={handleDownloadPDF}
+              disabled={downloadLoading}
+              style={{
+                width: "100%",
+                padding: "16px 24px",
+                borderRadius: 16,
+                background: downloadLoading ? "#C4C4C4" : "#1A1A2E",
+                color: "white",
+                fontWeight: 700,
+                fontSize: 15,
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
+            >
+              {downloadLoading ? (
+                <>
+                  <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2.5" opacity="0.25" />
+                    <path d="M12 2a10 10 0 0110 10" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
+                  Downloading…
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                  </svg>
+                  Download PDF
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              className="cta-btn"
+              onClick={() => setShowSignModal(true)}
+              style={{
+                width: "100%",
+                padding: "16px 24px",
+                borderRadius: 16,
+                background: "#9A88FD",
+                color: "white",
+                fontWeight: 700,
+                fontSize: 15,
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
+                <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+              </svg>
+              {landlordSigned || tenantSigned ? "Continue Signing" : "Request Signatures"}
+            </button>
+          )}
+
+          {/* Secondary row: Share */}
+          {reportUrl && (
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                className="cta-btn"
+                onClick={async () => {
+                  const shareUrl = window.location.href;
+                  const prop = normalizeOne(inspection.properties) as PropertyRelation | null;
+                  const bName = prop?.building_name ?? prop?.address ?? "Property";
+                  const uLabel = prop?.unit_number ? `Unit ${prop.unit_number}` : "";
+                  if (navigator.share) {
+                    await navigator.share({
+                      title: `Inspection Report — ${bName}`,
+                      text: uLabel ? `Inspection report for ${uLabel}` : "Inspection report",
+                      url: shareUrl,
+                    });
+                  } else {
+                    await navigator.clipboard.writeText(shareUrl);
+                    alert("Link copied to clipboard!");
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: "14px 20px",
+                  borderRadius: 14,
+                  background: "#F3F3F8",
+                  color: "#1A1A2E",
+                  fontWeight: 600,
+                  fontSize: 14,
+                  border: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                }}
+              >
+                <LinkIcon size={16} />
+                Share Report
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* In Person Sign Modal */}
+        {inPersonModal && (
+          <InPersonSignModal
+            inspectionId={inspection.id}
+            signerType={inPersonModal.signerType}
+            signerName={inPersonModal.name}
+            signerEmail={inPersonModal.email}
+            onSuccess={() => {
+              setInPersonModal(null);
+              router.refresh();
+            }}
+            onClose={() => setInPersonModal(null)}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
