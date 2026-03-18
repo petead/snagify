@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { compressAvatar, compressLogo } from "@/lib/compressImage";
+import { ImageCropModal } from "@/components/ui/ImageCropModal";
 import type { Company } from "@/types";
 
 type ProfileRow = {
@@ -83,6 +83,8 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const signatureInputRef = useRef<HTMLInputElement>(null);
+  const [avatarCropSrc, setAvatarCropSrc] = useState<string | null>(null);
+  const [logoCropSrc, setLogoCropSrc] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -138,17 +140,24 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
     return () => clearTimeout(t);
   }, [toast, router]);
 
-  const handleAvatarUpload = async (file: File) => {
-    if (!file.type.startsWith("image/")) return;
+  const handleAvatarFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    const url = URL.createObjectURL(file);
+    setAvatarCropSrc(url);
+    e.target.value = "";
+  };
+
+  const handleAvatarCropConfirm = async (croppedFile: File) => {
+    setAvatarCropSrc(null);
     setUploading("avatar");
     try {
       const supabase = createClient();
-      const compressed = await compressAvatar(file);
       const path = `${userId}/avatar.jpg`;
 
       const { error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(path, compressed, {
+        .upload(path, croppedFile, {
           upsert: true,
           contentType: "image/jpeg",
         });
@@ -174,19 +183,33 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
     }
   };
 
-  const handleLogoUpload = async (file: File) => {
-    if (!file.type.startsWith("image/")) return;
+  const handleLogoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    
+    // SVG files skip cropping — upload directly
+    if (file.type === "image/svg+xml") {
+      void uploadLogoFile(file);
+      e.target.value = "";
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    setLogoCropSrc(url);
+    e.target.value = "";
+  };
+
+  const uploadLogoFile = async (file: File) => {
     setUploading("company-logo");
     try {
       const supabase = createClient();
       const isSvg = file.type === "image/svg+xml";
-      const toUpload = isSvg ? file : await compressLogo(file);
       const ext = isSvg ? "svg" : "jpg";
       const path = `${userId}/logo.${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from("logos")
-        .upload(path, toUpload, {
+        .upload(path, file, {
           upsert: true,
           contentType: isSvg ? "image/svg+xml" : "image/jpeg",
         });
@@ -212,6 +235,11 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
     } finally {
       setUploading(null);
     }
+  };
+
+  const handleLogoCropConfirm = async (croppedFile: File) => {
+    setLogoCropSrc(null);
+    await uploadLogoFile(croppedFile);
   };
 
   const handleSignatureUpload = async (file: File) => {
@@ -369,22 +397,14 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
         ref={avatarInputRef}
         accept="image/png,image/jpeg,image/webp"
         style={{ display: "none" }}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) void handleAvatarUpload(f);
-          e.target.value = "";
-        }}
+        onChange={handleAvatarFileSelect}
       />
       <input
         type="file"
         ref={logoInputRef}
         accept="image/png,image/jpeg,image/webp,image/svg+xml"
         style={{ display: "none" }}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) void handleLogoUpload(f);
-          e.target.value = "";
-        }}
+        onChange={handleLogoFileSelect}
       />
       <input
         type="file"
@@ -866,6 +886,34 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
         >
           {toast}
         </div>
+      )}
+
+      {/* Avatar Crop Modal */}
+      {avatarCropSrc && (
+        <ImageCropModal
+          imageSrc={avatarCropSrc}
+          shape="circle"
+          title="Crop Profile Photo"
+          onConfirm={handleAvatarCropConfirm}
+          onCancel={() => {
+            URL.revokeObjectURL(avatarCropSrc);
+            setAvatarCropSrc(null);
+          }}
+        />
+      )}
+
+      {/* Logo Crop Modal */}
+      {logoCropSrc && (
+        <ImageCropModal
+          imageSrc={logoCropSrc}
+          shape="square"
+          title="Crop Company Logo"
+          onConfirm={handleLogoCropConfirm}
+          onCancel={() => {
+            URL.revokeObjectURL(logoCropSrc);
+            setLogoCropSrc(null);
+          }}
+        />
       )}
     </div>
   );
