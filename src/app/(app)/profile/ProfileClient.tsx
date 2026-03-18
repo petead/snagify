@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -78,10 +78,22 @@ export function ProfileClient({
   const isPro = accountType === "pro";
   const isOwner = role === "owner";
   const canManageBilling = isPro && isOwner;
+  const subscriptionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLoaded(true);
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get("section") === "subscription") {
+      setTimeout(() => {
+        subscriptionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 300);
+    }
+  }, [searchParams]);
 
   const initials = getInitials(profile.full_name, userEmail);
   const displayName = profile.full_name?.trim() || (userEmail ? userEmail.split("@")[0] : "User");
@@ -303,7 +315,7 @@ export function ProfileClient({
 
         {/* Subscription (pro owner only) */}
         {canManageBilling && company && (
-          <div className={loaded ? "fade-up" : ""} style={{ padding: "20px 24px 0", animationDelay: "0.19s" }}>
+          <div ref={subscriptionRef} className={loaded ? "fade-up" : ""} style={{ padding: "20px 24px 0", animationDelay: "0.19s" }}>
             <p style={{ fontSize: 13, color: "#BBB", margin: "0 0 12px", fontWeight: 500, letterSpacing: 2, textTransform: "uppercase" }}>
               Subscription
             </p>

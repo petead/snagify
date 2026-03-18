@@ -364,12 +364,14 @@ export function DashboardClient({
             <p className="font-body text-sm text-[#1A1A2E] leading-relaxed">
               You&apos;re on the free plan. Upgrade to start generating check-out reports and unlock your white-label branding.
             </p>
-            <Link
-              href="/settings/billing"
+            <button
+              type="button"
+              onClick={() => router.push("/profile?section=subscription")}
               className="inline-block mt-3 font-semibold text-sm text-[#9A88FD] hover:text-[#7B65FC] hover:underline"
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
             >
               View plans →
-            </Link>
+            </button>
           </div>
         </div>
       )}
@@ -604,14 +606,6 @@ export function DashboardClient({
               >
                 Buy credits →
               </button>
-            )}
-            {accountType === "pro" && (
-              <p style={{ marginTop: 4, fontSize: 12, color: "#9CA3AF", fontWeight: 500 }}>
-                {plan && plan !== "free"
-                  ? plan.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
-                  : "Free plan"
-                }
-              </p>
             )}
           </div>
         </div>
