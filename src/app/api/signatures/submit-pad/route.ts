@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendSignedPdfEmail } from '@/lib/sendSignedPdfEmail'
+import {
+  notifySignatureSigned,
+  notifyAllPartiesSigned,
+} from '@/lib/pushSignatureNotifications'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,6 +51,12 @@ export async function POST(req: NextRequest) {
       ip_address: ip,
     })
     .eq('id', sig.id)
+
+  // Fire push notifications (non-blocking)
+  Promise.all([
+    notifySignatureSigned(sig.id),
+    notifyAllPartiesSigned(inspectionId),
+  ]).catch((err) => console.error('[Push] signature notification error:', err))
 
   // Check if all parties have signed → update inspection status
   const { data: allSigs } = await supabaseAdmin

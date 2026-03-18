@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { sendPushNotification } from '@/lib/push';
+import {
+  notifyOpenedNotSigned,
+  notifyExpiringSignatures,
+} from '@/lib/pushSignatureNotifications';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -140,6 +144,8 @@ export async function GET(req: Request) {
     await Promise.all([
       notifyLeaseExpiry(),
       notifyInactivity(),
+      notifyOpenedNotSigned(),
+      notifyExpiringSignatures(),
     ]);
 
     console.log('[Cron] Daily notification job completed');
