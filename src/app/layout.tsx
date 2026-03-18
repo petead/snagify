@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Poppins, DM_Sans } from "next/font/google";
 import "./globals.css";
+import { NavigationReset } from "@/components/NavigationReset";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -33,6 +34,11 @@ export const metadata: Metadata = {
   themeColor: "#9A88FD",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -40,7 +46,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${poppins.variable} ${dmSans.variable}`}>
-      <body className="font-body antialiased">{children}</body>
+      <body className="font-body antialiased">
+        <NavigationReset />
+        {children}
+      </body>
     </html>
   );
 }
