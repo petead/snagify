@@ -17,6 +17,7 @@ export interface GhostCameraProps {
   onClose: () => void;
   roomName: string;
   isCheckout: boolean;
+  initialCoveredIds?: string[];
 }
 
 export default function GhostCamera({
@@ -25,6 +26,7 @@ export default function GhostCamera({
   onClose,
   roomName,
   isCheckout,
+  initialCoveredIds = [],
 }: GhostCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -34,7 +36,9 @@ export default function GhostCamera({
   const [activeGhostIndex, setActiveGhostIndex] = useState(0);
   const [capturing, setCapturing] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [coveredCheckinIds, setCoveredCheckinIds] = useState<Set<string>>(new Set());
+  const [coveredCheckinIds, setCoveredCheckinIds] = useState<Set<string>>(
+    () => new Set(initialCoveredIds)
+  );
   const [isAdditionalMode, setIsAdditionalMode] = useState(false);
 
   useEffect(() => {

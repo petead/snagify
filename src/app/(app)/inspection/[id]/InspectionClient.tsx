@@ -1376,6 +1376,11 @@ export function InspectionClient({
               }
               roomName={currentRoom.name}
               isCheckout={true}
+              initialCoveredIds={
+                photos
+                  .filter(p => p.room_id === currentRoom.id && p.checkin_photo_id)
+                  .map(p => p.checkin_photo_id as string)
+              }
               onClose={() => setIsCameraOpen(false)}
               onPhotoTaken={async (blob, linkedCheckinPhotoId, isAdditional) => {
                 setIsCameraOpen(false);
