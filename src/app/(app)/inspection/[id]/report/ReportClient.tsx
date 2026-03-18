@@ -532,7 +532,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
           {[
             { label: "Type", value: prop?.property_type ?? "—" },
             { label: "Date", value: formatDateShort(inspection.completed_at ?? undefined) || "—" },
-            { label: "Rooms", value: `${rooms.length} inspected` },
+            { label: "Rooms", value: String(rooms.length) },
             { label: "Photos", value: String(totalPhotos) },
           ].map((s) => (
             <div
@@ -814,7 +814,7 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
           delay="0.34s"
           loaded={loaded}
           icon={iconRooms}
-          title={`Rooms (${rooms.length} inspected)`}
+          title={`Rooms (${rooms.length})`}
         >
           {sortedRooms.map((room, i) => {
             const allPhotos = room.photos ?? [];
