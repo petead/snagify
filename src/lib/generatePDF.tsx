@@ -957,6 +957,12 @@ interface InspectionMeta {
     ejari_ref?: string;
     contract_from?: string;
     contract_to?: string;
+    actual_end_date?: string;
+    annual_rent?: number;
+    security_deposit?: number;
+    property_size?: number;
+    tenancy_type?: string;
+    status?: string;
     key_handover?: { item: string; qty: number }[];
     checkin_key_handover?: { item: string; qty: number }[];
   };
@@ -1029,13 +1035,49 @@ function InspectionReport({
     tenant_email: meta.inspection.tenant_email,
     contract_from: meta.inspection.contract_from,
     contract_to: meta.inspection.contract_to,
-    ejari_ref: (meta.inspection as any).ejari_ref,
-    annual_rent: (meta.inspection as any).annual_rent,
-    security_deposit: (meta.inspection as any).security_deposit,
-    tenancy_type: (meta.inspection as any).tenancy_type,
-    property_size: (meta.inspection as any).property_size,
-    status: (meta.inspection as any).status,
+    actual_end_date: meta.inspection.actual_end_date,
+    ejari_ref: meta.inspection.ejari_ref,
+    annual_rent: meta.inspection.annual_rent,
+    security_deposit: meta.inspection.security_deposit,
+    tenancy_type: meta.inspection.tenancy_type,
+    property_size: meta.inspection.property_size,
+    status: meta.inspection.status,
   };
+
+  const tenancyFields: Array<{ label: string; value: string }> = [];
+  if (tenancy.ejari_ref) {
+    tenancyFields.push({ label: "Ejari Reference", value: tenancy.ejari_ref });
+  }
+  if (tenancy.annual_rent != null) {
+    tenancyFields.push({
+      label: "Annual Rent",
+      value: `AED ${Number(tenancy.annual_rent).toLocaleString("en-AE")}`,
+    });
+  }
+  if (tenancy.security_deposit != null) {
+    tenancyFields.push({
+      label: "Security Deposit",
+      value: `AED ${Number(tenancy.security_deposit).toLocaleString("en-AE")}`,
+    });
+  }
+  if (tenancy.tenancy_type) {
+    tenancyFields.push({
+      label: "Tenancy Type",
+      value: tenancy.tenancy_type.charAt(0).toUpperCase() + tenancy.tenancy_type.slice(1),
+    });
+  }
+  if (tenancy.property_size != null) {
+    tenancyFields.push({
+      label: "Property Size",
+      value: `${Number(tenancy.property_size).toLocaleString("en-AE")} sqft`,
+    });
+  }
+  if (tenancy.status) {
+    tenancyFields.push({
+      label: "Contract Status",
+      value: tenancy.status.charAt(0).toUpperCase() + tenancy.status.slice(1).replace(/_/g, " "),
+    });
+  }
   const roomStats = report.rooms.map((room) => {
     const matchingMeta = meta.rooms.find(
       (mr) => mr.name.toLowerCase() === room.name.toLowerCase()
@@ -1118,21 +1160,22 @@ function InspectionReport({
         </View>
 
         <View style={s.coverBodyNew}>
-          <View style={s.metaStrip}>
+          <View style={[s.metaStrip, { flexWrap: "wrap" }]}>
             {[
-              { label: "Date of inspection", value: formatDate(inspection.created_at), icon: <IconCalendar size={13} color={tokens.primary} /> },
-              {
-                label: "Contract period",
-                value: `${formatDate(tenancy.contract_from)} – ${formatDate(tenancy.contract_to)}`,
-                icon: <IconContract size={13} color={tokens.primary} />,
-              },
-              {
-                label: "Property type",
-                value: capitalise(property.property_type || "Apartment"),
-                icon: <IconHouse size={13} color={tokens.primary} />,
-              },
+              { label: "Date of Inspection", value: formatDate(inspection.created_at), icon: <IconCalendar size={13} color={tokens.primary} /> },
+              { label: "Property Type", value: capitalise(property.property_type || "Apartment"), icon: <IconHouse size={13} color={tokens.primary} /> },
+              { label: "Contract Start", value: formatDate(tenancy.contract_from), icon: <IconCalendar size={13} color={tokens.primary} /> },
+              { label: "Contract End", value: formatDate(tenancy.actual_end_date || tenancy.contract_to), icon: <IconContract size={13} color={tokens.primary} /> },
             ].map((item, i) => (
-              <View key={i} style={[s.metaCell, ...(i < 2 ? [s.metaCellBorder] : [])]}>
+              <View
+                key={i}
+                style={[
+                  s.metaCell,
+                  { width: "50%" },
+                  i % 2 === 0 ? s.metaCellBorder : {},
+                  i < 2 ? { borderBottomWidth: 0.5, borderBottomColor: "#EEECFF" } : {},
+                ]}
+              >
                 <View style={[s.metaIconBox, { backgroundColor: tokens.primaryUltraLight, marginRight: 8 }]}>
                   {item.icon}
                 </View>
@@ -1170,59 +1213,54 @@ function InspectionReport({
             })}
           </View>
 
-          {/* Tenancy Details Card */}
-          <View style={{
-            borderRadius: 8,
-            borderWidth: 0.5,
-            borderColor: "#EEECFF",
-            padding: 14,
-            marginBottom: 14,
-            backgroundColor: "#FFFFFF",
-          }}>
-            <Text style={{
-              fontSize: 7.5,
-              fontFamily: "Helvetica-Bold",
-              textTransform: "uppercase",
-              letterSpacing: 0.8,
-              color: tokens.primary,
-              marginBottom: 10,
+          {/* Tenancy Details Card — only show if there are populated fields */}
+          {tenancyFields.length > 0 && (
+            <View style={{
+              borderRadius: 8,
+              borderWidth: 0.5,
+              borderColor: "#EEECFF",
+              padding: 14,
+              marginBottom: 14,
+              backgroundColor: "#FFFFFF",
             }}>
-              Tenancy Details
-            </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-              {[
-                { label: "Ejari Reference", value: tenancy.ejari_ref || "—" },
-                { label: "Annual Rent", value: tenancy.annual_rent ? `AED ${Number(tenancy.annual_rent).toLocaleString()}` : "—" },
-                { label: "Security Deposit", value: tenancy.security_deposit ? `AED ${Number(tenancy.security_deposit).toLocaleString()}` : "—" },
-                { label: "Tenancy Type", value: tenancy.tenancy_type ? tenancy.tenancy_type.charAt(0).toUpperCase() + tenancy.tenancy_type.slice(1) : "—" },
-                { label: "Property Size", value: tenancy.property_size ? `${Number(tenancy.property_size).toLocaleString()} sqft` : "—" },
-                { label: "Contract Status", value: tenancy.status ? tenancy.status.charAt(0).toUpperCase() + tenancy.status.slice(1).replace("_", " ") : "—" },
-              ].map((item, i) => (
-                <View key={i} style={{
-                  width: "50%",
-                  paddingRight: i % 2 === 0 ? 10 : 0,
-                  marginBottom: 8,
-                }}>
-                  <Text style={{
-                    fontSize: 7,
-                    color: "#9B9BA8",
-                    textTransform: "uppercase",
-                    letterSpacing: 0.6,
-                    marginBottom: 2,
+              <Text style={{
+                fontSize: 7.5,
+                fontFamily: "Helvetica-Bold",
+                textTransform: "uppercase",
+                letterSpacing: 0.8,
+                color: tokens.primary,
+                marginBottom: 10,
+              }}>
+                Tenancy Details
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                {tenancyFields.map((field, i) => (
+                  <View key={i} style={{
+                    width: "50%",
+                    paddingRight: i % 2 === 0 ? 10 : 0,
+                    marginBottom: 8,
                   }}>
-                    {item.label}
-                  </Text>
-                  <Text style={{
-                    fontSize: 9,
-                    fontFamily: "Helvetica-Bold",
-                    color: "#1A1A2E",
-                  }}>
-                    {item.value}
-                  </Text>
-                </View>
-              ))}
+                    <Text style={{
+                      fontSize: 7,
+                      color: "#9B9BA8",
+                      textTransform: "uppercase",
+                      letterSpacing: 0.6,
+                      marginBottom: 2,
+                    }}>
+                      {field.label}
+                    </Text>
+                    <Text style={{
+                      fontSize: 9,
+                      fontFamily: "Helvetica-Bold",
+                      color: "#1A1A2E",
+                    }}>
+                      {field.value}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
-          </View>
+          )}
 
           <View style={[s.summaryCard, { backgroundColor: tokens.primaryUltraLight }]}>
             <View style={s.summaryLabelRow}>
@@ -1233,7 +1271,7 @@ function InspectionReport({
           </View>
         </View>
 
-        <View style={[s.pdfFooter, { backgroundColor: tokens.primaryDark }]} fixed>
+        <View style={[s.pdfFooter, { backgroundColor: tokens.primary }]} fixed>
           <View style={s.footerLeft}>
             <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
             <View style={s.footerDivider} />
@@ -1254,9 +1292,30 @@ function InspectionReport({
               {property.address ?? "Property"} · {formatDate(inspection.created_at)}
             </Text>
           </View>
-          <View style={[s.overviewHeaderIcon, { backgroundColor: tokens.primaryLight }]}>
-            <IconShield size={16} color="#FFFFFF" />
-          </View>
+          {agencyLogoUrl ? (
+            <Image
+              src={agencyLogoUrl}
+              style={{
+                width: 36,
+                height: 36,
+                objectFit: "contain",
+                borderRadius: 8,
+                backgroundColor: "rgba(255,255,255,0.15)",
+              }}
+            />
+          ) : (
+            <View style={{
+              width: 36, height: 36,
+              borderRadius: 8,
+              backgroundColor: "rgba(255,255,255,0.15)",
+              alignItems: "center",
+              justifyContent: "center",
+            }}>
+              <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: "#FFFFFF" }}>
+                {agencyName?.charAt(0) || "S"}
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={s.statRow}>
@@ -1353,7 +1412,7 @@ function InspectionReport({
           })()}
         </View>
 
-        <View style={[s.pdfFooter, { backgroundColor: tokens.primaryDark }]} fixed>
+        <View style={[s.pdfFooter, { backgroundColor: tokens.primary }]} fixed>
           <View style={s.footerLeft}>
             <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
             <View style={s.footerDivider} />
@@ -1504,7 +1563,7 @@ function InspectionReport({
               })}
             </View>
 
-            <View style={[s.pdfFooter, { backgroundColor: tokens.primaryDark }]}>
+            <View style={[s.pdfFooter, { backgroundColor: tokens.primary }]}>
               <View style={s.footerLeft}>
                 <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
                 <View style={s.footerDivider} />
@@ -1645,7 +1704,7 @@ function InspectionReport({
           </Text>
         </View>
 
-        <View style={[s.pdfFooter, { backgroundColor: tokens.primaryDark }]} fixed>
+        <View style={[s.pdfFooter, { backgroundColor: tokens.primary }]} fixed>
           <View style={s.footerLeft}>
             <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
             <View style={s.footerDivider} />

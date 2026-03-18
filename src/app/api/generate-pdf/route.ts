@@ -121,6 +121,9 @@ type TenancyRow = {
   actual_end_date?: string | null;
   annual_rent?: number | null;
   security_deposit?: number | null;
+  property_size?: number | null;
+  tenancy_type?: string | null;
+  status?: string | null;
 };
 
 type RoomRow = {
@@ -174,7 +177,10 @@ const INSPECTION_SELECT = `
     contract_to,
     actual_end_date,
     annual_rent,
-    security_deposit
+    security_deposit,
+    property_size,
+    tenancy_type,
+    status
   ),
   rooms (
     id,
@@ -336,6 +342,12 @@ export async function buildPdfAndUpload(
         ejari_ref: tenancy?.ejari_ref ?? undefined,
         contract_from: tenancy?.contract_from != null ? String(tenancy.contract_from) : undefined,
         contract_to: tenancy?.contract_to != null ? String(tenancy.contract_to) : undefined,
+        actual_end_date: tenancy?.actual_end_date != null ? String(tenancy.actual_end_date) : undefined,
+        annual_rent: tenancy?.annual_rent ?? undefined,
+        security_deposit: tenancy?.security_deposit ?? undefined,
+        property_size: tenancy?.property_size ?? undefined,
+        tenancy_type: tenancy?.tenancy_type ?? undefined,
+        status: tenancy?.status ?? undefined,
         key_handover: keyHandoverSafe,
         checkin_key_handover: checkinKeyHandoverSafe,
       },
