@@ -12,6 +12,8 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import GhostCamera from "@/components/GhostCamera";
 import { getImageDimensions } from "@/lib/photos/getImageDimensions";
+import { CheckoutCreditConfirmModal } from "@/components/inspection/CheckoutCreditConfirmModal";
+import { useCredits } from "@/hooks/useCredits";
 
 // ─── Types ───────────────────────────────────────
 type RoomData = {
@@ -372,6 +374,8 @@ export function InspectionClient({
 }: Props) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const { balance: creditsBalance } = useCredits();
+  const isCheckout = inspectionType === "check-out";
 
   const [liveRooms, setLiveRooms] = useState<RoomData[]>(initialRooms);
   const [activeRoom, setActiveRoom] = useState(0);
@@ -428,6 +432,8 @@ export function InspectionClient({
   const [generating, setGenerating] = useState(false);
   const [navigating, setNavigating] = useState(false);
   const [showCompletenessWarning, setShowCompletenessWarning] = useState(false);
+  const [showCreditConfirm, setShowCreditConfirm] = useState(false);
+  const [creditCost, setCreditCost] = useState(2);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const notesTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -576,6 +582,19 @@ export function InspectionClient({
       return () => clearTimeout(t);
     }
   }, [toast]);
+
+  // Fetch credit cost from DB (for checkout)
+  useEffect(() => {
+    if (!isCheckout) return;
+    supabase
+      .from("credit_costs")
+      .select("credits")
+      .eq("action", "checkout_standard")
+      .single()
+      .then(({ data }) => {
+        if (data?.credits) setCreditCost(data.credits);
+      });
+  }, [isCheckout, supabase]);
 
   const showToast = (msg: string) => setToast(msg);
 
@@ -2102,7 +2121,14 @@ export function InspectionClient({
                   {!hasBlockingIssues && (
                     <button
                       type="button"
-                      onClick={handleGenerateReport}
+                      onClick={() => {
+                        setShowCompletenessWarning(false);
+                        if (isCheckout) {
+                          setShowCreditConfirm(true);
+                        } else {
+                          handleGenerateReport();
+                        }
+                      }}
                       style={{
                         flex: 1,
                         padding: "10px",
@@ -2139,8 +2165,12 @@ export function InspectionClient({
             <button
               type="button"
               onClick={() => {
-                if (inspectionType === "check-out" && completenessIssues.length > 0) {
-                  setShowCompletenessWarning(true);
+                if (isCheckout) {
+                  if (completenessIssues.length > 0) {
+                    setShowCompletenessWarning(true);
+                  } else {
+                    setShowCreditConfirm(true);
+                  }
                 } else {
                   handleGenerateReport();
                 }
@@ -2182,6 +2212,19 @@ export function InspectionClient({
             </button>
           </div>
         </div>
+      )}
+
+      {/* Checkout credit confirmation modal */}
+      {showCreditConfirm && (
+        <CheckoutCreditConfirmModal
+          creditsBalance={creditsBalance}
+          creditCost={creditCost}
+          onConfirm={async () => {
+            setShowCreditConfirm(false);
+            await handleGenerateReport();
+          }}
+          onCancel={() => setShowCreditConfirm(false)}
+        />
       )}
     </>
   );
