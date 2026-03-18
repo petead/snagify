@@ -674,23 +674,33 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
                     </>
                   )}
                 </button>
-                {companyLogoUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setCompanyLogoUrl(null)}
-                    style={{
-                      marginTop: 6,
-                      background: "none",
-                      border: "none",
-                      padding: 0,
-                      cursor: "pointer",
-                      fontSize: 12,
-                      color: "#dc2626",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Remove
-                  </button>
+                {companyLogoUrl && companyLogoUrl !== "https://app.snagify.net/icon-512x512.png" && (
+                  <div style={{ marginTop: 6, display: "flex", gap: 12 }}>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!companyId) return;
+                        const defaultLogo = "https://app.snagify.net/icon-512x512.png";
+                        const supabase = createClient();
+                        await supabase
+                          .from("companies")
+                          .update({ logo_url: defaultLogo })
+                          .eq("id", companyId);
+                        setCompanyLogoUrl(defaultLogo);
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        cursor: "pointer",
+                        fontSize: 12,
+                        color: "#6B7280",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Reset to default
+                    </button>
+                  </div>
                 )}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>

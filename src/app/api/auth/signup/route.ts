@@ -44,14 +44,17 @@ export async function POST(req: NextRequest) {
 
     const companyName =
       accountType === "pro" ? (agencyName?.trim() || fullName) : fullName;
+    // Pro: use chosen color. Individual: always Snagify purple default
     const companyColor =
-      accountType === "pro" ? (primaryColor || "#9A88FD") : "#9A88FD";
+      accountType === "pro" && primaryColor ? primaryColor : "#9A88FD";
 
     const { data: company, error: companyError } = await supabaseAdmin
       .from("companies")
       .insert({
         name: companyName || null,
         primary_color: companyColor,
+        // Default logo = Snagify icon (overrideable later by pro users)
+        logo_url: "https://app.snagify.net/icon-512x512.png",
         plan: "free",
         credits_balance: 0,
       })

@@ -1024,7 +1024,7 @@ function InspectionReport({
   const accentColor = tokens.primary;
   const agencyName = meta.agent?.agency_name?.trim() || meta.agent?.full_name?.trim() || "MULKEEF";
   const agencyWebsite = meta.agent?.company_website?.trim() || "snagify.net";
-  const agencyLogoUrl = meta.agent?.company_logo_url || null;
+  const agencyLogoUrl = meta.agent?.company_logo_url || "https://app.snagify.net/icon-512x512.png";
   const generatedBy = agencyName;
   const property = meta.property ?? {};
   const inspection = meta.inspection;
