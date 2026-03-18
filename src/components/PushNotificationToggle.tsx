@@ -71,19 +71,36 @@ export default function PushNotificationToggle() {
 
         let reg: ServiceWorkerRegistration;
         try {
-          const existing = await navigator.serviceWorker.getRegistration('/');
-          if (!existing) {
+          const allRegs = await navigator.serviceWorker.getRegistrations();
+          console.log('[Push] All SW registrations:', allRegs.map(r => ({
+            scope: r.scope,
+            active: r.active?.scriptURL,
+            state: r.active?.state,
+          })));
+
+          if (allRegs.length === 0) {
+            console.log('[Push] No SW found, registering /sw.js...');
             await navigator.serviceWorker.register('/sw.js', { scope: '/' });
           }
-          reg = await Promise.race([
-            navigator.serviceWorker.ready,
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error('timeout')), 10000)
-            ),
-          ]) as ServiceWorkerRegistration;
-        } catch (err) {
-          console.error('SW registration error:', err);
-          setError('Could not start notifications. Make sure the app is installed on your Home Screen.');
+
+          const existingReg = allRegs[0] || await navigator.serviceWorker.getRegistration('/');
+
+          if (existingReg) {
+            reg = existingReg;
+            console.log('[Push] Using existing SW:', reg.scope, reg.active?.scriptURL);
+          } else {
+            reg = await Promise.race([
+              navigator.serviceWorker.ready,
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('SW timeout after registration')), 10000)
+              ),
+            ]) as ServiceWorkerRegistration;
+          }
+
+          console.log('[Push] SW ready:', reg.scope);
+        } catch (err: unknown) {
+          console.error('[Push] SW error:', err);
+          setError(`SW error: ${err instanceof Error ? err.message : 'unknown'}. Check console for details.`);
           return;
         }
 
