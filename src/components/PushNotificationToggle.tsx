@@ -71,14 +71,19 @@ export default function PushNotificationToggle() {
 
         let reg: ServiceWorkerRegistration;
         try {
+          const existing = await navigator.serviceWorker.getRegistration('/');
+          if (!existing) {
+            await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+          }
           reg = await Promise.race([
             navigator.serviceWorker.ready,
             new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error('Service worker timeout')), 8000)
+              setTimeout(() => reject(new Error('timeout')), 10000)
             ),
           ]) as ServiceWorkerRegistration;
-        } catch {
-          setError('Service worker not ready. Try reloading the page.');
+        } catch (err) {
+          console.error('SW registration error:', err);
+          setError('Could not start notifications. Make sure the app is installed on your Home Screen.');
           return;
         }
 
