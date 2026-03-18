@@ -145,7 +145,6 @@ function InspectionRow({
   const [showBuyCredits, setShowBuyCredits] = useState(false);
 
   const state = inspection ? getInspectionState(inspection) : null;
-  const roomCount = inspection?.room_count ?? 0;
 
   const handleStart = async () => {
     if (inspectionType === "check-out" && sourceCheckInId) {
@@ -255,10 +254,10 @@ function InspectionRow({
   if (inspection && state) {
     return (
       <div className="py-3">
-        {/* Line 1: type badge + date + signed badge (if signed) */}
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          {/* Type badge */}
           <span
-            className={`text-[10px] font-bold tracking-wide px-2.5 py-1 rounded-lg
+            className={`text-[10px] font-bold tracking-wide px-2.5 py-1 rounded-lg flex-shrink-0
               ${inspectionType === "check-in"
                 ? "bg-[#EDE9FF] text-[#9A88FD]"
                 : "bg-amber-50 text-amber-600"
@@ -266,35 +265,24 @@ function InspectionRow({
           >
             {label}
           </span>
-          <span className="text-[13px] font-semibold text-[#1A1A2E]">
+
+          {/* Date */}
+          <span className="text-[13px] font-semibold text-[#1A1A2E] flex-1 whitespace-nowrap">
             {formatDateShort(inspection.completed_at ?? inspection.created_at)}
           </span>
+
+          {/* Signed badge */}
           {state === "signed" && (
-            <span className="text-[10px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5 ml-auto">
+            <span className="text-[10px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5 flex-shrink-0">
               ✓ Signed
             </span>
           )}
-        </div>
 
-        {/* Line 2: stats chips + action button(s) */}
-        <div className="flex items-center gap-2">
-          {/* Rooms chip */}
-          <div className="flex items-center gap-1.5 bg-[#F3F3F8] rounded-lg px-2.5 py-1.5">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-              <path d="M2 13V6l6-4 6 4v7H2z" stroke="#6B7280" strokeWidth="1.3" strokeLinejoin="round"/>
-              <path d="M6 13v-4h4v4" stroke="#6B7280" strokeWidth="1.3" strokeLinejoin="round"/>
-            </svg>
-            <span className="text-[12px] font-semibold text-[#6B7280]">{roomCount}</span>
-          </div>
-
-          {/* Spacer */}
-          <div className="flex-1" />
-
-          {/* Dynamic action button */}
+          {/* Sign button */}
           {state === "to_sign" && (
             <button
               onClick={() => router.push(`/inspection/${inspection.id}/report`)}
-              className="flex items-center gap-1.5 bg-[#9A88FD] text-white rounded-xl px-4 py-2 text-[13px] font-bold"
+              className="flex items-center gap-1.5 bg-[#9A88FD] text-white rounded-xl px-4 py-2 text-[13px] font-bold flex-shrink-0"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                 <path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"
@@ -304,20 +292,17 @@ function InspectionRow({
             </button>
           )}
 
+          {/* Open button */}
           {(state === "draft" || state === "signed") && (
             <button
               onClick={handleOpen}
-              className="flex items-center gap-1.5 bg-[#F3F3F8] text-[#1A1A2E] rounded-xl px-4 py-2 text-[13px] font-bold"
+              className="flex items-center gap-1.5 bg-[#F3F3F8] text-[#1A1A2E] rounded-xl px-4 py-2 text-[13px] font-bold flex-shrink-0"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                <rect x="3" y="3" width="18" height="18" rx="3" stroke="#1A1A2E" strokeWidth="1.5"/>
-                <path d="M9 9h6M9 13h4" stroke="#1A1A2E" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
               Open
             </button>
           )}
 
-          {/* Trash button — only in draft state */}
+          {/* Trash button — draft only */}
           {state === "draft" && onRemove && onRollback && (
             <div
               style={{
