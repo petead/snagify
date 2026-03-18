@@ -258,9 +258,10 @@ export function ProfileClient({
 
           <div style={{ background: "#fff", borderRadius: 22, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
             {/* Install App */}
-            <div
+            <Link
+              href="/install-guide"
               className="setting-row"
-              style={{ padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #F0EFEC" }}
+              style={{ padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #F0EFEC", textDecoration: "none" }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                 <div style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(154,136,253,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -275,7 +276,7 @@ export function ProfileClient({
                 </div>
               </div>
               <span style={{ fontSize: 12, color: "#9A88FD", fontWeight: 600 }}>Guide →</span>
-            </div>
+            </Link>
 
             {/* Language */}
             <div
