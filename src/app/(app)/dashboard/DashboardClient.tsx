@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 import { PenLine, AlertTriangle } from "lucide-react";
@@ -225,42 +226,14 @@ export function DashboardClient({
         style={{ padding: "18px 24px 0", animationDelay: "0s" }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 10,
-                background: "#9A88FD",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#fff"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              >
-                <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4m0-6v6" />
-              </svg>
-            </div>
-            <span
-              style={{
-                fontSize: 16,
-                fontWeight: 700,
-                color: "#1A1A1A",
-                letterSpacing: -0.3,
-                fontFamily: "'Poppins', sans-serif",
-              }}
-            >
-              Snagify
-            </span>
-          </div>
+          <Image
+            src="/logo-full.png"
+            alt="Snagify"
+            width={100}
+            height={32}
+            style={{ height: 32, width: "auto", objectFit: "contain" }}
+            priority
+          />
           <Link
             href="/profile"
             style={{

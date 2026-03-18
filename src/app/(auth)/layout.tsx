@@ -1,36 +1,11 @@
 import Link from "next/link";
+import Image from "next/image";
 
 const FEATURES = [
   "AI-powered contract extraction",
   "Digital signatures & PDF reports",
   "RERA compliant documentation",
 ];
-
-function LogoIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 56 56"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      <path
-        d="M28 4L52 16v24L28 52 4 40V16L28 4z"
-        stroke="white"
-        strokeWidth="2"
-        fill="none"
-      />
-      <path
-        d="M28 24v20M20 32l8-8 8 8M22 44h12"
-        stroke="white"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 export default function AuthLayout({
   children,
@@ -48,10 +23,14 @@ export default function AuthLayout({
           }}
         >
           <div className="max-w-md w-full flex flex-col items-center text-center">
-            <LogoIcon className="w-14 h-14 text-white mb-6 flex-shrink-0" />
-            <h1 className="font-heading font-extrabold text-white text-[32px] leading-tight mb-4">
-              Snagify
-            </h1>
+            <Image
+              src="/logo-full.png"
+              alt="Snagify"
+              width={160}
+              height={52}
+              className="h-13 w-auto object-contain brightness-0 invert mb-6"
+              priority
+            />
             <p
               className="font-heading font-bold text-white text-2xl leading-[1.2] mb-4"
               style={{ lineHeight: 1.2 }}
@@ -86,11 +65,15 @@ export default function AuthLayout({
         <div className="flex-1 flex flex-col min-h-screen bg-[#fcfcfc] lg:min-w-0">
           {/* Mobile header */}
           <header className="lg:hidden flex items-center justify-center py-5 px-4 bg-[#9A88FD]">
-            <Link href="/" className="flex items-center gap-2">
-              <LogoIcon className="w-9 h-9 text-white flex-shrink-0" />
-              <span className="font-heading font-extrabold text-white text-xl">
-                Snagify
-              </span>
+            <Link href="/">
+              <Image
+                src="/logo-full.png"
+                alt="Snagify"
+                width={120}
+                height={40}
+                className="h-9 w-auto object-contain brightness-0 invert"
+                priority
+              />
             </Link>
           </header>
 
