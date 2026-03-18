@@ -1,9 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+
+export const dynamic = "force-dynamic";
 
 type InviteStatus = "loading" | "valid" | "invalid" | "expired" | "done";
 
@@ -20,7 +22,7 @@ type InviteData = {
   } | null;
 };
 
-export default function InvitePage() {
+function InvitePageInner() {
   const params = useSearchParams();
   const router = useRouter();
   const token = params.get("token");
@@ -234,5 +236,19 @@ export default function InvitePage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function InvitePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#F8F7F4]">
+          <div className="w-8 h-8 border-2 border-[#9A88FD] border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <InvitePageInner />
+    </Suspense>
   );
 }

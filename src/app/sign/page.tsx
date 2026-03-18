@@ -4,6 +4,8 @@ import { useSearchParams } from 'next/navigation'
 import { Loader2, FileText, Check, RotateCcw, ShieldCheck } from 'lucide-react'
 import { formatPropertyAddress } from '@/lib/formatPropertyAddress'
 
+export const dynamic = 'force-dynamic'
+
 type Step = 'loading' | 'overview' | 'otp' | 'pad' | 'done' | 'already_signed' | 'error'
 
 function SignPageContent() {

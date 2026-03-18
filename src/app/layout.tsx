@@ -31,10 +31,10 @@ export const metadata: Metadata = {
       { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
     ],
   },
-  themeColor: "#9A88FD",
 };
 
 export const viewport: Viewport = {
+  themeColor: "#9A88FD",
   width: "device-width",
   initialScale: 1,
 };
