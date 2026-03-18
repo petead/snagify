@@ -192,6 +192,16 @@ function buildPhotoPairs(checkoutRoom: CheckoutRoom, checkinPhotosMap?: Map<stri
   return pairs;
 }
 
+function getPhotoStyle(photo: { width?: number | null; height?: number | null } | null | undefined, maxWidth: number): { width: number; height: number } {
+  if (photo?.width && photo?.height && photo.width > 0 && photo.height > 0) {
+    const aspectRatio = photo.height / photo.width;
+    const displayWidth = maxWidth;
+    const displayHeight = Math.min(displayWidth * aspectRatio, 280);
+    return { width: displayWidth, height: displayHeight };
+  }
+  return { width: maxWidth, height: maxWidth * 0.75 };
+}
+
 function getKeyLabel(item: KeyHandoverItem): string {
   return item.label || item.name || item.item || "Key";
 }
@@ -1291,43 +1301,131 @@ export function CheckoutPDFDocument({
           })}
         </View>
 
-        {/* Key Return comparison */}
-        <View style={s.sectionHd}>
-          <Text style={s.sectionHdText}>Key Return</Text>
-          <View style={s.sectionHdLine} />
-        </View>
+        {/* Key Return section — inline rows */}
+        <View style={{ marginHorizontal: 28, marginBottom: 20 }}>
+          <Text style={{
+            fontSize: 9, fontFamily: 'Helvetica-Bold',
+            color: tokens.primary, textTransform: 'uppercase',
+            letterSpacing: 1, marginBottom: 10,
+          }}>
+            Key Return
+          </Text>
 
-        <View style={s.keysCard}>
           {keyComparison.length === 0 ? (
             <Text style={{ fontSize: 8, color: "#9B9BA8", fontFamily: "Helvetica-Oblique" }}>
               No key items recorded
             </Text>
           ) : (
-            keyComparison.map((k, i) => (
-              <View key={i} style={[s.keyItem, ...(i === keyComparison.length - 1 ? [s.keyItemLast] : [])]}>
-                <View style={[s.keyIconBox, { backgroundColor: tokens.primaryUltraLight }]}>
-                  {getKeyIcon(k.item, tokens.primary)}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.keyLabel}>{k.item}</Text>
-                  <Text style={s.keySubLabel}>Given ×{k.given} → Returned ×{k.returned}</Text>
-                </View>
-                <View style={[s.keyStatus, { backgroundColor: k.ok ? "#DCFCE7" : "#FEE2E2" }]}>
-                  <Text style={[s.keyStatusText, { color: k.ok ? "#16A34A" : "#DC2626" }]}>
-                    {k.ok ? "✓ All returned" : `Missing ×${k.missing}`}
-                  </Text>
-                </View>
+            <>
+              {/* Column headers */}
+              <View style={{
+                flexDirection: 'row', paddingBottom: 4, marginBottom: 4,
+                borderBottomWidth: 0.5, borderBottomColor: '#E5E5E5',
+              }}>
+                <Text style={{ flex: 3, fontSize: 7, color: '#9B9BA8',
+                  textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Item
+                </Text>
+                <Text style={{ flex: 1, fontSize: 7, color: '#9B9BA8',
+                  textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Given
+                </Text>
+                <Text style={{ flex: 1, fontSize: 7, color: '#9B9BA8',
+                  textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Returned
+                </Text>
+                <Text style={{ flex: 1, fontSize: 7, color: '#9B9BA8',
+                  textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Status
+                </Text>
               </View>
-            ))
-          )}
 
-          {missingKeys.length > 0 && (
-            <View style={s.missingAlert}>
-              <IconWarning size={12} color="#DC2626" />
-              <Text style={{ fontSize: 8, color: "#DC2626", fontFamily: "Helvetica-Bold", marginLeft: 6 }}>
-                ⚠ Some items were not returned. Please verify with the tenant.
-              </Text>
-            </View>
+              {keyComparison.map((k, i) => (
+                <View key={i} style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 7,
+                  borderBottomWidth: 0.5,
+                  borderBottomColor: '#F3F3F8',
+                  backgroundColor: k.ok ? 'transparent' : '#FEF2F2',
+                  borderRadius: 4,
+                  paddingHorizontal: k.ok ? 0 : 6,
+                  marginBottom: k.ok ? 0 : 2,
+                }}>
+                  {/* Item name */}
+                  <Text style={{
+                    flex: 3, fontSize: 8,
+                    fontFamily: 'Helvetica-Bold', color: '#1A1A2E',
+                  }}>
+                    {k.item}
+                  </Text>
+
+                  {/* Given qty — gray */}
+                  <View style={{ flex: 1, alignItems: 'center' }}>
+                    <Text style={{
+                      fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#9B9BA8',
+                    }}>
+                      x{k.given}
+                    </Text>
+                  </View>
+
+                  {/* Returned qty — green or red */}
+                  <View style={{ flex: 1, alignItems: 'center' }}>
+                    <Text style={{
+                      fontSize: 10, fontFamily: 'Helvetica-Bold',
+                      color: k.ok ? '#16A34A' : '#DC2626',
+                    }}>
+                      x{k.returned}
+                    </Text>
+                  </View>
+
+                  {/* Status badge */}
+                  <View style={{ flex: 1, alignItems: 'center' }}>
+                    <View style={{
+                      backgroundColor: k.ok ? '#DCFCE7' : '#FEE2E2',
+                      borderRadius: 20, paddingHorizontal: 6, paddingVertical: 2,
+                    }}>
+                      <Text style={{
+                        fontSize: 6.5, fontFamily: 'Helvetica-Bold',
+                        color: k.ok ? '#16A34A' : '#DC2626',
+                      }}>
+                        {k.ok ? 'Returned' : `Missing x${k.missing}`}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+
+              {/* Summary footer */}
+              {(() => {
+                const allOk = keyComparison.every((k) => k.ok);
+                return (
+                  <View style={{
+                    marginTop: 8, flexDirection: 'row', alignItems: 'center',
+                    backgroundColor: allOk ? '#DCFCE7' : '#FEE2E2',
+                    borderRadius: 6, padding: '5 10',
+                  }}>
+                    <View style={{
+                      width: 6, height: 6, borderRadius: 3,
+                      backgroundColor: allOk ? '#16A34A' : '#DC2626',
+                      marginRight: 6,
+                    }} />
+                    <Text style={{
+                      fontSize: 7.5, fontFamily: 'Helvetica-Bold',
+                      color: allOk ? '#16A34A' : '#DC2626',
+                    }}>
+                      {allOk
+                        ? 'All keys returned'
+                        : keyComparison
+                            .filter((k) => !k.ok)
+                            .map((k) => `${k.item}: missing x${k.missing}`)
+                            .join(' | ')
+                      }
+                    </Text>
+                  </View>
+                );
+              })()}
+            </>
           )}
         </View>
 
@@ -1421,18 +1519,22 @@ export function CheckoutPDFDocument({
                         </Text>
                       </View>
 
-                      {/* Full-width checkout photo */}
-                      {pair.coPhoto.url && pair.coPhoto.url.startsWith("http") && (
-                        <Image
-                          src={pair.coPhoto.url}
-                          style={{
-                            width: "100%",
-                            height: 200,
-                            objectFit: "cover",
-                            borderRadius: 6,
-                          }}
-                        />
-                      )}
+                      {/* Full-width checkout photo — natural aspect ratio */}
+                      {pair.coPhoto.url && pair.coPhoto.url.startsWith("http") && (() => {
+                        const photoStyle = getPhotoStyle(pair.coPhoto, 490);
+                        return (
+                          <Image
+                            src={pair.coPhoto.url}
+                            style={{
+                              width: photoStyle.width,
+                              height: photoStyle.height,
+                              objectFit: "contain",
+                              borderRadius: 6,
+                              backgroundColor: "#F8F7F4",
+                            }}
+                          />
+                        );
+                      })()}
 
                       {/* Damage tags */}
                       {pair.coPhoto.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
@@ -1482,16 +1584,21 @@ export function CheckoutPDFDocument({
                           </Text>
                         </View>
 
-                        {pair.ciPhoto?.url ? (
-                          <Image
-                            src={pair.ciPhoto.url}
-                            style={{
-                              width: "100%", height: 140,
-                              objectFit: "cover", borderRadius: 6,
-                              opacity: 0.85,
-                            }}
-                          />
-                        ) : (
+                        {pair.ciPhoto?.url ? (() => {
+                          const photoStyle = getPhotoStyle(pair.ciPhoto, 238);
+                          return (
+                            <Image
+                              src={pair.ciPhoto.url}
+                              style={{
+                                width: photoStyle.width,
+                                height: photoStyle.height,
+                                objectFit: "contain",
+                                borderRadius: 6,
+                                backgroundColor: "#F8F7F4",
+                              }}
+                            />
+                          );
+                        })() : (
                           <View style={{
                             width: "100%", height: 140,
                             backgroundColor: "#F3F3F8", borderRadius: 6,
@@ -1545,17 +1652,23 @@ export function CheckoutPDFDocument({
                           </Text>
                         </View>
 
-                        {pair.coPhoto.url && pair.coPhoto.url.startsWith("http") && (
-                          <Image
-                            src={pair.coPhoto.url}
-                            style={{
-                              width: "100%", height: 140,
-                              objectFit: "cover", borderRadius: 6,
-                              borderWidth: 1.5,
-                              borderColor: tokens.primary,
-                            }}
-                          />
-                        )}
+                        {pair.coPhoto.url && pair.coPhoto.url.startsWith("http") && (() => {
+                          const photoStyle = getPhotoStyle(pair.coPhoto, 238);
+                          return (
+                            <Image
+                              src={pair.coPhoto.url}
+                              style={{
+                                width: photoStyle.width,
+                                height: photoStyle.height,
+                                objectFit: "contain",
+                                borderRadius: 6,
+                                backgroundColor: "#F8F7F4",
+                                borderWidth: 1.5,
+                                borderColor: tokens.primary,
+                              }}
+                            />
+                          );
+                        })()}
 
                         {/* Check-out damage tags */}
                         {pair.coPhoto.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
