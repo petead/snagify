@@ -2,15 +2,62 @@
 
 import { useState, useEffect } from 'react';
 
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const base64 = base64String
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+  const padding = '='.repeat((4 - (base64.length % 4)) % 4);
+  const padded = base64 + padding;
+  
+  try {
+    const rawData = window.atob(padded);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  } catch (e) {
+    console.error('[Push] VAPID key decode error:', e, 'key was:', base64String);
+    throw new Error('Invalid VAPID key format');
   }
-  return outputArray;
+}
+
+async function getOrRegisterSW(): Promise<ServiceWorkerRegistration> {
+  const allRegs = await navigator.serviceWorker.getRegistrations();
+  console.log('[Push] Existing SW registrations:', allRegs.map(r => ({
+    scope: r.scope,
+    scriptURL: r.active?.scriptURL,
+    state: r.active?.state,
+    hasPushManager: !!r.pushManager,
+  })));
+
+  const pushReg = allRegs.find(r => !!r.pushManager);
+  if (pushReg) {
+    console.log('[Push] Using existing SW with pushManager:', pushReg.active?.scriptURL);
+    return pushReg;
+  }
+
+  console.log('[Push] No push-capable SW found, registering /sw-push.js...');
+  try {
+    const newReg = await navigator.serviceWorker.register('/sw-push.js', {
+      scope: '/',
+      updateViaCache: 'none',
+    });
+    await new Promise<void>((resolve) => {
+      if (newReg.active) { resolve(); return; }
+      const sw = newReg.installing || newReg.waiting;
+      if (!sw) { resolve(); return; }
+      sw.addEventListener('statechange', (e) => {
+        if ((e.target as ServiceWorker).state === 'activated') resolve();
+      });
+      setTimeout(resolve, 5000);
+    });
+    console.log('[Push] sw-push.js registered and active');
+    return newReg;
+  } catch (err) {
+    console.error('[Push] Failed to register sw-push.js:', err);
+    throw err;
+  }
 }
 
 export default function PushNotificationToggle() {
@@ -30,16 +77,14 @@ export default function PushNotificationToggle() {
 
   async function checkSubscription() {
     try {
-      const reg = await Promise.race([
-        navigator.serviceWorker.ready,
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('SW timeout')), 5000)
-        ),
-      ]);
-      const sub = await (reg as ServiceWorkerRegistration).pushManager.getSubscription();
-      setIsSubscribed(!!sub);
+      const allRegs = await navigator.serviceWorker.getRegistrations();
+      for (const reg of allRegs) {
+        const sub = await reg.pushManager?.getSubscription();
+        if (sub) { setIsSubscribed(true); return; }
+      }
+      setIsSubscribed(false);
     } catch (err) {
-      console.error('checkSubscription error:', err);
+      console.error('[Push] checkSubscription error:', err);
     }
   }
 
@@ -50,93 +95,94 @@ export default function PushNotificationToggle() {
 
     try {
       if (isSubscribed) {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (sub) {
-          await fetch('/api/push/subscribe', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ endpoint: sub.endpoint }),
-          });
-          await sub.unsubscribe();
+        const allRegs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of allRegs) {
+          const sub = await reg.pushManager?.getSubscription();
+          if (sub) {
+            await fetch('/api/push/subscribe', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ endpoint: sub.endpoint }),
+            });
+            await sub.unsubscribe();
+            break;
+          }
         }
         setIsSubscribed(false);
-      } else {
-        const perm = await Notification.requestPermission();
-        setPermission(perm);
-        if (perm !== 'granted') {
-          setError('Permission denied. Enable notifications in your browser settings.');
-          return;
-        }
-
-        let reg: ServiceWorkerRegistration;
-        try {
-          const allRegs = await navigator.serviceWorker.getRegistrations();
-          console.log('[Push] All SW registrations:', allRegs.map(r => ({
-            scope: r.scope,
-            active: r.active?.scriptURL,
-            state: r.active?.state,
-          })));
-
-          if (allRegs.length === 0) {
-            console.log('[Push] No SW found, registering /sw.js...');
-            await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-          }
-
-          const existingReg = allRegs[0] || await navigator.serviceWorker.getRegistration('/');
-
-          if (existingReg) {
-            reg = existingReg;
-            console.log('[Push] Using existing SW:', reg.scope, reg.active?.scriptURL);
-          } else {
-            reg = await Promise.race([
-              navigator.serviceWorker.ready,
-              new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error('SW timeout after registration')), 10000)
-              ),
-            ]) as ServiceWorkerRegistration;
-          }
-
-          console.log('[Push] SW ready:', reg.scope);
-        } catch (err: unknown) {
-          console.error('[Push] SW error:', err);
-          setError(`SW error: ${err instanceof Error ? err.message : 'unknown'}. Check console for details.`);
-          return;
-        }
-
-        let sub: PushSubscription;
-        try {
-          sub = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(
-              process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
-            ),
-          });
-        } catch (err: unknown) {
-          console.error('pushManager.subscribe error:', err);
-          setError('Could not subscribe. On iOS, make sure the app is added to your Home Screen.');
-          return;
-        }
-
-        const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
-        const res = await fetch('/api/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
-        });
-
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          console.error('Server subscribe error:', body);
-          setError('Server error. Please try again.');
-          return;
-        }
-
-        setIsSubscribed(true);
+        return;
       }
+
+      const perm = await Notification.requestPermission();
+      setPermission(perm);
+      console.log('[Push] Permission result:', perm);
+      if (perm !== 'granted') {
+        setError('Permission denied. Enable notifications in iOS Settings → Safari → Notifications.');
+        return;
+      }
+
+      let reg: ServiceWorkerRegistration;
+      try {
+        reg = await getOrRegisterSW();
+      } catch (err: unknown) {
+        setError(`SW error: ${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
+
+      if (!reg.pushManager) {
+        setError('pushManager not available on this SW. Check console for SW details.');
+        return;
+      }
+
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      console.log('[Push] VAPID key (first 20 chars):', vapidKey?.substring(0, 20));
+      if (!vapidKey) {
+        setError('VAPID key missing. Check NEXT_PUBLIC_VAPID_PUBLIC_KEY env var.');
+        return;
+      }
+
+      let applicationServerKey: Uint8Array;
+      try {
+        applicationServerKey = urlBase64ToUint8Array(vapidKey);
+        console.log('[Push] VAPID key decoded, length:', applicationServerKey.length);
+      } catch (err: unknown) {
+        setError(`VAPID key error: ${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
+
+      let sub: PushSubscription;
+      try {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey as BufferSource,
+        });
+        console.log('[Push] Subscribed successfully:', sub.endpoint.substring(0, 40) + '...');
+      } catch (err: unknown) {
+        console.error('[Push] pushManager.subscribe failed:', err);
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(`Subscribe failed: ${msg}`);
+        return;
+      }
+
+      const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
+      const res = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.error('[Push] Server error:', body);
+        setError(`Server error ${res.status}: ${JSON.stringify(body)}`);
+        return;
+      }
+
+      console.log('[Push] ✅ Fully subscribed and saved to server');
+      setIsSubscribed(true);
+
     } catch (err: unknown) {
-      console.error('Push toggle error:', err);
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      console.error('[Push] Unexpected error:', err);
+      setError(`Unexpected: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsLoading(false);
     }
@@ -185,7 +231,7 @@ export default function PushNotificationToggle() {
             </p>
             <p style={{ fontSize: 11, color: "#BBB", margin: "2px 0 0" }}>
               {permission === 'denied'
-                ? 'Blocked — check browser settings'
+                ? 'Blocked — check iOS Settings'
                 : isSubscribed
                 ? 'Active — receiving alerts'
                 : 'Get notified for reports'}
@@ -250,7 +296,7 @@ export default function PushNotificationToggle() {
       </div>
 
       {error && (
-        <p style={{ marginTop: 8, fontSize: 11, color: "#EF4444" }}>{error}</p>
+        <p style={{ marginTop: 8, fontSize: 11, color: "#EF4444", wordBreak: "break-all" }}>{error}</p>
       )}
 
       <style>{`
