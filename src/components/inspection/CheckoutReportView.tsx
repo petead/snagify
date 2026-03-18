@@ -6,12 +6,10 @@ import {
   findCheckinRoom,
   countIssues,
   getRoomVerdict,
-  getKeyDelta,
   getComparisonStats,
   type RoomData,
   type KeyItem,
 } from '@/lib/inspectionCompare'
-import { formatPropertyAddress } from '@/lib/formatPropertyAddress'
 
 interface Props {
   inspection: {
@@ -60,18 +58,6 @@ export function CheckoutReportView({
     [checkinData, inspection, hasCheckinData]
   )
 
-  const keyDelta = useMemo(
-    () => getKeyDelta(
-      (checkinData?.key_handover as KeyItem[]) ?? [],
-      (inspection?.key_handover as KeyItem[]) ?? []
-    ),
-    [checkinData, inspection]
-  )
-
-  const missingKeys = keyDelta.filter(k => !k.ok)
-
-  const landlordSig = signatures?.find(s => s.signer_type === 'landlord')
-  const tenantSig = signatures?.find(s => s.signer_type === 'tenant')
 
   function formatDate(d?: string | null) {
     if (!d) return '—'
@@ -103,48 +89,6 @@ export function CheckoutReportView({
     )
   }
 
-  function getKeyIcon(name: string) {
-    const n = name.toLowerCase()
-    if (n.includes('door') || n.includes('key')) {
-      return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <circle cx="7.5" cy="15.5" r="4.5" stroke="#9A88FD" strokeWidth="1.8" />
-          <path
-            d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2"
-            stroke="#9A88FD"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-          />
-        </svg>
-      )
-    }
-    if (n.includes('parking') || n.includes('car')) {
-      return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <rect x="1" y="4" width="22" height="16" rx="2" stroke="#9A88FD" strokeWidth="1.8" />
-          <path d="M1 10h22" stroke="#9A88FD" strokeWidth="1.8" />
-        </svg>
-      )
-    }
-    if (n.includes('mail')) {
-      return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
-            stroke="#9A88FD"
-            strokeWidth="1.8"
-          />
-          <path d="M22 6l-10 7L2 6" stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
-      )
-    }
-    return (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-        <rect x="3" y="11" width="18" height="11" rx="2" stroke="#9A88FD" strokeWidth="1.8" />
-        <path d="M7 11V7a5 5 0 0110 0v4" stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round" />
-      </svg>
-    )
-  }
 
   const isSigned = inspection.signed_at || inspection.status === 'signed'
   const property = inspection.property
@@ -250,10 +194,10 @@ export function CheckoutReportView({
         </div>
       </div>
 
-      <div className="px-4 pt-4 space-y-3">
+      <div className="pt-4">
         {/* ── COMPARISON SUMMARY ── */}
-        <div className="bg-white rounded-2xl p-4 border border-[#EEECFF]">
-          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[#F3F3F8]">
+        <div className="bg-white rounded-2xl border border-[#EEECFF] mx-4 mb-3">
+          <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-[#F3F3F8]">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path
                 d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"
@@ -267,7 +211,7 @@ export function CheckoutReportView({
 
           {!hasCheckinData ? (
             /* Skeleton loader when checkinData is not available */
-            <div className="animate-pulse">
+            <div className="animate-pulse p-4">
               <div className="grid grid-cols-2 gap-2 mb-3">
                 <div className="bg-[#F8F7F4] rounded-xl p-3">
                   <div className="h-3 bg-gray-200 rounded w-16 mb-3" />
@@ -297,7 +241,7 @@ export function CheckoutReportView({
               </div>
             </div>
           ) : stats && (
-            <>
+            <div className="p-4">
               {/* Two column cards */}
               <div className="grid grid-cols-2 gap-2 mb-3">
                 {/* Check-in */}
@@ -365,13 +309,13 @@ export function CheckoutReportView({
                   </p>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
 
         {/* ── ROOM BY ROOM DELTA ── */}
-        <div className="bg-white rounded-2xl p-4 border border-[#EEECFF]">
-          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[#F3F3F8]">
+        <div className="bg-white rounded-2xl border border-[#EEECFF] mx-4 mb-3">
+          <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-[#F3F3F8]">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path
                 d="M3 9.5L12 3l9 6.5V20H3z"
@@ -386,6 +330,7 @@ export function CheckoutReportView({
             </span>
           </div>
 
+          <div className="p-4">
           {inspection.rooms?.map(room => {
             const ciRoom = hasCheckinData ? findCheckinRoom(checkinData?.rooms, room.name) : null
             const ciPhotos = ciRoom?.photos?.length ?? 0
@@ -527,128 +472,127 @@ export function CheckoutReportView({
               </div>
             )
           })}
+          </div>
         </div>
 
-        {/* ── KEY RETURN COMPARISON ── */}
-        {keyDelta.length > 0 && (
-          <div className="bg-white rounded-2xl p-4 border border-[#EEECFF]">
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[#F3F3F8]">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <circle cx="7.5" cy="15.5" r="4.5" stroke="#9A88FD" strokeWidth="1.8" />
-                <path
-                  d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2"
-                  stroke="#9A88FD"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <span className="text-[14px] font-bold text-[#1A1A2E]">Key Return</span>
-            </div>
-
-            {keyDelta.map((k, i) => (
-              <div key={i} className="flex items-center gap-3 py-2.5 border-b border-[#F3F3F8] last:border-b-0">
-                <div className="w-8 h-8 bg-[#EDE9FF] rounded-xl flex items-center justify-center flex-shrink-0">
-                  {getKeyIcon(k.item)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-semibold text-[#1A1A2E] truncate">{k.item}</div>
-                  <div className="text-[11px] text-[#9B9BA8]">
-                    Given ×{k.given} → Returned ×{k.returned}
-                  </div>
-                </div>
-                <span className={`text-[13px] font-bold ${k.ok ? 'text-[#16A34A]' : 'text-[#EF4444]'}`}>
-                  ×{k.returned}
-                </span>
-                <span
-                  className={`text-[10px] font-bold px-2 py-1 rounded-full flex-shrink-0 ${
-                    k.ok ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FEE2E2] text-[#EF4444]'
-                  }`}
-                >
-                  {k.ok ? '✓ Returned' : `Missing ×${k.missing}`}
-                </span>
-              </div>
-            ))}
-
-            {/* Missing keys alert */}
-            {missingKeys.length > 0 && (
-              <div className="bg-[#FEF2F2] rounded-xl p-3 mt-3 flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
-                  <circle cx="12" cy="12" r="10" stroke="#EF4444" strokeWidth="1.8" />
-                  <path d="M12 8v4M12 16h.01" stroke="#EF4444" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-                <span className="text-[12px] text-[#DC2626] font-semibold">
-                  {missingKeys.length} item{missingKeys.length > 1 ? 's' : ''} missing:{' '}
-                  {missingKeys.map(k => `${k.item} ×${k.missing}`).join(', ')}
-                </span>
-              </div>
-            )}
-
-            {/* All returned success */}
-            {missingKeys.length === 0 && keyDelta.length > 0 && (
-              <div className="bg-[#DCFCE7] rounded-xl p-3 mt-3 flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+        {/* ── HANDOVER KEYS — matching check-in style ── */}
+        {(() => {
+          const keyItems = (inspection.key_handover as Array<{ item: string; qty: number }>) ?? []
+          if (keyItems.length === 0) return null
+          return (
+            <div className="bg-white rounded-2xl border border-[#EEECFF] mx-4 mb-3">
+              <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-[#F3F3F8]">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <circle cx="7.5" cy="15.5" r="4.5" stroke="#9A88FD" strokeWidth="1.8" />
                   <path
-                    d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    stroke="#16A34A"
+                    d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2"
+                    stroke="#9A88FD"
                     strokeWidth="1.8"
                     strokeLinecap="round"
                   />
                 </svg>
-                <span className="text-[12px] text-[#16A34A] font-semibold">All keys returned ✓</span>
+                <span className="text-[14px] font-bold text-[#1A1A2E]">Handover Keys</span>
               </div>
-            )}
-          </div>
-        )}
+              <div className="p-4 grid grid-cols-2 gap-2">
+                {keyItems.map((item, i) => (
+                  <div
+                    key={i}
+                    className="bg-[#F8F7F4] rounded-xl p-3 flex items-center justify-between"
+                  >
+                    <span className="text-[13px] font-medium text-[#6B7280]">
+                      {item.item}
+                    </span>
+                    <span
+                      className="text-[16px] font-extrabold text-[#1A1A2E] bg-white w-8 h-8 rounded-[10px] flex items-center justify-center"
+                      style={{ fontFamily: "'Poppins', sans-serif" }}
+                    >
+                      {item.qty}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
 
-        {/* ── SIGNATURES ── */}
-        <div className="bg-white rounded-2xl p-4 border border-[#EEECFF]">
-          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[#F3F3F8]">
+        {/* ── SIGNATURES — matching check-in style ── */}
+        <div className="bg-white rounded-2xl border border-[#EEECFF] mx-4 mb-3">
+          <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-[#F3F3F8]">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path
                 d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"
                 stroke="#9A88FD"
                 strokeWidth="1.8"
                 strokeLinecap="round"
+                strokeLinejoin="round"
               />
             </svg>
             <span className="text-[14px] font-bold text-[#1A1A2E]">Signatures</span>
           </div>
 
-          {[
-            { sig: landlordSig, name: tenancy?.landlord_name, role: 'Landlord' },
-            { sig: tenantSig, name: tenancy?.tenant_name, role: 'Tenant' },
-          ].map(({ sig, name, role }) => (
-            <div key={role} className="flex items-center gap-3 py-2.5 border-b border-[#F3F3F8] last:border-b-0">
-              <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold flex-shrink-0 ${
-                  sig?.signed_at ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#EDE9FF] text-[#9A88FD]'
-                }`}
-              >
-                {sig?.signed_at
-                  ? '✓'
-                  : name
-                      ?.split(' ')
-                      .map((n: string) => n[0])
-                      .slice(0, 2)
-                      .join('') || role[0]}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-semibold text-[#1A1A2E] truncate">
-                  {name || role}
+          <div className="divide-y divide-[#F3F3F8]">
+            {[
+              {
+                label: 'Landlord',
+                name: tenancy?.landlord_name,
+                sig: signatures?.find((s) => s.signer_type === 'landlord'),
+              },
+              {
+                label: 'Tenant',
+                name: tenancy?.tenant_name,
+                sig: signatures?.find((s) => s.signer_type === 'tenant'),
+              },
+            ].map(({ label, name, sig }) => {
+              const isSigned = !!sig?.signed_at
+              const initials = name?.split(' ').map((n: string) => n[0])
+                .slice(0, 2).join('') || label.slice(0,2).toUpperCase()
+
+              return (
+                <div key={label} className="flex items-center gap-3 px-4 py-3.5">
+                  {/* Avatar */}
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold flex-shrink-0 ${
+                    isSigned ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#EDE9FF] text-[#9A88FD]'
+                  }`}>
+                    {isSigned ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M20 6L9 17l-5-5"
+                          stroke="#16A34A"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : initials}
+                  </div>
+
+                  {/* Name + date/pending */}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-semibold text-[#1A1A2E] truncate">
+                      {name || label}
+                    </div>
+                    <div className="text-[11px] text-[#9B9BA8] mt-0.5">
+                      {isSigned && sig?.signed_at
+                        ? `Signed on ${new Date(sig.signed_at).toLocaleDateString('en-AE', {
+                            day: 'numeric', month: 'long', year: 'numeric'
+                          })}`
+                        : 'Pending signature'
+                      }
+                    </div>
+                  </div>
+
+                  {/* Badge */}
+                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
+                    isSigned
+                      ? 'bg-[#DCFCE7] text-[#16A34A]'
+                      : 'bg-[#F3F3F8] text-[#9B9BA8]'
+                  }`}>
+                    {isSigned ? 'Signed' : 'Pending'}
+                  </span>
                 </div>
-                <div className="text-[11px] text-[#9B9BA8]">
-                  {sig?.signed_at ? `Signed on ${formatDate(sig.signed_at)}` : 'Pending signature'}
-                </div>
-              </div>
-              <span
-                className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                  sig?.signed_at ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#F3F3F8] text-[#9B9BA8]'
-                }`}
-              >
-                {sig?.signed_at ? 'Signed' : 'Pending'}
-              </span>
-            </div>
-          ))}
+              )
+            })}
+          </div>
         </div>
       </div>
     </div>
