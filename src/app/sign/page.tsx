@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient } from '@supabase/ssr'
 import { Loader2, FileText, Check, RotateCcw, ShieldCheck } from 'lucide-react'
 
 type Step = 'loading' | 'overview' | 'otp' | 'pad' | 'done' | 'already_signed' | 'error'
@@ -12,7 +12,10 @@ function SignPageContent() {
   const signerType = params.get('signerType') as 'landlord' | 'tenant'
   const email = params.get('email')
 
-  const supabase = createClientComponentClient()
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
   const [step, setStep] = useState<Step>('loading')
   const [data, setData] = useState<any>(null)
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
