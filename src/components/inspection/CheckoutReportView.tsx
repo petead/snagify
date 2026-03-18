@@ -473,7 +473,7 @@ export function CheckoutReportView({
                             {/* Check-in photo */}
                             <div className="flex flex-col items-center gap-1 flex-1">
                               <span className="text-[9px] text-[#9B9BA8] font-medium self-start">
-                                Entry
+                                Check-in
                               </span>
                               {pair.ciPhoto ? (
                                 <div className="w-full aspect-square rounded-lg overflow-hidden border border-gray-200 opacity-70">
