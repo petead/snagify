@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { compressAvatar, compressLogo } from "@/lib/compressImage";
 import type { Company } from "@/types";
 
 type ProfileRow = {
@@ -137,23 +138,95 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
     return () => clearTimeout(t);
   }, [toast, router]);
 
-  const handleFileUpload = async (kind: "avatar" | "company-logo" | "signature", file: File) => {
+  const handleAvatarUpload = async (file: File) => {
     if (!file.type.startsWith("image/")) return;
-    setUploading(kind);
+    setUploading("avatar");
+    try {
+      const supabase = createClient();
+      const compressed = await compressAvatar(file);
+      const path = `${userId}/avatar.jpg`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, compressed, {
+          upsert: true,
+          contentType: "image/jpeg",
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(path);
+
+      const urlWithCache = `${publicUrl}?t=${Date.now()}`;
+
+      await supabase
+        .from("profiles")
+        .update({ avatar_url: urlWithCache })
+        .eq("id", userId);
+
+      setAvatarUrl(urlWithCache);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Avatar upload failed");
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const handleLogoUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    setUploading("company-logo");
+    try {
+      const supabase = createClient();
+      const isSvg = file.type === "image/svg+xml";
+      const toUpload = isSvg ? file : await compressLogo(file);
+      const ext = isSvg ? "svg" : "jpg";
+      const path = `${userId}/logo.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("logos")
+        .upload(path, toUpload, {
+          upsert: true,
+          contentType: isSvg ? "image/svg+xml" : "image/jpeg",
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("logos")
+        .getPublicUrl(path);
+
+      const urlWithCache = `${publicUrl}?t=${Date.now()}`;
+
+      if (companyId) {
+        await supabase
+          .from("companies")
+          .update({ logo_url: urlWithCache })
+          .eq("id", companyId);
+      }
+
+      setCompanyLogoUrl(urlWithCache);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Logo upload failed");
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const handleSignatureUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    setUploading("signature");
     const formData = new FormData();
     formData.set("file", file);
-    if (kind !== "company-logo") formData.set("kind", kind);
+    formData.set("kind", "signature");
     try {
-      const endpoint = kind === "company-logo" ? "/api/upload-logo" : "/api/upload-avatar";
-      const res = await fetch(endpoint, { method: "POST", body: formData });
+      const res = await fetch("/api/upload-avatar", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload failed");
-      const url = data.url as string;
-      if (kind === "avatar") setAvatarUrl(url);
-      if (kind === "company-logo") setCompanyLogoUrl(url);
-      if (kind === "signature") setSignatureImageUrl(url);
+      setSignatureImageUrl(data.url as string);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Upload failed");
+      alert(e instanceof Error ? e.message : "Signature upload failed");
     } finally {
       setUploading(null);
     }
@@ -294,33 +367,33 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
       <input
         type="file"
         ref={avatarInputRef}
-        accept="image/*"
+        accept="image/png,image/jpeg,image/webp"
         style={{ display: "none" }}
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f) handleFileUpload("avatar", f);
+          if (f) void handleAvatarUpload(f);
           e.target.value = "";
         }}
       />
       <input
         type="file"
         ref={logoInputRef}
-        accept="image/*"
+        accept="image/png,image/jpeg,image/webp,image/svg+xml"
         style={{ display: "none" }}
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f) handleFileUpload("company-logo", f);
+          if (f) void handleLogoUpload(f);
           e.target.value = "";
         }}
       />
       <input
         type="file"
         ref={signatureInputRef}
-        accept="image/*"
+        accept="image/png"
         style={{ display: "none" }}
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f) handleFileUpload("signature", f);
+          if (f) void handleSignatureUpload(f);
           e.target.value = "";
         }}
       />
@@ -328,33 +401,57 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
       <div style={{ padding: "20px 16px" }}>
         {/* ─── PHOTO ─── */}
         <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <button
-            type="button"
-            onClick={() => avatarInputRef.current?.click()}
-            disabled={!!uploading}
-            style={{
-              width: 80,
-              height: 80,
-              borderRadius: "50%",
-              overflow: "hidden",
-              border: "none",
-              padding: 0,
-              cursor: uploading === "avatar" ? "wait" : "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: avatarUrl ? "transparent" : "#9A88FD",
-            }}
-          >
-            {uploading === "avatar" ? (
-              <span style={{ fontSize: 18, color: "#fff" }}>…</span>
-            ) : avatarUrl ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : (
-              <span style={{ color: "#fff", fontSize: 28, fontWeight: 800 }}>{initials}</span>
+          <div style={{ position: "relative", display: "inline-block" }}>
+            <button
+              type="button"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={!!uploading}
+              style={{
+                width: 80,
+                height: 80,
+                borderRadius: "50%",
+                overflow: "hidden",
+                border: "none",
+                padding: 0,
+                cursor: uploading === "avatar" ? "wait" : "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: avatarUrl ? "transparent" : "#9A88FD",
+                opacity: uploading === "avatar" ? 0.5 : 1,
+                transition: "opacity 0.2s",
+              }}
+            >
+              {avatarUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <span style={{ color: "#fff", fontSize: 28, fontWeight: 800 }}>{initials}</span>
+              )}
+            </button>
+            {uploading === "avatar" && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <div
+                  style={{
+                    width: 24,
+                    height: 24,
+                    border: "2px solid #9A88FD",
+                    borderTopColor: "transparent",
+                    borderRadius: "50%",
+                    animation: "spin 0.8s linear infinite",
+                  }}
+                />
+              </div>
             )}
-          </button>
+          </div>
           <button
             type="button"
             onClick={() => avatarInputRef.current?.click()}
@@ -373,7 +470,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
               color: "#9A88FD",
             }}
           >
-            Change Photo
+            {uploading === "avatar" ? "Uploading..." : "Change Photo"}
           </button>
           {/* Account type badge */}
           <div style={{ marginTop: 12, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
@@ -553,7 +650,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
                   ) : (
                     <>
                       <span style={{ fontSize: 13, color: "#666", marginBottom: 2 }}>Tap to upload your logo</span>
-                      <span style={{ fontSize: 11, color: "#999" }}>PNG or JPG · Max 2MB · Used in PDF reports</span>
+                      <span style={{ fontSize: 11, color: "#999" }}>PNG, JPG, or SVG · Used in PDF reports</span>
                     </>
                   )}
                 </button>
