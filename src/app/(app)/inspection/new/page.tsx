@@ -985,24 +985,24 @@ function NewInspectionContent() {
               className={inputCls}
             />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="From" required>
-              <input
-                type="date"
-                value={formData.contract_from}
-                onChange={(e) => set("contract_from", e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="To" required>
-              <input
-                type="date"
-                value={formData.contract_to}
-                onChange={(e) => set("contract_to", e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-          </div>
+          <Field label="Contract Start" required>
+            <input
+              type="date"
+              value={formData.contract_from}
+              onChange={(e) => set("contract_from", e.target.value)}
+              className={inputCls}
+              style={{ fontSize: 16 }}
+            />
+          </Field>
+          <Field label="Contract End" required>
+            <input
+              type="date"
+              value={formData.contract_to}
+              onChange={(e) => set("contract_to", e.target.value)}
+              className={inputCls}
+              style={{ fontSize: 16 }}
+            />
+          </Field>
           <Field label="Annual Rent">
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">
