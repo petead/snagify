@@ -291,7 +291,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
     : userEmail?.split("@")[0].slice(0, 2).toUpperCase() || "PA";
 
   return (
-    <div className="min-h-screen bg-[#F3F2EF] pb-32">
+    <div className="min-h-screen bg-[#F3F2EF]" style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom) + 80px)" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&display=swap');`}</style>
 
       {/* Hidden file inputs */}
@@ -653,7 +653,10 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
       )}
 
       {/* Save button */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#F3F2EF] border-t border-gray-100 px-5 pt-3 pb-8">
+      <div
+        className="fixed bottom-0 left-0 right-0 bg-[#F3F2EF] border-t border-gray-100 px-5 pt-3"
+        style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom) + 8px)" }}
+      >
         <button
           onClick={handleSave}
           disabled={saving}
