@@ -20,6 +20,8 @@ type InspectionInGroup = {
   status: string | null;
   created_at: string | null;
   completed_at: string | null;
+  report_url: string | null;
+  signed_at: string | null;
   room_count: number;
   signatures: InspectionSignature[];
 };
@@ -75,10 +77,35 @@ function tenantInitials(name: string | null): string {
     .toUpperCase();
 }
 
-function inspectionDisplayStatus(status: string | null): "draft" | "completed" | "signed" {
-  if (status === "signed") return "signed";
-  if (status === "completed") return "completed";
-  return "draft";
+function getInspectionDisplayStatus(inspection: {
+  status: string | null;
+  report_url?: string | null;
+  signed_at?: string | null;
+}): {
+  label: string;
+  style: string;
+} {
+  // Signed — all parties have signed
+  if (inspection.signed_at || inspection.status === "signed") {
+    return {
+      label: "Signed",
+      style: "bg-green-50 text-green-700 border border-green-200",
+    };
+  }
+
+  // Pending Signatures — report generated, waiting for signatures
+  if (inspection.report_url) {
+    return {
+      label: "Pending Signatures",
+      style: "bg-amber-50 text-amber-700 border border-amber-200",
+    };
+  }
+
+  // Draft — inspection started but no report yet
+  return {
+    label: "Draft",
+    style: "bg-gray-100 text-gray-500 border border-gray-200",
+  };
 }
 
 type CheckInWithRooms = {
@@ -107,17 +134,14 @@ type CheckInWithRooms = {
 
 function InspectionRow({
   label,
-  data,
+  inspection,
   canStart,
   accentLabel,
-  inspectionId,
   propertyId,
   tenancyId,
   inspectionType,
-  inspectionStatus,
   onRemove,
   onRollback,
-  signatures,
   sourceCheckInId,
   creditsBalance,
   creditsPlan,
@@ -125,17 +149,14 @@ function InspectionRow({
   refreshCredits,
 }: {
   label: string;
-  data: { date: string; status: string } | null;
+  inspection: InspectionInGroup | null;
   canStart: boolean;
   accentLabel: boolean;
-  inspectionId?: string;
   propertyId: string;
   tenancyId: string | null;
   inspectionType: "check-in" | "check-out";
-  inspectionStatus?: string | null;
   onRemove?: () => void;
   onRollback?: () => void;
-  signatures?: InspectionSignature[];
   sourceCheckInId?: string;
   creditsBalance: number;
   creditsPlan: string;
@@ -145,6 +166,8 @@ function InspectionRow({
   const router = useRouter();
   const [preparingCheckOut, setPreparingCheckOut] = useState(false);
   const [showBuyCredits, setShowBuyCredits] = useState(false);
+
+  const displayStatus = inspection ? getInspectionDisplayStatus(inspection) : null;
 
   const handleStart = async () => {
     if (inspectionType === "check-out" && sourceCheckInId) {
@@ -242,10 +265,12 @@ function InspectionRow({
   };
 
   const handleOpen = () => {
-    if (inspectionId && (data?.status === "signed" || data?.status === "completed")) {
-      router.push(`/inspection/${inspectionId}/report`);
-    } else if (inspectionId) {
-      router.push(`/inspection/${inspectionId}`);
+    if (!inspection) return;
+    // Navigate to report if report exists, otherwise to inspection editor
+    if (inspection.report_url || inspection.signed_at || inspection.status === "signed" || inspection.status === "completed") {
+      router.push(`/inspection/${inspection.id}/report`);
+    } else {
+      router.push(`/inspection/${inspection.id}`);
     }
   };
 
@@ -254,74 +279,40 @@ function InspectionRow({
       style={{
         display: "flex",
         alignItems: "center",
-        justifyContent: "space-between",
+        gap: 10,
         padding: "12px 0",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            color: accentLabel ? "#9A88FD" : "#999",
-            background: accentLabel ? "rgba(154,136,253,0.1)" : "#EEEDE9",
-            padding: "4px 10px",
-            borderRadius: 8,
-            letterSpacing: 0.5,
-            flexShrink: 0,
-          }}
-        >
-          {label}
-        </span>
-        {data ? (
-          <button
-            type="button"
-            onClick={handleOpen}
-            style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: "#1A1A1A",
-              background: "none",
-              border: "none",
-              padding: 0,
-              cursor: "pointer",
-              textAlign: "left",
-            }}
-          >
-            {data.date}
-          </button>
-        ) : (
-          <span style={{ fontSize: 13, color: "#CCC" }}>—</span>
-        )}
-      </div>
+      {/* Type badge */}
+      <span
+        className={`text-[10px] font-bold px-2.5 py-1 rounded-lg tracking-wide flex-shrink-0
+          ${inspectionType === "check-in"
+            ? "text-[#9A88FD] bg-[#EDE9FF]"
+            : "text-orange-600 bg-orange-50"
+          }`}
+      >
+        {label}
+      </span>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        {data ? (
+      {/* Date */}
+      {inspection ? (
+        <span className="text-sm text-[#1A1A2E] font-medium flex-1">
+          {formatDateShort(inspection.completed_at ?? inspection.created_at)}
+        </span>
+      ) : (
+        <span className="text-sm text-gray-300 flex-1">—</span>
+      )}
+
+      {/* Status badge + Actions */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {inspection && displayStatus ? (
           <>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color:
-                  data.status === "signed"
-                    ? "#15803D"
-                    : data.status === "completed"
-                      ? "#9A88FD"
-                      : "#999",
-                background:
-                  data.status === "signed"
-                    ? "#DCFCE7"
-                    : data.status === "completed"
-                      ? "rgba(154,136,253,0.1)"
-                      : "#EEEDE9",
-                padding: "4px 10px",
-                borderRadius: 8,
-                textTransform: "capitalize",
-              }}
-            >
-              {data.status === "signed" ? "Signed" : data.status === "completed" ? "Completed" : "Draft"}
+            <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${displayStatus.style}`}>
+              {displayStatus.label}
             </span>
-            {data.status === "draft" && inspectionId && onRemove && onRollback && signatures && (
+
+            {/* Delete button for drafts */}
+            {displayStatus.label === "Draft" && onRemove && onRollback && (
               <div
                 style={{
                   width: 30,
@@ -334,10 +325,10 @@ function InspectionRow({
                 }}
               >
                 <DeleteInspectionButton
-                  inspectionId={inspectionId}
+                  inspectionId={inspection.id}
                   inspectionType={inspectionType}
-                  status={inspectionStatus ?? "draft"}
-                  signatures={signatures}
+                  status={inspection.status ?? "draft"}
+                  signatures={inspection.signatures}
                   redirectTo={`/property/${propertyId}`}
                   variant="icon"
                   onOptimisticRemove={onRemove}
@@ -345,39 +336,38 @@ function InspectionRow({
                 />
               </div>
             )}
+
+            {/* Open button */}
+            <button
+              type="button"
+              onClick={handleOpen}
+              className="text-xs font-semibold text-[#9A88FD] bg-[#EDE9FF]
+                px-3 py-1.5 rounded-lg hover:bg-[#DDD6FE] transition-colors
+                flex items-center gap-1 flex-shrink-0"
+            >
+              Open
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                <path d="M6 3l5 5-5 5" stroke="#9A88FD" strokeWidth="1.8"
+                  strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
           </>
         ) : !canStart && inspectionType === "check-out" ? (
           <span
             title="Complete the check-in first"
-            style={{
-              background: "#E5E7EB",
-              color: "#9CA3AF",
-              padding: "6px 14px",
-              borderRadius: 10,
-              fontSize: 12,
-              fontWeight: 600,
-              opacity: 0.4,
-              cursor: "not-allowed",
-            }}
+            className="bg-gray-200 text-gray-400 px-3.5 py-1.5 rounded-lg text-xs font-semibold opacity-50 cursor-not-allowed"
           >
-            Complete the check-in first
+            Complete check-in first
           </span>
         ) : canStart ? (
           <button
             type="button"
             onClick={() => void handleStart()}
             disabled={preparingCheckOut}
-            style={{
-              background: accentLabel ? "#9A88FD" : "#1A1A1A",
-              color: "#fff",
-              padding: "6px 14px",
-              borderRadius: 10,
-              fontSize: 12,
-              fontWeight: 600,
-              border: "none",
-              cursor: preparingCheckOut ? "wait" : "pointer",
-              opacity: preparingCheckOut ? 0.9 : 1,
-            }}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white border-none
+              ${accentLabel ? "bg-[#9A88FD] hover:bg-[#8674FC]" : "bg-[#1A1A1A] hover:bg-[#333]"}
+              ${preparingCheckOut ? "opacity-90 cursor-wait" : "cursor-pointer"}
+              transition-colors`}
           >
             {preparingCheckOut
               ? "Starting..."
@@ -386,7 +376,7 @@ function InspectionRow({
                 : "Start"}
           </button>
         ) : (
-          <span style={{ fontSize: 12, color: "#DDD" }}>—</span>
+          <span className="text-xs text-gray-300">—</span>
         )}
       </div>
       <BuyCreditsModal
@@ -603,26 +593,6 @@ export function PropertyClient({
                 ? "active"
                 : "past";
 
-            const checkInData = checkIn
-              ? {
-                  date: formatDateShort(checkIn.completed_at ?? checkIn.created_at),
-                  status: inspectionDisplayStatus(
-                    checkIn.status === "signed" || (checkIn.signatures ?? []).some((s) => s.otp_verified || s.signed_at)
-                      ? "signed"
-                      : checkIn.status
-                  ),
-                }
-              : null;
-            const checkOutData = checkOut
-              ? {
-                  date: formatDateShort(checkOut.completed_at ?? checkOut.created_at),
-                  status: inspectionDisplayStatus(
-                    checkOut.status === "signed" || (checkOut.signatures ?? []).some((s) => s.otp_verified || s.signed_at)
-                      ? "signed"
-                      : checkOut.status
-                  ),
-                }
-              : null;
 
             return (
               <div
@@ -725,17 +695,14 @@ export function PropertyClient({
                   <div style={{ borderTop: "1px solid #F0EFEC", padding: "4px 20px" }}>
                     <InspectionRow
                       label="CHECK-IN"
-                      data={checkInData}
+                      inspection={checkIn ?? null}
                       canStart={group.canStartCheckIn.allowed}
                       accentLabel={true}
-                      inspectionId={checkIn?.id}
                       propertyId={property.id}
                       tenancyId={group.tenancyId}
                       inspectionType="check-in"
-                      inspectionStatus={checkIn?.status}
                       onRemove={checkIn ? () => removeInspectionFromList(checkIn.id) : undefined}
                       onRollback={rollbackGroups}
-                      signatures={checkIn?.signatures}
                       creditsBalance={balance}
                       creditsPlan={plan}
                       creditsAccountType={accountType as "individual" | "pro"}
@@ -744,17 +711,14 @@ export function PropertyClient({
                     <div style={{ height: 1, background: "#F0EFEC" }} />
                     <InspectionRow
                       label="CHECK-OUT"
-                      data={checkOutData}
+                      inspection={checkOut ?? null}
                       canStart={group.canStartCheckOut.allowed}
                       accentLabel={false}
-                      inspectionId={checkOut?.id}
                       propertyId={property.id}
                       tenancyId={group.tenancyId}
                       inspectionType="check-out"
-                      inspectionStatus={checkOut?.status}
                       onRemove={checkOut ? () => removeInspectionFromList(checkOut.id) : undefined}
                       onRollback={rollbackGroups}
-                      signatures={checkOut?.signatures}
                       sourceCheckInId={checkIn?.id}
                       creditsBalance={balance}
                       creditsPlan={plan}

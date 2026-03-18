@@ -20,6 +20,8 @@ type InspectionWithRooms = {
   created_at: string | null;
   completed_at: string | null;
   tenancy_id?: string | null;
+  report_url?: string | null;
+  signed_at?: string | null;
   rooms?: { id: string }[] | null;
   signatures?: InspectionSignature[] | null;
 };
@@ -39,6 +41,8 @@ type TenancyRow = {
     tenancy_id?: string | null;
     created_at: string | null;
     completed_at: string | null;
+    report_url?: string | null;
+    signed_at?: string | null;
     rooms?: { id: string }[];
     signatures?: InspectionSignature[] | null;
   }[];
@@ -61,6 +65,8 @@ type TenancyGroup = {
     status: string | null;
     created_at: string | null;
     completed_at: string | null;
+    report_url: string | null;
+    signed_at: string | null;
     room_count: number;
     signatures: InspectionSignature[];
   }[];
@@ -94,7 +100,7 @@ export default async function PropertyPage({
         ejari_ref,
         property_size,
         inspections (
-          id, type, status, created_at, completed_at, tenancy_id,
+          id, type, status, created_at, completed_at, tenancy_id, report_url, signed_at,
           rooms (id),
           signatures (signer_type, otp_verified, signed_at)
         )
@@ -131,6 +137,8 @@ export default async function PropertyPage({
         status: i.status,
         created_at: i.created_at,
         completed_at: i.completed_at,
+        report_url: i.report_url ?? null,
+        signed_at: i.signed_at ?? null,
         room_count: Array.isArray(i.rooms) ? i.rooms.length : 0,
         signatures: (i.signatures ?? []) as InspectionSignature[],
       }));
@@ -200,7 +208,7 @@ export default async function PropertyPage({
       address,
       property_type,
       inspections (
-        id, type, status, created_at, completed_at,
+        id, type, status, created_at, completed_at, report_url, signed_at,
         rooms (id),
         signatures (signer_type, otp_verified, signed_at)
       )
@@ -224,12 +232,14 @@ export default async function PropertyPage({
       status: i.status,
       created_at: i.created_at,
       completed_at: i.completed_at,
+      report_url: i.report_url ?? null,
+      signed_at: i.signed_at ?? null,
       room_count: Array.isArray(i.rooms) ? i.rooms.length : 0,
       signatures: (i.signatures ?? []) as InspectionSignature[],
     }));
 
   const groupedByContract = inspections.reduce<
-    Record<string, { id: string; type: string | null; status: string | null; created_at: string | null; completed_at: string | null; room_count: number; signatures: InspectionSignature[] }[]>
+    Record<string, { id: string; type: string | null; status: string | null; created_at: string | null; completed_at: string | null; report_url: string | null; signed_at: string | null; room_count: number; signatures: InspectionSignature[] }[]>
   >((groups, inspection) => {
     const key = inspection.id;
     if (!groups[key]) groups[key] = [];
@@ -239,6 +249,8 @@ export default async function PropertyPage({
         status: inspection.status,
         created_at: inspection.created_at,
         completed_at: inspection.completed_at,
+        report_url: inspection.report_url,
+        signed_at: inspection.signed_at,
         room_count: inspection.room_count,
         signatures: inspection.signatures,
       });
