@@ -53,27 +53,45 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  // Fetch agency branding for email
+  const { data: insp } = await supabaseAdmin
+    .from('inspections')
+    .select('agent:profiles(company:companies(name, primary_color, logo_url))')
+    .eq('id', inspectionId)
+    .single()
+
+  const agencyName = (insp?.agent as any)?.company?.name || 'Snagify'
+  const primaryColor = (insp?.agent as any)?.company?.primary_color || '#9A88FD'
+
   // Send OTP email via Resend
   await resend.emails.send({
-    from: 'Snagify <noreply@snagify.net>',
+    from: `${agencyName} <noreply@snagify.net>`,
     to: email,
-    subject: 'Your signature code',
+    subject: 'Your signature verification code',
     html: `
-      <div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:32px;">
-        <img src="https://app.snagify.net/logo-full.png"
-          alt="Snagify" style="height:32px;margin-bottom:24px;" />
-        <h2 style="color:#1A1A2E;margin-bottom:8px;">Your signature code</h2>
-        <p style="color:#6B7280;margin-bottom:24px;">
-          ${name || 'You'} — enter this code in the Snagify app to sign the inspection report.
+      <div style="font-family:-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+        <div style="background:${primaryColor};border-radius:16px;padding:20px 24px;margin-bottom:24px;">
+          <div style="font-size:18px;font-weight:800;color:white;">${agencyName}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px;">
+            Property Inspection Report
+          </div>
+        </div>
+        <h2 style="font-size:20px;font-weight:800;color:#1A1A2E;margin:0 0 8px;">Your signature code</h2>
+        <p style="font-size:14px;color:#6B7280;margin:0 0 24px;line-height:1.6;">
+          ${name || 'You'} — enter this code to verify your identity and sign the inspection report.
         </p>
         <div style="background:#EDE9FF;border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
-          <span style="font-size:36px;font-weight:800;letter-spacing:8px;color:#9A88FD;">
+          <span style="font-size:36px;font-weight:800;letter-spacing:8px;color:${primaryColor};">
             ${otp}
           </span>
         </div>
-        <p style="color:#9B9BA8;font-size:12px;">
+        <p style="font-size:11px;color:#9B9BA8;text-align:center;line-height:1.5;">
           This code expires in 15 minutes. Do not share it with anyone.
         </p>
+        <div style="margin-top:32px;padding-top:16px;border-top:1px solid #F3F3F8;
+          text-align:center;font-size:11px;color:#C4C4C4;">
+          Powered by Snagify · app.snagify.net
+        </div>
       </div>
     `,
   })

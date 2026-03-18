@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Loader2, FileText, Check, RotateCcw, ShieldCheck } from 'lucide-react'
+import { formatPropertyAddress } from '@/lib/formatPropertyAddress'
 
 type Step = 'loading' | 'overview' | 'otp' | 'pad' | 'done' | 'already_signed' | 'error'
 
@@ -189,11 +190,7 @@ function SignPageContent() {
     if (res.ok) setStep('done')
   }
 
-  const propAddress = [
-    property?.building_name,
-    property?.address,
-    property?.unit_number ? `Unit ${property.unit_number}` : null,
-  ].filter(Boolean).join(', ')
+  const propAddress = formatPropertyAddress(property)
 
   if (step === 'loading') return (
     <div className="min-h-screen bg-[#F3F2EF] flex items-center justify-center">
