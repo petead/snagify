@@ -475,42 +475,112 @@ export function CheckoutReportView({
           </div>
         </div>
 
-        {/* ── HANDOVER KEYS — matching check-in style ── */}
+        {/* ── HANDOVER KEYS — 2x2 grid with given/returned comparison ── */}
         {(() => {
-          const keyItems = (inspection.key_handover as Array<{ item: string; qty: number }>) ?? []
-          if (keyItems.length === 0) return null
+          const checkinKeys = (checkinData?.key_handover as Array<{ item: string; qty: number }>) ?? []
+          const checkoutKeys = (inspection.key_handover as Array<{ item: string; qty: number }>) ?? []
+
+          if (checkinKeys.length === 0 && checkoutKeys.length === 0) return null
+
+          // Build comparison: for each check-in key, find returned qty
+          const keyItems = checkinKeys.map((ck) => {
+            const returned = checkoutKeys.find(
+              (k) => k.item?.toLowerCase() === ck.item?.toLowerCase()
+            )?.qty ?? 0
+            return {
+              item: ck.item,
+              given: ck.qty,
+              returned,
+              ok: returned >= ck.qty,
+              missing: Math.max(0, ck.qty - returned),
+            }
+          })
+
+          const allOk = keyItems.every(k => k.ok)
+
           return (
             <div className="bg-white rounded-2xl border border-[#EEECFF] mx-4 mb-3">
-              <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-[#F3F3F8]">
+
+              {/* Section header — same as check-in */}
+              <div className="flex items-center gap-2 px-4 py-4 border-b border-[#F3F3F8]">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <circle cx="7.5" cy="15.5" r="4.5" stroke="#9A88FD" strokeWidth="1.8" />
-                  <path
-                    d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2"
-                    stroke="#9A88FD"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  />
+                  <circle cx="7.5" cy="15.5" r="4.5"
+                    stroke="#9A88FD" strokeWidth="1.8"/>
+                  <path d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2"
+                    stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round"/>
                 </svg>
-                <span className="text-[14px] font-bold text-[#1A1A2E]">Handover Keys</span>
+                <span className="text-[15px] font-bold text-[#1A1A2E]">
+                  Handover Keys
+                </span>
               </div>
+
+              {/* SAME 2x2 grid as check-in */}
               <div className="p-4 grid grid-cols-2 gap-2">
-                {keyItems.map((item, i) => (
+                {keyItems.map((k, i) => (
                   <div
                     key={i}
-                    className="bg-[#F8F7F4] rounded-xl p-3 flex items-center justify-between"
+                    className={`rounded-2xl p-3 flex items-center justify-between ${
+                      k.ok ? 'bg-[#F8F7F4]' : 'bg-[#FEF2F2]'
+                    }`}
                   >
-                    <span className="text-[13px] font-medium text-[#6B7280]">
-                      {item.item}
+                    <span className={`text-[13px] font-medium ${
+                      k.ok ? 'text-[#6B7280]' : 'text-[#DC2626]'
+                    }`}>
+                      {k.item}
                     </span>
-                    <span
-                      className="text-[16px] font-extrabold text-[#1A1A2E] bg-white w-8 h-8 rounded-[10px] flex items-center justify-center"
-                      style={{ fontFamily: "'Poppins', sans-serif" }}
-                    >
-                      {item.qty}
-                    </span>
+
+                    {/* Given / Returned — same style as check-in qty badge */}
+                    <div className="flex items-center gap-1.5">
+                      {/* Gray "given" number */}
+                      <span className="text-[13px] font-bold text-[#C4C4C4]">
+                        ×{k.given}
+                      </span>
+                      <span className="text-[10px] text-[#C4C4C4]">→</span>
+                      {/* Returned number — green if ok, red if missing */}
+                      <span className={`text-[15px] font-extrabold ${
+                        k.ok ? 'text-[#1A1A2E]' : 'text-[#DC2626]'
+                      }`}>
+                        ×{k.returned}
+                      </span>
+                      {/* Status dot */}
+                      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                        k.ok ? 'bg-[#16A34A]' : 'bg-[#EF4444]'
+                      }`} />
+                    </div>
                   </div>
                 ))}
               </div>
+
+              {/* Summary line — only if missing */}
+              {!allOk && (
+                <div className="mx-4 mb-4 bg-[#FEF2F2] rounded-xl px-3 py-2.5 flex items-center gap-2">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10"
+                      stroke="#EF4444" strokeWidth="1.8"/>
+                    <path d="M12 8v4M12 16h.01"
+                      stroke="#EF4444" strokeWidth="1.8" strokeLinecap="round"/>
+                  </svg>
+                  <span className="text-[12px] font-semibold text-[#DC2626]">
+                    {keyItems.filter(k => !k.ok).map(k =>
+                      `${k.item} ×${k.missing} missing`
+                    ).join(' · ')}
+                  </span>
+                </div>
+              )}
+
+              {/* All good line */}
+              {allOk && (
+                <div className="mx-4 mb-4 bg-[#DCFCE7] rounded-xl px-3 py-2.5 flex items-center gap-2">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      stroke="#16A34A" strokeWidth="1.8" strokeLinecap="round"/>
+                  </svg>
+                  <span className="text-[12px] font-semibold text-[#16A34A]">
+                    All keys returned ✓
+                  </span>
+                </div>
+              )}
+
             </div>
           )
         })()}
