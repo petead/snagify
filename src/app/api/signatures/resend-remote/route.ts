@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import { formatPropertyAddress } from '@/lib/formatPropertyAddress'
+import { REMOTE_OTP_MS } from '@/lib/constants'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
     .from('signatures')
     .update({
       opened_at: null,
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + REMOTE_OTP_MS).toISOString(),
     })
     .eq('id', sig.id)
 
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest) {
 
         <p style="font-size:11px;color:#9B9BA8;text-align:center;
           line-height:1.5;margin:0;">
-          This link expires in 7 days. If you didn't expect this,
+          This link expires in 30 minutes. If you didn't expect this,
           please ignore it.
         </p>
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
+import { IN_PERSON_OTP_MS } from '@/lib/constants'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const supabaseAdmin = createClient(
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
 
   // Generate 6-digit OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString()
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 min
+  const expiresAt = new Date(Date.now() + IN_PERSON_OTP_MS)
 
   // Upsert signature record with in_person mode
   const { data: sig, error } = await supabaseAdmin

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
+import { REMOTE_OTP_MS } from "@/lib/constants";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const supabaseAdmin = createClient(
@@ -35,8 +36,8 @@ export async function POST(request: NextRequest) {
     // This hides inspectionId and email from the URL
     const signUrl = `${appUrl}/sign?inspectionId=${inspectionId}&signerType=${signerType}&email=${encodeURIComponent(email)}`;
 
-    // 7-day expiration for remote links
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    // 30-minute expiration for remote links
+    const expiresAt = new Date(Date.now() + REMOTE_OTP_MS).toISOString();
 
     // Fetch inspection details for branded email
     const { data: inspection } = await supabaseAdmin
@@ -156,7 +157,7 @@ export async function POST(request: NextRequest) {
 
           <!-- Legal -->
           <p style="font-size:11px;color:#9B9BA8;text-align:center;line-height:1.5;margin:0;">
-            This link expires in 7 days. By signing, you agree to the findings of this report.
+            This link expires in 30 minutes. By signing, you agree to the findings of this report.
             If you didn't expect this email, please ignore it.
           </p>
 
