@@ -1295,11 +1295,16 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                   {/* In person option */}
                   <button
                     type="button"
-                    onClick={() => setInPersonModal({
-                      signerType: 'landlord',
-                      name: tenancy?.landlord_name || 'Landlord',
-                      email: tenancy?.landlord_email || '',
-                    })}
+                    onClick={() => {
+                      setShowSignModal(false);
+                      setTimeout(() => {
+                        setInPersonModal({
+                          signerType: 'landlord',
+                          name: tenancy?.landlord_name || 'Landlord',
+                          email: tenancy?.landlord_email || '',
+                        });
+                      }, 200);
+                    }}
                     style={{
                       flex: 1,
                       padding: "12px 8px",
@@ -1401,11 +1406,16 @@ export function ReportClient({ inspection, profile }: ReportClientProps) {
                   {/* In person option */}
                   <button
                     type="button"
-                    onClick={() => setInPersonModal({
-                      signerType: 'tenant',
-                      name: tenancy?.tenant_name || 'Tenant',
-                      email: tenancy?.tenant_email || '',
-                    })}
+                    onClick={() => {
+                      setShowSignModal(false);
+                      setTimeout(() => {
+                        setInPersonModal({
+                          signerType: 'tenant',
+                          name: tenancy?.tenant_name || 'Tenant',
+                          email: tenancy?.tenant_email || '',
+                        });
+                      }, 200);
+                    }}
                     style={{
                       flex: 1,
                       padding: "12px 8px",
