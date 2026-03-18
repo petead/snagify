@@ -555,8 +555,8 @@ export function DashboardClient({
           role="button"
           tabIndex={0}
           className="stat-card"
-          onClick={() => balance === 0 && setShowBuyCredits(true)}
-          onKeyDown={(e) => e.key === "Enter" && balance === 0 && setShowBuyCredits(true)}
+          onClick={() => accountType === "individual" && setShowBuyCredits(true)}
+          onKeyDown={(e) => e.key === "Enter" && accountType === "individual" && setShowBuyCredits(true)}
           style={{
             background: "#fff",
             borderRadius: 18,
@@ -569,7 +569,7 @@ export function DashboardClient({
             justifyContent: "space-between",
             minHeight: 130,
             border: "1px solid #F3F4F6",
-            cursor: balance === 0 ? "pointer" : "default",
+            cursor: accountType === "individual" ? "pointer" : "default",
           }}
         >
           <div
@@ -596,7 +596,7 @@ export function DashboardClient({
             <p style={{ fontSize: 13, color: "#6B7280", margin: "4px 0 0", fontWeight: 500 }}>
               Credits
             </p>
-            {balance === 0 && (
+            {accountType === "individual" && (
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setShowBuyCredits(true); }}
@@ -604,6 +604,14 @@ export function DashboardClient({
               >
                 Buy credits →
               </button>
+            )}
+            {accountType === "pro" && (
+              <p style={{ marginTop: 4, fontSize: 12, color: "#9CA3AF", fontWeight: 500 }}>
+                {plan && plan !== "free"
+                  ? plan.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+                  : "Free plan"
+                }
+              </p>
             )}
           </div>
         </div>

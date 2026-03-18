@@ -3,9 +3,11 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import PushNotificationToggle from "@/components/PushNotificationToggle";
+import { SubscriptionSection } from "@/components/profile/SubscriptionSection";
+import { Check } from "lucide-react";
 
 export type ProfileData = {
   full_name: string | null;
@@ -24,11 +26,20 @@ export type ProfileData = {
   company_primary_color: string | null;
 };
 
+export type CompanyData = {
+  id: string;
+  plan: string;
+  credits_balance: number;
+  stripe_subscription_id?: string | null;
+} | null;
+
 interface ProfileClientProps {
   userId: string;
   userEmail: string | null;
   profile: ProfileData;
   stats: { properties: number; inspections: number; reports: number };
+  accountType: "individual" | "pro";
+  company: CompanyData;
 }
 
 function getInitials(fullName: string | null, email: string | null): string {
@@ -52,9 +63,14 @@ export function ProfileClient({
   userEmail,
   profile,
   stats,
+  accountType,
+  company,
 }: ProfileClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loaded, setLoaded] = useState(false);
+  const justSubscribed = searchParams.get("subscribed") === "true";
+  const isPro = accountType === "pro";
 
   useEffect(() => {
     setLoaded(true);
@@ -142,6 +158,33 @@ export function ProfileClient({
       </div>
 
       <div className="scroll-hide" style={{ overflowY: "auto", paddingBottom: 24 }}>
+        {/* Success banner for subscription */}
+        {justSubscribed && (
+          <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: "0.08s" }}>
+            <div
+              style={{
+                background: "#DCFCE7",
+                border: "1px solid #BBF7D0",
+                borderRadius: 16,
+                padding: 16,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <Check size={18} color="#16A34A" />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#166534" }}>
+                  Subscription activated!
+                </div>
+                <div style={{ fontSize: 12, color: "#15803D" }}>
+                  Your credits have been added to your account.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Identity card (read-only) */}
         <div className={loaded ? "fade-up" : ""} style={{ padding: "20px 24px 0", animationDelay: "0.1s" }}>
           <div style={{ background: "#fff", borderRadius: 22, padding: "24px", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
@@ -251,8 +294,18 @@ export function ProfileClient({
           ))}
         </div>
 
+        {/* Subscription (pro only) */}
+        {isPro && company && (
+          <div className={loaded ? "fade-up" : ""} style={{ padding: "20px 24px 0", animationDelay: "0.19s" }}>
+            <p style={{ fontSize: 13, color: "#BBB", margin: "0 0 12px", fontWeight: 500, letterSpacing: 2, textTransform: "uppercase" }}>
+              Subscription
+            </p>
+            <SubscriptionSection company={company} />
+          </div>
+        )}
+
         {/* Settings */}
-        <div className={loaded ? "fade-up" : ""} style={{ padding: "20px 24px 0", animationDelay: "0.22s" }}>
+        <div className={loaded ? "fade-up" : ""} style={{ padding: "20px 24px 0", animationDelay: isPro ? "0.28s" : "0.22s" }}>
           <p style={{ fontSize: 13, color: "#BBB", margin: "0 0 12px", fontWeight: 500, letterSpacing: 2, textTransform: "uppercase" }}>
             Settings
           </p>
@@ -323,7 +376,7 @@ export function ProfileClient({
         </div>
 
         {/* Sign Out */}
-        <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: "0.28s" }}>
+        <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: isPro ? "0.34s" : "0.28s" }}>
           <button
             type="button"
             className="signout-btn"
@@ -354,7 +407,7 @@ export function ProfileClient({
 
         {/* Member since */}
         {memberSince && (
-          <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", textAlign: "center", animationDelay: "0.32s" }}>
+          <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", textAlign: "center", animationDelay: isPro ? "0.38s" : "0.32s" }}>
             <p style={{ fontSize: 12, color: "#CCC", fontWeight: 500 }}>
               Member since {formatMemberSince(memberSince)}
             </p>

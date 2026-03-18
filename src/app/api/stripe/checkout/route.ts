@@ -62,12 +62,20 @@ export async function POST(req: NextRequest) {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.snagify.net";
 
+    const isSubscription = type === "subscription";
+    const successUrl = isSubscription
+      ? `${appUrl}/profile?subscribed=true`
+      : `${appUrl}/dashboard?payment=success`;
+    const cancelUrl = isSubscription
+      ? `${appUrl}/profile`
+      : `${appUrl}/dashboard?payment=cancelled`;
+
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
-      mode: type === "subscription" ? "subscription" : "payment",
+      mode: isSubscription ? "subscription" : "payment",
       line_items: [{ price: price_id, quantity: 1 }],
-      success_url: `${appUrl}/dashboard?payment=success`,
-      cancel_url: `${appUrl}/dashboard?payment=cancelled`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       metadata: {
         supabase_user_id: user.id,
         company_id: profile.company_id,

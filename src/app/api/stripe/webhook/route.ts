@@ -150,15 +150,32 @@ export async function POST(req: NextRequest) {
         break;
       }
 
+      case "customer.subscription.created":
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
         const companyId = subscription.metadata?.company_id;
-        const planSlug = subscription.metadata?.plan_slug;
-        if (!companyId || !planSlug) break;
+        let planSlug: string | undefined = subscription.metadata?.plan_slug;
+
+        if (!companyId) break;
+
+        if (!planSlug) {
+          const priceId = subscription.items.data[0]?.price?.id;
+          const priceIdToPlanMap: Record<string, string> = {
+            'price_1TC1CrKIsjOh5d33lCuUGmcd': 'pro_solo',
+            'price_1TC1D3KIsjOh5d33oEd1E3T1': 'pro_agency',
+            'price_1TC1DPKIsjOh5d33hlQhhUTf': 'pro_max',
+          };
+          planSlug = priceId ? priceIdToPlanMap[priceId] ?? undefined : undefined;
+        }
+
+        if (!planSlug) break;
 
         await supabaseAdmin
           .from("companies")
-          .update({ plan: planSlug })
+          .update({
+            plan: planSlug,
+            stripe_subscription_id: subscription.id,
+          })
           .eq("id", companyId);
         break;
       }
