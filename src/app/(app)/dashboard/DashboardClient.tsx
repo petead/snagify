@@ -226,14 +226,27 @@ export function DashboardClient({
         style={{ padding: "18px 24px 0", animationDelay: "0s" }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Image
-            src="/logo-full.png"
-            alt="Snagify"
-            width={100}
-            height={32}
-            style={{ height: 32, width: "auto", objectFit: "contain" }}
-            priority
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Image
+              src="/icon-512x512.png"
+              alt="Snagify"
+              width={32}
+              height={32}
+              style={{ width: 32, height: 32, borderRadius: 10, objectFit: "contain" }}
+              priority
+            />
+            <span
+              style={{
+                fontSize: 16,
+                fontWeight: 700,
+                color: "#1A1A1A",
+                letterSpacing: -0.3,
+                fontFamily: "'Poppins', sans-serif",
+              }}
+            >
+              Snagify
+            </span>
+          </div>
           <Link
             href="/profile"
             style={{
