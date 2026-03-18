@@ -375,7 +375,7 @@ export function InspectionClient({
 
   const [liveRooms, setLiveRooms] = useState<RoomData[]>(initialRooms);
   const [activeRoom, setActiveRoom] = useState(0);
-  const [activeReviewRoom, setActiveReviewRoom] = useState(0);
+  const [activeReviewRoom, setActiveReviewRoom] = useState<string | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [screen, setScreen] = useState<"rooms" | "inspect" | "review">(
     initialRooms.length > 0 ? "inspect" : "rooms"
@@ -832,8 +832,11 @@ export function InspectionClient({
       }
     };
     reload();
-    setActiveReviewRoom(0);
-  }, [screen]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Set initial tab to first room
+    if (liveRooms.length > 0 && activeReviewRoom === null) {
+      setActiveReviewRoom(liveRooms[0].id);
+    }
+  }, [screen, liveRooms, activeReviewRoom]);
 
   const handlePhotoFiles = async (files: FileList | null) => {
     if (!files || !currentRoom) return;
@@ -1463,22 +1466,22 @@ export function InspectionClient({
           </div>
 
           <div style={{ padding: "16px 16px 0" }}>
-            {/* Room pills */}
+            {/* Room pills + Keys tab */}
             <div style={{
               display: "flex", gap: 8, overflowX: "auto",
               paddingBottom: 12, scrollbarWidth: "none",
               marginLeft: -16, paddingLeft: 16,
               marginRight: -16, paddingRight: 16,
             } as React.CSSProperties}>
-              {liveRooms.map((room, i) => {
+              {liveRooms.map((room) => {
                 const rp = photos.filter((p) => p.room_id === room.id);
                 const hasDamages = rp.some((p) => p.damage_tags?.length > 0);
-                const isActive = i === activeReviewRoom;
+                const isActive = room.id === activeReviewRoom;
                 return (
                   <button
                     key={room.id}
                     type="button"
-                    onClick={() => setActiveReviewRoom(i)}
+                    onClick={() => setActiveReviewRoom(room.id)}
                     style={{
                       flexShrink: 0,
                       padding: "8px 16px",
@@ -1511,12 +1514,199 @@ export function InspectionClient({
                   </button>
                 );
               })}
+              {/* Keys tab */}
+              <button
+                type="button"
+                onClick={() => setActiveReviewRoom("keys")}
+                style={{
+                  flexShrink: 0,
+                  padding: "8px 16px",
+                  borderRadius: 100,
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 12, fontWeight: 700,
+                  whiteSpace: "nowrap",
+                  transition: "all 0.15s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: activeReviewRoom === "keys"
+                    ? (inspectionType === "check-in" ? "#9A88FD" : "#FF8A65")
+                    : keyHandover.length > 0 ? "#f5f5f5" : "#f0f0f0",
+                  color: activeReviewRoom === "keys" ? "white" : keyHandover.length > 0 ? "#374151" : "#9ca3af",
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                  <circle cx="7.5" cy="15.5" r="4.5"
+                    stroke={activeReviewRoom === "keys" ? "white" : "#9A88FD"}
+                    strokeWidth="1.8"/>
+                  <path d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2"
+                    stroke={activeReviewRoom === "keys" ? "white" : "#9A88FD"}
+                    strokeWidth="1.8" strokeLinecap="round"/>
+                </svg>
+                Keys
+                {keyHandover.length > 0 && (
+                  <span style={{
+                    marginLeft: 2, opacity: 0.7, fontSize: 11,
+                    background: activeReviewRoom === "keys" ? "rgba(255,255,255,0.2)" : "#e5e7eb",
+                    padding: "1px 6px", borderRadius: 100,
+                  }}>
+                    {keyHandover.length}
+                  </span>
+                )}
+              </button>
             </div>
           </div>
 
+          {/* ── KEYS TAB CONTENT ── */}
+          {activeReviewRoom === "keys" && (() => {
+            const keyItems = keyHandover;
+
+            function getKeyIcon(name: string) {
+              const n = name.toLowerCase();
+              if (n.includes("door") || n.includes("key"))
+                return (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <circle cx="7.5" cy="15.5" r="4.5" stroke="#9A88FD" strokeWidth="1.8"/>
+                    <path d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2" stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round"/>
+                  </svg>
+                );
+              if (n.includes("parking") || n.includes("car"))
+                return (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <rect x="1" y="4" width="22" height="16" rx="2" stroke="#9A88FD" strokeWidth="1.8"/>
+                    <path d="M1 10h22" stroke="#9A88FD" strokeWidth="1.8"/>
+                  </svg>
+                );
+              if (n.includes("mailbox") || n.includes("mail"))
+                return (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="#9A88FD" strokeWidth="1.8"/>
+                    <path d="M22 6l-10 7L2 6" stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round"/>
+                  </svg>
+                );
+              if (n.includes("access") || n.includes("fob") || n.includes("card"))
+                return (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="11" width="18" height="11" rx="2" stroke="#9A88FD" strokeWidth="1.8"/>
+                    <path d="M7 11V7a5 5 0 0110 0v4" stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round"/>
+                  </svg>
+                );
+              if (n.includes("remote") || n.includes("control"))
+                return (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <rect x="7" y="2" width="10" height="20" rx="3" stroke="#9A88FD" strokeWidth="1.8"/>
+                    <path d="M12 7h.01M12 11h.01M12 15h.01" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                );
+              return (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <circle cx="7.5" cy="15.5" r="4.5" stroke="#9A88FD" strokeWidth="1.8"/>
+                  <path d="M21 2l-9.6 9.6" stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round"/>
+                </svg>
+              );
+            }
+
+            return (
+              <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 160px" }}>
+                {/* Header */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                  <div>
+                    <h3 style={{ fontFamily: "Poppins, sans-serif", fontWeight: 800, fontSize: 16, color: "#1a1a2e", margin: 0 }}>
+                      Key Handover
+                    </h3>
+                    <p style={{ fontSize: 12, color: "#9ca3af", margin: "4px 0 0" }}>
+                      {inspectionType === "check-in" ? "Items handed over at check-in" : "Keys to be returned"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setScreen("inspect")}
+                    style={{
+                      fontSize: 12, fontWeight: 600, color: "#9A88FD",
+                      background: "#EDE9FF", padding: "6px 12px", borderRadius: 10,
+                      border: "none", cursor: "pointer",
+                    }}
+                  >
+                    Edit
+                  </button>
+                </div>
+
+                {keyItems.length === 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 20px", gap: 16 }}>
+                    <div style={{ width: 56, height: 56, background: "#F3F3F8", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <circle cx="7.5" cy="15.5" r="4.5" stroke="#9B9BA8" strokeWidth="1.8"/>
+                        <path d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2" stroke="#9B9BA8" strokeWidth="1.8" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                      <p style={{ fontSize: 14, fontWeight: 600, color: "#1a1a2e", margin: "0 0 4px" }}>No keys recorded</p>
+                      <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>Go back to add the keys handed over</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setScreen("inspect")}
+                      style={{
+                        background: "#9A88FD", color: "white", fontWeight: 600,
+                        borderRadius: 12, padding: "12px 24px", fontSize: 13,
+                        border: "none", cursor: "pointer",
+                      }}
+                    >
+                      Add keys
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {keyItems.map((item, i) => (
+                      <div key={i} style={{
+                        background: "white", borderRadius: 16, border: "1px solid #EEECFF",
+                        padding: 16, display: "flex", alignItems: "center", gap: 16,
+                      }}>
+                        <div style={{
+                          width: 40, height: 40, background: "#EDE9FF", borderRadius: 12,
+                          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                        }}>
+                          {getKeyIcon(item.item || "")}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e" }}>
+                            {item.item}
+                          </div>
+                        </div>
+                        <div style={{
+                          background: "#EDE9FF", borderRadius: 12, padding: "6px 12px", flexShrink: 0,
+                        }}>
+                          <span style={{ fontSize: 15, fontWeight: 800, color: "#9A88FD" }}>
+                            ×{item.qty}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Summary */}
+                    <div style={{
+                      background: "#F8F7F4", borderRadius: 16, padding: 12,
+                      display: "flex", alignItems: "center", gap: 8, marginTop: 4,
+                    }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 01-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 01-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 01-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 01.806-1.946 3.42 3.42 0 013.138-3.138z"
+                          stroke="#16A34A" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                      <span style={{ fontSize: 12, color: "#166534", fontWeight: 500 }}>
+                        {keyItems.length} item{keyItems.length > 1 ? "s" : ""} recorded ·{" "}
+                        {keyItems.reduce((acc, k) => acc + (k.qty ?? 1), 0)} total keys
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* ── ROOM CONTENT ── */}
-          {(() => {
-            const room = liveRooms[activeReviewRoom];
+          {activeReviewRoom !== "keys" && (() => {
+            const room = liveRooms.find((r) => r.id === activeReviewRoom);
             if (!room) return null;
             const roomPhotos = photos.filter((p) => p.room_id === room.id);
             const hasDamages = roomPhotos.some((p) => p.damage_tags.length > 0);
@@ -1667,7 +1857,8 @@ export function InspectionClient({
                     <button
                       type="button"
                       onClick={() => {
-                        setActiveRoom(activeReviewRoom);
+                        const roomIndex = liveRooms.findIndex((r) => r.id === activeReviewRoom);
+                        if (roomIndex >= 0) setActiveRoom(roomIndex);
                         setScreen("inspect");
                       }}
                       style={{
@@ -1681,93 +1872,6 @@ export function InspectionClient({
                     </button>
                   </div>
                 )}
-              {inspectionType === "check-out" && initialCheckinKeyHandover.length > 0 ? (
-                  <div style={{ margin: "16px 0" }}>
-                    <p style={{ fontWeight: 700, fontSize: 11, marginBottom: 4, fontFamily: "'Poppins', sans-serif", color: "#1a1a2e", textTransform: "uppercase", letterSpacing: 1 }}>
-                      Key Return
-                    </p>
-                    <p style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>Verify keys returned by tenant</p>
-                    {initialCheckinKeyHandover.map((checkinItem) => {
-                      const returnedQty = keyHandover.find((k) => k.item === checkinItem.item)?.qty ?? checkinItem.qty;
-                      const missing = checkinItem.qty - returnedQty;
-                      const statusBadge =
-                        returnedQty === checkinItem.qty
-                          ? { text: "✅ All returned", bg: "#dcfce7", color: "#166534" }
-                          : returnedQty > 0
-                            ? { text: `⚠️ ${missing} missing`, bg: "#fff7ed", color: "#c2410c" }
-                            : { text: "❌ Not returned", bg: "#fee2e2", color: "#b91c1c" };
-                      const setReturned = (delta: number) => {
-                        const maxQty = checkinItem.qty;
-                        setKeyHandover((prev) => {
-                          const rest = prev.filter((k) => k.item !== checkinItem.item);
-                          const current = prev.find((k) => k.item === checkinItem.item)?.qty ?? checkinItem.qty;
-                          const newQty = Math.max(0, Math.min(maxQty, current + delta));
-                          rest.push({ item: checkinItem.item, qty: newQty });
-                          return rest;
-                        });
-                      };
-                      return (
-                        <div
-                          key={checkinItem.item}
-                          style={{
-                            background: "#fff",
-                            borderRadius: 12,
-                            padding: 14,
-                            marginBottom: 10,
-                            border: "1px solid #f0f0f0",
-                          }}
-                        >
-                          <p style={{ fontWeight: 700, fontSize: 14, margin: "0 0 4px", color: "#1a1a2e" }}>🔑 {checkinItem.item}</p>
-                          <p style={{ fontSize: 12, color: "#999", margin: "0 0 10px" }}>Given at entry: {checkinItem.qty}</p>
-                          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-                            <button type="button" onClick={() => setReturned(-1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid #e0e0e0", background: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
-                            <span style={{ fontSize: 16, fontWeight: 600, minWidth: 24, textAlign: "center" }}>{returnedQty}</span>
-                            <button type="button" onClick={() => setReturned(1)} style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid #9A88FD", background: "#F3F0FF", color: "#9A88FD", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
-                          </div>
-                          <span style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 100, background: statusBadge.bg, color: statusBadge.color }}>{statusBadge.text}</span>
-                        </div>
-                      );
-                    })}
-                    {(() => {
-                      const fullReturn = initialCheckinKeyHandover.filter((c) => (keyHandover.find((k) => k.item === c.item)?.qty ?? c.qty) === c.qty).length;
-                      const partialReturn = initialCheckinKeyHandover.filter((c) => { const r = keyHandover.find((k) => k.item === c.item)?.qty ?? 0; return r > 0 && r < c.qty; }).length;
-                      const notReturned = initialCheckinKeyHandover.filter((c) => (keyHandover.find((k) => k.item === c.item)?.qty ?? 0) === 0).length;
-                      const anyMissing = partialReturn > 0 || notReturned > 0;
-                      return (
-                        <div style={{ background: anyMissing ? "#FFF8F0" : "#F0FFF4", border: `1px solid ${anyMissing ? "rgba(230,81,0,0.2)" : "rgba(34,197,94,0.2)"}`, borderRadius: 12, padding: 14, marginTop: 8 }}>
-                          <p style={{ fontWeight: 700, fontSize: 11, marginBottom: 8, color: "#1a1a2e", textTransform: "uppercase", letterSpacing: 0.5 }}>Key return summary</p>
-                          {fullReturn > 0 && <p style={{ fontSize: 13, color: "#166534", margin: "0 0 4px" }}>✅ {fullReturn} item(s) returned in full</p>}
-                          {partialReturn > 0 && <p style={{ fontSize: 13, color: "#c2410c", margin: "0 0 4px" }}>⚠️ {partialReturn} partial return</p>}
-                          {notReturned > 0 && <p style={{ fontSize: 13, color: "#b91c1c", margin: 0 }}>❌ {notReturned} item(s) missing</p>}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                ) : inspectionType === "check-out" && initialCheckinKeyHandover.length === 0 ? (
-                  <div style={{ margin: "16px 0", padding: 16, borderRadius: 14, background: "#FAFAFA", border: "1px solid #f0f0f0" }}>
-                    <p style={{ fontWeight: 700, fontSize: 11, marginBottom: 8, fontFamily: "'Poppins', sans-serif", color: "#1a1a2e", textTransform: "uppercase", letterSpacing: 1 }}>Key Handover</p>
-                    <p style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>No keys were recorded at check-in — record what&apos;s being returned</p>
-                    {keyHandover.length > 0 && <p style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>{keyHandover.map((k) => `${k.item} x${k.qty}`).join(" · ")}</p>}
-                  </div>
-                ) : keyHandover.length > 0 ? (
-                  <div
-                    style={{
-                      margin: "16px 0", padding: 16, borderRadius: 14,
-                      background: "#FAFAFA", border: "1px solid #f0f0f0",
-                    }}
-                  >
-                    <p style={{
-                      fontWeight: 700, fontSize: 11, marginBottom: 8,
-                      fontFamily: "Poppins, sans-serif", color: "#1a1a2e",
-                      textTransform: "uppercase", letterSpacing: 1,
-                    }}>
-                      Key Handover
-                    </p>
-                    <p style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>
-                      {keyHandover.map((k) => `${k.item} x${k.qty}`).join(" · ")}
-                    </p>
-                  </div>
-                ) : null}
 
               </div>
             );
