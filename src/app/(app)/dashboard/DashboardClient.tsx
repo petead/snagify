@@ -509,179 +509,206 @@ export function DashboardClient({
         </div>
       )}
 
-      {/* Stat Cards */}
+      {/* Stat Cards — 2×2 Grid */}
       <div
         className={loaded ? "fade-up" : ""}
         style={{
           padding: alerts.length > 0 ? "16px 24px 0" : "20px 24px 0",
-          display: "flex",
-          gap: 10,
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 12,
           animationDelay: "0.14s",
         }}
       >
-        {[
-          {
-            label: "Properties",
-            value: String(totalProperties),
-            icon: (
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#9A88FD"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+        {/* Properties — top-left */}
+        <Link
+          href="/properties"
+          className="stat-card"
+          style={{
+            background: "#fff",
+            borderRadius: 18,
+            padding: 16,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+            textDecoration: "none",
+            color: "inherit",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            minHeight: 130,
+            border: "1px solid #F3F4F6",
+          }}
+        >
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              background: "#EDE9FF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+          </div>
+          <div>
+            <p style={{ fontSize: 30, fontWeight: 800, margin: 0, color: "#1A1A2E", fontFamily: "'Poppins', sans-serif", lineHeight: 1 }}>
+              {totalProperties}
+            </p>
+            <p style={{ fontSize: 13, color: "#6B7280", margin: "4px 0 0", fontWeight: 500 }}>
+              Properties
+            </p>
+          </div>
+        </Link>
+
+        {/* Credits — top-right */}
+        <div
+          role="button"
+          tabIndex={0}
+          className="stat-card"
+          onClick={() => balance === 0 && setShowBuyCredits(true)}
+          onKeyDown={(e) => e.key === "Enter" && balance === 0 && setShowBuyCredits(true)}
+          style={{
+            background: "#fff",
+            borderRadius: 18,
+            padding: 16,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+            textDecoration: "none",
+            color: "inherit",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            minHeight: 130,
+            border: "1px solid #F3F4F6",
+            cursor: balance === 0 ? "pointer" : "default",
+          }}
+        >
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              background: "#EDE9FF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 6v12" />
+              <path d="M15 9.5c0-1.38-1.34-2.5-3-2.5s-3 1.12-3 2.5c0 1.93 3 2.5 3 4.5 0 1.38-1.34 2.5-3 2.5" />
+            </svg>
+          </div>
+          <div>
+            <p style={{ fontSize: 30, fontWeight: 800, margin: 0, color: "#9A88FD", fontFamily: "'Poppins', sans-serif", lineHeight: 1 }}>
+              {balance}
+            </p>
+            <p style={{ fontSize: 13, color: "#6B7280", margin: "4px 0 0", fontWeight: 500 }}>
+              Credits
+            </p>
+            {balance === 0 && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setShowBuyCredits(true); }}
+                style={{ marginTop: 4, background: "none", border: "none", padding: 0, fontSize: 12, color: "#9A88FD", fontWeight: 600, cursor: "pointer" }}
               >
-                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
-              </svg>
-            ),
-            href: "/properties",
-          },
-          {
-            label: "Inspections",
-            value: String(totalInspections),
-            icon: (
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#9A88FD"
-                strokeWidth="2"
-                strokeLinecap="round"
-              >
-                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
-                <rect x="9" y="3" width="6" height="4" rx="1" />
-                <path d="M9 14l2 2 4-4" />
-              </svg>
-            ),
-            href: "/reports",
-          },
-          {
-            label: "Pending Sign.",
-            value: String(pendingSigCount),
-            icon: (
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#9A88FD"
-                strokeWidth="2"
-                strokeLinecap="round"
-              >
-                <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-              </svg>
-            ),
-            href: "/reports",
-          },
-          {
-            label: "Credits",
-            value: String(balance),
-            icon: (
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#9A88FD"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="2" y="6" width="20" height="12" rx="3" />
-                <path d="M2 10h20" />
-                <circle cx="17" cy="14" r="1" />
-              </svg>
-            ),
-          },
-        ].map((stat) => {
-          const Wrapper = stat.href ? Link : "div";
-          return (
-            <Wrapper
-              key={stat.label}
-              href={stat.href ?? "#"}
-              className="stat-card"
-              style={{
-                flex: 1,
-                background: "#fff",
-                borderRadius: 18,
-                padding: "16px 14px",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-                textDecoration: "none",
-                color: "inherit",
-              }}
-              onClick={
-                stat.label === "Credits" && balance === 0 && plan === "free"
-                  ? () => setShowBuyCredits(true)
-                  : undefined
-              }
-            >
-              <div
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 12,
-                  background: "rgba(154,136,253,0.1)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 12,
-                }}
-              >
-                {stat.icon}
-              </div>
-              <p
-                style={{
-                  fontSize: 28,
-                  fontWeight: 800,
-                  margin: 0,
-                  color: "#1A1A1A",
-                  fontFamily: "'Poppins', sans-serif",
-                  lineHeight: 1,
-                }}
-              >
-                {stat.value}
-              </p>
-              <p
-                style={{
-                  fontSize: 11,
-                  color: "#BBB",
-                  margin: "6px 0 0",
-                  fontWeight: 500,
-                }}
-              >
-                {stat.label}
-              </p>
-              {stat.label === "Credits" && balance === 0 && plan === "free" && (
-                <button
-                  type="button"
-                  onClick={() => setShowBuyCredits(true)}
-                  style={{
-                    marginTop: 6,
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    fontSize: 11,
-                    color: "#9A88FD",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  Buy credits →
-                </button>
-              )}
-              {stat.label === "Credits" && plan !== "free" && (
-                <p style={{ margin: "6px 0 0", fontSize: 11, color: "#9CA3AF", fontWeight: 500 }}>
-                  Resets monthly
-                </p>
-              )}
-            </Wrapper>
-          );
-        })}
+                Buy credits →
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Inspections — bottom-left */}
+        <Link
+          href="/reports"
+          className="stat-card"
+          style={{
+            background: "#fff",
+            borderRadius: 18,
+            padding: 16,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+            textDecoration: "none",
+            color: "inherit",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            minHeight: 130,
+            border: "1px solid #F3F4F6",
+          }}
+        >
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              background: "#EDE9FF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+              <rect x="9" y="3" width="6" height="4" rx="1" />
+              <path d="M9 14l2 2 4-4" />
+            </svg>
+          </div>
+          <div>
+            <p style={{ fontSize: 30, fontWeight: 800, margin: 0, color: "#1A1A2E", fontFamily: "'Poppins', sans-serif", lineHeight: 1 }}>
+              {totalInspections}
+            </p>
+            <p style={{ fontSize: 13, color: "#6B7280", margin: "4px 0 0", fontWeight: 500 }}>
+              Inspections
+            </p>
+          </div>
+        </Link>
+
+        {/* Pending Sign. — bottom-right */}
+        <Link
+          href="/reports"
+          className="stat-card"
+          style={{
+            background: "#fff",
+            borderRadius: 18,
+            padding: 16,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+            textDecoration: "none",
+            color: "inherit",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            minHeight: 130,
+            border: "1px solid #F3F4F6",
+          }}
+        >
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              background: "#EDE9FF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round">
+              <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+            </svg>
+          </div>
+          <div>
+            <p style={{ fontSize: 30, fontWeight: 800, margin: 0, color: "#1A1A2E", fontFamily: "'Poppins', sans-serif", lineHeight: 1 }}>
+              {pendingSigCount}
+            </p>
+            <p style={{ fontSize: 13, color: "#6B7280", margin: "4px 0 0", fontWeight: 500 }}>
+              Pending Sign.
+            </p>
+          </div>
+        </Link>
       </div>
 
       {/* Recent Inspections */}
