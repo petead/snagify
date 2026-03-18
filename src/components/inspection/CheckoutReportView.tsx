@@ -8,6 +8,7 @@ import {
   getRoomVerdict,
   getComparisonStats,
   type RoomData,
+  type RoomPhoto,
   type KeyItem,
 } from '@/lib/inspectionCompare'
 
@@ -331,144 +332,244 @@ export function CheckoutReportView({
           </div>
 
           <div className="p-4">
-          {inspection.rooms?.map(room => {
+          {inspection.rooms?.map((room: RoomData) => {
             const ciRoom = hasCheckinData ? findCheckinRoom(checkinData?.rooms, room.name) : null
-            const ciPhotos = ciRoom?.photos?.length ?? 0
-            const coPhotos = room.photos?.length ?? 0
-            const ciIssues = countIssues(ciRoom?.photos ?? [])
-            const coIssues = countIssues(room.photos ?? [])
-            const verdict = hasCheckinData ? getRoomVerdict(ciIssues, coIssues) : { label: '—', color: '#6B7280', bg: '#F3F3F8' }
+            const ciPhotos = ciRoom?.photos ?? []
+            const coPhotos = room.photos ?? []
+            const ciIssuesCount = countIssues(ciPhotos)
+            const coIssuesCount = countIssues(coPhotos)
+            const verdict = hasCheckinData ? getRoomVerdict(ciIssuesCount, coIssuesCount) : { label: '—', color: '#6B7280', bg: '#F3F3F8' }
 
-            const ciPhoto = ciRoom?.photos?.[0]
-            const coPhoto = room.photos?.[0]
+            // Build ALL photo pairs for this room
+            const matchedPairs: Array<{
+              ciPhoto: RoomPhoto | null
+              coPhoto: RoomPhoto | null
+              isNew: boolean
+            }> = []
+
+            // First pass: matched photos (have checkin_photo_id) + new photos
+            for (const coPhoto of coPhotos) {
+              if ((coPhoto as any).checkin_photo_id) {
+                const ciPhoto = ciPhotos.find(
+                  (p) => p.id === (coPhoto as any).checkin_photo_id
+                ) ?? null
+                matchedPairs.push({ ciPhoto, coPhoto, isNew: false })
+              } else {
+                matchedPairs.push({ ciPhoto: null, coPhoto, isNew: true })
+              }
+            }
+
+            // Second pass: check-in photos NOT referenced by any checkout photo
+            const referencedCiIds = new Set(
+              coPhotos
+                .filter((p) => (p as any).checkin_photo_id)
+                .map((p) => (p as any).checkin_photo_id)
+            )
+            const unreferencedCiPhotos = ciPhotos.filter(
+              (p) => !referencedCiIds.has(p.id)
+            )
+            for (const ciPhoto of unreferencedCiPhotos) {
+              matchedPairs.push({ ciPhoto, coPhoto: null, isNew: false })
+            }
 
             return (
-              <div key={room.id} className="flex gap-3 py-3 border-b border-[#F3F3F8] last:border-b-0">
-                {/* Verdict dot */}
-                <div
-                  className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5"
-                  style={{ background: verdict.color }}
-                />
+              <div key={room.id} className="py-3 border-b border-[#F3F3F8] last:border-b-0">
 
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[14px] font-bold text-[#1A1A2E]">{room.name}</span>
-                    {hasCheckinData && (
-                      <span
-                        className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                        style={{ background: verdict.bg, color: verdict.color }}
-                      >
-                        {verdict.label}
-                      </span>
-                    )}
+                {/* Room header row */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ background: verdict.color }} />
+                    <span className="text-[14px] font-bold text-[#1A1A2E]">
+                      {room.name}
+                    </span>
                   </div>
-
-                  {/* Stats chips */}
-                  <div className="flex gap-2 mb-2 flex-wrap">
-                    <div className="flex items-center gap-1 bg-[#F3F3F8] rounded-lg px-2 py-1">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                        <rect x="3" y="3" width="18" height="18" rx="2" stroke="#6B7280" strokeWidth="1.8" />
-                        <circle cx="12" cy="12" r="3" stroke="#6B7280" strokeWidth="1.8" />
-                      </svg>
-                      <span className="text-[11px] text-[#6B7280] font-medium">
-                        {hasCheckinData ? `${ciPhotos} → ${coPhotos} photos` : `${coPhotos} photos`}
-                      </span>
-                    </div>
-                    <div
-                      className={`flex items-center gap-1 rounded-lg px-2 py-1 ${
-                        hasCheckinData
-                          ? coIssues > ciIssues
-                            ? 'bg-[#FEE2E2]'
-                            : coIssues < ciIssues
-                              ? 'bg-[#DCFCE7]'
-                              : 'bg-[#F3F3F8]'
-                          : coIssues > 0
-                            ? 'bg-[#FEE2E2]'
-                            : 'bg-[#DCFCE7]'
-                      }`}
-                    >
-                      <span
-                        className={`text-[11px] font-medium ${
-                          hasCheckinData
-                            ? coIssues > ciIssues
-                              ? 'text-[#DC2626]'
-                              : coIssues < ciIssues
-                                ? 'text-[#16A34A]'
-                                : 'text-[#6B7280]'
-                            : coIssues > 0
-                              ? 'text-[#DC2626]'
-                              : 'text-[#16A34A]'
-                        }`}
-                      >
-                        {hasCheckinData
-                          ? `${coIssues > ciIssues ? '⚠' : coIssues < ciIssues ? '✓' : '='} Issues: ${ciIssues} → ${coIssues}`
-                          : `${coIssues > 0 ? '⚠' : '✓'} ${coIssues} issues`}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Photo side-by-side (only show comparison if checkin data exists) */}
-                  {hasCheckinData && (ciPhoto || coPhoto) && (
-                    <div className="flex items-center gap-2">
-                      <div className="text-[9px] text-[#9B9BA8] w-8">Entry</div>
-                      {ciPhoto ? (
-                        <Image
-                          src={ciPhoto.url}
-                          alt="check-in"
-                          width={44}
-                          height={44}
-                          className="w-11 h-11 rounded-lg object-cover border-2 border-gray-300 opacity-70"
-                        />
-                      ) : (
-                        <div className="w-11 h-11 rounded-lg bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center">
-                          <span className="text-[8px] text-gray-400">N/A</span>
-                        </div>
-                      )}
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                        <path
-                          d="M5 12h14M13 6l6 6-6 6"
-                          stroke="#C4C4C4"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                      {coPhoto ? (
-                        <Image
-                          src={coPhoto.url}
-                          alt="check-out"
-                          width={44}
-                          height={44}
-                          className="w-11 h-11 rounded-lg object-cover border-2 border-[#9A88FD]"
-                        />
-                      ) : (
-                        <div className="w-11 h-11 rounded-lg bg-[#EDE9FF] border-2 border-dashed border-[#9A88FD] flex items-center justify-center">
-                          <span className="text-[8px] text-[#9A88FD]">N/A</span>
-                        </div>
-                      )}
-                      <span className="text-[9px] font-medium ml-1" style={{ color: verdict.color }}>
-                        {verdict.label === 'Better'
-                          ? 'Improved'
-                          : verdict.label === 'Worse'
-                            ? 'New damage'
-                            : 'No change'}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Show just checkout photo if no checkin data */}
-                  {!hasCheckinData && coPhoto && (
-                    <div className="flex items-center gap-2">
-                      <Image
-                        src={coPhoto.url}
-                        alt="check-out"
-                        width={44}
-                        height={44}
-                        className="w-11 h-11 rounded-lg object-cover border-2 border-[#9A88FD]"
-                      />
-                      <span className="text-[9px] text-[#9B9BA8]">Check-out photo</span>
-                    </div>
+                  {hasCheckinData && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: verdict.bg, color: verdict.color }}>
+                      {verdict.label}
+                    </span>
                   )}
                 </div>
+
+                {/* Stats chips */}
+                <div className="flex gap-2 mb-3">
+                  <div className="flex items-center gap-1 bg-[#F3F3F8] rounded-lg px-2 py-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                      <rect x="3" y="3" width="18" height="18" rx="2"
+                        stroke="#6B7280" strokeWidth="1.8"/>
+                      <circle cx="12" cy="12" r="3"
+                        stroke="#6B7280" strokeWidth="1.8"/>
+                    </svg>
+                    <span className="text-[11px] text-[#6B7280] font-medium">
+                      {hasCheckinData ? `${ciPhotos.length} → ${coPhotos.length} photos` : `${coPhotos.length} photos`}
+                    </span>
+                  </div>
+                  <div className={`flex items-center gap-1 rounded-lg px-2 py-1 ${
+                    hasCheckinData
+                      ? coIssuesCount > ciIssuesCount ? 'bg-[#FEE2E2]'
+                        : coIssuesCount < ciIssuesCount ? 'bg-[#DCFCE7]'
+                        : 'bg-[#F3F3F8]'
+                      : coIssuesCount > 0 ? 'bg-[#FEE2E2]' : 'bg-[#DCFCE7]'
+                  }`}>
+                    <span className={`text-[11px] font-medium ${
+                      hasCheckinData
+                        ? coIssuesCount > ciIssuesCount ? 'text-[#DC2626]'
+                          : coIssuesCount < ciIssuesCount ? 'text-[#16A34A]'
+                          : 'text-[#6B7280]'
+                        : coIssuesCount > 0 ? 'text-[#DC2626]' : 'text-[#16A34A]'
+                    }`}>
+                      {hasCheckinData
+                        ? `${coIssuesCount > ciIssuesCount ? '⚠' : coIssuesCount < ciIssuesCount ? '✓' : '='} Issues: ${ciIssuesCount} → ${coIssuesCount}`
+                        : `${coIssuesCount > 0 ? '⚠' : '✓'} ${coIssuesCount} issues`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* ALL photo pairs */}
+                {hasCheckinData && matchedPairs.length > 0 && (
+                  <div className="space-y-2">
+                    {matchedPairs.map((pair, pairIdx) => (
+                      <div key={pairIdx}
+                        className={`rounded-xl overflow-hidden ${
+                          pair.isNew ? 'border border-[#D97706]/30' : ''
+                        }`}>
+
+                        {pair.isNew && pair.coPhoto ? (
+                          /* ── NEW DAMAGE: single photo + amber badge ── */
+                          <div>
+                            <div className="flex items-center gap-1.5 bg-[#FEF3C7] px-2.5 py-1.5 rounded-t-xl">
+                              <div className="w-1.5 h-1.5 rounded-full bg-[#D97706]" />
+                              <span className="text-[10px] font-bold text-[#D97706] uppercase tracking-wide">
+                                New — not present at check-in
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 px-2 py-2 bg-[#FFFBEB]">
+                              <div className="w-14 h-14 rounded-lg overflow-hidden border-2 border-[#D97706]/40 flex-shrink-0">
+                                <img
+                                  src={pair.coPhoto.url}
+                                  alt="new damage"
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div>
+                                {pair.coPhoto.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {pair.coPhoto.damage_tags.slice(0, 3).map((tag: string, ti: number) => (
+                                      <span key={ti}
+                                        className="text-[9px] font-bold uppercase bg-[#FEE2E2] text-[#DC2626] px-1.5 py-0.5 rounded-full">
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          /* ── MATCHED PAIR: check-in LEFT / check-out RIGHT ── */
+                          <div className="flex items-start gap-2">
+
+                            {/* Check-in photo */}
+                            <div className="flex flex-col items-center gap-1 flex-1">
+                              <span className="text-[9px] text-[#9B9BA8] font-medium self-start">
+                                Entry
+                              </span>
+                              {pair.ciPhoto ? (
+                                <div className="w-full aspect-square rounded-lg overflow-hidden border border-gray-200 opacity-70">
+                                  <img
+                                    src={pair.ciPhoto.url}
+                                    alt="check-in"
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-full aspect-square rounded-lg bg-[#F3F3F8] border border-dashed border-gray-300 flex items-center justify-center">
+                                  <span className="text-[9px] text-gray-400">
+                                    No photo
+                                  </span>
+                                </div>
+                              )}
+                              {pair.ciPhoto?.damage_tags && pair.ciPhoto.damage_tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 self-start">
+                                  {pair.ciPhoto.damage_tags.slice(0, 2).map((tag: string, ti: number) => (
+                                    <span key={ti}
+                                      className="text-[8px] font-bold uppercase bg-gray-100 text-gray-500 px-1 py-0.5 rounded">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Arrow */}
+                            <div className="flex items-center pt-6 flex-shrink-0">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                                <path d="M5 12h14M13 6l6 6-6 6"
+                                  stroke="#C4C4C4" strokeWidth="1.8"
+                                  strokeLinecap="round"/>
+                              </svg>
+                            </div>
+
+                            {/* Check-out photo */}
+                            <div className="flex flex-col items-center gap-1 flex-1">
+                              <span className="text-[9px] text-[#9A88FD] font-medium self-start">
+                                Check-out
+                              </span>
+                              {pair.coPhoto ? (
+                                <div className="w-full aspect-square rounded-lg overflow-hidden border-2 border-[#9A88FD]/40">
+                                  <img
+                                    src={pair.coPhoto.url}
+                                    alt="check-out"
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-full aspect-square rounded-lg bg-[#EDE9FF]/30 border border-dashed border-[#9A88FD]/30 flex items-center justify-center">
+                                  <span className="text-[9px] text-[#9A88FD]">
+                                    Not taken
+                                  </span>
+                                </div>
+                              )}
+                              {pair.coPhoto?.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 self-start">
+                                  {pair.coPhoto.damage_tags.slice(0, 2).map((tag: string, ti: number) => (
+                                    <span key={ti}
+                                      className="text-[8px] font-bold uppercase bg-[#FEE2E2] text-[#DC2626] px-1 py-0.5 rounded">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Show checkout photos only if no checkin data */}
+                {!hasCheckinData && coPhotos.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto">
+                    {coPhotos.slice(0, 4).map((photo, i) => (
+                      <div key={i} className="w-14 h-14 rounded-lg overflow-hidden border-2 border-[#9A88FD]/40 flex-shrink-0">
+                        <img
+                          src={photo.url}
+                          alt="check-out"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                    {coPhotos.length > 4 && (
+                      <div className="w-14 h-14 rounded-lg bg-[#EDE9FF] flex items-center justify-center flex-shrink-0">
+                        <span className="text-[11px] font-bold text-[#9A88FD]">+{coPhotos.length - 4}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </div>
             )
           })}
