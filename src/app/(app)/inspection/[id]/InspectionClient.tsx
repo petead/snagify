@@ -384,6 +384,35 @@ export function InspectionClient({
 
   const [keyHandover, setKeyHandover] = useState<{ item: string; qty: number }[]>([]);
 
+  // Keys inline edit mode
+  const [editingKeys, setEditingKeys] = useState(false);
+  const [editableKeys, setEditableKeys] = useState<Array<{ item: string; qty: number }>>([]);
+  const [savingKeys, setSavingKeys] = useState(false);
+
+  function startEditKeys(keyItems: Array<{ item: string; qty: number }>) {
+    setEditableKeys(keyItems.map(k => ({ ...k })));
+    setEditingKeys(true);
+  }
+
+  async function saveKeys() {
+    setSavingKeys(true);
+    try {
+      const { error } = await supabase
+        .from("inspections")
+        .update({ key_handover: editableKeys })
+        .eq("id", inspectionId);
+
+      if (error) throw error;
+
+      setKeyHandover(editableKeys);
+      setEditingKeys(false);
+    } catch (err) {
+      console.error("Failed to save keys:", err);
+    } finally {
+      setSavingKeys(false);
+    }
+  }
+
   // Check-out ghost overlay: room name → check-in photos
   const [checkinGhostMap, setCheckinGhostMap] = useState<Record<string, GhostPhoto[]>>({});
   const [checkinInspectionId, setCheckinInspectionId] = useState<string | null>(null);
@@ -1624,87 +1653,227 @@ export function InspectionClient({
                       {inspectionType === "check-in" ? "Items handed over at check-in" : "Keys to be returned"}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setScreen("inspect")}
-                    style={{
-                      fontSize: 12, fontWeight: 600, color: "#9A88FD",
-                      background: "#EDE9FF", padding: "6px 12px", borderRadius: 10,
-                      border: "none", cursor: "pointer",
-                    }}
-                  >
-                    Edit
-                  </button>
-                </div>
-
-                {keyItems.length === 0 ? (
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 20px", gap: 16 }}>
-                    <div style={{ width: 56, height: 56, background: "#F3F3F8", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <circle cx="7.5" cy="15.5" r="4.5" stroke="#9B9BA8" strokeWidth="1.8"/>
-                        <path d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2" stroke="#9B9BA8" strokeWidth="1.8" strokeLinecap="round"/>
-                      </svg>
-                    </div>
-                    <div style={{ textAlign: "center" }}>
-                      <p style={{ fontSize: 14, fontWeight: 600, color: "#1a1a2e", margin: "0 0 4px" }}>No keys recorded</p>
-                      <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>Go back to add the keys handed over</p>
-                    </div>
+                  {!editingKeys ? (
                     <button
                       type="button"
-                      onClick={() => setScreen("inspect")}
+                      onClick={() => startEditKeys(keyItems)}
                       style={{
-                        background: "#9A88FD", color: "white", fontWeight: 600,
-                        borderRadius: 12, padding: "12px 24px", fontSize: 13,
+                        fontSize: 12, fontWeight: 600, color: "#9A88FD",
+                        background: "#EDE9FF", padding: "6px 12px", borderRadius: 10,
                         border: "none", cursor: "pointer",
                       }}
                     >
-                      Add keys
+                      Edit
                     </button>
-                  </div>
-                ) : (
+                  ) : (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => setEditingKeys(false)}
+                        style={{
+                          fontSize: 12, fontWeight: 600, color: "#6B7280",
+                          background: "#F3F4F6", padding: "6px 12px", borderRadius: 10,
+                          border: "none", cursor: "pointer",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveKeys}
+                        disabled={savingKeys}
+                        style={{
+                          fontSize: 12, fontWeight: 600, color: "white",
+                          background: "#9A88FD", padding: "6px 12px", borderRadius: 10,
+                          border: "none", cursor: "pointer",
+                          opacity: savingKeys ? 0.5 : 1,
+                          display: "flex", alignItems: "center", gap: 6,
+                        }}
+                      >
+                        {savingKeys && (
+                          <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2" opacity="0.25"/>
+                            <path d="M12 2a10 10 0 0110 10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                          </svg>
+                        )}
+                        Save
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* READ MODE */}
+                {!editingKeys && (
+                  <>
+                    {keyItems.length === 0 ? (
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 20px", gap: 16 }}>
+                        <div style={{ width: 56, height: 56, background: "#F3F3F8", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <circle cx="7.5" cy="15.5" r="4.5" stroke="#9B9BA8" strokeWidth="1.8"/>
+                            <path d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2" stroke="#9B9BA8" strokeWidth="1.8" strokeLinecap="round"/>
+                          </svg>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <p style={{ fontSize: 14, fontWeight: 600, color: "#1a1a2e", margin: "0 0 4px" }}>No keys recorded</p>
+                          <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>Tap Edit to add items</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {keyItems.map((item, i) => (
+                          <div key={i} style={{
+                            background: "white", borderRadius: 16, border: "1px solid #EEECFF",
+                            padding: 16, display: "flex", alignItems: "center", gap: 16,
+                          }}>
+                            <div style={{
+                              width: 40, height: 40, background: "#EDE9FF", borderRadius: 12,
+                              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                            }}>
+                              {getKeyIcon(item.item || "")}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e" }}>
+                                {item.item}
+                              </div>
+                            </div>
+                            <div style={{
+                              background: "#EDE9FF", borderRadius: 12, padding: "6px 12px", flexShrink: 0,
+                            }}>
+                              <span style={{ fontSize: 15, fontWeight: 800, color: "#9A88FD" }}>
+                                ×{item.qty}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Summary */}
+                        <div style={{
+                          background: "#F8F7F4", borderRadius: 16, padding: 12,
+                          display: "flex", alignItems: "center", gap: 8, marginTop: 4,
+                        }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                            <path d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                              stroke="#16A34A" strokeWidth="1.5" strokeLinecap="round"/>
+                          </svg>
+                          <span style={{ fontSize: 12, color: "#166534", fontWeight: 500 }}>
+                            {keyItems.length} item{keyItems.length > 1 ? "s" : ""} recorded ·{" "}
+                            {keyItems.reduce((acc, k) => acc + (k.qty ?? 1), 0)} total keys
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* EDIT MODE */}
+                {editingKeys && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {keyItems.map((item, i) => (
+                    {editableKeys.map((item, i) => (
                       <div key={i} style={{
-                        background: "white", borderRadius: 16, border: "1px solid #EEECFF",
-                        padding: 16, display: "flex", alignItems: "center", gap: 16,
+                        background: "white", borderRadius: 16, border: "2px solid rgba(154,136,253,0.2)",
+                        padding: 16, display: "flex", alignItems: "center", gap: 12,
                       }}>
+                        {/* Icon */}
                         <div style={{
                           width: 40, height: 40, background: "#EDE9FF", borderRadius: 12,
                           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                         }}>
-                          {getKeyIcon(item.item || "")}
+                          {getKeyIcon(item.item)}
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e" }}>
-                            {item.item}
-                          </div>
-                        </div>
-                        <div style={{
-                          background: "#EDE9FF", borderRadius: 12, padding: "6px 12px", flexShrink: 0,
-                        }}>
-                          <span style={{ fontSize: 15, fontWeight: 800, color: "#9A88FD" }}>
-                            ×{item.qty}
+
+                        {/* Item name */}
+                        <input
+                          type="text"
+                          value={item.item}
+                          onChange={e => {
+                            const next = [...editableKeys];
+                            next[i] = { ...next[i], item: e.target.value };
+                            setEditableKeys(next);
+                          }}
+                          style={{
+                            flex: 1, fontSize: 16, fontWeight: 600, color: "#1a1a2e",
+                            background: "transparent", border: "none", outline: "none",
+                          }}
+                        />
+
+                        {/* Qty controls */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...editableKeys];
+                              next[i] = { ...next[i], qty: Math.max(0, next[i].qty - 1) };
+                              setEditableKeys(next);
+                            }}
+                            style={{
+                              width: 32, height: 32, borderRadius: 10, background: "#F3F3F8",
+                              border: "none", cursor: "pointer", fontSize: 18, fontWeight: 700,
+                              color: "#1a1a2e", display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                          >
+                            −
+                          </button>
+                          <span style={{
+                            fontSize: 15, fontWeight: 800, color: "#9A88FD",
+                            width: 24, textAlign: "center",
+                          }}>
+                            {item.qty}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...editableKeys];
+                              next[i] = { ...next[i], qty: next[i].qty + 1 };
+                              setEditableKeys(next);
+                            }}
+                            style={{
+                              width: 32, height: 32, borderRadius: 10, background: "#EDE9FF",
+                              border: "none", cursor: "pointer", fontSize: 18, fontWeight: 700,
+                              color: "#9A88FD", display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                          >
+                            +
+                          </button>
                         </div>
+
+                        {/* Delete item */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditableKeys(prev => prev.filter((_, idx) => idx !== i));
+                          }}
+                          style={{
+                            width: 32, height: 32, borderRadius: 10, background: "#FEF2F2",
+                            border: "none", cursor: "pointer", flexShrink: 0,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                            <path d="M18 6L6 18M6 6l12 12" stroke="#EF4444" strokeWidth="1.8" strokeLinecap="round"/>
+                          </svg>
+                        </button>
                       </div>
                     ))}
 
-                    {/* Summary */}
-                    <div style={{
-                      background: "#F8F7F4", borderRadius: 16, padding: 12,
-                      display: "flex", alignItems: "center", gap: 8, marginTop: 4,
-                    }}>
+                    {/* Add item button */}
+                    <button
+                      type="button"
+                      onClick={() => setEditableKeys(prev => [...prev, { item: "New Key", qty: 1 }])}
+                      style={{
+                        width: "100%", padding: 12, border: "2px dashed rgba(154,136,253,0.3)",
+                        borderRadius: 16, background: "transparent", cursor: "pointer",
+                        fontSize: 13, fontWeight: 600, color: "#9A88FD",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      }}
+                    >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                        <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 01-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 01-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 01-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 01.806-1.946 3.42 3.42 0 013.138-3.138z"
-                          stroke="#16A34A" strokeWidth="1.5" strokeLinecap="round"/>
+                        <path d="M12 5v14M5 12h14" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round"/>
                       </svg>
-                      <span style={{ fontSize: 12, color: "#166534", fontWeight: 500 }}>
-                        {keyItems.length} item{keyItems.length > 1 ? "s" : ""} recorded ·{" "}
-                        {keyItems.reduce((acc, k) => acc + (k.qty ?? 1), 0)} total keys
-                      </span>
-                    </div>
+                      Add item
+                    </button>
                   </div>
                 )}
+
               </div>
             );
           })()}
