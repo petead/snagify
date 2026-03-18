@@ -170,6 +170,28 @@ function getRoomVerdict(
   return { label: "Same", color: "#6B7280", bg: "#F3F3F8" };
 }
 
+interface PhotoPair {
+  ciPhoto: CheckoutPhoto["checkin_photo"] | null;
+  coPhoto: CheckoutPhoto;
+  isNew: boolean;
+}
+
+function buildPhotoPairs(checkoutRoom: CheckoutRoom, checkinPhotosMap?: Map<string, CheckoutPhoto["checkin_photo"]>): PhotoPair[] {
+  const pairs: PhotoPair[] = [];
+  
+  for (const coPhoto of checkoutRoom.photos || []) {
+    if (coPhoto.checkin_photo_id && coPhoto.checkin_photo) {
+      pairs.push({ ciPhoto: coPhoto.checkin_photo, coPhoto, isNew: false });
+    } else if (coPhoto.checkin_photo_id && checkinPhotosMap) {
+      const ciPhoto = checkinPhotosMap.get(coPhoto.checkin_photo_id) || null;
+      pairs.push({ ciPhoto, coPhoto, isNew: false });
+    } else {
+      pairs.push({ ciPhoto: null, coPhoto, isNew: true });
+    }
+  }
+  return pairs;
+}
+
 function getKeyLabel(item: KeyHandoverItem): string {
   return item.label || item.name || item.item || "Key";
 }
@@ -1192,30 +1214,81 @@ export function CheckoutPDFDocument({
         </View>
 
         {/* Room comparison table */}
-        <View style={s.sectionHd}>
-          <Text style={s.sectionHdText}>Room comparison</Text>
-          <View style={s.sectionHdLine} />
-        </View>
+        <View style={{ marginHorizontal: 28, marginBottom: 20 }}>
+          <Text style={{
+            fontSize: 9, fontFamily: 'Helvetica-Bold',
+            color: tokens.primary, textTransform: 'uppercase',
+            letterSpacing: 1, marginBottom: 8,
+          }}>
+            Room Comparison
+          </Text>
 
-        <View style={s.roomTable}>
-          <View style={[s.roomThead, { backgroundColor: tokens.primary }]}>
-            <Text style={[s.roomTheadCell, { flex: 2.5 }]}>Room</Text>
-            <Text style={[s.roomTheadCell, { flex: 1.5 }]}>Photos</Text>
-            <Text style={[s.roomTheadCell, { flex: 1.5 }]}>Issues</Text>
-            <Text style={[s.roomTheadCell, { flex: 1.5 }]}>Verdict</Text>
+          {/* Table header */}
+          <View style={{
+            flexDirection: 'row',
+            backgroundColor: tokens.primary,
+            borderRadius: 4,
+            padding: '6 10',
+            marginBottom: 2,
+          }}>
+            {['Room', 'Check-in Photos', 'Check-out Photos', 'Issues (in->out)', 'Verdict'].map((h, i) => (
+              <Text key={i} style={{
+                flex: i === 0 ? 2 : 1,
+                fontSize: 7,
+                fontFamily: 'Helvetica-Bold',
+                color: 'white',
+                textAlign: i === 0 ? 'left' : 'center',
+              }}>
+                {h}
+              </Text>
+            ))}
           </View>
-          {roomStats.map((r, i) => (
-            <View key={r.room.id} style={[s.roomRow, ...(i % 2 === 1 ? [s.roomRowAlt] : [])]}>
-              <Text style={[s.roomCellBold, { flex: 2.5 }]}>{r.room.name}</Text>
-              <Text style={[s.roomCell, { flex: 1.5 }]}>{r.ciPhotos} → {r.coPhotos}</Text>
-              <Text style={[s.roomCell, { flex: 1.5 }]}>{r.ciIssues} → {r.coIssues}</Text>
-              <View style={{ flex: 1.5 }}>
-                <View style={[s.verdictBadge, { backgroundColor: r.verdict.bg }]}>
-                  <Text style={[s.verdictBadgeText, { color: r.verdict.color }]}>{r.verdict.label}</Text>
+
+          {/* Table rows */}
+          {roomStats.map((r, i) => {
+            return (
+              <View key={r.room.id} style={{
+                flexDirection: 'row',
+                backgroundColor: i % 2 === 0 ? '#F8F7F4' : 'white',
+                borderRadius: 4,
+                padding: '8 10',
+                marginBottom: 2,
+                alignItems: 'center',
+              }}>
+                <Text style={{
+                  flex: 2, fontSize: 8,
+                  fontFamily: 'Helvetica-Bold', color: '#1A1A2E',
+                }}>
+                  {r.room.name}
+                </Text>
+                <Text style={{ flex: 1, fontSize: 8, color: '#6B7280', textAlign: 'center' }}>
+                  {r.ciPhotos}
+                </Text>
+                <Text style={{ flex: 1, fontSize: 8, color: '#1A1A2E',
+                  fontFamily: 'Helvetica-Bold', textAlign: 'center' }}>
+                  {r.coPhotos}
+                </Text>
+                <Text style={{ flex: 1, fontSize: 8, color: '#1A1A2E', textAlign: 'center' }}>
+                  {r.ciIssues} {'->'} {r.coIssues}
+                </Text>
+                <View style={{
+                  flex: 1, alignItems: 'center',
+                }}>
+                  <View style={{
+                    backgroundColor: r.verdict.bg,
+                    borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2,
+                  }}>
+                    <Text style={{
+                      fontSize: 7, fontFamily: 'Helvetica-Bold',
+                      color: r.verdict.color,
+                    }}>
+                      {r.verdict.label}
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* Key Return comparison */}
@@ -1268,136 +1341,258 @@ export function CheckoutPDFDocument({
         </View>
       </Page>
 
-      {/* ROOM PAGES */}
+      {/* ROOM PAGES — 2-column check-in vs check-out comparison */}
       {roomStats.map((r, roomIndex) => {
         const room = r.room;
-        const photos = room.photos.filter((p) => p.url && p.url.startsWith("https://"));
-        const cond = (r.roomCondition || "good").toLowerCase().replace(/\s+/g, "_");
-
-        const condBadgeStyle =
-          cond === "good" || cond === "excellent"
-            ? s.roomCondBadgeGood
-            : cond === "needs_attention" || cond === "fair"
-              ? s.roomCondBadgeWarn
-              : s.roomCondBadgeCritical;
-        const condTextStyle =
-          cond === "good" || cond === "excellent"
-            ? s.roomCondTextGood
-            : cond === "needs_attention" || cond === "fair"
-              ? s.roomCondTextWarn
-              : s.roomCondTextCritical;
-        const condLabel =
-          cond === "good" || cond === "excellent"
-            ? "Good"
-            : cond === "needs_attention" || cond === "fair"
-              ? "Needs Attention"
-              : "Critical";
-
-        const totalIssuesRoom = photos.filter((p) => (p.damage_tags?.length ?? 0) > 0).length;
-
-        const photoPairs: (typeof photos)[] = [];
-        for (let i = 0; i < photos.length; i += 2) {
-          photoPairs.push(photos.slice(i, i + 2));
-        }
-
-        const PAGE_INNER_WIDTH = 515;
-        const COL_WIDTH_2 = (PAGE_INNER_WIDTH - 8) / 2;
-        const COL_WIDTH_1 = PAGE_INNER_WIDTH;
+        const pairs = buildPhotoPairs(room);
+        const issueCount = room.photos.filter((p) => (p.damage_tags?.length ?? 0) > 0).length;
+        
+        const verdict = r.verdict;
+        const verdictColor = verdict.label === "Better" || verdict.label === "Same"
+          ? "#16A34A" : verdict.label === "Worse" ? "#DC2626" : "#F59E0B";
+        const verdictBg = verdict.label === "Better" || verdict.label === "Same"
+          ? "#DCFCE7" : verdict.label === "Worse" ? "#FEE2E2" : "#FEF9C3";
 
         return (
-          <Page key={roomIndex} size="A4" style={s.page} wrap={false}>
+          <Page key={roomIndex} size="A4" style={s.page}>
+            {/* Room header */}
             <View style={[s.roomHero, { backgroundColor: tokens.primary }]}>
               <View style={[s.roomHeroDecoOuter, { borderColor: tokens.primaryDark }]} />
               <View style={[s.roomHeroDecoInner, { borderColor: tokens.primaryLight }]} />
               <View style={s.roomHeroTop}>
                 <View>
                   <Text style={s.roomNumber}>
-                    Room {String(roomIndex + 1).padStart(2, "0")} of {String(roomStats.length).padStart(2, "0")}
+                    ROOM {String(roomIndex + 1).padStart(2, "0")} OF {String(roomStats.length).padStart(2, "0")}
                   </Text>
                   <Text style={s.roomTitle}>{room.name}</Text>
                   <Text style={s.roomDate}>Inspected on {formatDate(inspection.created_at)}</Text>
                 </View>
-                <View style={condBadgeStyle}>
-                  <Text style={condTextStyle}>{condLabel}</Text>
+                <View style={{ backgroundColor: verdictBg, borderRadius: 20, paddingHorizontal: 11, paddingVertical: 5 }}>
+                  <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold", color: verdictColor }}>
+                    {verdict.label}
+                  </Text>
                 </View>
               </View>
               <View style={s.roomStatsRow}>
                 <View style={[s.roomStatItem, { marginRight: 16 }]}>
                   <View style={[s.roomStatDot, { marginRight: 5 }]} />
                   <Text style={s.roomStatText}>
-                    {photos.length} photo{photos.length !== 1 ? "s" : ""} captured
+                    {room.photos.length} photo{room.photos.length !== 1 ? "s" : ""} captured
                   </Text>
                 </View>
                 <View style={s.roomStatItem}>
                   <View style={[s.roomStatDot, { marginRight: 5 }]} />
                   <Text style={s.roomStatText}>
-                    {totalIssuesRoom} issue{totalIssuesRoom !== 1 ? "s" : ""} flagged
+                    {issueCount} {issueCount === 1 ? "issue" : "issues"} flagged
                   </Text>
                 </View>
               </View>
             </View>
 
+            {/* Photo pairs — check-in LEFT / check-out RIGHT */}
             <View style={s.roomBody}>
-              {photoPairs.map((pair, pairIdx) => {
-                const isSingleAny = pair.length === 1;
-                return (
-                  <View
-                    key={pairIdx}
-                    style={isSingleAny ? { marginBottom: 8 } : [s.photosGrid, { marginBottom: 8 }]}
-                  >
-                    {pair.map((photo, pi) => {
-                      const useFull = isSingleAny;
-                      const colW = useFull ? COL_WIDTH_1 : COL_WIDTH_2;
-                      const imgH = getPdfImageHeight(colW, photo.width, photo.height);
+              {pairs.map((pair, pairIdx) => (
+                <View key={pairIdx} style={{
+                  marginBottom: 24,
+                  borderBottomWidth: pairIdx < pairs.length - 1 ? 0.5 : 0,
+                  borderBottomColor: "#F3F3F8",
+                  paddingBottom: pairIdx < pairs.length - 1 ? 24 : 0,
+                }}>
 
-                      return (
-                        <View
-                          key={photo.id}
-                          style={[
-                            useFull ? s.photoCardFull : s.photoCard,
-                            ...(!useFull && pi === 0 ? [{ marginRight: 8 }] : []),
-                          ]}
-                        >
-                          {photo.url && photo.url.startsWith("http") ? (
-                            <Image
-                              src={photo.url}
-                              style={{
-                                width: "100%",
-                                height: imgH,
-                                objectFit: "contain",
-                                backgroundColor: "#F8F8FC",
-                              }}
-                            />
-                          ) : null}
-                          {photo.damage_tags && photo.damage_tags.length > 0 && (
-                            <View style={s.photoTagsRow}>
-                              {photo.damage_tags.map((tag, ti) => {
-                                const ts = tagStyle(tag);
-                                return (
-                                  <View key={ti} style={[s.photoTag, { backgroundColor: ts.bg, marginRight: 3, marginBottom: 2 }]}>
-                                    <Text style={[s.photoTagText, { color: ts.text }]}>{tag}</Text>
-                                  </View>
-                                );
-                              })}
-                            </View>
-                          )}
-                          {photo.ai_analysis && (
-                            <>
-                              <View style={s.photoAiDivider} />
-                              <View style={s.photoAiWrap}>
-                                <Text style={[s.photoAiLabel, { color: tokens.primary }]}>AI Analysis</Text>
-                                <Text style={s.photoAiText}>{photo.ai_analysis}</Text>
+                  {pair.isNew ? (
+                    /* NEW DAMAGE: full width photo + warning banner */
+                    <View>
+                      <View style={{
+                        backgroundColor: "#FEE2E2",
+                        borderRadius: 6, padding: "6 10",
+                        flexDirection: "row", alignItems: "center",
+                        marginBottom: 8,
+                      }}>
+                        <View style={{
+                          width: 8, height: 8, borderRadius: 4,
+                          backgroundColor: "#DC2626", marginRight: 6,
+                        }} />
+                        <Text style={{
+                          fontSize: 8, fontFamily: "Helvetica-Bold",
+                          color: "#DC2626", textTransform: "uppercase",
+                          letterSpacing: 0.5,
+                        }}>
+                          New damage - not present at check-in
+                        </Text>
+                      </View>
+
+                      {/* Full-width checkout photo */}
+                      {pair.coPhoto.url && pair.coPhoto.url.startsWith("http") && (
+                        <Image
+                          src={pair.coPhoto.url}
+                          style={{
+                            width: "100%",
+                            height: 200,
+                            objectFit: "cover",
+                            borderRadius: 6,
+                          }}
+                        />
+                      )}
+
+                      {/* Damage tags */}
+                      {pair.coPhoto.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
+                        <View style={{
+                          flexDirection: "row", flexWrap: "wrap",
+                          marginTop: 6,
+                        }}>
+                          {pair.coPhoto.damage_tags.map((tag, ti) => {
+                            const ts = tagStyle(tag);
+                            return (
+                              <View key={ti} style={[s.photoTag, { backgroundColor: ts.bg, marginRight: 3, marginBottom: 2 }]}>
+                                <Text style={[s.photoTagText, { color: ts.text }]}>{tag.toUpperCase()}</Text>
                               </View>
-                            </>
-                          )}
+                            );
+                          })}
                         </View>
-                      );
-                    })}
-                  </View>
-                );
-              })}
+                      )}
+
+                      {/* AI analysis */}
+                      {pair.coPhoto.ai_analysis && (
+                        <View style={{ marginTop: 6 }}>
+                          <Text style={[s.photoAiLabel, { color: tokens.primary }]}>AI ANALYSIS</Text>
+                          <Text style={s.photoAiText}>
+                            {pair.coPhoto.ai_analysis.slice(0, 180)}
+                            {pair.coPhoto.ai_analysis.length > 180 ? "..." : ""}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  ) : (
+                    /* MATCHED: 2-column check-in LEFT / check-out RIGHT */
+                    <View style={{ flexDirection: "row" }}>
+
+                      {/* CHECK-IN column */}
+                      <View style={{ flex: 1, marginRight: 6 }}>
+                        <View style={{
+                          backgroundColor: "#F3F3F8",
+                          borderRadius: 4, padding: "3 8",
+                          marginBottom: 6, alignSelf: "flex-start",
+                        }}>
+                          <Text style={{
+                            fontSize: 7, fontFamily: "Helvetica-Bold",
+                            color: "#6B7280", textTransform: "uppercase",
+                            letterSpacing: 0.5,
+                          }}>
+                            Check-in
+                          </Text>
+                        </View>
+
+                        {pair.ciPhoto?.url ? (
+                          <Image
+                            src={pair.ciPhoto.url}
+                            style={{
+                              width: "100%", height: 140,
+                              objectFit: "cover", borderRadius: 6,
+                              opacity: 0.85,
+                            }}
+                          />
+                        ) : (
+                          <View style={{
+                            width: "100%", height: 140,
+                            backgroundColor: "#F3F3F8", borderRadius: 6,
+                            alignItems: "center", justifyContent: "center",
+                          }}>
+                            <Text style={{ fontSize: 8, color: "#C4C4C4" }}>
+                              No check-in photo
+                            </Text>
+                          </View>
+                        )}
+
+                        {/* Check-in damage tags */}
+                        {pair.ciPhoto?.damage_tags && pair.ciPhoto.damage_tags.length > 0 && (
+                          <View style={{
+                            flexDirection: "row", flexWrap: "wrap",
+                            marginTop: 4,
+                          }}>
+                            {pair.ciPhoto.damage_tags.map((tag, ti) => (
+                              <View key={ti} style={[s.photoTag, { backgroundColor: "#F3F3F8", marginRight: 3, marginBottom: 2 }]}>
+                                <Text style={[s.photoTagText, { color: "#6B7280" }]}>{tag.toUpperCase()}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+
+                        {/* Check-in AI note */}
+                        {pair.ciPhoto?.ai_analysis && (
+                          <View style={{ marginTop: 5 }}>
+                            <Text style={[s.photoAiLabel, { color: "#9B9BA8" }]}>CHECK-IN NOTE</Text>
+                            <Text style={[s.photoAiText, { color: "#9B9BA8", fontSize: 7 }]}>
+                              {pair.ciPhoto.ai_analysis.slice(0, 150)}
+                              {pair.ciPhoto.ai_analysis.length > 150 ? "..." : ""}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {/* CHECK-OUT column */}
+                      <View style={{ flex: 1, marginLeft: 6 }}>
+                        <View style={{
+                          backgroundColor: tokens.primaryUltraLight || "#EDE9FF",
+                          borderRadius: 4, padding: "3 8",
+                          marginBottom: 6, alignSelf: "flex-start",
+                        }}>
+                          <Text style={{
+                            fontSize: 7, fontFamily: "Helvetica-Bold",
+                            color: tokens.primary, textTransform: "uppercase",
+                            letterSpacing: 0.5,
+                          }}>
+                            Check-out
+                          </Text>
+                        </View>
+
+                        {pair.coPhoto.url && pair.coPhoto.url.startsWith("http") && (
+                          <Image
+                            src={pair.coPhoto.url}
+                            style={{
+                              width: "100%", height: 140,
+                              objectFit: "cover", borderRadius: 6,
+                              borderWidth: 1.5,
+                              borderColor: tokens.primary,
+                            }}
+                          />
+                        )}
+
+                        {/* Check-out damage tags */}
+                        {pair.coPhoto.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
+                          <View style={{
+                            flexDirection: "row", flexWrap: "wrap",
+                            marginTop: 4,
+                          }}>
+                            {pair.coPhoto.damage_tags.map((tag, ti) => {
+                              const ts = tagStyle(tag);
+                              return (
+                                <View key={ti} style={[s.photoTag, { backgroundColor: ts.bg, marginRight: 3, marginBottom: 2 }]}>
+                                  <Text style={[s.photoTagText, { color: ts.text }]}>{tag.toUpperCase()}</Text>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        )}
+
+                        {/* Check-out AI analysis */}
+                        {pair.coPhoto.ai_analysis && (
+                          <View style={{ marginTop: 5 }}>
+                            <Text style={[s.photoAiLabel, { color: tokens.primary }]}>AI ANALYSIS</Text>
+                            <Text style={[s.photoAiText, { fontSize: 7 }]}>
+                              {pair.coPhoto.ai_analysis.slice(0, 150)}
+                              {pair.coPhoto.ai_analysis.length > 150 ? "..." : ""}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                    </View>
+                  )}
+                </View>
+              ))}
             </View>
 
+            {/* Footer */}
             <View style={[s.pdfFooter, { backgroundColor: tokens.primary }]}>
               <View style={s.footerLeft}>
                 <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
