@@ -112,7 +112,7 @@ export function DashboardClient({
   alerts = [],
   recentInspections: initialRecentInspections = [],
 }: DashboardClientProps) {
-  const { balance, plan, accountType } = useCredits();
+  const { balance, plan, accountType, refresh: refreshCredits } = useCredits();
   const [showBuyCredits, setShowBuyCredits] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -124,6 +124,18 @@ export function DashboardClient({
   useEffect(() => {
     setLoaded(true);
   }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") === "success") {
+      alert("Payment successful! Your credits have been added.");
+      void refreshCredits();
+      window.history.replaceState({}, "", "/dashboard");
+    } else if (params.get("payment") === "cancelled") {
+      alert("Payment cancelled.");
+      window.history.replaceState({}, "", "/dashboard");
+    }
+  }, [refreshCredits]);
   useEffect(() => {
     setRecentInspections(initialRecentInspections);
   }, [initialRecentInspections]);
