@@ -24,9 +24,9 @@ const AMBER_LIGHT = "#FEF3C7";
 /** Usable content width (A4 595pt − 30×2 margins) */
 const PAGE_W = 535;
 const COL_W = 262; // (PAGE_W - 10 gap) / 2
-const PAIR_MAX_H = 185;
-const NEW_MAX_H = 280;
-const PAIR_GAP = 14;
+const PAIR_MAX_H = 270; // (702pt − 14 gap) / 2 − ~70pt text ≈ 274 → 270
+const NEW_MAX_H = 400; // full-width new damage — higher cap
+const PAIR_GAP = 16; // vertical gap between two pairs on same page
 /** Layout reserve (tags + AI under photos), ~65pt — for future pagination tuning */
 const TEXT_AREA = 65;
 
@@ -37,8 +37,9 @@ function calcPhotoSize(
 ): { w: number; h: number } {
   const srcW = photo?.width || 1200;
   const srcH = photo?.height || 900;
-  const ratio = srcH / srcW;
+  const ratio = srcH / srcW; // height / width
 
+  // Ceiling comes only from maxWidth / maxHeight (PAIR_MAX_H or NEW_MAX_H) — no secondary cap
   let displayW = maxWidth;
   let displayH = displayW * ratio;
 
