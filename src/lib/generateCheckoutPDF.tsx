@@ -1174,7 +1174,7 @@ export function CheckoutPDFDocument({
       <Page size="A4" style={s.page}>
         <View style={[s.coverHero, { backgroundColor: tokens.primary }]}>
           <View style={[s.coverHeroGeoCircle, { borderColor: tokens.primaryDark }]} />
-          <View style={[s.coverHeroGeoCircle2, { borderColor: tokens.primaryLight }]} />
+          <View style={[s.coverHeroGeoCircle2, { borderColor: tokens.primaryDark }]} />
 
           <View style={s.coverLogoRow}>
             <View style={s.coverLogoLeft}>
@@ -1605,7 +1605,7 @@ export function CheckoutPDFDocument({
                   height: 80,
                   borderRadius: 40,
                   borderWidth: 16,
-                  borderColor: "rgba(255,255,255,0.06)",
+                  borderColor: tokens.primaryDark,
                 }}
               />
               <View
