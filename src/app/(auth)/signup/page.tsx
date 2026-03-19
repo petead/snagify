@@ -1,19 +1,30 @@
 'use client'
 
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import Cropper, { type Area } from 'react-easy-crop'
+import 'react-easy-crop/react-easy-crop.css'
 import { Eye, EyeOff, Loader2, ArrowRight, UploadCloud, Check } from 'lucide-react'
 import { createBrowserClient } from '@supabase/ssr'
 import { PasswordStrengthBar } from '@/components/auth/PasswordStrengthBar'
 import { analyzePassword } from '@/lib/passwordStrength'
 import { cn } from '@/lib/utils'
+import { getCroppedImg } from '@/utils/cropImage'
 
 type AccountType = 'individual' | 'pro'
 type Step = 1 | 2 | 3
-type ProSubStep = 1 | 2 | 3 | 4
+type ProSubStep = 1 | 2 | 3
+
+const LOGO_MAX_BYTES = 5 * 1024 * 1024
+const LOGO_ACCEPT_TYPES = [
+  'image/png',
+  'image/svg+xml',
+  'image/jpeg',
+  'image/webp',
+] as const
 
 const inputFocus =
   'transition-all duration-200 focus:ring-2 focus:ring-[#9A88FD]/40 focus:border-[#9A88FD] focus:shadow-[0_0_0_4px_rgba(154,136,253,0.12)] outline-none'
@@ -174,8 +185,16 @@ export default function SignupPage() {
   const [country, setCountry] = useState('UAE')
   const [tradeLicense, setTradeLicense] = useState('')
   const [brandPrimaryColor, setBrandPrimaryColor] = useState('#9A88FD')
-  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [croppedLogoBlob, setCroppedLogoBlob] = useState<Blob | null>(null)
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
+  const [logoError, setLogoError] = useState<string | null>(null)
+  const [cropModalOpen, setCropModalOpen] = useState(false)
+  const [imageToCropSrc, setImageToCropSrc] = useState<string | null>(null)
+  const [crop, setCrop] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [applyingCrop, setApplyingCrop] = useState(false)
+  const croppedAreaPixelsRef = useRef<Area | null>(null)
+  const logoFileInputRef = useRef<HTMLInputElement>(null)
   const [reraNumber, setReraNumber] = useState('')
   const [proWebsite, setProWebsite] = useState('')
   const [email, setEmail] = useState('')
@@ -200,14 +219,29 @@ export default function SignupPage() {
   )
 
   useEffect(() => {
-    if (!logoFile) {
+    if (!croppedLogoBlob) {
       setLogoPreviewUrl(null)
       return
     }
-    const url = URL.createObjectURL(logoFile)
+    const url = URL.createObjectURL(croppedLogoBlob)
     setLogoPreviewUrl(url)
     return () => URL.revokeObjectURL(url)
-  }, [logoFile])
+  }, [croppedLogoBlob])
+
+  useEffect(() => {
+    if (cropModalOpen || !imageToCropSrc) return
+    const timer = window.setTimeout(() => {
+      setImageToCropSrc((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return null
+      })
+      setCrop({ x: 0, y: 0 })
+      setZoom(1)
+      croppedAreaPixelsRef.current = null
+      if (logoFileInputRef.current) logoFileInputRef.current.value = ''
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [cropModalOpen, imageToCropSrc])
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
   const emailError = emailTouched && email && !emailValid
@@ -247,17 +281,11 @@ export default function SignupPage() {
   }
 
   const uploadLogoAfterSignup = async (userId: string) => {
-    if (!logoFile) return
-    const ext =
-      logoFile.type === 'image/png'
-        ? 'png'
-        : logoFile.type === 'image/jpeg' || logoFile.type === 'image/jpg'
-          ? 'jpg'
-          : 'webp'
-    const path = `${userId}/logos/company-logo.${ext}`
+    if (!croppedLogoBlob) return
+    const path = `${userId}/logos/company-logo.png`
     const { error: upErr } = await supabase.storage
       .from('avatars')
-      .upload(path, logoFile, { upsert: true, contentType: logoFile.type || 'image/png' })
+      .upload(path, croppedLogoBlob, { upsert: true, contentType: 'image/png' })
     if (upErr) {
       console.error('Logo upload failed:', upErr)
       return
@@ -331,7 +359,7 @@ export default function SignupPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (user?.id && isPro && logoFile) {
+      if (user?.id && isPro && croppedLogoBlob) {
         await uploadLogoAfterSignup(user.id)
       }
 
@@ -350,6 +378,16 @@ export default function SignupPage() {
     if (!companyEmail.trim() || !companyEmailValid)
       err.companyEmail = 'Valid company email is required.'
     if (!companyPhone.trim()) err.phone = 'Phone number is required.'
+    const w = proWebsite.trim()
+    if (w) {
+      try {
+        const u = w.match(/^https?:\/\//i) ? w : `https://${w}`
+        // eslint-disable-next-line no-new
+        new URL(u)
+      } catch {
+        err.website = 'Enter a valid URL.'
+      }
+    }
     setProFieldErrors(err)
     return Object.keys(err).length === 0
   }
@@ -363,26 +401,73 @@ export default function SignupPage() {
     return Object.keys(err).length === 0
   }
 
-  const validateProWebsite = (): boolean => {
-    const w = proWebsite.trim()
-    if (!w) return true
-    try {
-      const u = w.match(/^https?:\/\//i) ? w : `https://${w}`
-      // eslint-disable-next-line no-new
-      new URL(u)
-      return true
-    } catch {
-      setProFieldErrors((prev) => ({ ...prev, website: 'Enter a valid URL.' }))
-      return false
-    }
-  }
-
   const handleProFinalSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     clearProError('website')
-    if (!validateProWebsite()) return
+    const w = proWebsite.trim()
+    if (w) {
+      try {
+        const u = w.match(/^https?:\/\//i) ? w : `https://${w}`
+        // eslint-disable-next-line no-new
+        new URL(u)
+      } catch {
+        setProFieldErrors((prev) => ({ ...prev, website: 'Enter a valid URL.' }))
+        return
+      }
+    }
     void handleSubmit()
+  }
+
+  const onLogoFileChosen = (file: File | null) => {
+    setLogoError(null)
+    if (!file) return
+    if (file.size > LOGO_MAX_BYTES) {
+      setLogoError('File too large. Max size is 5MB.')
+      return
+    }
+    if (!(LOGO_ACCEPT_TYPES as readonly string[]).includes(file.type)) {
+      setLogoError('Please upload a PNG, JPG, WebP or SVG file.')
+      return
+    }
+    setImageToCropSrc((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return URL.createObjectURL(file)
+    })
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
+    croppedAreaPixelsRef.current = null
+    setCropModalOpen(true)
+  }
+
+  const handleCropCancel = () => {
+    setCropModalOpen(false)
+  }
+
+  const handleCropApply = async () => {
+    const src = imageToCropSrc
+    const area = croppedAreaPixelsRef.current
+    if (!src || !area) return
+    setApplyingCrop(true)
+    setLogoError(null)
+    try {
+      const blob = await getCroppedImg(src, area)
+      setCroppedLogoBlob(blob)
+      setImageToCropSrc((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return null
+      })
+      setCropModalOpen(false)
+      setCrop({ x: 0, y: 0 })
+      setZoom(1)
+      croppedAreaPixelsRef.current = null
+      if (logoFileInputRef.current) logoFileInputRef.current.value = ''
+    } catch (e) {
+      console.error(e)
+      setLogoError('Could not crop this image. Try another file.')
+    } finally {
+      setApplyingCrop(false)
+    }
   }
 
   const inputClass = `w-full px-4 py-3 rounded-xl border text-base ${inputFocus}`
@@ -390,7 +475,7 @@ export default function SignupPage() {
 
   const totalSteps = accountType === 'pro' ? 3 : 2
 
-  const proProgressWidth = `${proSubStep * 25}%`
+  const proProgressWidth = `${(proSubStep / 3) * 100}%`
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#F8F7F4] p-4">
@@ -845,6 +930,52 @@ export default function SignupPage() {
                         </ProInputShell>
                       </StaggerField>
 
+                      <StaggerField index={3}>
+                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          RERA number{' '}
+                          <span className="font-normal normal-case text-gray-400">(optional)</span>
+                        </label>
+                        <ProInputShell
+                          showValid={!!reraNumber.trim()}
+                          errorMsg={null}
+                        >
+                          <input
+                            type="text"
+                            value={reraNumber}
+                            onChange={(e) => setReraNumber(e.target.value)}
+                            placeholder="RERA registration number (optional)"
+                            autoComplete="off"
+                            className={`${inputClass} border-gray-200 bg-gray-50 pr-10 focus:bg-white`}
+                          />
+                        </ProInputShell>
+                      </StaggerField>
+
+                      <StaggerField index={4}>
+                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Website{' '}
+                          <span className="font-normal normal-case text-gray-400">(optional)</span>
+                        </label>
+                        <ProInputShell
+                          showValid={!!proWebsite.trim() && !proFieldErrors.website}
+                          errorMsg={proFieldErrors.website}
+                        >
+                          <input
+                            type="url"
+                            value={proWebsite}
+                            onChange={(e) => {
+                              setProWebsite(e.target.value)
+                              clearProError('website')
+                            }}
+                            placeholder="https://yourcompany.com"
+                            className={cn(
+                              inputClass,
+                              'border-gray-200 bg-gray-50 pr-10 focus:bg-white',
+                              proFieldErrors.website && 'border-red-400 bg-red-50'
+                            )}
+                          />
+                        </ProInputShell>
+                      </StaggerField>
+
                       <motion.button
                         type="button"
                         onClick={() => {
@@ -1023,158 +1154,6 @@ export default function SignupPage() {
                         Your brand will appear on all inspection reports.
                       </p>
 
-                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                        <StaggerField index={0}>
-                          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            Logo
-                          </label>
-                          <motion.label
-                            onHoverStart={() => setLogoHover(true)}
-                            onHoverEnd={() => setLogoHover(false)}
-                            animate={{ scale: logoHover ? 1.01 : 1 }}
-                            transition={springCheck}
-                            className={cn(
-                              'flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-gray-50 p-6 transition-colors',
-                              logoHover ? 'border-[#9A88FD]' : 'border-gray-200'
-                            )}
-                          >
-                            <input
-                              type="file"
-                              accept="image/png,image/jpeg,image/webp"
-                              className="hidden"
-                              onChange={(e) => {
-                                const f = e.target.files?.[0]
-                                if (!f) return
-                                if (f.size > 2 * 1024 * 1024) {
-                                  setError('Logo must be 2MB or less.')
-                                  return
-                                }
-                                setLogoFile(f)
-                                setError(null)
-                              }}
-                            />
-                            <AnimatePresence mode="wait">
-                              {logoPreviewUrl ? (
-                                <motion.div
-                                  key="prev"
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  exit={{ opacity: 0 }}
-                                  className="relative h-28 w-full max-w-[200px]"
-                                >
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={logoPreviewUrl}
-                                    alt="Logo preview"
-                                    className="h-full w-full object-contain"
-                                  />
-                                </motion.div>
-                              ) : (
-                                <motion.div
-                                  key="placeholder"
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  className="flex flex-col items-center text-center"
-                                >
-                                  <UploadCloud className="mb-2 h-10 w-10 text-gray-400" />
-                                  <span className="text-sm font-semibold text-[#1A1A2E]">
-                                    Upload your logo
-                                  </span>
-                                  <span className="mt-1 text-xs text-gray-500">
-                                    PNG, JPEG or WebP, max 2MB
-                                  </span>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </motion.label>
-                        </StaggerField>
-
-                        <StaggerField index={1}>
-                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            Brand color
-                          </p>
-                          <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-6 md:grid-cols-3">
-                            {COLOR_PRESETS.map((c) => {
-                              const selected = brandPrimaryColor.toLowerCase() === c.toLowerCase()
-                              return (
-                                <motion.button
-                                  key={c}
-                                  type="button"
-                                  onClick={() => setBrandPrimaryColor(c)}
-                                  whileTap={{ scale: 1.2 }}
-                                  transition={springCheck}
-                                  className="relative flex h-9 w-9 items-center justify-center rounded-xl border-2 border-transparent shadow-sm"
-                                  style={{ backgroundColor: c }}
-                                  aria-label={`Color ${c}`}
-                                >
-                                  {selected && (
-                                    <motion.span
-                                      initial={{ scale: 0 }}
-                                      animate={{ scale: 1 }}
-                                      transition={springCheck}
-                                    >
-                                      <Check className="h-4 w-4 text-white drop-shadow" strokeWidth={3} />
-                                    </motion.span>
-                                  )}
-                                </motion.button>
-                              )
-                            })}
-                          </div>
-                          <label className="mb-1 block text-xs text-gray-500">Custom color</label>
-                          <input
-                            type="color"
-                            value={brandPrimaryColor}
-                            onChange={(e) => setBrandPrimaryColor(e.target.value)}
-                            className="h-10 w-full max-w-[120px] cursor-pointer rounded-lg border border-gray-200 bg-white"
-                          />
-
-                          <motion.div
-                            className="mt-4 overflow-hidden rounded-xl border border-gray-100 shadow-sm transition-colors duration-300"
-                            style={{ backgroundColor: brandPrimaryColor }}
-                          >
-                            <div className="px-4 py-3">
-                              <p className="text-sm font-bold text-white">Snagify</p>
-                            </div>
-                            <div className="bg-white px-4 py-3">
-                              <p className="text-xs text-gray-500">Your reports will look like this</p>
-                            </div>
-                          </motion.div>
-                        </StaggerField>
-                      </div>
-
-                      <motion.button
-                        type="button"
-                        onClick={() => setProSubStep(4)}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="mt-4 w-full rounded-2xl bg-[#9A88FD] py-4 text-base font-semibold text-white"
-                      >
-                        <span className="flex items-center justify-center gap-2">
-                          Next
-                          <ArrowRight size={18} />
-                        </span>
-                      </motion.button>
-                    </motion.div>
-                  )}
-
-                  {proSubStep === 4 && (
-                    <motion.div key="pro-sub-4" {...proSubPresence}>
-                      <button
-                        type="button"
-                        onClick={() => setProSubStep(3)}
-                        className="mb-4 text-sm font-semibold text-[#9A88FD] hover:underline"
-                      >
-                        ← Back
-                      </button>
-
-                      <h1
-                        className="mb-1 text-2xl font-extrabold text-[#1A1A2E]"
-                        style={{ fontFamily: 'var(--font-heading), Poppins, sans-serif' }}
-                      >
-                        Almost done! 🎉
-                      </h1>
-                      <p className="mb-6 text-sm text-gray-500">Last step, we promise.</p>
-
                       <form onSubmit={handleProFinalSubmit} className="space-y-4">
                         <AnimatePresence>
                           {error && (
@@ -1189,85 +1168,170 @@ export default function SignupPage() {
                           )}
                         </AnimatePresence>
 
-                        <StaggerField index={0}>
-                          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            RERA number{' '}
-                            <span className="font-normal normal-case text-gray-400">(optional)</span>
-                          </label>
-                          <ProInputShell
-                            showValid={!!reraNumber.trim()}
-                            errorMsg={null}
-                          >
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                          <StaggerField index={0}>
+                            <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Logo
+                            </label>
                             <input
-                              type="text"
-                              value={reraNumber}
-                              onChange={(e) => setReraNumber(e.target.value)}
-                              placeholder="RERA registration number"
-                              className={`${inputClass} border-gray-200 bg-gray-50 pr-10 focus:bg-white`}
-                            />
-                          </ProInputShell>
-                        </StaggerField>
-
-                        <StaggerField index={1}>
-                          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            Website <span className="font-normal normal-case text-gray-400">(optional)</span>
-                          </label>
-                          <ProInputShell
-                            showValid={!!proWebsite.trim() && !proFieldErrors.website}
-                            errorMsg={proFieldErrors.website}
-                          >
-                            <input
-                              type="url"
-                              value={proWebsite}
+                              ref={logoFileInputRef}
+                              type="file"
+                              accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                              className="hidden"
                               onChange={(e) => {
-                                setProWebsite(e.target.value)
-                                clearProError('website')
+                                const f = e.target.files?.[0] ?? null
+                                onLogoFileChosen(f)
                               }}
-                              placeholder="https://yourcompany.com"
+                            />
+                            <motion.div
+                              onHoverStart={() => setLogoHover(true)}
+                              onHoverEnd={() => setLogoHover(false)}
+                              animate={{ scale: logoHover ? 1.01 : 1 }}
+                              transition={springCheck}
                               className={cn(
-                                inputClass,
-                                'border-gray-200 bg-gray-50 pr-10 focus:bg-white',
-                                proFieldErrors.website && 'border-red-400 bg-red-50'
+                                'flex min-h-[180px] flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-gray-50 p-6 transition-colors',
+                                logoHover ? 'border-[#9A88FD]' : 'border-gray-200',
+                                !logoPreviewUrl && 'cursor-pointer'
                               )}
-                            />
-                          </ProInputShell>
-                        </StaggerField>
+                              onClick={() => {
+                                if (!logoPreviewUrl) logoFileInputRef.current?.click()
+                              }}
+                              role={!logoPreviewUrl ? 'button' : undefined}
+                              tabIndex={!logoPreviewUrl ? 0 : undefined}
+                              onKeyDown={(e) => {
+                                if (!logoPreviewUrl && (e.key === 'Enter' || e.key === ' ')) {
+                                  e.preventDefault()
+                                  logoFileInputRef.current?.click()
+                                }
+                              }}
+                            >
+                              <AnimatePresence mode="wait">
+                                {logoPreviewUrl ? (
+                                  <motion.div
+                                    key="prev"
+                                    initial={{ opacity: 0, scale: 0.92 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.92 }}
+                                    transition={springCheck}
+                                    className="flex flex-col items-center"
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={logoPreviewUrl}
+                                      alt="Logo preview"
+                                      className="h-28 w-28 rounded-full object-cover shadow-md ring-2 ring-white"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        logoFileInputRef.current?.click()
+                                      }}
+                                      className="mt-3 text-sm font-semibold text-[#9A88FD] hover:underline"
+                                    >
+                                      Change
+                                    </button>
+                                  </motion.div>
+                                ) : (
+                                  <motion.div
+                                    key="placeholder"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="flex flex-col items-center text-center"
+                                  >
+                                    <UploadCloud className="mb-2 h-10 w-10 text-gray-400" />
+                                    <span className="text-sm font-semibold text-[#1A1A2E]">
+                                      Upload your logo
+                                    </span>
+                                    <span className="mt-1 text-xs text-gray-500">
+                                      PNG, JPG or SVG · Max 5MB · Will be cropped to square
+                                    </span>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </motion.div>
+                            <AnimatePresence>
+                              {logoError && (
+                                <motion.p
+                                  initial={{ opacity: 0, y: -4 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -4 }}
+                                  className="mt-2 text-xs text-red-500"
+                                >
+                                  {logoError}
+                                </motion.p>
+                              )}
+                            </AnimatePresence>
+                          </StaggerField>
 
-                        <motion.div
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.15, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                          className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4 shadow-inner"
-                        >
-                          <p className="text-base font-bold text-[#1A1A2E]">{companyName.trim() || '—'}</p>
-                          <p className="mt-1 text-xs text-gray-500">
-                            {companyEmail.trim() || '—'} · {companyPhone.trim() || '—'}
-                          </p>
-                          <div className="mt-3 flex items-center gap-2">
-                            <span
-                              className="inline-block h-4 w-4 rounded-full border border-white shadow"
-                              style={{ backgroundColor: brandPrimaryColor }}
+                          <StaggerField index={1}>
+                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Brand color
+                            </p>
+                            <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-6 md:grid-cols-3">
+                              {COLOR_PRESETS.map((c) => {
+                                const selected = brandPrimaryColor.toLowerCase() === c.toLowerCase()
+                                return (
+                                  <motion.button
+                                    key={c}
+                                    type="button"
+                                    onClick={() => setBrandPrimaryColor(c)}
+                                    whileTap={{ scale: 1.2 }}
+                                    transition={springCheck}
+                                    className="relative flex h-9 w-9 items-center justify-center rounded-xl border-2 border-transparent shadow-sm"
+                                    style={{ backgroundColor: c }}
+                                    aria-label={`Color ${c}`}
+                                  >
+                                    {selected && (
+                                      <motion.span
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                        transition={springCheck}
+                                      >
+                                        <Check className="h-4 w-4 text-white drop-shadow" strokeWidth={3} />
+                                      </motion.span>
+                                    )}
+                                  </motion.button>
+                                )
+                              })}
+                            </div>
+                            <label className="mb-1 block text-xs text-gray-500">Custom color</label>
+                            <input
+                              type="color"
+                              value={brandPrimaryColor}
+                              onChange={(e) => setBrandPrimaryColor(e.target.value)}
+                              className="h-10 w-full max-w-[120px] cursor-pointer rounded-lg border border-gray-200 bg-white"
                             />
-                            <span className="text-sm text-gray-600">Brand color</span>
-                          </div>
-                          <p className="mt-3 text-sm font-medium text-green-600">
-                            Your profile is ready to go ✓
-                          </p>
-                        </motion.div>
+
+                            <motion.div
+                              className="mt-4 overflow-hidden rounded-xl border border-gray-100 shadow-sm transition-colors duration-300"
+                              style={{ backgroundColor: brandPrimaryColor }}
+                            >
+                              <div className="px-4 py-3">
+                                <p className="text-sm font-bold text-white">Snagify</p>
+                              </div>
+                              <div className="bg-white px-4 py-3">
+                                <p className="text-xs text-gray-500">Your reports will look like this</p>
+                              </div>
+                            </motion.div>
+                          </StaggerField>
+                        </div>
 
                         <motion.button
                           type="submit"
                           disabled={loading}
                           whileHover={{
                             scale: 1.02,
-                            boxShadow: `0 8px 30px ${hexToRgba(brandPrimaryColor, 0.45)}`,
+                            boxShadow: `0 8px 30px ${hexToRgba(brandPrimaryColor || '#9A88FD', 0.45)}`,
                           }}
                           whileTap={{ scale: 0.97 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                           onHoverStart={() => setCtaFinalHover(true)}
                           onHoverEnd={() => setCtaFinalHover(false)}
-                          style={{ backgroundColor: brandPrimaryColor }}
-                          className="relative mt-2 w-full overflow-hidden rounded-2xl py-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                          style={{
+                            backgroundColor: brandPrimaryColor?.trim() || '#9A88FD',
+                          }}
+                          className="relative mt-4 w-full overflow-hidden rounded-2xl py-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <motion.div
                             aria-hidden
@@ -1311,6 +1375,69 @@ export default function SignupPage() {
           </Link>
         </motion.div>
       </div>
+
+      <AnimatePresence>
+        {cropModalOpen && imageToCropSrc && (
+          <motion.div
+            key="crop-overlay"
+            className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 p-4 sm:items-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 40 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="max-h-[90vh] w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-3">
+                <span className="text-lg" aria-hidden>
+                  ✂️
+                </span>
+                <h2 className="text-lg font-bold text-[#1A1A2E]">Crop your logo</h2>
+              </div>
+              <div className="relative h-72 w-full bg-gray-900">
+                <Cropper
+                  image={imageToCropSrc}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={1}
+                  cropShape="round"
+                  showGrid={false}
+                  onCropChange={setCrop}
+                  onZoomChange={setZoom}
+                  onCropComplete={(_area, areaPixels) => {
+                    croppedAreaPixelsRef.current = areaPixels
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-4 py-4">
+                <button
+                  type="button"
+                  onClick={handleCropCancel}
+                  className="text-sm font-semibold text-gray-500 hover:text-gray-800"
+                >
+                  Cancel
+                </button>
+                <motion.button
+                  type="button"
+                  disabled={applyingCrop}
+                  onClick={() => void handleCropApply()}
+                  whileHover={{ scale: applyingCrop ? 1 : 1.02 }}
+                  whileTap={{ scale: applyingCrop ? 1 : 0.98 }}
+                  className="rounded-xl bg-[#9A88FD] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  {applyingCrop ? 'Applying…' : 'Apply crop ✓'}
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
