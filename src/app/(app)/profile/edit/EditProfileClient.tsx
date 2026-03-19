@@ -26,7 +26,8 @@ type ProfileRow = {
   signature_image_url: string | null;
   company_id: string | null;
   account_type?: "individual" | "pro" | null;
-  role?: ProfileRole | null;
+  /** owner | inspector (legacy DB may still have "agent", normalized in UI) */
+  role?: ProfileRole | string | null;
   company?: (Company & { plan?: string | null }) | (Company & { plan?: string | null })[] | null;
 };
 

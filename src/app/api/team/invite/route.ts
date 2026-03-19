@@ -12,6 +12,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 type ProfileWithCompany = {
   role: string | null;
+  account_type: string | null;
   company_id: string | null;
   full_name: string | null;
   company:
@@ -49,12 +50,17 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabaseAdmin
       .from("profiles")
-      .select("role, company_id, full_name, company:companies(name, logo_url, primary_color, max_users)")
+      .select(
+        "role, account_type, company_id, full_name, company:companies(name, logo_url, primary_color, max_users)"
+      )
       .eq("id", user.id)
       .single<ProfileWithCompany>();
 
-    if (profile?.role !== "owner") {
-      return NextResponse.json({ error: "Only owners can invite" }, { status: 403 });
+    if (profile?.role !== "owner" || profile?.account_type !== "pro") {
+      return NextResponse.json(
+        { error: "Only pro company owners can invite inspectors" },
+        { status: 403 }
+      );
     }
 
     const company = Array.isArray(profile.company) ? profile.company[0] : profile.company;

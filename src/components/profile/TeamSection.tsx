@@ -66,7 +66,7 @@ export function TeamSection({ company, currentUserId }: Props) {
     setInviting(true);
     setInviteError(null);
 
-    const res = await fetch("/api/team/invite", {
+    const res = await fetch("/api/invite", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: inviteEmail }),

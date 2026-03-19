@@ -21,6 +21,12 @@ function getErrorMessage(error: string): string {
   if (error.includes('Too many requests'))
     return 'Too many attempts. Please wait a few minutes.'
   if (error.includes('Network')) return 'Connection issue. Check your internet.'
+  if (
+    error.includes('COMPANY_EXISTS') ||
+    error.toLowerCase().includes('company already exists')
+  ) {
+    return 'This company already exists. Please contact your manager to be invited as an inspector.'
+  }
   return error
 }
 
@@ -45,6 +51,7 @@ function BuildingIcon({ className }: { className?: string }) {
 export default function SignupPage() {
   const [currentStep, setCurrentStep] = useState<Step>(1)
   const [fullName, setFullName] = useState('')
+  const [companyName, setCompanyName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -72,6 +79,7 @@ export default function SignupPage() {
 
   const canContinueStep1 =
     fullName.trim().length > 0 &&
+    companyName.trim().length > 0 &&
     emailValid &&
     passwordOk
 
@@ -93,6 +101,7 @@ export default function SignupPage() {
           email,
           password,
           fullName: fullName.trim(),
+          companyName: companyName.trim(),
           accountType: accountType ?? 'individual',
           agencyName: accountType === 'pro' ? agencyName.trim() : '',
           primaryColor: accountType === 'pro' ? primaryColor : '#9A88FD',
@@ -100,7 +109,21 @@ export default function SignupPage() {
       })
 
       const data = (await res.json()) as { error?: string }
-      if (!res.ok) throw new Error(data.error || 'Signup failed')
+      if (!res.ok) {
+        const msg = data.error || 'Signup failed'
+        if (
+          msg.includes('COMPANY_EXISTS') ||
+          msg.toLowerCase().includes('company already exists')
+        ) {
+          setError(
+            'This company already exists. Please contact your manager to be invited as an inspector.'
+          )
+        } else {
+          setError(getErrorMessage(msg))
+        }
+        setLoading(false)
+        return
+      }
 
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -238,6 +261,22 @@ export default function SignupPage() {
                       autoComplete="name"
                       placeholder="John Smith"
                       className={`${inputClass} border-gray-200 bg-gray-50 focus:border-[#9A88FD] focus:bg-white focus:ring-2 focus:ring-[#9A88FD]/10`}
+                    />
+                  </div>
+
+                  {/* Company name */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                      Company name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Company name"
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      required
+                      autoComplete="organization"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base bg-white focus:border-[#9A88FD] focus:ring-2 focus:ring-[#9A88FD]/10 outline-none transition-all duration-200"
                     />
                   </div>
 

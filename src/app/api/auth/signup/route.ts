@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { normalizeCompanyNameKey } from "@/lib/profileLabels";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
       accountType,
       agencyName,
       primaryColor,
+      companyName,
     } = body as {
       email?: string;
       password?: string;
@@ -23,11 +25,42 @@ export async function POST(req: NextRequest) {
       accountType?: string;
       agencyName?: string;
       primaryColor?: string;
+      companyName?: string;
     };
 
     if (!email || !password || !fullName || !accountType) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    const companyNameTrimmed = (companyName ?? "").trim();
+    if (!companyNameTrimmed) {
+      return NextResponse.json(
+        { error: "Company name is required" },
+        { status: 400 }
+      );
+    }
+
+    const resolvedCompanyName =
+      accountType === "pro"
+        ? (agencyName?.trim() || companyNameTrimmed)
+        : companyNameTrimmed;
+
+    const nameKey = normalizeCompanyNameKey(resolvedCompanyName);
+    const { data: existingCompanies } = await supabaseAdmin
+      .from("companies")
+      .select("id, name");
+    const duplicate = (existingCompanies ?? []).some(
+      (c) => normalizeCompanyNameKey(c.name ?? "") === nameKey && nameKey.length > 0
+    );
+    if (duplicate) {
+      return NextResponse.json(
+        {
+          error:
+            "COMPANY_EXISTS: This company already exists. Please contact your manager to be invited as an inspector.",
+        },
         { status: 400 }
       );
     }
@@ -42,8 +75,6 @@ export async function POST(req: NextRequest) {
     const userId = authData.user?.id;
     if (!userId) throw new Error("User creation failed");
 
-    const companyName =
-      accountType === "pro" ? (agencyName?.trim() || fullName) : fullName;
     // Pro: use chosen color. Individual: always Snagify purple default
     const companyColor =
       accountType === "pro" && primaryColor ? primaryColor : "#9A88FD";
@@ -51,7 +82,7 @@ export async function POST(req: NextRequest) {
     const { data: company, error: companyError } = await supabaseAdmin
       .from("companies")
       .insert({
-        name: companyName || null,
+        name: resolvedCompanyName || null,
         primary_color: companyColor,
         // Default logo = Snagify icon (overrideable later by pro users)
         logo_url: "https://app.snagify.net/icon-512x512.png",
