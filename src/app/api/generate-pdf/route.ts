@@ -12,6 +12,10 @@ import {
 } from "@/lib/generateCheckoutPDF";
 import { getBrandTokens } from "@/lib/pdf/brandTokens";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import {
+  compressCheckoutRoomPhotos,
+  compressSimpleRoomPhotos,
+} from "@/lib/compressImageForPdf";
 
 export const maxDuration = 60;
 
@@ -451,6 +455,12 @@ export async function buildPdfAndUpload(
       })),
     };
 
+    /** Smaller JPEG data URLs for PDF embedding only — document_hash uses original meta above */
+    const metaForPdf: InspectionMeta = {
+      ...meta,
+      rooms: await compressSimpleRoomPhotos(meta.rooms),
+    };
+
     const dataString = JSON.stringify({
       inspectionId,
       rooms: reportData.rooms,
@@ -470,35 +480,43 @@ export async function buildPdfAndUpload(
       const primaryColor = (agentData as { company_primary_color?: string } | null)?.company_primary_color ?? "#6366F1";
       const tokens = getBrandTokens(primaryColor);
       const sortedRooms = (row.rooms ?? []).sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-      const roomsWithDelta: CheckoutPDFProps["rooms"] = sortedRooms.map((room) => {
-        const photos = (room.photos ?? [])
-          .filter((p) => p.url && p.url.startsWith("https://"))
-          .map((p) => ({
-            id: p.id,
-            url: p.url!,
-            damage_tags: p.damage_tags,
-            ai_analysis: p.ai_analysis ?? undefined,
-            width: p.width ?? null,
-            height: p.height ?? null,
-            checkin_photo_id: p.checkin_photo_id ?? null,
-            is_additional: p.is_additional ?? false,
-            checkin_photo: p.checkin_photo_id ? (checkinPhotosById.get(p.checkin_photo_id) ?? null) : null,
-          }));
-        return {
-          id: room.id,
-          name: room.name ?? "Room",
-          order_index: room.order_index ?? 0,
-          condition: room.condition ?? undefined,
-          checkin_condition: checkinRoomConditionsByName.get(room.name ?? "") ?? undefined,
-          photos,
-        };
-      });
+      const checkinRoomsForPdfCompressed =
+        checkinRoomsForPdf && checkinRoomsForPdf.length > 0
+          ? await compressSimpleRoomPhotos(checkinRoomsForPdf)
+          : checkinRoomsForPdf;
+
+      const roomsWithDelta: CheckoutPDFProps["rooms"] = await Promise.all(
+        sortedRooms.map(async (room) => {
+          const photosRaw = (room.photos ?? [])
+            .filter((p) => p.url && p.url.startsWith("https://"))
+            .map((p) => ({
+              id: p.id,
+              url: p.url!,
+              damage_tags: p.damage_tags,
+              ai_analysis: p.ai_analysis ?? undefined,
+              width: p.width ?? null,
+              height: p.height ?? null,
+              checkin_photo_id: p.checkin_photo_id ?? null,
+              is_additional: p.is_additional ?? false,
+              checkin_photo: p.checkin_photo_id ? (checkinPhotosById.get(p.checkin_photo_id) ?? null) : null,
+            }));
+          const photos = await compressCheckoutRoomPhotos(photosRaw);
+          return {
+            id: room.id,
+            name: room.name ?? "Room",
+            order_index: room.order_index ?? 0,
+            condition: room.condition ?? undefined,
+            checkin_condition: checkinRoomConditionsByName.get(room.name ?? "") ?? undefined,
+            photos,
+          };
+        })
+      );
 
       const keyHandoverForPdf = keyHandoverSafe.map((k) => ({ label: k.item, quantity: k.qty }));
       const checkinKeyHandoverForPdf = checkinKeyHandoverSafe.map((k) => ({ label: k.item, quantity: k.qty }));
 
       const checkoutProps: CheckoutPDFProps = {
-        checkinRooms: checkinRoomsForPdf,
+        checkinRooms: checkinRoomsForPdfCompressed,
         inspection: {
           id: row.id,
           type: row.type ?? "check-out",
@@ -548,7 +566,7 @@ export async function buildPdfAndUpload(
 
       pdfBuffer = await renderCheckoutPDFToBuffer(checkoutProps);
     } else {
-      pdfBuffer = await generateInspectionPDFBuffer(reportData, meta, documentHash);
+      pdfBuffer = await generateInspectionPDFBuffer(reportData, metaForPdf, documentHash);
     }
 
     const fileName = `report_${inspectionId}.pdf`;
@@ -559,6 +577,11 @@ export async function buildPdfAndUpload(
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const storageClient =
       supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : supabase;
+
+    const { error: removeErr } = await storageClient.storage.from("reports").remove([fileName]);
+    if (removeErr) {
+      console.warn("[generate-pdf] remove old PDF (ok if missing):", removeErr.message);
+    }
 
     const { error: uploadError } = await storageClient.storage
       .from("reports")

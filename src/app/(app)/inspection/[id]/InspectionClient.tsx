@@ -11,10 +11,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GhostCamera from "@/components/GhostCamera";
-import {
-  assertValidDimensions,
-  getImageDimensions,
-} from "@/lib/getImageDimensions";
+import { assertValidDimensions } from "@/lib/getImageDimensions";
+import { compressPhoto, compressPhotoDataUrl } from "@/lib/compressPhoto";
 import { CheckoutCreditConfirmModal } from "@/components/inspection/CheckoutCreditConfirmModal";
 import { useCredits } from "@/hooks/useCredits";
 import { trackAction } from "@/lib/breadcrumb";
@@ -686,22 +684,27 @@ export function InspectionClient({
       let blob: Blob;
       let localBase64: string;
 
+      let dimensions: { width: number; height: number };
+
       if (typeof imageInput === "string") {
         if (!imageInput.startsWith("data:image")) {
           throw new Error("Invalid image data URL");
         }
-        const base64Clean = imageInput.replace(/^data:image\/\w+;base64,/, "");
-        const byteCharacters = atob(base64Clean);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        blob = new Blob([byteArray], { type: "image/jpeg" });
-        localBase64 = imageInput;
+        const compressed = await compressPhotoDataUrl(imageInput, {
+          maxDimension: 1920,
+          quality: 0.82,
+        });
+        blob = compressed.blob;
+        dimensions = { width: compressed.width, height: compressed.height };
+        localBase64 = compressed.dataUrl;
       } else {
-        blob = imageInput;
-        localBase64 = await new Promise((resolve, reject) => {
+        const compressed = await compressPhoto(imageInput, {
+          maxDimension: 1920,
+          quality: 0.82,
+        });
+        blob = compressed.blob;
+        dimensions = { width: compressed.width, height: compressed.height };
+        localBase64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
           reader.onerror = reject;
@@ -709,7 +712,6 @@ export function InspectionClient({
         });
       }
 
-      const dimensions = await getImageDimensions(blob);
       assertValidDimensions(dimensions, "inspection photo blob");
 
       const { error: storageError } = await supabase.storage
