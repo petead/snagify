@@ -655,7 +655,8 @@ export function InspectionClient({
     roomId: string,
     roomName: string,
     checkinPhotoId?: string | null,
-    isAdditional: boolean = false
+    isAdditional: boolean = false,
+    prefillDamageTags: string[] = []
   ) => {
     const localPreviewUrl =
       typeof imageInput === "string" ? imageInput : URL.createObjectURL(imageInput);
@@ -670,7 +671,7 @@ export function InspectionClient({
       url: localPreviewUrl,
       width: null,
       height: null,
-      damage_tags: [],
+      damage_tags: [...prefillDamageTags],
       notes: "Uploading...",
       isUploading: true,
       uploadFailed: false,
@@ -728,7 +729,7 @@ export function InspectionClient({
         url: publicUrl,
         width: dimensions?.width ?? null,
         height: dimensions?.height ?? null,
-        damage_tags: [],
+        damage_tags: [...prefillDamageTags],
         notes: "",
         taken_at: new Date().toISOString(),
         gps_lat: coords?.lat ?? null,
@@ -757,7 +758,7 @@ export function InspectionClient({
               url: publicUrl,
               width: dimensions?.width ?? null,
               height: dimensions?.height ?? null,
-              damage_tags: [],
+              damage_tags: [...prefillDamageTags],
               notes: "",
               taken_at: new Date().toISOString(),
               gps_lat: coords?.lat ?? null,
@@ -796,20 +797,21 @@ export function InspectionClient({
             roomName: localRoomName,
             checkinPhotoId: checkinPhotoId ?? null,
             isAdditional,
+            prefillDamageTags,
           }),
         });
 
         if (res.ok) {
           const data = await res.json();
-          // Update state with AI result
+          const aiTags = Array.isArray(data.damage_tags) ? data.damage_tags : [];
+          const mergedTags = aiTags.length > 0 ? aiTags : [...prefillDamageTags];
+          // Update state with AI result; keep pre-filled check-in tags if AI returns none
           setPhotos((prev) => prev.map((p) =>
             p.id === realPhotoId
               ? {
                   ...p,
                   notes: data.ai_analysis || "",
-                  damage_tags: Array.isArray(data.damage_tags) && data.damage_tags.length > 0
-                    ? data.damage_tags
-                    : [],
+                  damage_tags: mergedTags,
                 }
               : p
           ));
@@ -1433,14 +1435,15 @@ export function InspectionClient({
                   .map(p => p.checkin_photo_id as string)
               }
               onClose={() => setIsCameraOpen(false)}
-              onPhotoTaken={async (blob, linkedCheckinPhotoId, isAdditional) => {
+              onPhotoTaken={async (blob, linkedCheckinPhotoId, isAdditional, damageTags) => {
                 setIsCameraOpen(false);
                 await handlePhotoCapture(
                   blob,
                   currentRoom.id,
                   currentRoom.name,
                   linkedCheckinPhotoId,
-                  isAdditional
+                  isAdditional,
+                  damageTags
                 );
               }}
             />

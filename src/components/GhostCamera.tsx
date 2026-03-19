@@ -3,6 +3,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 
+/** Same list as InspectionClient PhotoCard */
+const DAMAGE_TAGS = [
+  "scratch", "stain", "crack", "damp", "missing", "broken", "hole", "leak",
+];
+
 export type GhostPhoto = {
   id: string;
   url: string;
@@ -13,7 +18,12 @@ export type GhostPhoto = {
 
 export interface GhostCameraProps {
   checkinPhotos: GhostPhoto[];
-  onPhotoTaken: (blob: Blob, linkedCheckinPhotoId: string | null, isAdditional: boolean) => void;
+  onPhotoTaken: (
+    blob: Blob,
+    linkedCheckinPhotoId: string | null,
+    isAdditional: boolean,
+    damageTags: string[]
+  ) => void;
   onClose: () => void;
   roomName: string;
   isCheckout: boolean;
@@ -40,6 +50,27 @@ export default function GhostCamera({
     () => new Set(initialCoveredIds)
   );
   const [isAdditionalMode, setIsAdditionalMode] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [prepopulatedHintVisible, setPrepopulatedHintVisible] = useState(false);
+
+  /** Sync tags from the active check-in ghost photo (entry photo strip / index). */
+  useEffect(() => {
+    if (!isCheckout) return;
+    if (isAdditionalMode) return;
+    if (checkinPhotos.length === 0) {
+      setSelectedTags([]);
+      setPrepopulatedHintVisible(false);
+      return;
+    }
+    const ph = checkinPhotos[activeGhostIndex];
+    if (ph?.damage_tags && ph.damage_tags.length > 0) {
+      setSelectedTags([...ph.damage_tags]);
+      setPrepopulatedHintVisible(true);
+    } else {
+      setSelectedTags([]);
+      setPrepopulatedHintVisible(false);
+    }
+  }, [isCheckout, isAdditionalMode, activeGhostIndex, checkinPhotos]);
 
   useEffect(() => {
     let mounted = true;
@@ -88,13 +119,15 @@ export default function GhostCamera({
     const ctx = canvas.getContext("2d");
     ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+    const tagsSnapshot = [...selectedTags];
+
     canvas.toBlob(
       (blob) => {
         if (blob) {
           const linkedId = isAdditionalMode
             ? null
             : (checkinPhotos[activeGhostIndex]?.id ?? null);
-          onPhotoTaken(blob, linkedId, isAdditionalMode);
+          onPhotoTaken(blob, linkedId, isAdditionalMode, tagsSnapshot);
           if (linkedId) {
             setCoveredCheckinIds((prev) => new Set(Array.from(prev).concat(linkedId)));
           }
@@ -102,6 +135,7 @@ export default function GhostCamera({
             setIsAdditionalMode(false);
             setGhostOpacity(0.35);
           }
+          // Keep selectedTags for next capture (same ghost); effect updates when index changes
         }
         setCapturing(false);
       },
@@ -118,6 +152,13 @@ export default function GhostCamera({
   };
 
   const activeGhost = checkinPhotos[activeGhostIndex] ?? null;
+
+  const toggleTag = (tag: string) => {
+    setPrepopulatedHintVisible(false);
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
 
   return (
     <div
@@ -355,7 +396,9 @@ export default function GhostCamera({
                   <button
                     key={photo.id}
                     type="button"
-                    onClick={() => setActiveGhostIndex(idx)}
+                    onClick={() => {
+                      setActiveGhostIndex(idx);
+                    }}
                     style={{
                       flexShrink: 0,
                       position: "relative",
@@ -401,6 +444,70 @@ export default function GhostCamera({
           </>
         )}
 
+        {isCheckout && (
+          <div style={{ marginBottom: 4 }}>
+            <p
+              style={{
+                color: "rgba(255,255,255,0.45)",
+                fontSize: 10,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: 0.6,
+                margin: "0 0 8px",
+              }}
+            >
+              Damage tags
+            </p>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 6,
+              }}
+            >
+              {DAMAGE_TAGS.map((tag) => {
+                const on = selectedTags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleTag(tag)}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: 20,
+                      border: on ? "1.5px solid #9A88FD" : "1.5px solid rgba(255,255,255,0.2)",
+                      background: on ? "rgba(154,136,253,0.25)" : "rgba(255,255,255,0.06)",
+                      color: on ? "#e9e4ff" : "rgba(255,255,255,0.65)",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      textTransform: "capitalize",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+            {prepopulatedHintVisible && selectedTags.length > 0 && !isAdditionalMode && (
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <circle cx="12" cy="12" r="10" stroke="#D97706" strokeWidth="1.8" />
+                  <path
+                    d="M12 8v4M12 16h.01"
+                    stroke="#D97706"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <span className="text-[10px] text-[#D97706] font-medium">
+                  Pre-filled from check-in · tap to remove if resolved
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
         <div
           style={{
             display: "flex",
@@ -444,6 +551,8 @@ export default function GhostCamera({
             onClick={() => {
               setGhostOpacity(0);
               setIsAdditionalMode(true);
+              setSelectedTags([]);
+              setPrepopulatedHintVisible(false);
             }}
             style={{
               marginTop: 8,

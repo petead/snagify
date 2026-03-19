@@ -77,6 +77,7 @@ export async function POST(request: Request) {
       isCheckout,
       checkinPhotoId,
       isAdditional,
+      prefillDamageTags,
     } = body as {
       image?: string;
       base64?: string;
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
       isCheckout?: boolean;
       checkinPhotoId?: string | null;
       isAdditional?: boolean;
+      prefillDamageTags?: string[] | null;
     };
     const base64Data = base64 ?? image;
 
@@ -264,10 +266,18 @@ Analyze the property condition visible in this photo only.`,
     }
 
     const suggestedTags = Array.isArray(parsed.suggested_tags)
-      ? parsed.suggested_tags.filter((t) =>
-          DAMAGE_TAGS_REF.includes(String(t).toLowerCase())
-        )
+      ? parsed.suggested_tags
+          .map((t) => String(t).toLowerCase())
+          .filter((t) => DAMAGE_TAGS_REF.includes(t))
       : [];
+    const validatedPrefill = Array.isArray(prefillDamageTags)
+      ? prefillDamageTags
+          .map((t) => String(t).toLowerCase())
+          .filter((t) => DAMAGE_TAGS_REF.includes(t))
+      : [];
+    /** If AI suggests tags, use them; otherwise keep user / check-in pre-filled tags. */
+    const finalDamageTags =
+      suggestedTags.length > 0 ? suggestedTags : validatedPrefill;
     const conditionSummary = parsed.condition_summary ?? "";
 
     if (photoId && typeof photoId === "string") {
@@ -280,7 +290,7 @@ Analyze the property condition visible in this photo only.`,
         .update({
           ai_analysis: conditionSummary,
           notes: conditionSummary,
-          damage_tags: suggestedTags,
+          damage_tags: finalDamageTags,
         })
         .eq("id", photoId);
       if (updateError) {
@@ -297,7 +307,7 @@ Analyze the property condition visible in this photo only.`,
     return NextResponse.json({
       success: true,
       ai_analysis: conditionSummary,
-      damage_tags: suggestedTags,
+      damage_tags: finalDamageTags,
     });
   } catch (err) {
     console.error("analyze-photo error:", err);
