@@ -22,3 +22,28 @@ export function formatPropertyAddress(property: {
 
   return '—'
 }
+
+/**
+ * Label for emails, PDF subjects, push: **building + unit first**, not the area/location field.
+ * Falls back to location/address only when building name is missing (legacy / incomplete data).
+ */
+export function formatPropertyBuildingUnit(property: {
+  location?: string | null
+  address?: string | null
+  building_name?: string | null
+  unit_number?: string | null
+} | null | undefined): string {
+  if (!property) return '—'
+
+  const b = property.building_name?.trim()
+  const u = property.unit_number?.trim()
+
+  if (b && u) return `${b}, Unit ${u}`
+  if (b) return b
+  if (u) return `Unit ${u}`
+
+  if (property.location?.trim()) return property.location.trim()
+  if (property.address?.trim()) return property.address.trim()
+
+  return '—'
+}

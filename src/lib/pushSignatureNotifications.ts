@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendPushNotification } from '@/lib/push';
+import { formatPropertyBuildingUnit } from '@/lib/formatPropertyAddress';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -62,14 +63,14 @@ export async function notifySignatureSigned(signatureId: string) {
     if (!inspection) return;
 
     const prop = (inspection as { properties?: { building_name?: string; unit_number?: string; location?: string } }).properties;
-    const propName = prop?.building_name || prop?.location || 'a property';
-    const unit = prop?.unit_number ? ` - Unit ${prop.unit_number}` : '';
+    const propLabel = formatPropertyBuildingUnit(prop ?? null);
+    const placeLabel = propLabel !== '—' ? propLabel : 'a property';
     const signerLabel = sig.signer_type === 'tenant' ? 'Tenant' :
                         sig.signer_type === 'landlord' ? 'Landlord' : 'A party';
 
     await sendToAgent(inspection.agent_id, {
       title: 'Signature Received',
-      body: `${signerLabel} ${sig.signer_name || ''} just signed the inspection report for ${propName}${unit}.`,
+      body: `${signerLabel} ${sig.signer_name || ''} just signed the inspection report for ${placeLabel}.`,
       url: `/inspection/${sig.inspection_id}/report`,
     });
   } catch (err) {
@@ -102,12 +103,12 @@ export async function notifyAllPartiesSigned(inspectionId: string) {
     if (!inspection) return;
 
     const prop = (inspection as { properties?: { building_name?: string; unit_number?: string; location?: string } }).properties;
-    const propName = prop?.building_name || prop?.location || 'a property';
-    const unit = prop?.unit_number ? ` - Unit ${prop.unit_number}` : '';
+    const propLabel = formatPropertyBuildingUnit(prop ?? null);
+    const placeLabel = propLabel !== '—' ? propLabel : 'a property';
 
     await sendToAgent(inspection.agent_id, {
       title: 'All Parties Signed',
-      body: `The inspection report for ${propName}${unit} is fully signed and complete.`,
+      body: `The inspection report for ${placeLabel} is fully signed and complete.`,
       url: `/inspection/${inspectionId}/report`,
     });
   } catch (err) {
@@ -134,14 +135,14 @@ export async function notifyOpenedNotSigned() {
       if (!inspection) continue;
 
       const prop = (inspection as { properties?: { building_name?: string; unit_number?: string; location?: string } }).properties;
-      const propName = prop?.building_name || prop?.location || 'a property';
-      const unit = prop?.unit_number ? ` - Unit ${prop.unit_number}` : '';
+      const propLabel = formatPropertyBuildingUnit(prop ?? null);
+      const placeLabel = propLabel !== '—' ? propLabel : 'a property';
       const signerLabel = sig.signer_type === 'tenant' ? 'Tenant' :
                           sig.signer_type === 'landlord' ? 'Landlord' : 'A party';
 
       await sendToAgent(inspection.agent_id, {
         title: 'Report Opened — Not Signed Yet',
-        body: `${signerLabel} ${sig.signer_name || ''} opened the report for ${propName}${unit} but hasn't signed yet.`,
+        body: `${signerLabel} ${sig.signer_name || ''} opened the report for ${placeLabel} but hasn't signed yet.`,
         url: `/inspection/${sig.inspection_id}/report`,
       });
 
@@ -176,14 +177,14 @@ export async function notifyExpiringSignatures() {
       if (!inspection) continue;
 
       const prop = (inspection as { properties?: { building_name?: string; unit_number?: string; location?: string } }).properties;
-      const propName = prop?.building_name || prop?.location || 'a property';
-      const unit = prop?.unit_number ? ` - Unit ${prop.unit_number}` : '';
+      const propLabel = formatPropertyBuildingUnit(prop ?? null);
+      const placeLabel = propLabel !== '—' ? propLabel : 'a property';
       const signerLabel = sig.signer_type === 'tenant' ? 'Tenant' :
                           sig.signer_type === 'landlord' ? 'Landlord' : 'A party';
 
       await sendToAgent(inspection.agent_id, {
         title: 'Signature Link Expiring Soon',
-        body: `${signerLabel} ${sig.signer_name || ''}'s signature link for ${propName}${unit} expires in less than 24 hours.`,
+        body: `${signerLabel} ${sig.signer_name || ''}'s signature link for ${placeLabel} expires in less than 24 hours.`,
         url: `/inspection/${sig.inspection_id}/report`,
       });
 

@@ -5,6 +5,7 @@ import {
   notifyOpenedNotSigned,
   notifyExpiringSignatures,
 } from '@/lib/pushSignatureNotifications';
+import { formatPropertyBuildingUnit } from '@/lib/formatPropertyAddress';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -73,8 +74,8 @@ async function notifyLeaseExpiry() {
 
   for (const tenancy of tenancies ?? []) {
     const prop = (tenancy as { properties?: { building_name?: string; unit_number?: string; location?: string } }).properties;
-    const propName = prop?.building_name || prop?.location || 'your property';
-    const unit = prop?.unit_number ? ` - Unit ${prop.unit_number}` : '';
+    const propLabel = formatPropertyBuildingUnit(prop ?? null);
+    const placeLabel = propLabel !== '—' ? propLabel : 'your property';
     const tenantName = (tenancy as { tenant_name?: string }).tenant_name || 'Your tenant';
     const agentId = (tenancy as { agent_id?: string }).agent_id;
     const contractTo = (tenancy as { contract_to?: string }).contract_to;
@@ -82,7 +83,7 @@ async function notifyLeaseExpiry() {
     if (agentId) {
       await sendToUser(agentId, {
         title: 'Lease Expiring in 30 Days',
-        body: `${tenantName}'s lease at ${propName}${unit} ends on ${contractTo}. Time to schedule a check-out inspection.`,
+        body: `${tenantName}'s lease at ${placeLabel} ends on ${contractTo}. Time to schedule a check-out inspection.`,
         url: '/properties',
       });
     }

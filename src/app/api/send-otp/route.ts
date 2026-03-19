@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 import { REMOTE_OTP_MS } from "@/lib/constants";
+import { formatPropertyBuildingUnit } from "@/lib/formatPropertyAddress";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const supabaseAdmin = createClient(
@@ -44,12 +45,21 @@ export async function POST(request: NextRequest) {
       .from("inspections")
       .select(`
         created_at,
+        property:properties(building_name, unit_number, location),
         agent:profiles(
           company:companies(name, logo_url, primary_color)
         )
       `)
       .eq("id", inspectionId)
       .single();
+
+    const propertyRow = inspection?.property as
+      | { building_name?: string | null; unit_number?: string | null; location?: string | null }
+      | null
+      | undefined;
+    const propertyFromDb = formatPropertyBuildingUnit(propertyRow ?? null);
+    const emailPropertyName =
+      propertyFromDb !== "—" ? propertyFromDb : propertyName || "Property";
 
     const company = (inspection?.agent as any)?.company;
     const primaryColor = company?.primary_color || "#9A88FD";
@@ -97,7 +107,7 @@ export async function POST(request: NextRequest) {
     const { error: emailError } = await resend.emails.send({
       from: `${agencyName} <noreply@snagify.net>`,
       to: email,
-      subject: `Sign your inspection report — ${propertyName}`,
+      subject: `Sign your inspection report — ${emailPropertyName}`,
       html: `
         <div style="font-family:-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
           
@@ -122,7 +132,7 @@ export async function POST(request: NextRequest) {
           </h2>
           <p style="font-size:14px;color:#6B7280;margin:0 0 24px;line-height:1.6;">
             Hi ${signerName || "there"}, you have been invited to sign the inspection report for
-            <strong style="color:#1A1A2E;">${propertyName}</strong>.
+            <strong style="color:#1A1A2E;">${emailPropertyName}</strong>.
           </p>
 
           <!-- Report details -->
@@ -130,7 +140,7 @@ export async function POST(request: NextRequest) {
             <table style="width:100%;font-size:13px;border-collapse:collapse;">
               <tr>
                 <td style="color:#9B9BA8;padding:4px 0;">Property</td>
-                <td style="color:#1A1A2E;font-weight:600;text-align:right;">${propertyName}</td>
+                <td style="color:#1A1A2E;font-weight:600;text-align:right;">${emailPropertyName}</td>
               </tr>
               <tr>
                 <td style="color:#9B9BA8;padding:4px 0;">Type</td>

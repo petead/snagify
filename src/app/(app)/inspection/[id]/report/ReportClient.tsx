@@ -14,6 +14,7 @@ import {
   type CheckinData,
 } from "./page";
 import { CheckoutReportView } from "@/components/inspection/CheckoutReportView";
+import { formatPropertyBuildingUnit } from "@/lib/formatPropertyAddress";
 
 interface ReportClientProps {
   inspection: InspectionWithRelations;
@@ -385,7 +386,11 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
           inspectionId: inspection.id,
           signerType,
           signerName: signerName || "there",
-          propertyName: buildingName + (unitNumber ? `, Unit ${unitNumber}` : ""),
+          propertyName:
+            (() => {
+              const label = formatPropertyBuildingUnit(prop);
+              return label !== "—" ? label : "Property";
+            })(),
           inspectionType: inspection.type ?? "check-in",
         }),
       });
@@ -406,12 +411,14 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
     const handleShare = async () => {
       const shareUrl = window.location.href;
       const p = normalizeOne(inspection.properties) as PropertyRelation | null;
-      const bName = p?.building_name ?? p?.location ?? "Property";
-      const uLabel = p?.unit_number ? `Unit ${p.unit_number}` : "";
+      const shareLabel = (() => {
+        const label = formatPropertyBuildingUnit(p);
+        return label !== "—" ? label : "Property";
+      })();
       if (navigator.share) {
         await navigator.share({
-          title: `Inspection Report — ${bName}`,
-          text: uLabel ? `Inspection report for ${uLabel}` : "Inspection report",
+          title: `Inspection Report — ${shareLabel}`,
+          text: `Inspection report for ${shareLabel}`,
           url: shareUrl,
         });
       } else {

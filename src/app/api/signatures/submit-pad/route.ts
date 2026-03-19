@@ -5,7 +5,7 @@ import {
   notifySignatureSigned,
   notifyAllPartiesSigned,
 } from '@/lib/pushSignatureNotifications'
-import { formatPropertyAddress } from '@/lib/formatPropertyAddress'
+import { formatPropertyBuildingUnit } from '@/lib/formatPropertyAddress'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -123,7 +123,8 @@ export async function POST(req: NextRequest) {
         const property = fullInspection.property as { location?: string; building_name?: string; unit_number?: string }
         const agent = fullInspection.agent as any
 
-        const propertyAddress = formatPropertyAddress(property) || 'the property'
+        const propertyLabel = formatPropertyBuildingUnit(property)
+        const propertyAddress = propertyLabel !== '—' ? propertyLabel : 'the property'
 
         const inspectionDate = new Date(fullInspection.created_at)
           .toLocaleDateString('en-AE', {

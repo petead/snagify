@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
-import { formatPropertyAddress } from '@/lib/formatPropertyAddress'
+import { formatPropertyBuildingUnit } from '@/lib/formatPropertyAddress'
 import { REMOTE_OTP_MS } from '@/lib/constants'
 
 const supabaseAdmin = createClient(
@@ -40,7 +40,8 @@ export async function POST(req: NextRequest) {
   const primaryColor = (insp?.agent as any)?.company?.primary_color || '#9A88FD'
   const agencyLogo = (insp?.agent as any)?.company?.logo_url
   const property = insp?.property as { location?: string; building_name?: string; unit_number?: string }
-  const propertyAddress = formatPropertyAddress(property)
+  const propertyLabel = formatPropertyBuildingUnit(property)
+  const propertyAddress = propertyLabel !== '—' ? propertyLabel : 'the property'
 
   // Reset opened_at so tracking is fresh
   await supabaseAdmin
