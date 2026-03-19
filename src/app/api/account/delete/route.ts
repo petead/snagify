@@ -8,58 +8,13 @@ const supabaseAdmin = createAdminClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-type FileObject = { name: string; metadata: Record<string, unknown> | null };
-
-function isStorageFile(item: FileObject): boolean {
-  const size = (item.metadata as { size?: number } | null)?.size;
-  return typeof size === "number";
-}
-
-/** Recursively remove all objects under a prefix (bug screenshots, nested folders). */
-async function removeStoragePrefix(bucket: string, prefix: string): Promise<void> {
-  const { data: items, error } = await supabaseAdmin.storage
-    .from(bucket)
-    .list(prefix, { limit: 1000 });
-
-  if (error || !items?.length) return;
-
-  const pathsToRemove: string[] = [];
-
-  for (const raw of items as FileObject[]) {
-    const path = prefix ? `${prefix}/${raw.name}` : raw.name;
-    if (isStorageFile(raw)) {
-      pathsToRemove.push(path);
-    } else {
-      await removeStoragePrefix(bucket, path);
-    }
-  }
-
-  if (pathsToRemove.length > 0) {
-    await supabaseAdmin.storage.from(bucket).remove(pathsToRemove);
-  }
-}
-
-function photoPathFromPublicUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  const fromPublic = url
-    .split("/storage/v1/object/public/inspection-photos/")[1]
-    ?.split("?")[0];
-  if (fromPublic) return decodeURIComponent(fromPublic);
-  const match = url.match(/inspection-photos\/(.+)/);
-  return match ? decodeURIComponent(match[1].split("?")[0]) : null;
-}
-
-function reportPathFromUrl(reportUrl: string | null | undefined, inspectionId: string): string[] {
-  const paths = new Set<string>();
-  paths.add(`report_${inspectionId}.pdf`);
-  if (reportUrl) {
-    const fromPublic = reportUrl
-      .split("/storage/v1/object/public/reports/")[1]
-      ?.split("?")[0];
-    if (fromPublic) paths.add(decodeURIComponent(fromPublic));
-  }
-  return Array.from(paths);
-}
+const STORAGE_BUCKETS = [
+  "inspection-photos",
+  "reports",
+  "avatars",
+  "logos",
+  "signatures",
+] as const;
 
 export async function DELETE() {
   try {
@@ -90,10 +45,8 @@ export async function DELETE() {
       .select(
         `
         id,
-        report_url,
         tenancy_id,
-        property_id,
-        rooms ( id, photos ( id, url ) )
+        rooms ( id )
       `
       )
       .eq("agent_id", userId);
@@ -104,62 +57,40 @@ export async function DELETE() {
 
     const rows = (inspections ?? []) as Array<{
       id: string;
-      report_url: string | null;
       tenancy_id: string | null;
-      property_id: string | null;
-      rooms: Array<{ id: string; photos: Array<{ id: string; url: string | null }> }> | null;
+      rooms: Array<{ id: string }> | null;
     }>;
 
-    const photoPaths: string[] = [];
-    const reportPaths: string[] = [];
+    // Nullify storage.objects owner — JS .schema('storage') is unreliable; use RPC instead.
+    const { error: rpcError } = await supabaseAdmin.rpc("delete_user_account", {
+      target_user_id: userId,
+    });
+    if (rpcError) {
+      console.error("RPC cleanup error:", rpcError);
+      // Log but don't block — attempt storage + auth delete anyway
+    }
 
-    for (const row of rows) {
-      const rooms = row.rooms ?? [];
-      for (const room of rooms) {
-        for (const p of room.photos ?? []) {
-          const path = photoPathFromPublicUrl(p.url);
-          if (path) photoPaths.push(path);
+    // Delete storage files per bucket using list + remove (non-blocking per bucket).
+    for (const bucket of STORAGE_BUCKETS) {
+      try {
+        const { data: files } = await supabaseAdmin.storage.from(bucket).list("", {
+          search: userId,
+        } as { limit?: number; offset?: number; search?: string; sortBy?: { column: string; order: string } });
+
+        if (files && files.length > 0) {
+          const paths = files.map((f) => f.name);
+          await supabaseAdmin.storage.from(bucket).remove(paths);
         }
-      }
-      reportPaths.push(...reportPathFromUrl(row.report_url, row.id));
-    }
 
-    try {
-      const chunk = 80;
-      for (let i = 0; i < photoPaths.length; i += chunk) {
-        await supabaseAdmin.storage
-          .from("inspection-photos")
-          .remove(photoPaths.slice(i, i + chunk));
-      }
-      const uniqueReports = Array.from(new Set(reportPaths));
-      for (let i = 0; i < uniqueReports.length; i += chunk) {
-        await supabaseAdmin.storage
-          .from("reports")
-          .remove(uniqueReports.slice(i, i + chunk));
-      }
-    } catch (e) {
-      console.error("account/delete storage (photos/reports) cleanup:", e);
-    }
+        const { data: folderFiles } = await supabaseAdmin.storage.from(bucket).list(userId);
 
-    try {
-      await supabaseAdmin.storage.from("avatars").remove([
-        `${userId}/avatar.jpg`,
-        `signatures/${userId}/inspector-signature.png`,
-      ]);
-      await removeStoragePrefix("avatars", `bug-reports/${userId}`);
-    } catch (e) {
-      console.error("account/delete avatars bucket cleanup:", e);
-    }
-
-    try {
-      await supabaseAdmin.storage.from("logos").remove([
-        `${userId}/logo.jpg`,
-        `${userId}/logo.svg`,
-        `${userId}/logo.png`,
-        `${userId}/logo.webp`,
-      ]);
-    } catch (e) {
-      console.error("account/delete logos bucket cleanup:", e);
+        if (folderFiles && folderFiles.length > 0) {
+          const folderPaths = folderFiles.map((f) => `${userId}/${f.name}`);
+          await supabaseAdmin.storage.from(bucket).remove(folderPaths);
+        }
+      } catch (e) {
+        console.error(`Storage cleanup failed for bucket ${bucket}:`, e);
+      }
     }
 
     const inspectionIds = rows.map((r) => r.id);
