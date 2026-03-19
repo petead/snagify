@@ -268,7 +268,7 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
               borderRadius: 14,
               border: "1.5px solid transparent",
               background: "#EEEDE9",
-              fontSize: 14,
+              fontSize: 16,
               color: "#1A1A1A",
               outline: "none",
               fontFamily: "'DM Sans', sans-serif",

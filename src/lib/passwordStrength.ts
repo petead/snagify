@@ -39,8 +39,8 @@ export function analyzePassword(password: string): PasswordAnalysis {
     0: { strength: 'weak',   label: 'Too short',  color: '#EF4444', bgColor: '#FEE2E2' },
     1: { strength: 'weak',   label: 'Weak',       color: '#EF4444', bgColor: '#FEE2E2' },
     2: { strength: 'fair',   label: 'Fair',       color: '#F59E0B', bgColor: '#FEF3C7' },
-    3: { strength: 'good',   label: 'Good',       color: '#3B82F6', bgColor: '#DBEAFE' },
-    4: { strength: 'good',   label: 'Good',       color: '#3B82F6', bgColor: '#DBEAFE' },
+    3: { strength: 'good',   label: 'Good',       color: '#9A88FD', bgColor: '#EDE9FF' },
+    4: { strength: 'good',   label: 'Good',       color: '#9A88FD', bgColor: '#EDE9FF' },
     5: { strength: 'strong', label: 'Strong 💪',  color: '#10B981', bgColor: '#D1FAE5' },
   }
 

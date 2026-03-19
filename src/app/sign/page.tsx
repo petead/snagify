@@ -8,6 +8,34 @@ export const dynamic = 'force-dynamic'
 
 type Step = 'loading' | 'overview' | 'otp' | 'pad' | 'done' | 'already_signed' | 'error'
 
+interface SignInspectionData {
+  type?: string
+  created_at?: string
+  report_url?: string
+  rooms?: unknown[]
+  agent?: {
+    company?: {
+      primary_color?: string
+      name?: string
+      logo_url?: string
+    }
+  }
+  property?: {
+    building_name?: string
+    unit_number?: string
+    address?: string
+    [key: string]: unknown
+  }
+  tenancy?: {
+    tenant_name?: string
+    landlord_name?: string
+    contract_from?: string
+    contract_to?: string
+    annual_rent?: string | number
+    [key: string]: unknown
+  }
+}
+
 function SignPageContent() {
   const params = useSearchParams()
   const inspectionId = params.get('inspectionId')
@@ -15,7 +43,7 @@ function SignPageContent() {
   const email = params.get('email')
 
   const [step, setStep] = useState<Step>('loading')
-  const [data, setData] = useState<any>(null)
+  const [data, setData] = useState<SignInspectionData | null>(null)
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [otpError, setOtpError] = useState<string | null>(null)
   const [otpLoading, setOtpLoading] = useState(false)
@@ -71,17 +99,22 @@ function SignPageContent() {
 
   async function handleRequestOtp() {
     setOtpLoading(true)
-    await fetch('/api/signatures/send-inperson-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        inspectionId, signerType,
-        email, name: signerName,
-      }),
-    })
-    setOtpLoading(false)
-    setStep('otp')
-    setTimeout(() => inputRefs.current[0]?.focus(), 100)
+    try {
+      await fetch('/api/signatures/send-inperson-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inspectionId, signerType,
+          email, name: signerName,
+        }),
+      })
+      setStep('otp')
+      setTimeout(() => inputRefs.current[0]?.focus(), 100)
+    } catch {
+      setOtpError('Network error — please try again.')
+    } finally {
+      setOtpLoading(false)
+    }
   }
 
   function handleOtpChange(i: number, val: string) {
@@ -182,26 +215,31 @@ function SignPageContent() {
     const c = canvasRef.current
     if (!c || !hasDrawn) return
     setSubmitLoading(true)
-    const signatureData = c.toDataURL('image/png', 0.8)
-    const res = await fetch('/api/signatures/submit-pad', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inspectionId, signerType, signatureData }),
-    })
-    setSubmitLoading(false)
-    if (res.ok) setStep('done')
+    try {
+      const signatureData = c.toDataURL('image/png', 0.8)
+      const res = await fetch('/api/signatures/submit-pad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inspectionId, signerType, signatureData }),
+      })
+      if (res.ok) setStep('done')
+    } catch {
+      setOtpError('Network error — please try again.')
+    } finally {
+      setSubmitLoading(false)
+    }
   }
 
   const propAddress = formatPropertyAddress(property)
 
   if (step === 'loading') return (
-    <div className="min-h-screen bg-[#F3F2EF] flex items-center justify-center">
+    <div className="min-h-screen bg-[#F8F7F4] flex items-center justify-center">
       <Loader2 size={32} className="animate-spin text-[#9A88FD]" />
     </div>
   )
 
   if (step === 'error') return (
-    <div className="min-h-screen bg-[#F3F2EF] flex flex-col items-center
+    <div className="min-h-screen bg-[#F8F7F4] flex flex-col items-center
       justify-center px-8 text-center gap-4">
       <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center
         justify-center">
@@ -215,7 +253,7 @@ function SignPageContent() {
   )
 
   if (step === 'already_signed') return (
-    <div className="min-h-screen bg-[#F3F2EF] flex flex-col items-center
+    <div className="min-h-screen bg-[#F8F7F4] flex flex-col items-center
       justify-center px-8 text-center gap-4">
       <div className="w-14 h-14 bg-green-50 rounded-2xl flex items-center
         justify-center">
@@ -229,7 +267,7 @@ function SignPageContent() {
   )
 
   if (step === 'done') return (
-    <div className="min-h-screen bg-[#F3F2EF] flex flex-col items-center
+    <div className="min-h-screen bg-[#F8F7F4] flex flex-col items-center
       justify-center px-8 text-center gap-4">
       <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
         style={{ background: primaryColor + '20' }}>
@@ -250,7 +288,7 @@ function SignPageContent() {
   )
 
   return (
-    <div className="min-h-screen bg-[#F3F2EF]">
+    <div className="min-h-screen bg-[#F8F7F4]">
 
       {/* Agency header */}
       <div className="px-5 pt-5 pb-6" style={{ background: primaryColor }}>
@@ -475,7 +513,8 @@ function SignPageContent() {
               }
             </button>
             <button onClick={handleRequestOtp}
-              className="w-full mt-2 py-2 text-sm text-gray-400 font-medium">
+              disabled={otpLoading}
+              className="w-full mt-2 py-2 text-sm text-gray-400 font-medium disabled:opacity-40">
               Resend code
             </button>
           </div>
@@ -535,7 +574,7 @@ function SignPageContent() {
       {/* Sticky CTA button (overview step only) */}
       {step === 'overview' && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t
-          from-[#F3F2EF] to-transparent">
+          from-[#F8F7F4] to-transparent">
           <button
             onClick={handleRequestOtp}
             disabled={otpLoading}
@@ -571,7 +610,7 @@ function SignPageContent() {
 export default function SignPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#F3F2EF] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F8F7F4] flex items-center justify-center">
         <Loader2 size={32} className="animate-spin text-[#9A88FD]" />
       </div>
     }>

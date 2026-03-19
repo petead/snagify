@@ -106,7 +106,11 @@ export function ProfileClient({
 
   const handleSignOut = async () => {
     const supabase = createClient();
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      /* sign-out best-effort */
+    }
     router.push("/login");
   };
 

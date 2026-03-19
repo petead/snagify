@@ -18,7 +18,7 @@ export default async function ReportsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fcfcfc]">
+    <div className="min-h-screen bg-[#F8F7F4]">
       <DashboardHeader fullName={fullName} userEmail={user?.email ?? null} />
       <main className="max-w-[480px] mx-auto px-4 pb-24 pt-6">
         <h1 className="font-heading font-bold text-lg text-brand-dark">

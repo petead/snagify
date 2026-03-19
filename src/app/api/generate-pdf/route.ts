@@ -218,7 +218,6 @@ export async function buildPdfAndUpload(
   inspectionId: string
 ): Promise<{ report_url: string | null; buffer: Uint8Array }> {
   try {
-    console.log("[generate-pdf] START inspectionId:", inspectionId);
     const supabase = await createServerClient();
 
     const { data: inspection, error: inspErr } = await supabase
@@ -570,8 +569,6 @@ export async function buildPdfAndUpload(
     }
 
     const fileName = `report_${inspectionId}.pdf`;
-    console.log("[generate-pdf] PDF buffer size:", pdfBuffer.length);
-    console.log("[generate-pdf] Upload path:", fileName);
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -596,7 +593,6 @@ export async function buildPdfAndUpload(
     } else {
       const { data: urlData } = storageClient.storage.from("reports").getPublicUrl(fileName);
       const bustUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-      console.log("[generate-pdf] Public URL (with cache-bust):", bustUrl);
       const { error: updateErr } = await storageClient
         .from("inspections")
         .update({ report_url: bustUrl })
@@ -608,7 +604,6 @@ export async function buildPdfAndUpload(
       }
     }
 
-    console.log("[generate-pdf] Done OK");
     return { report_url: reportUrl, buffer: new Uint8Array(pdfBuffer) };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -625,11 +620,8 @@ export async function POST(request: NextRequest) {
     if (!inspectionId) {
       return NextResponse.json({ error: "Missing inspectionId" }, { status: 400 });
     }
-    console.log("[generate-pdf] START — inspectionId:", inspectionId);
-
     step = "buildPdfAndUpload";
     const { report_url: _reportUrl, buffer } = await buildPdfAndUpload(inspectionId);
-    console.log("[generate-pdf] PDF rendered — size:", buffer.length);
 
     step = "return pdf response";
     return new NextResponse(Buffer.from(buffer), {

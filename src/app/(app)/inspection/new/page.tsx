@@ -206,7 +206,7 @@ const ALL_ROOMS = [
 ];
 
 const inputCls =
-  "w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:border-[#9A88FD] focus:outline-none transition-colors bg-white";
+  "w-full h-11 px-4 rounded-xl border border-gray-200 text-base focus:border-[#9A88FD] focus:outline-none transition-colors bg-white";
 
 // ─────────────────────────────────────────
 // Sub-components
@@ -300,7 +300,7 @@ function NewInspectionContent() {
       const client = createClient();
       const { data } = await client
         .from("properties")
-        .select("*")
+        .select("id, building_name, unit_number, property_type, address")
         .eq("id", existingPropertyId)
         .single();
       if (data) {
@@ -606,7 +606,7 @@ function NewInspectionContent() {
   // Render
   // ─────────────────────────────────────
   return (
-    <div className="min-h-screen bg-white max-w-lg mx-auto pb-48">
+    <div className="min-h-screen bg-[#F8F7F4] max-w-lg mx-auto pb-48">
       {/* HEADER */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
         <div className="flex items-center gap-3 px-4 py-3">
@@ -1481,7 +1481,7 @@ function NewInspectionContent() {
 // ─────────────────────────────────────────
 function NewInspectionLoading() {
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
+    <div className="min-h-screen bg-[#F8F7F4] flex items-center justify-center">
       <div className="text-center">
         <div className="w-8 h-8 border-2 border-[#9A88FD] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
         <p className="text-sm text-gray-400">Loading...</p>

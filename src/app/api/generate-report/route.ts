@@ -45,8 +45,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing inspectionId" }, { status: 400 });
     }
 
-    console.log("[generate-report] Starting for inspection:", inspectionId);
-
     step = "fetch inspection";
     const supabase = await createClient();
 
@@ -59,7 +57,6 @@ export async function POST(request: Request) {
     if (inspErr || !inspection) {
       return NextResponse.json({ error: "Inspection not found" }, { status: 404 });
     }
-    console.log("[generate-report] inspection fetched");
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
@@ -87,14 +84,12 @@ export async function POST(request: Request) {
         .select("id, name, order_index")
         .eq("inspection_id", inspectionId)
         .order("order_index", { ascending: true });
-      console.log("[generate-report] inspection fetched — rooms:", rooms?.length ?? 0);
 
       step = "fetch signatures";
       const { data: signatures } = await supabase
         .from("signatures")
         .select("id")
         .eq("inspection_id", inspectionId);
-      console.log("[generate-report] signatures:", signatures?.length ?? 0);
 
       step = "fetch room photos";
       const roomIds = (rooms ?? []).map((r) => r.id);
@@ -197,15 +192,9 @@ export async function POST(request: Request) {
     let pdfBuffer: Uint8Array | null = null;
     try {
       step = "buildPdfAndUpload";
-      const fileName = `report_${inspectionId}.pdf`;
-      console.log("[generate-report] Upload path:", fileName);
       const pdfResult = await buildPdfAndUpload(inspectionId);
       report_url = pdfResult.report_url;
       pdfBuffer = pdfResult.buffer;
-      console.log("[generate-report] PDF buffer size:", pdfBuffer?.length ?? 0);
-      console.log("[generate-report] Public URL:", report_url ?? "null");
-      console.log("[generate-report] uploaded to storage OK");
-      console.log("[generate-report] report_url saved OK");
     } catch (pdfErr) {
       console.error("[generate-report] PDF build/upload failed:", pdfErr);
       throw pdfErr;

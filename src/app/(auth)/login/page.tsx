@@ -122,7 +122,7 @@ export default function LoginPage() {
                   onBlur={() => setEmailTouched(true)}
                   placeholder="you@example.com"
                   autoComplete="email"
-                  className={`w-full px-4 py-3 rounded-xl border text-sm transition-all duration-200 outline-none
+                  className={`w-full px-4 py-3 rounded-xl border text-base transition-all duration-200 outline-none
                     ${emailError
                       ? 'border-red-300 bg-red-50 focus:border-red-400'
                       : emailTouched && emailValid
@@ -179,7 +179,7 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   autoComplete="current-password"
                   className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 bg-gray-50
-                    text-sm transition-all duration-200 outline-none
+                    text-base transition-all duration-200 outline-none
                     focus:border-[#9A88FD] focus:bg-white focus:ring-2 focus:ring-[#9A88FD]/10"
                 />
                 <button

@@ -296,12 +296,6 @@ Analyze the property condition visible in this photo only.`,
       if (updateError) {
         console.error("Failed to update photo:", updateError);
       }
-      console.log(
-        "AI update result for photoId:",
-        photoId,
-        "notes:",
-        conditionSummary?.substring(0, 50)
-      );
     }
 
     return NextResponse.json({

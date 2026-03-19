@@ -15,7 +15,7 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-[#fcfcfc] flex flex-col items-center justify-center px-6">
+    <div className="min-h-screen bg-[#F8F7F4] flex flex-col items-center justify-center px-6">
       <div className="text-center max-w-sm">
         <p className="font-heading font-bold text-lg text-[#1A1A1A] mb-2">
           Something went wrong
@@ -27,7 +27,7 @@ export default function Error({
           <button
             type="button"
             onClick={reset}
-            className="w-full rounded-xl px-4 py-3 font-heading font-bold text-white"
+            className="w-full rounded-2xl px-4 py-3 font-heading font-bold text-white active:scale-95 transition-transform"
             style={{ backgroundColor: "#9A88FD" }}
           >
             Try again

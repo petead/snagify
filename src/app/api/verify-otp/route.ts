@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   // Find signature record
   const { data: signature, error } = await supabase
     .from("signatures")
-    .select("*")
+    .select("id, otp_code, expires_at, signature_data, signed_at")
     .eq("inspection_id", inspectionId)
     .eq("signer_type", signerType)
     .single();

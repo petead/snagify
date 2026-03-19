@@ -266,7 +266,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F3F2EF] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F8F7F4] flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-[#9A88FD]" />
       </div>
     );
@@ -291,7 +291,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
     : userEmail?.split("@")[0].slice(0, 2).toUpperCase() || "PA";
 
   return (
-    <div className="min-h-screen bg-[#F3F2EF]" style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom) + 80px)" }}>
+    <div className="min-h-screen bg-[#F8F7F4]" style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom) + 80px)" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&display=swap');`}</style>
 
       {/* Hidden file inputs */}

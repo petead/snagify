@@ -24,20 +24,10 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 async function getOrRegisterSW(): Promise<ServiceWorkerRegistration> {
   const allRegs = await navigator.serviceWorker.getRegistrations();
-  console.log('[Push] Existing SW registrations:', allRegs.map(r => ({
-    scope: r.scope,
-    scriptURL: r.active?.scriptURL,
-    state: r.active?.state,
-    hasPushManager: !!r.pushManager,
-  })));
 
   const pushReg = allRegs.find(r => !!r.pushManager);
-  if (pushReg) {
-    console.log('[Push] Using existing SW with pushManager:', pushReg.active?.scriptURL);
-    return pushReg;
-  }
+  if (pushReg) return pushReg;
 
-  console.log('[Push] No push-capable SW found, registering /sw-push.js...');
   try {
     const newReg = await navigator.serviceWorker.register('/sw-push.js', {
       scope: '/',
@@ -52,7 +42,6 @@ async function getOrRegisterSW(): Promise<ServiceWorkerRegistration> {
       });
       setTimeout(resolve, 5000);
     });
-    console.log('[Push] sw-push.js registered and active');
     return newReg;
   } catch (err) {
     console.error('[Push] Failed to register sw-push.js:', err);
@@ -114,7 +103,6 @@ export default function PushNotificationToggle() {
 
       const perm = await Notification.requestPermission();
       setPermission(perm);
-      console.log('[Push] Permission result:', perm);
       if (perm !== 'granted') {
         setError('Permission denied. Enable notifications in iOS Settings → Safari → Notifications.');
         return;
@@ -134,7 +122,6 @@ export default function PushNotificationToggle() {
       }
 
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      console.log('[Push] VAPID key (first 20 chars):', vapidKey?.substring(0, 20));
       if (!vapidKey) {
         setError('VAPID key missing. Check NEXT_PUBLIC_VAPID_PUBLIC_KEY env var.');
         return;
@@ -143,7 +130,6 @@ export default function PushNotificationToggle() {
       let applicationServerKey: Uint8Array;
       try {
         applicationServerKey = urlBase64ToUint8Array(vapidKey);
-        console.log('[Push] VAPID key decoded, length:', applicationServerKey.length);
       } catch (err: unknown) {
         setError(`VAPID key error: ${err instanceof Error ? err.message : String(err)}`);
         return;
@@ -155,7 +141,6 @@ export default function PushNotificationToggle() {
           userVisibleOnly: true,
           applicationServerKey: applicationServerKey as BufferSource,
         });
-        console.log('[Push] Subscribed successfully:', sub.endpoint.substring(0, 40) + '...');
       } catch (err: unknown) {
         console.error('[Push] pushManager.subscribe failed:', err);
         const msg = err instanceof Error ? err.message : String(err);
@@ -177,7 +162,6 @@ export default function PushNotificationToggle() {
         return;
       }
 
-      console.log('[Push] ✅ Fully subscribed and saved to server');
       setIsSubscribed(true);
 
     } catch (err: unknown) {

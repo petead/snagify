@@ -292,7 +292,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
               borderRadius: 14,
               border: "1.5px solid transparent",
               background: "#EEEDE9",
-              fontSize: 14,
+              fontSize: 16,
               color: "#1A1A1A",
               fontFamily: "'DM Sans', sans-serif",
               boxSizing: "border-box",

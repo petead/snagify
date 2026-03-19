@@ -96,7 +96,7 @@ export function CheckoutReportView({
 
   return (
     <div
-      className="min-h-screen bg-[#F3F2EF]"
+      className="min-h-screen bg-[#F8F7F4]"
       style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom) + 150px)' }}
     >
       {/* ── HERO — identical structure to check-in ── */}

@@ -138,7 +138,7 @@ export default function SignupPage() {
   }
 
   const inputClass =
-    'w-full px-4 py-3 rounded-xl border text-sm transition-all duration-200 outline-none'
+    'w-full px-4 py-3 rounded-xl border text-base transition-all duration-200 outline-none'
 
   return (
     <div className="min-h-screen bg-[#F8F7F4] flex items-center justify-center p-4">

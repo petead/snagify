@@ -43,7 +43,11 @@ export function DashboardHeader({ fullName, userEmail }: DashboardHeaderProps) {
 
   const handleLogout = async () => {
     setShowMenu(false);
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      /* sign-out best-effort */
+    }
     router.push("/login");
   };
 

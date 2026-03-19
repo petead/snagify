@@ -1,6 +1,6 @@
 export default function DashboardLoading() {
   return (
-    <div className="min-h-screen bg-[#fcfcfc]">
+    <div className="min-h-screen bg-[#F8F7F4]">
       {/* Header skeleton */}
       <div className="sticky top-0 z-50 h-16 bg-white border-b border-[#E5E7EB]">
         <div className="h-full max-w-[480px] mx-auto px-4 flex items-center justify-between">

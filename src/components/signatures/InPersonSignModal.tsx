@@ -35,18 +35,23 @@ export function InPersonSignModal({
   async function sendOtp() {
     setStep('sending')
     setLoading(true)
-    const res = await fetch('/api/signatures/send-inperson-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        inspectionId, signerType,
-        email: signerEmail, name: signerName,
-      }),
-    })
-    setLoading(false)
-    if (res.ok) {
-      setStep('otp')
-      setTimeout(() => inputRefs.current[0]?.focus(), 100)
+    try {
+      const res = await fetch('/api/signatures/send-inperson-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inspectionId, signerType,
+          email: signerEmail, name: signerName,
+        }),
+      })
+      if (res.ok) {
+        setStep('otp')
+        setTimeout(() => inputRefs.current[0]?.focus(), 100)
+      }
+    } catch {
+      setOtpError('Network error — please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -160,15 +165,20 @@ export function InPersonSignModal({
     if (!canvas || !hasDrawn) return
     const signatureData = canvas.toDataURL('image/png', 0.8)
     setLoading(true)
-    const res = await fetch('/api/signatures/submit-pad', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inspectionId, signerType, signatureData }),
-    })
-    setLoading(false)
-    if (res.ok) {
-      setStep('done')
-      setTimeout(() => onSuccess(), 1500)
+    try {
+      const res = await fetch('/api/signatures/submit-pad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inspectionId, signerType, signatureData }),
+      })
+      if (res.ok) {
+        setStep('done')
+        setTimeout(() => onSuccess(), 1500)
+      }
+    } catch {
+      setOtpError('Network error — please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -287,8 +297,9 @@ export function InPersonSignModal({
               </button>
               <button
                 onClick={sendOtp}
+                disabled={loading}
                 className="w-full mt-2 py-2 text-sm text-gray-400
-                  font-medium text-center"
+                  font-medium text-center disabled:opacity-40"
               >
                 Resend code
               </button>

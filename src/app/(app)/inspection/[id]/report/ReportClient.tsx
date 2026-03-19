@@ -58,9 +58,9 @@ function getRemoteStatus(sig?: SignatureStatus | null) {
   if (sig.opened_at) return {
     label: 'Link opened',
     sub: `Opened ${formatRelative(sig.opened_at)}`,
-    color: 'text-blue-600',
-    bg: 'bg-blue-50',
-    dot: 'bg-blue-400',
+    color: 'text-[#9A88FD]',
+    bg: 'bg-[#EDE9FF]',
+    dot: 'bg-[#9A88FD]',
   }
   return {
     label: 'Link sent',
@@ -502,7 +502,7 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
           <button
             onClick={handleDownloadPDF}
             disabled={downloadLoading}
-            className="cta-btn w-full py-4 rounded-2xl bg-[#9A88FD] text-white font-extrabold text-[15px] flex items-center justify-center gap-2 mb-2"
+            className="cta-btn w-full py-4 rounded-2xl bg-[#9A88FD] text-white font-extrabold text-[15px] flex items-center justify-center gap-2 mb-2 disabled:opacity-50"
             style={{ fontFamily: 'Poppins, sans-serif' }}
           >
             {downloadLoading ? (

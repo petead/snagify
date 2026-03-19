@@ -723,7 +723,7 @@ export function InspectionClient({
       const { data: { publicUrl } } = supabase.storage
         .from("inspection-photos")
         .getPublicUrl(fileName);
-      console.log("Storage publicUrl:", publicUrl);
+      
       if (!publicUrl || !publicUrl.includes("/storage/v1/object/public/inspection-photos/")) {
         throw new Error("Storage: invalid public URL");
       }
@@ -929,8 +929,6 @@ export function InspectionClient({
       if (error) {
         console.error("PHOTO DELETE FAILED:", error.message, "photoId:", photoId);
         return;
-      } else {
-        console.log("Photo deleted from DB:", photoId);
       }
 
       const urlParts = photoUrl.split("/inspection-photos/");
@@ -999,8 +997,6 @@ export function InspectionClient({
           .then((data) => {
             if (data.error) {
               console.error("TAG SAVE FAILED:", data.error);
-            } else {
-              console.log("Tags saved OK:", photoId, finalTags);
             }
           })
           .catch((err) => console.error("TAG SAVE ERROR:", err));
@@ -1230,7 +1226,7 @@ export function InspectionClient({
                 placeholder="+ Add a custom room..."
                 style={{
                   flex: 1, height: 44, padding: "0 16px",
-                  borderRadius: 10, fontSize: 13, color: "#374151",
+                  borderRadius: 10, fontSize: 16, color: "#374151",
                   border: "1.5px dashed #d1d5db",
                   outline: "none", background: "white",
                   fontFamily: "DM Sans, sans-serif",
@@ -2036,7 +2032,7 @@ export function InspectionClient({
                             padding: "10px 12px",
                             borderRadius: 10,
                             border: "1.5px solid #e5e7eb",
-                            fontSize: 13,
+                            fontSize: 16,
                             color: "#374151",
                             fontFamily: "DM Sans, sans-serif",
                             lineHeight: 1.5,

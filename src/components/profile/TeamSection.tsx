@@ -87,13 +87,21 @@ export function TeamSection({ company, currentUserId }: Props) {
 
   async function handleRemove(userId: string) {
     if (!window.confirm("Remove this inspector from your team?")) return;
-    await fetch(`/api/team/${userId}`, { method: "DELETE" });
-    await loadTeam();
+    try {
+      await fetch(`/api/team/${userId}`, { method: "DELETE" });
+      await loadTeam();
+    } catch (err) {
+      console.error("Failed to remove team member:", err);
+    }
   }
 
   async function handleCancelInvite(inviteId: string) {
-    await fetch(`/api/team/invite/${inviteId}`, { method: "DELETE" });
-    await loadTeam();
+    try {
+      await fetch(`/api/team/invite/${inviteId}`, { method: "DELETE" });
+      await loadTeam();
+    } catch (err) {
+      console.error("Failed to cancel invite:", err);
+    }
   }
 
   const maxUsers = company.max_users || 1;
