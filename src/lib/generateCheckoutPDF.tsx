@@ -1826,7 +1826,7 @@ export function CheckoutPDFDocument({
                                 marginBottom: 2,
                               }}
                             >
-                              AI Analysis
+                              Comparison Note
                             </Text>
                             <Text style={{ fontSize: 7, color: "#4B4B4B", lineHeight: 1.4 }}>
                               {pair.coPhoto.ai_analysis}
@@ -2084,7 +2084,7 @@ export function CheckoutPDFDocument({
                                       marginBottom: 2,
                                     }}
                                   >
-                                    AI Analysis
+                                    Comparison Note
                                   </Text>
                                   <Text style={{ fontSize: 7, color: "#4B4B4B", lineHeight: 1.4 }}>
                                     {pair.coPhoto.ai_analysis}

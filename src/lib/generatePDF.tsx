@@ -1767,7 +1767,7 @@ function InspectionReport({
                               <View style={s.photoAiDivider} />
                               <View style={s.photoAiWrap}>
                                 <Text style={[s.photoAiLabel, { color: tokens.primary }]}>
-                                  AI Analysis
+                                  Check-in Note
                                 </Text>
                                 <Text style={s.photoAiText}>{photo.ai_analysis}</Text>
                               </View>
