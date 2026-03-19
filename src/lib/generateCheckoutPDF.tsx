@@ -614,11 +614,11 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
 
-  /* Room hero (pages 3–N) */
+  /* Room hero (pages 3–N) — compact header (~1.5x shorter vertically) */
   roomHero: {
     paddingHorizontal: 28,
-    paddingTop: 20,
-    paddingBottom: 22,
+    paddingTop: 13,
+    paddingBottom: 15,
     position: "relative",
     overflow: "hidden",
   },
@@ -648,20 +648,20 @@ const s = StyleSheet.create({
     alignItems: "flex-start",
   },
   roomNumber: {
-    fontSize: 8,
+    fontSize: 7,
     textTransform: "uppercase",
     letterSpacing: 1,
     color: "rgba(255,255,255,0.55)",
     marginBottom: 4,
   },
   roomTitle: {
-    fontSize: 24,
+    fontSize: 16,
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
     letterSpacing: -0.5,
   },
   roomDate: {
-    fontSize: 9,
+    fontSize: 7,
     color: "rgba(255,255,255,0.6)",
     marginTop: 3,
   },
@@ -686,7 +686,7 @@ const s = StyleSheet.create({
   roomCondTextGood: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#15803D" },
   roomCondTextWarn: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#A16207" },
   roomCondTextCritical: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#DC2626" },
-  roomStatsRow: { flexDirection: "row", marginTop: 14 },
+  roomStatsRow: { flexDirection: "row", marginTop: 7 },
   roomStatItem: { flexDirection: "row", alignItems: "center" },
   roomStatDot: {
     width: 5,
@@ -696,8 +696,8 @@ const s = StyleSheet.create({
   },
   roomStatText: { fontSize: 8.5, color: "rgba(255,255,255,0.65)" },
 
-  /* Room body */
-  roomBody: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 8 },
+  /* Room body (pages 3–N) */
+  roomBody: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8 },
   photosGrid: { flexDirection: "row", marginBottom: 8 },
   photoCard: {
     flex: 1,
@@ -1481,10 +1481,10 @@ export function CheckoutPDFDocument({
             <View style={s.roomBody}>
               {pairs.map((pair, pairIdx) => (
                 <View key={pairIdx} style={{
-                  marginBottom: 24,
+                  marginBottom: 12,
                   borderBottomWidth: pairIdx < pairs.length - 1 ? 0.5 : 0,
                   borderBottomColor: "#F3F3F8",
-                  paddingBottom: pairIdx < pairs.length - 1 ? 24 : 0,
+                  paddingBottom: pairIdx < pairs.length - 1 ? 12 : 0,
                 }}>
 
                   {pair.isNew ? (
@@ -1494,7 +1494,7 @@ export function CheckoutPDFDocument({
                         backgroundColor: "#FEE2E2",
                         borderRadius: 6, padding: "6 10",
                         flexDirection: "row", alignItems: "center",
-                        marginBottom: 8,
+                        marginBottom: 4,
                       }}>
                         <View style={{
                           width: 8, height: 8, borderRadius: 4,
@@ -1528,7 +1528,7 @@ export function CheckoutPDFDocument({
                       {pair.coPhoto.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
                         <View style={{
                           flexDirection: "row", flexWrap: "wrap",
-                          marginTop: 6,
+                          marginTop: 3,
                         }}>
                           {pair.coPhoto.damage_tags.map((tag, ti) => {
                             const ts = tagStyle(tag);
@@ -1543,25 +1543,22 @@ export function CheckoutPDFDocument({
 
                       {/* AI analysis */}
                       {pair.coPhoto.ai_analysis && (
-                        <View style={{ marginTop: 6 }}>
+                        <View style={{ marginTop: 3 }}>
                           <Text style={[s.photoAiLabel, { color: tokens.primary }]}>AI ANALYSIS</Text>
-                          <Text style={s.photoAiText}>
-                            {pair.coPhoto.ai_analysis.slice(0, 180)}
-                            {pair.coPhoto.ai_analysis.length > 180 ? "..." : ""}
-                          </Text>
+                          <Text style={[s.photoAiText, { fontSize: 7.5 }]}>{pair.coPhoto.ai_analysis}</Text>
                         </View>
                       )}
                     </View>
                   ) : (
                     /* MATCHED: 2-column check-in LEFT / check-out RIGHT */
-                    <View style={{ flexDirection: "row" }}>
+                    <View style={{ flexDirection: "row", gap: 10 }}>
 
                       {/* CHECK-IN column */}
-                      <View style={{ flex: 1, marginRight: 6 }}>
+                      <View style={{ flex: 1 }}>
                         <View style={{
                           backgroundColor: "#F3F3F8",
                           borderRadius: 4, padding: "3 8",
-                          marginBottom: 6, alignSelf: "flex-start",
+                          marginBottom: 3, alignSelf: "flex-start",
                         }}>
                           <Text style={{
                             fontSize: 7, fontFamily: "Helvetica-Bold",
@@ -1600,7 +1597,7 @@ export function CheckoutPDFDocument({
                         {pair.ciPhoto?.damage_tags && pair.ciPhoto.damage_tags.length > 0 && (
                           <View style={{
                             flexDirection: "row", flexWrap: "wrap",
-                            marginTop: 4,
+                            marginTop: 2,
                           }}>
                             {pair.ciPhoto.damage_tags.map((tag, ti) => (
                               <View key={ti} style={[s.photoTag, { backgroundColor: "#F3F3F8", marginRight: 3, marginBottom: 2 }]}>
@@ -1612,22 +1609,21 @@ export function CheckoutPDFDocument({
 
                         {/* Check-in AI note */}
                         {pair.ciPhoto?.ai_analysis && (
-                          <View style={{ marginTop: 5 }}>
+                          <View style={{ marginTop: 3 }}>
                             <Text style={[s.photoAiLabel, { color: "#9B9BA8" }]}>CHECK-IN NOTE</Text>
-                            <Text style={[s.photoAiText, { color: "#9B9BA8", fontSize: 7 }]}>
-                              {pair.ciPhoto.ai_analysis.slice(0, 150)}
-                              {pair.ciPhoto.ai_analysis.length > 150 ? "..." : ""}
+                            <Text style={[s.photoAiText, { color: "#9B9BA8", fontSize: 7.5 }]}>
+                              {pair.ciPhoto.ai_analysis}
                             </Text>
                           </View>
                         )}
                       </View>
 
                       {/* CHECK-OUT column */}
-                      <View style={{ flex: 1, marginLeft: 6 }}>
+                      <View style={{ flex: 1 }}>
                         <View style={{
                           backgroundColor: tokens.primaryUltraLight || "#EDE9FF",
                           borderRadius: 4, padding: "3 8",
-                          marginBottom: 6, alignSelf: "flex-start",
+                          marginBottom: 3, alignSelf: "flex-start",
                         }}>
                           <Text style={{
                             fontSize: 7, fontFamily: "Helvetica-Bold",
@@ -1659,7 +1655,7 @@ export function CheckoutPDFDocument({
                         {pair.coPhoto.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
                           <View style={{
                             flexDirection: "row", flexWrap: "wrap",
-                            marginTop: 4,
+                            marginTop: 2,
                           }}>
                             {pair.coPhoto.damage_tags.map((tag, ti) => {
                               const ts = tagStyle(tag);
@@ -1674,12 +1670,9 @@ export function CheckoutPDFDocument({
 
                         {/* Check-out AI analysis */}
                         {pair.coPhoto.ai_analysis && (
-                          <View style={{ marginTop: 5 }}>
+                          <View style={{ marginTop: 3 }}>
                             <Text style={[s.photoAiLabel, { color: tokens.primary }]}>AI ANALYSIS</Text>
-                            <Text style={[s.photoAiText, { fontSize: 7 }]}>
-                              {pair.coPhoto.ai_analysis.slice(0, 150)}
-                              {pair.coPhoto.ai_analysis.length > 150 ? "..." : ""}
-                            </Text>
+                            <Text style={[s.photoAiText, { fontSize: 7.5 }]}>{pair.coPhoto.ai_analysis}</Text>
                           </View>
                         )}
                       </View>
