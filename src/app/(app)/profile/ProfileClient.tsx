@@ -77,6 +77,8 @@ export function ProfileClient({
   const searchParams = useSearchParams();
   const [loaded, setLoaded] = useState(false);
   const [showBugReport, setShowBugReport] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const justSubscribed = searchParams.get("subscribed") === "true";
   const isPro = accountType === "pro";
   const isOwner = role === "owner";
@@ -112,6 +114,34 @@ export function ProfileClient({
       /* sign-out best-effort */
     }
     router.push("/login");
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    try {
+      const res = await fetch("/api/account/delete", { method: "DELETE" });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(body.error || "Failed to delete account");
+      }
+      const supabase = createClient();
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        /* session already invalid after delete */
+      }
+      router.push("/login");
+      router.refresh();
+    } catch (err) {
+      console.error(err);
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Failed to delete account. Please try again."
+      );
+      setIsDeletingAccount(false);
+      setShowDeleteConfirm(false);
+    }
   };
 
   return (
@@ -447,6 +477,33 @@ export function ProfileClient({
           </div>
         </div>
 
+        {/* Danger zone — self-service account deletion (API uses service role + storage cleanup). */}
+        <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: canManageBilling ? "0.36s" : "0.26s" }}>
+          <div className="bg-white rounded-2xl p-5 border border-red-100">
+            <h3 className="font-heading font-extrabold text-base text-gray-900 mb-1">
+              Delete account
+            </h3>
+            <p className="text-sm text-gray-400 mb-4 font-body">
+              Permanently delete your account and all associated data including
+              properties, inspections, photos and reports. This cannot be undone.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 text-red-500 text-sm font-semibold active:scale-95 transition-transform hover:bg-red-50 min-h-[44px]"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+                <path d="M9 6V4h6v2" />
+              </svg>
+              Delete my account
+            </button>
+          </div>
+        </div>
+
         {/* Sign Out */}
         <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: canManageBilling ? "0.38s" : "0.28s" }}>
           <button
@@ -490,6 +547,64 @@ export function ProfileClient({
       {/* Bug report modal */}
       {showBugReport && (
         <ReportBugModal onClose={() => setShowBugReport(false)} />
+      )}
+
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 px-4 pb-8"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-account-title"
+        >
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <h4
+              id="delete-account-title"
+              className="font-heading font-extrabold text-center text-gray-900 text-lg mb-2"
+            >
+              Delete your account?
+            </h4>
+            <p className="text-sm text-gray-400 text-center mb-6 font-body">
+              All your properties, inspections, photos and reports will be{" "}
+              <span className="font-semibold text-gray-600">permanently deleted</span>.
+              This cannot be undone.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => void handleDeleteAccount()}
+                disabled={isDeletingAccount}
+                className="w-full py-3 rounded-xl bg-red-500 text-white font-semibold text-sm disabled:opacity-50 disabled:pointer-events-none active:scale-95 transition-transform flex items-center justify-center gap-2 min-h-[44px]"
+              >
+                {isDeletingAccount ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                    Deleting...
+                  </>
+                ) : (
+                  "Yes, delete everything"
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeletingAccount}
+                className="w-full py-3 rounded-xl bg-gray-100 text-gray-600 font-semibold text-sm active:scale-95 transition-transform min-h-[44px]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
