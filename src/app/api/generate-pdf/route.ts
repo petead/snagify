@@ -16,6 +16,10 @@ import {
   compressCheckoutRoomPhotos,
   compressSimpleRoomPhotos,
 } from "@/lib/compressImageForPdf";
+import {
+  buildPdfSignatureEmbeds,
+  type SignatureRow,
+} from "@/lib/pdf/inspectionSignatureEmbeds";
 
 export const maxDuration = 60;
 
@@ -394,6 +398,33 @@ export async function buildPdfAndUpload(
         }
       : null;
 
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseAdmin =
+      supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
+
+    let freshSignatureRows: SignatureRow[] = [];
+    if (supabaseAdmin) {
+      const { data: sigData, error: sigFetchErr } = await supabaseAdmin
+        .from("signatures")
+        .select("signer_type, signed_at, signature_data, otp_verified")
+        .eq("inspection_id", inspectionId);
+      if (sigFetchErr) {
+        console.error("[generate-pdf] Signatures fetch error:", sigFetchErr);
+      }
+      freshSignatureRows = (sigData ?? []) as SignatureRow[];
+    } else {
+      console.warn("[generate-pdf] No SUPABASE_SERVICE_ROLE_KEY — signatures from inspection join");
+      freshSignatureRows = ((row.signatures ?? []) as unknown as SignatureRow[]) ?? [];
+    }
+
+    const signatureEmbeds = await buildPdfSignatureEmbeds({
+      rows: freshSignatureRows,
+      profileSignatureUrl: agentData?.signature_image_url ?? null,
+      accountType: agentData?.account_type ?? "individual",
+      inspectionCreatedAt: row.created_at != null ? String(row.created_at) : null,
+    });
+
     const meta: InspectionMeta = {
       inspection: {
         id: row.id,
@@ -458,17 +489,13 @@ export async function buildPdfAndUpload(
         }),
       checkinPhotoMap: undefined,
       checkinRooms: undefined,
-      signatures: ((row.signatures ?? []) as {
-        signer_type?: string;
-        signed_at?: string | null;
-        signature_data?: string | null;
-        otp_verified?: boolean;
-      }[]).map((s) => ({
+      signatures: freshSignatureRows.map((s) => ({
         signer_type: s.signer_type ?? "",
         signed_at: s.signed_at ?? null,
         signature_data: s.signature_data ?? null,
         otp_verified: s.otp_verified ?? false,
       })),
+      signatureEmbeds,
     };
 
     /** Smaller JPEG data URLs for PDF embedding only — document_hash uses original meta above */
@@ -567,6 +594,7 @@ export async function buildPdfAndUpload(
           signature_data: s.signature_data ?? undefined,
           signed_at: s.signed_at ?? null,
         })),
+        signatureEmbeds: meta.signatureEmbeds,
         profile: agentData
           ? {
               full_name: agentData.full_name,
@@ -596,10 +624,7 @@ export async function buildPdfAndUpload(
       `${inspectionId}/${inspectionId}.pdf`,
     ];
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const storageClient =
-      supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : supabase;
+    const storageClient = supabaseAdmin ?? supabase;
 
     const { error: removeErr } = await storageClient.storage
       .from("reports")

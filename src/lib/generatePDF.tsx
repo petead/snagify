@@ -18,6 +18,10 @@ import {
 import QRCode from "qrcode";
 import { getBrandTokens } from "@/lib/pdf/brandTokens";
 import { getPdfImageHeight } from "@/lib/photos/getImageDimensions";
+import {
+  isFullySigned,
+  type PdfSignatureEmbeds,
+} from "@/lib/pdf/inspectionSignatureEmbeds";
 
 const PURPLE = "#9A88FD";
 const GREEN = "#cafe87";
@@ -1072,6 +1076,8 @@ interface InspectionMeta {
   signatures?: SignatureEntry[];
   checkinPhotoMap?: Record<string, { id: string; url: string; damage_tags?: string[]; ai_analysis?: string | null }>;
   checkinRooms?: { name: string; photos: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }[] }[];
+  /** Data URLs + dates for PDF Image embedding (from service-role signature fetch). */
+  signatureEmbeds?: PdfSignatureEmbeds;
 }
 
 function isValidHex(s: string | undefined): boolean {
@@ -1101,6 +1107,8 @@ function InspectionReport({
   const generatedBy = agencyName;
   const property = meta.property ?? {};
   const inspection = meta.inspection;
+  const sigE = meta.signatureEmbeds;
+
   const tenancy = {
     landlord_name: meta.inspection.landlord_name,
     landlord_email: meta.inspection.landlord_email,
@@ -1806,9 +1814,31 @@ function InspectionReport({
                 <Text style={s.sigLogoSub}>PROPERTY INSPECTION REPORT</Text>
               </View>
             </View>
-            <View style={[s.sigVerifiedBadge, { backgroundColor: tokens.primaryLight }]}>
-              <View style={[s.sigVerifiedDot, { marginRight: 5 }]} />
-              <Text style={s.sigVerifiedText}>Verified Document</Text>
+            <View
+              style={[
+                s.sigVerifiedBadge,
+                {
+                  backgroundColor: sigE && isFullySigned(sigE) ? tokens.primaryLight : "#F3F4F6",
+                },
+              ]}
+            >
+              <View
+                style={[
+                  s.sigVerifiedDot,
+                  {
+                    marginRight: 5,
+                    backgroundColor: sigE && isFullySigned(sigE) ? tokens.primary : "#9CA3AF",
+                  },
+                ]}
+              />
+              <Text
+                style={[
+                  s.sigVerifiedText,
+                  { color: sigE && isFullySigned(sigE) ? undefined : "#6B7280" },
+                ]}
+              >
+                {sigE && isFullySigned(sigE) ? "Verified Document" : "Pending Signatures"}
+              </Text>
             </View>
           </View>
           <Text style={s.sigTitle}>
@@ -1839,12 +1869,16 @@ function InspectionReport({
             {(() => {
               const landlordSig = (meta.signatures ?? []).find((s) => s.signer_type === "landlord");
               const tenantSig = (meta.signatures ?? []).find((s) => s.signer_type === "tenant");
+              const landlordImg = sigE?.landlord.base64 ?? landlordSig?.signature_data ?? null;
+              const tenantImg = sigE?.tenant.base64 ?? tenantSig?.signature_data ?? null;
+              const landlordSignedAt = sigE?.landlord.signedAt ?? landlordSig?.signed_at ?? null;
+              const tenantSignedAt = sigE?.tenant.signedAt ?? tenantSig?.signed_at ?? null;
               const sigBoxStyle = {
                 borderWidth: 1,
                 borderStyle: "solid" as const,
                 borderColor: "#E5E7EB",
                 borderRadius: 4,
-                height: 60,
+                height: 76,
                 alignItems: "center" as const,
                 justifyContent: "center" as const,
                 backgroundColor: "#FAFAFA",
@@ -1876,18 +1910,16 @@ function InspectionReport({
                       {tenancy.landlord_name ?? "—"}
                     </Text>
                     <View style={sigBoxStyle}>
-                      {landlordSig?.signature_data ? (
+                      {landlordImg ? (
                         <Image
-                          src={landlordSig.signature_data}
-                          style={{ width: 140, height: 50, objectFit: "contain" }}
+                          src={landlordImg}
+                          style={{ width: 160, height: 70, objectFit: "contain" }}
                         />
                       ) : (
-                        <Text style={{ fontSize: 8, color: "#C4C4C4", fontFamily: "Helvetica-Oblique" }}>
-                          Pending Signature
-                        </Text>
+                        <Text style={{ fontSize: 10, color: "#9CA3AF" }}>Pending Signature</Text>
                       )}
                     </View>
-                    {landlordSig?.signed_at ? (
+                    {landlordSignedAt ? (
                       <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <View
                           style={{
@@ -1898,8 +1930,8 @@ function InspectionReport({
                             marginRight: 4,
                           }}
                         />
-                        <Text style={{ fontSize: 7, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
-                          Signed on {formatDate(landlordSig.signed_at, true)}
+                        <Text style={{ fontSize: 8, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
+                          ● Signed on {formatDate(landlordSignedAt, true)}
                         </Text>
                       </View>
                     ) : (
@@ -1913,7 +1945,7 @@ function InspectionReport({
                             marginRight: 4,
                           }}
                         />
-                        <Text style={{ fontSize: 7, color: "#9B9BA8" }}>Awaiting signature</Text>
+                        <Text style={{ fontSize: 8, color: "#9CA3AF" }}>● Awaiting signature</Text>
                       </View>
                     )}
                   </View>
@@ -1942,18 +1974,16 @@ function InspectionReport({
                       {tenancy.tenant_name ?? "—"}
                     </Text>
                     <View style={sigBoxStyle}>
-                      {tenantSig?.signature_data ? (
+                      {tenantImg ? (
                         <Image
-                          src={tenantSig.signature_data}
-                          style={{ width: 140, height: 50, objectFit: "contain" }}
+                          src={tenantImg}
+                          style={{ width: 160, height: 70, objectFit: "contain" }}
                         />
                       ) : (
-                        <Text style={{ fontSize: 8, color: "#C4C4C4", fontFamily: "Helvetica-Oblique" }}>
-                          Pending Signature
-                        </Text>
+                        <Text style={{ fontSize: 10, color: "#9CA3AF" }}>Pending Signature</Text>
                       )}
                     </View>
-                    {tenantSig?.signed_at ? (
+                    {tenantSignedAt ? (
                       <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <View
                           style={{
@@ -1964,8 +1994,8 @@ function InspectionReport({
                             marginRight: 4,
                           }}
                         />
-                        <Text style={{ fontSize: 7, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
-                          Signed on {formatDate(tenantSig.signed_at, true)}
+                        <Text style={{ fontSize: 8, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
+                          ● Signed on {formatDate(tenantSignedAt, true)}
                         </Text>
                       </View>
                     ) : (
@@ -1979,7 +2009,7 @@ function InspectionReport({
                             marginRight: 4,
                           }}
                         />
-                        <Text style={{ fontSize: 7, color: "#9B9BA8" }}>Awaiting signature</Text>
+                        <Text style={{ fontSize: 8, color: "#9CA3AF" }}>● Awaiting signature</Text>
                       </View>
                     )}
                   </View>
@@ -2001,18 +2031,18 @@ function InspectionReport({
               ? (meta.signatures ?? []).find((s) => s.signer_type === "landlord")
               : null;
 
-            // Inspector date logic:
-            // - individual: same signed_at as landlord (same person)
-            // - pro: use inspection created_at (pre-registered signature)
-            const inspectorSignedAt = isIndividual
+            const inspectorImg =
+              sigE?.inspector.base64 ??
+              inspectorSig?.signature_data ??
+              landlordSigForInspector?.signature_data ??
+              (!isIndividual ? profile?.signature_image_url : null) ??
+              null;
+
+            const inspectorSignedAtEmbed = sigE?.inspector.signedAt ?? null;
+            const inspectorSignedAtLegacy = isIndividual
               ? (landlordSigForInspector?.signed_at ?? null)
               : (meta.inspection.created_at ?? null);
-
-            const inspectorSignatureUrl =
-              inspectorSig?.signature_data ||
-              landlordSigForInspector?.signature_data ||
-              (!isIndividual ? profile?.signature_image_url : null) ||
-              null;
+            const inspectorSignedAt = inspectorSignedAtEmbed ?? inspectorSignedAtLegacy;
             return (
               <View
                 style={{
@@ -2062,43 +2092,36 @@ function InspectionReport({
                         }}
                       />
                       <Text style={{ fontSize: 7, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
-                        {isIndividual
-                          ? (inspectorSignedAt ? `Signed on ${formatDate(inspectorSignedAt, true)}` : "Pending signature")
-                          : `Report generated on ${formatDate(meta.inspection.created_at, true)}`
-                        }
+                        {inspectorImg
+                          ? `● Signed on ${formatDate(inspectorSignedAt ?? meta.inspection.created_at, true)}`
+                          : isIndividual
+                            ? "Pending signature"
+                            : `Report generated on ${formatDate(meta.inspection.created_at, true)}`}
                       </Text>
                     </View>
                   </View>
 
-                  <View style={{ width: 160 }}>
+                  <View style={{ width: 170 }}>
                     <View
                       style={{
                         borderWidth: 1,
                         borderStyle: "solid",
                         borderColor: "#E5E7EB",
                         borderRadius: 4,
-                        height: 56,
+                        height: 76,
                         alignItems: "center",
                         justifyContent: "center",
                         backgroundColor: "#FAFAFA",
                         marginBottom: 4,
                       }}
                     >
-                      {inspectorSignatureUrl ? (
+                      {inspectorImg ? (
                         <Image
-                          src={inspectorSignatureUrl}
-                          style={{ width: 130, height: 46, objectFit: "contain" }}
+                          src={inspectorImg}
+                          style={{ width: 160, height: 70, objectFit: "contain" }}
                         />
                       ) : (
-                        <Text
-                          style={{
-                            fontSize: 7,
-                            color: "#C4C4C4",
-                            fontFamily: "Helvetica-Oblique",
-                          }}
-                        >
-                          Inspector signature
-                        </Text>
+                        <Text style={{ fontSize: 10, color: "#9CA3AF" }}>Pending Signature</Text>
                       )}
                     </View>
                   </View>
