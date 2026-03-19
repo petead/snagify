@@ -14,7 +14,6 @@ import GhostCamera from "@/components/GhostCamera";
 import { assertValidDimensions } from "@/lib/getImageDimensions";
 import { compressPhoto, compressPhotoDataUrl } from "@/lib/compressPhoto";
 import { CheckoutCreditConfirmModal } from "@/components/inspection/CheckoutCreditConfirmModal";
-import { useCredits } from "@/hooks/useCredits";
 import { trackAction } from "@/lib/breadcrumb";
 
 // ─── Types ───────────────────────────────────────
@@ -376,7 +375,6 @@ export function InspectionClient({
 }: Props) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const { balance: creditsBalance } = useCredits();
   const isCheckout = inspectionType === "check-out";
 
   const [liveRooms, setLiveRooms] = useState<RoomData[]>(initialRooms);
@@ -435,6 +433,7 @@ export function InspectionClient({
   const [navigating, setNavigating] = useState(false);
   const [showCompletenessWarning, setShowCompletenessWarning] = useState(false);
   const [showCreditConfirm, setShowCreditConfirm] = useState(false);
+  const [liveCredits, setLiveCredits] = useState<number | null>(null);
   const [creditCost, setCreditCost] = useState(2);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -471,6 +470,27 @@ export function InspectionClient({
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [screen]);
+
+  // Fetch current company credits each time the checkout modal opens.
+  useEffect(() => {
+    if (!showCreditConfirm) return;
+
+    const fetchCredits = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("profiles")
+        .select("company:companies(credits_balance)")
+        .eq("id", user.id)
+        .single();
+
+      const balance = (data?.company as { credits_balance?: number } | null)?.credits_balance ?? 0;
+      setLiveCredits(balance);
+    };
+
+    void fetchCredits();
+  }, [showCreditConfirm, supabase]);
 
   // Pre-select existing room names on mount + detect matching template
   useEffect(() => {
@@ -2335,7 +2355,7 @@ export function InspectionClient({
       {/* Checkout credit confirmation modal */}
       {showCreditConfirm && (
         <CheckoutCreditConfirmModal
-          creditsBalance={creditsBalance}
+          creditsBalance={liveCredits ?? 0}
           creditCost={creditCost}
           onConfirm={async () => {
             setShowCreditConfirm(false);
