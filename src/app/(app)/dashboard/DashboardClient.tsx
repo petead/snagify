@@ -8,6 +8,7 @@ import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButt
 import { PenLine, AlertTriangle } from "lucide-react";
 import { useCredits } from "@/hooks/useCredits";
 import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
+import { OnboardingTutorial } from "@/components/onboarding/OnboardingTutorial";
 import { trackAction } from "@/lib/breadcrumb";
 
 type InspectionRow = {
@@ -131,6 +132,7 @@ export function DashboardClient({
   const [recentInspections, setRecentInspections] = useState(initialRecentInspections);
   const recentRollbackRef = useRef<RecentInspectionRow[]>([]);
   const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const router = useRouter();
 
   const handleDownloadPDF = useCallback(async (insp: RecentInspectionRow) => {
@@ -202,6 +204,15 @@ export function DashboardClient({
   const pendingSigCount = allInspections.filter((i) => i?.status === "completed").length;
 
   const initials = getInitials(fullName, userEmail);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const done = localStorage.getItem("snagify_onboarding_v1_done");
+    if (!done && allInspections.length === 0) {
+      const t = setTimeout(() => setShowOnboarding(true), 600);
+      return () => clearTimeout(t);
+    }
+  }, [allInspections.length]);
 
   return (
     <div
@@ -1149,6 +1160,9 @@ export function DashboardClient({
         accountType={(accountType as "individual" | "pro") || "individual"}
         plan={plan}
       />
+      {showOnboarding && (
+        <OnboardingTutorial onDone={() => setShowOnboarding(false)} />
+      )}
     </div>
   );
 }
