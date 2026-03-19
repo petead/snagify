@@ -46,7 +46,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${poppins.variable} ${dmSans.variable}`}>
-      <body className="font-body antialiased">
+      <body className="font-body antialiased bg-[#F8F7F4] overscroll-none">
         <NavigationReset />
         {children}
       </body>
