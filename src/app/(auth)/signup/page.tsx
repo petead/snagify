@@ -235,11 +235,15 @@ export default function SignupPage() {
     setCurrentStep(2)
   }
 
-  const handleContinueStep2 = () => {
+  const handleStep2Continue = async () => {
     setError(null)
     if (accountType === null) return
-    setProSubStep(1)
-    setCurrentStep(3)
+    if (accountType === 'individual') {
+      await handleSubmit()
+    } else {
+      setProSubStep(1)
+      setCurrentStep(3)
+    }
   }
 
   const uploadLogoAfterSignup = async (userId: string) => {
@@ -273,7 +277,7 @@ export default function SignupPage() {
     }
   }
 
-  const handleSignup = async () => {
+  const handleSubmit = async () => {
     if (!accountType) return
     setLoading(true)
     setError(null)
@@ -284,9 +288,9 @@ export default function SignupPage() {
         password,
         fullName: fullName.trim(),
         accountType,
-        reraNumber: reraNumber.trim() || undefined,
       }
       if (isPro) {
+        body.reraNumber = reraNumber.trim() || undefined
         body.companyName = companyName.trim()
         body.primaryColor = brandPrimaryColor
         body.companyEmail = companyEmail.trim()
@@ -340,13 +344,6 @@ export default function SignupPage() {
     }
   }
 
-  const handleIndividualSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    if (!accountType) return
-    void handleSignup()
-  }
-
   const validateProSub1 = () => {
     const err: Record<string, string> = {}
     if (!companyName.trim()) err.companyName = 'Company name is required.'
@@ -385,11 +382,13 @@ export default function SignupPage() {
     setError(null)
     clearProError('website')
     if (!validateProWebsite()) return
-    void handleSignup()
+    void handleSubmit()
   }
 
   const inputClass = `w-full px-4 py-3 rounded-xl border text-base ${inputFocus}`
   const cardSpring = { type: 'spring' as const, stiffness: 400, damping: 30 }
+
+  const totalSteps = accountType === 'pro' ? 3 : 2
 
   const proProgressWidth = `${proSubStep * 25}%`
 
@@ -447,19 +446,32 @@ export default function SignupPage() {
           transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
           className="rounded-3xl border border-black/5 bg-white/90 p-8 shadow-2xl shadow-[#9A88FD]/10 ring-1 ring-black/5 backdrop-blur-sm"
         >
-          <div className="mb-8 flex justify-center gap-2" aria-label="Progress">
-            {([1, 2, 3] as const).map((step) => (
-              <motion.div
-                key={step}
-                className="h-2 rounded-full"
-                animate={{
-                  width: currentStep === step ? 24 : 8,
-                  backgroundColor:
-                    currentStep === step ? '#9A88FD' : 'rgba(154, 136, 253, 0.3)',
-                }}
-                transition={cardSpring}
-              />
-            ))}
+          <div className="mb-8 flex min-h-[8px] justify-center gap-2" aria-label="Progress">
+            <AnimatePresence initial={false} mode="popLayout">
+              {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => (
+                <motion.div
+                  key={step}
+                  layout
+                  initial={
+                    step === 3 ? { opacity: 0, scale: 0.4, width: 0 } : false
+                  }
+                  animate={{
+                    opacity: 1,
+                    scale: 1,
+                    width: currentStep === step ? 24 : 8,
+                    backgroundColor:
+                      currentStep === step ? '#9A88FD' : 'rgba(154, 136, 253, 0.3)',
+                  }}
+                  exit={
+                    step === 3
+                      ? { opacity: 0, scale: 0.4, width: 0 }
+                      : { opacity: 0, width: 0 }
+                  }
+                  transition={cardSpring}
+                  className="h-2 shrink-0 rounded-full"
+                />
+              ))}
+            </AnimatePresence>
           </div>
 
           <AnimatePresence mode="wait">
@@ -702,108 +714,27 @@ export default function SignupPage() {
 
                 <motion.button
                   type="button"
-                  onClick={handleContinueStep2}
-                  disabled={accountType === null}
-                  whileHover={accountType !== null ? { scale: 1.02 } : {}}
-                  whileTap={accountType !== null ? { scale: 0.98 } : {}}
+                  onClick={() => void handleStep2Continue()}
+                  disabled={accountType === null || loading}
+                  whileHover={accountType !== null && !loading ? { scale: 1.02 } : {}}
+                  whileTap={accountType !== null && !loading ? { scale: 0.98 } : {}}
                   transition={{ type: 'spring', stiffness: 400, damping: 22 }}
                   className="mt-8 w-full rounded-2xl bg-[#9A88FD] py-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span className="flex items-center justify-center gap-2">
-                    Continue
-                    <ArrowRight size={18} />
+                    {loading && accountType === 'individual' ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Creating account...
+                      </>
+                    ) : (
+                      <>
+                        Continue
+                        <ArrowRight size={18} />
+                      </>
+                    )}
                   </span>
                 </motion.button>
-              </motion.div>
-            )}
-
-            {currentStep === 3 && accountType === 'individual' && (
-              <motion.div key="step3-individual" {...stepPresence}>
-                <motion.button
-                  type="button"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.25 }}
-                  onClick={() => {
-                    setCurrentStep(2)
-                    setError(null)
-                  }}
-                  className="mb-5 text-sm font-semibold text-[#9A88FD] hover:underline"
-                >
-                  ← Back
-                </motion.button>
-
-                <h1
-                  className="mb-1 text-2xl font-extrabold text-[#1A1A2E]"
-                  style={{ fontFamily: 'var(--font-heading), Poppins, sans-serif' }}
-                >
-                  Almost there! 🎉
-                </h1>
-                <p className="mb-6 text-sm text-gray-500">Just one optional detail.</p>
-
-                <form onSubmit={handleIndividualSubmit} className="space-y-4">
-                  <AnimatePresence>
-                    {error && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
-                      >
-                        {error}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <StaggerField index={0}>
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      RERA number <span className="font-normal normal-case text-gray-400">(optional)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={reraNumber}
-                      onChange={(e) => setReraNumber(e.target.value)}
-                      placeholder="RERA registration number"
-                      autoComplete="off"
-                      className={`${inputClass} border-gray-200 bg-gray-50 focus:bg-white`}
-                    />
-                  </StaggerField>
-
-                  <motion.button
-                    type="submit"
-                    disabled={loading}
-                    whileHover={{
-                      scale: 1.02,
-                      boxShadow: '0 8px 30px rgba(154,136,253,0.45)',
-                    }}
-                    whileTap={{ scale: 0.97 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                    onHoverStart={() => setCtaFinalHover(true)}
-                    onHoverEnd={() => setCtaFinalHover(false)}
-                    className="relative mt-2 w-full overflow-hidden rounded-2xl bg-[#9A88FD] py-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <motion.div
-                      aria-hidden
-                      className="pointer-events-none absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                      initial={{ x: '-100%' }}
-                      animate={{ x: ctaFinalHover ? '200%' : '-100%' }}
-                      transition={{ duration: 0.6, ease: 'easeInOut' }}
-                    />
-                    <span className="pointer-events-none relative z-10 flex items-center justify-center gap-2">
-                      {loading ? (
-                        <>
-                          <Loader2 size={18} className="animate-spin" />
-                          Creating account...
-                        </>
-                      ) : (
-                        <>
-                          Create my account
-                          <ArrowRight size={18} />
-                        </>
-                      )}
-                    </span>
-                  </motion.button>
-                </form>
               </motion.div>
             )}
 
