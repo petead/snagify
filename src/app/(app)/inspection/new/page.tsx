@@ -263,6 +263,9 @@ function NewInspectionContent() {
   const searchParams = useSearchParams();
   const existingPropertyId = searchParams.get("propertyId");
   const urlTenancyId = searchParams.get("tenancyId");
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(
+    existingPropertyId
+  );
 
   const router = useRouter();
   const supabase = createClient();
@@ -305,13 +308,13 @@ function NewInspectionContent() {
   }, [step]);
 
   useEffect(() => {
-    if (!existingPropertyId) return;
+    if (!selectedPropertyId) return;
     const fetchProperty = async () => {
       const client = createClient();
       const { data } = await client
         .from("properties")
         .select("id, building_name, unit_number, property_type, location")
-        .eq("id", existingPropertyId)
+        .eq("id", selectedPropertyId)
         .single();
       if (data) {
         const property = data as ExistingProperty;
@@ -328,7 +331,7 @@ function NewInspectionContent() {
       }
     };
     void fetchProperty();
-  }, [existingPropertyId]);
+  }, [selectedPropertyId]);
 
   const set = (k: keyof FormData, v: string) =>
     setFormData((d) => ({ ...d, [k]: v }));
@@ -472,7 +475,7 @@ function NewInspectionContent() {
   };
 
   // ── Start inspection: formData (user-validated) is the only source of truth for DB
-  const handleStartInspection = async () => {
+  const handleStartInspection = async (forcedPropertyId?: string) => {
     setSaveError(null);
     setSaving(true);
     try {
@@ -513,7 +516,7 @@ function NewInspectionContent() {
           .replace("villa", "villa")
           .replace("townhouse", "townhouse") || "apartment";
 
-      let propertyId = existingPropertyId;
+      let propertyId = forcedPropertyId ?? selectedPropertyId;
       if (!propertyId) {
         // 1) Check for fuzzy duplicates before creating a property
         const dupeRes = await fetch("/api/properties/check-duplicate", {
@@ -578,6 +581,7 @@ function NewInspectionContent() {
           throw propError;
         }
         propertyId = property.id;
+        setSelectedPropertyId(property.id);
       }
 
       // Tenancy: insert from formData only
@@ -1510,7 +1514,7 @@ function NewInspectionContent() {
         <BottomBar>
           <button
             type="button"
-            onClick={handleStartInspection}
+            onClick={() => void handleStartInspection()}
             disabled={saving}
             className="w-full h-12 rounded-xl font-bold text-base active:scale-[0.98] transition-transform disabled:opacity-50"
             style={{
@@ -1567,7 +1571,11 @@ function NewInspectionContent() {
                 onClick={() => {
                   const existing = duplicateWarning[0];
                   setDuplicateWarning(null);
-                  if (existing) router.push(`/property/${existing.id}`);
+                  if (!existing) return;
+                  // Use existing in current flow: skip property creation and continue submit.
+                  setSelectedPropertyId(existing.id);
+                  setPendingSubmit(true);
+                  void handleStartInspection(existing.id);
                 }}
                 className="w-full py-3 rounded-xl bg-[#9A88FD] text-white font-semibold text-sm active:scale-95 transition-transform"
               >
@@ -1575,6 +1583,7 @@ function NewInspectionContent() {
               </button>
               <button
                 onClick={() => {
+                  // Skip duplicate check, create a new property and continue flow.
                   setDuplicateWarning(null);
                   setPendingSubmit(true);
                   void handleStartInspection();
