@@ -276,6 +276,13 @@ function NewInspectionContent() {
   const [formData, setFormData] = useState<FormData>({ ...emptyForm });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    id: string;
+    building_name: string;
+    unit_number: string;
+    location?: string | null;
+  }[] | null>(null);
+  const [pendingSubmit, setPendingSubmit] = useState(false);
   const [existingProperty, setExistingProperty] = useState<ExistingProperty | null>(null);
   const [propertyMismatch, setPropertyMismatch] = useState(false);
 
@@ -508,6 +515,40 @@ function NewInspectionContent() {
 
       let propertyId = existingPropertyId;
       if (!propertyId) {
+        // 1) Check for fuzzy duplicates before creating a property
+        const dupeRes = await fetch("/api/properties/check-duplicate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            building_name: formData.building_name,
+            unit_number: formData.unit_number,
+          }),
+        });
+        const dupeJson = (await dupeRes.json()) as {
+          duplicates?: Array<{
+            id: string;
+            building_name: string | null;
+            unit_number: string | null;
+            location?: string | null;
+          }>;
+        };
+
+        if (dupeJson.duplicates && dupeJson.duplicates.length > 0 && !pendingSubmit) {
+          setDuplicateWarning(
+            dupeJson.duplicates.map((d) => ({
+              id: d.id,
+              building_name: d.building_name ?? "Unknown building",
+              unit_number: d.unit_number ?? "—",
+              location: d.location ?? null,
+            }))
+          );
+          setSaving(false);
+          return;
+        }
+
+        // 2) Continue with creation (reset bypass flag)
+        setPendingSubmit(false);
+
         // Property: insert from formData only
         const { data: property, error: propError } = await supabase
           .from("properties")
@@ -1485,6 +1526,66 @@ function NewInspectionContent() {
                 : "Skip — Start Inspection"}
           </button>
         </BottomBar>
+      )}
+
+      {duplicateWarning && duplicateWarning.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-8">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-yellow-50 mx-auto mb-4">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-6 h-6 text-yellow-500"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <h4 className="font-poppins font-extrabold text-center text-gray-900 text-base mb-2">
+              Similar property found
+            </h4>
+            <p className="text-sm text-gray-400 text-center mb-4">
+              This looks like an existing property in your portfolio:
+            </p>
+            {duplicateWarning.map((d) => (
+              <div key={d.id} className="bg-[#F8F7F4] rounded-xl p-3 mb-4 text-center">
+                <p className="font-semibold text-gray-800 text-sm">{d.building_name}</p>
+                <p className="text-gray-500 text-xs mt-0.5">
+                  Unit {d.unit_number}
+                  {d.location ? ` · ${d.location}` : ""}
+                </p>
+              </div>
+            ))}
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  const existing = duplicateWarning[0];
+                  setDuplicateWarning(null);
+                  if (existing) router.push(`/property/${existing.id}`);
+                }}
+                className="w-full py-3 rounded-xl bg-[#9A88FD] text-white font-semibold text-sm active:scale-95 transition-transform"
+              >
+                Use existing property
+              </button>
+              <button
+                onClick={() => {
+                  setDuplicateWarning(null);
+                  setPendingSubmit(true);
+                  void handleStartInspection();
+                }}
+                className="w-full py-3 rounded-xl bg-gray-100 text-gray-600 font-semibold text-sm active:scale-95 transition-transform"
+              >
+                Create new anyway
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
