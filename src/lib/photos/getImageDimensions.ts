@@ -3,34 +3,81 @@ export interface ImageDimensions {
   height: number;
 }
 
+function readDimensionsViaImageElement(file: File | Blob): Promise<ImageDimensions> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const width = img.naturalWidth;
+      const height = img.naturalHeight;
+      if (!width || !height) {
+        reject(new Error("Image has no readable pixel dimensions"));
+        return;
+      }
+      resolve({ width, height });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Failed to decode image for dimensions"));
+    };
+    img.src = url;
+  });
+}
+
 /**
- * Reads pixel dimensions from a File or Blob using createImageBitmap.
- * Works in browser only (called before upload).
- * Falls back to null if browser does not support createImageBitmap.
+ * True pixel size of the video frame for canvas capture — NOT CSS/display size.
+ * Prefers MediaStreamTrack.getSettings() (negotiated camera resolution), then videoWidth/videoHeight.
  */
-export async function getImageDimensions(
-  file: File | Blob
-): Promise<ImageDimensions | null> {
+export function getVideoCaptureDimensions(video: HTMLVideoElement): ImageDimensions {
+  const stream = video.srcObject;
+  if (stream instanceof MediaStream) {
+    const track = stream.getVideoTracks()[0];
+    const settings = track?.getSettings?.() ?? {};
+    const sw = settings.width;
+    const sh = settings.height;
+    if (typeof sw === "number" && sw > 0 && typeof sh === "number" && sh > 0) {
+      return { width: sw, height: sh };
+    }
+  }
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (vw > 0 && vh > 0) {
+    return { width: vw, height: vh };
+  }
+  return { width: 0, height: 0 };
+}
+
+export function assertValidDimensions(
+  dims: ImageDimensions,
+  context: string
+): asserts dims is ImageDimensions & { width: number; height: number } {
+  if (!dims.width || !dims.height) {
+    console.error(`[${context}] Photo dimensions missing or zero`, dims);
+    throw new Error(`Cannot save photo without dimensions (${context})`);
+  }
+}
+
+/**
+ * Reads pixel dimensions from a File or Blob (actual encoded image, not display size).
+ * Uses createImageBitmap when available, else HTMLImageElement naturalWidth/Height.
+ * Rejects if dimensions cannot be read or are zero.
+ */
+export async function getImageDimensions(file: File | Blob): Promise<ImageDimensions> {
   try {
     const bitmap = await createImageBitmap(file);
-    const dimensions = { width: bitmap.width, height: bitmap.height };
-    bitmap.close();
-    return dimensions;
+    try {
+      const width = bitmap.width;
+      const height = bitmap.height;
+      if (!width || !height) {
+        throw new Error("Bitmap has zero dimensions");
+      }
+      return { width, height };
+    } finally {
+      bitmap.close();
+    }
   } catch {
-    // Fallback: use an Image element
-    return new Promise((resolve) => {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        resolve({ width: img.naturalWidth, height: img.naturalHeight });
-        URL.revokeObjectURL(url);
-      };
-      img.onerror = () => {
-        resolve(null);
-        URL.revokeObjectURL(url);
-      };
-      img.src = url;
-    });
+    return readDimensionsViaImageElement(file);
   }
 }
 

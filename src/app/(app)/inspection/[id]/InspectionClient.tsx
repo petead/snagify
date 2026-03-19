@@ -11,7 +11,10 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GhostCamera from "@/components/GhostCamera";
-import { getImageDimensions } from "@/lib/photos/getImageDimensions";
+import {
+  assertValidDimensions,
+  getImageDimensions,
+} from "@/lib/getImageDimensions";
 import { CheckoutCreditConfirmModal } from "@/components/inspection/CheckoutCreditConfirmModal";
 import { useCredits } from "@/hooks/useCredits";
 import { trackAction } from "@/lib/breadcrumb";
@@ -707,6 +710,7 @@ export function InspectionClient({
       }
 
       const dimensions = await getImageDimensions(blob);
+      assertValidDimensions(dimensions, "inspection photo blob");
 
       const { error: storageError } = await supabase.storage
         .from("inspection-photos")
@@ -727,8 +731,8 @@ export function InspectionClient({
       const insertPayload = {
         room_id: localRoomId,
         url: publicUrl,
-        width: dimensions?.width ?? null,
-        height: dimensions?.height ?? null,
+        width: dimensions.width,
+        height: dimensions.height,
         damage_tags: [...prefillDamageTags],
         notes: "",
         taken_at: new Date().toISOString(),
@@ -756,8 +760,8 @@ export function InspectionClient({
             .insert({
               room_id: localRoomId,
               url: publicUrl,
-              width: dimensions?.width ?? null,
-              height: dimensions?.height ?? null,
+              width: dimensions.width,
+              height: dimensions.height,
               damage_tags: [...prefillDamageTags],
               notes: "",
               taken_at: new Date().toISOString(),
@@ -779,7 +783,7 @@ export function InspectionClient({
       // ── STEP 4: Replace temp with real URL, show "Analyzing..."
       setPhotos((prev) => prev.map((p) =>
         p.id === tempId
-          ? { ...p, id: realPhotoId, url: publicUrl, width: dimensions?.width ?? null, height: dimensions?.height ?? null, isUploading: false, uploadFailed: false, notes: "Analyzing..." }
+          ? { ...p, id: realPhotoId, url: publicUrl, width: dimensions.width, height: dimensions.height, isUploading: false, uploadFailed: false, notes: "Analyzing..." }
           : p
       ));
       if (localPreviewUrl.startsWith("blob:")) {

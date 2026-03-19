@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
+import { getVideoCaptureDimensions } from "@/lib/getImageDimensions";
 
 /** Same list as InspectionClient PhotoCard */
 const DAMAGE_TAGS = [
@@ -113,11 +114,17 @@ export default function GhostCamera({
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const { width: frameW, height: frameH } = getVideoCaptureDimensions(video);
+    if (!frameW || !frameH) {
+      console.error("[GhostCamera] Video frame dimensions unavailable — cannot capture");
+      setCapturing(false);
+      return;
+    }
+    canvas.width = frameW;
+    canvas.height = frameH;
 
     const ctx = canvas.getContext("2d");
-    ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx?.drawImage(video, 0, 0, frameW, frameH);
 
     const tagsSnapshot = [...selectedTags];
 
