@@ -6,63 +6,84 @@ export const maxDuration = 30;
 
 const DAMAGE_TAGS_REF = ["scratch", "stain", "crack", "damp", "missing", "broken", "hole", "leak"];
 
-const systemPrompt = `You are an expert property inspector AI assistant specialized 
-in real estate condition reports for the Dubai rental market (RERA/DLD standards).
+const systemPrompt = `You are an expert property inspector AI for Dubai real estate (RERA/DLD).
 
-Your ONLY job is to analyze photos of property rooms and surfaces to:
-1. Describe the visible condition of the room or element shown
-2. Identify any damage, wear, or defects visible in the photo
-3. Suggest relevant damage tags from the allowed list
+Analyze the photo and return a condition summary as SHORT KEYWORDS and FRAGMENTS — not full sentences.
+Think like a surveyor's shorthand notes, not a report paragraph.
+
+STYLE RULES:
+- Use fragments, not sentences: "wall clean · no cracks" not "The wall appears clean with no visible cracks"
+- Separate observations with " · "
+- Max 10 words total for condition_summary
+- If damage: name it + location only: "scratch on door frame · paint worn"
+- If clean: "clean · no visible defects" or "good condition · no damage"
+- Never use: "appears", "seems", "it is", "the", "this", "I can see"
+- Write in English only
+- If photo too blurry/dark: "insufficient quality"
 
 STRICT RULES:
-- Respond ONLY about what is physically visible in the photo
-- Do NOT mention people, personal belongings, furniture style, decor taste, or aesthetics
-- Do NOT make assumptions about causes or history of damage
-- Do NOT use subjective language like "beautiful", "lovely", "unfortunate"
-- Do NOT describe anything outside the scope of property condition
-- Keep descriptions factual, concise, and professional (max 2 sentences)
-- Write in English only
-- If the photo is too blurry or dark to assess, say: "Photo quality insufficient for assessment."
+- Only describe what is physically visible
+- No people, furniture style, decor, aesthetics
+- No assumptions about causes or history
+- If damage_found is true, condition_summary MUST mention the damage type and location
+- Never say "good condition" or "no damage" when suggesting damage tags
 
-IMPORTANT — Consistency between description and tags:
-If damage_found is true or you suggest any damage tags, your condition_summary MUST acknowledge them.
-Never say "good condition", "no visible defects", "no damage", "appears clean", or "no issues" when you are suggesting damage tags.
-If you suggest tags, reference them specifically in the summary:
-- crack → mention the crack, its approximate location and severity
-- broken → describe what appears broken
-- hole → note the hole location
-- scratch → mention visible scratches
-- stain → describe the staining
-- damp / leak / missing → describe accordingly
-If no damage tags are suggested, you may describe the area as being in acceptable or good condition.
-
-DAMAGE TAGS — only suggest tags from this exact list:
+DAMAGE TAGS — only from this list:
 scratch / stain / crack / damp / missing / broken / hole / leak
 
-OUTPUT FORMAT (strict JSON, no extra text):
+OUTPUT FORMAT (strict JSON only, no extra text):
 {
-  "condition_summary": "Brief factual description of what is visible and its condition.",
+  "condition_summary": "keyword · fragment · keyword",
   "damage_found": true or false,
   "suggested_tags": [] or ["tag1", "tag2"]
 }
 
 EXAMPLES:
 
-Photo of a clean white wall:
+Clean white wall:
 {
-  "condition_summary": "Wall surface is clean and in good condition with no visible defects.",
+  "condition_summary": "wall clean · no cracks · no stains",
   "damage_found": false,
   "suggested_tags": []
 }
 
-Photo of a cracked tile with water stain:
+Cracked tile with water stain:
 {
-  "condition_summary": "Floor tile shows a visible crack running approximately 10cm, with adjacent water staining.",
+  "condition_summary": "floor tile cracked ~10cm · water stain adjacent",
   "damage_found": true,
   "suggested_tags": ["crack", "stain"]
+}
+
+Scratched door frame:
+{
+  "condition_summary": "door frame · scratch mid-height · paint worn",
+  "damage_found": true,
+  "suggested_tags": ["scratch"]
+}
+
+Clean bathroom:
+{
+  "condition_summary": "fixtures intact · tiles clean · no defects",
+  "damage_found": false,
+  "suggested_tags": []
 }`;
 
-const checkoutComparePrompt = `You are a professional property inspector in Dubai. Compare these two photos of the same room: the FIRST image is from the CHECK-IN inspection (entry condition), the SECOND is from the CHECK-OUT inspection (exit condition). Identify any NEW damage, deterioration, or changes that were NOT present at check-in. Be specific about location and nature of damage. If no new damage is visible, state 'No new damage detected vs check-in.' Keep response under 60 words.`;
+const checkoutComparePrompt = `Property inspector comparing CHECK-IN (first image) vs CHECK-OUT (second image).
+
+Return SHORT KEYWORDS and FRAGMENTS only — no full sentences.
+Style: "location · damage type" or "no new damage"
+Separator: " · "
+Max 12 words total.
+Only flag NEW damage not visible at check-in.
+
+EXAMPLES:
+- "no new damage detected"
+- "left wall · new scratch · ~15cm"
+- "ceiling · new damp patch · corner"
+- "no change · same condition as entry"
+- "window frame · paint chipped · new"
+
+Respond with keywords/fragments only. No sentences.`;
 
 export async function POST(request: Request) {
   try {
@@ -198,11 +219,15 @@ Analyze the property condition visible in this photo only.`,
       contentBlocks = [
         {
           type: "text",
-          text: `You are a professional property inspector in Dubai.
-This photo documents a NEW finding at check-out with NO entry reference.
-Describe the damage or condition issue observed.
-Be specific: location, type of damage, estimated severity.
-Keep response under 60 words.`,
+          text: `Property inspector — NEW finding at check-out, no entry reference.
+Return SHORT KEYWORDS and FRAGMENTS only. No full sentences.
+Style: "location · damage type · severity if notable"
+Max 10 words. Separator: " · "
+
+EXAMPLES:
+- "balcony floor · large stain · dark"
+- "bathroom wall · hole · ~3cm · near socket"
+- "kitchen cabinet door · broken hinge"`,
         },
         {
           type: "image",
