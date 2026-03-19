@@ -438,11 +438,12 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
         <div className="fixed top-0 left-0 right-0 z-10 pt-safe">
           <div className="px-4 pt-5 pb-2">
             <button
-              onClick={() => router.back()}
+              onClick={() => router.push(inspection.property_id ? `/property/${inspection.property_id}` : '/dashboard')}
               className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm back-btn"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A2E" strokeWidth="2.5" strokeLinecap="round">
-                <polyline points="15 18 9 12 15 6" />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1A1A2E" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
               </svg>
             </button>
           </div>
@@ -535,7 +536,10 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
                 (s) => s.signer_type === 'tenant'
               );
               const bothSignedStatus = !!landlordSigStatus?.signed_at && !!tenantSigStatus?.signed_at;
+              const noSignaturesSentYet = !landlordSigStatus && !tenantSigStatus;
+              const landlordSignedStatus = !!landlordSigStatus?.signed_at;
 
+              // Fully signed
               if (bothSignedStatus) return (
                 <div className="flex-1 py-3 rounded-2xl border-2 border-green-200 bg-green-50 flex items-center justify-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-green-500" />
@@ -545,12 +549,33 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
                 </div>
               );
 
-              const pendingType = !landlordSigStatus?.signed_at ? 'landlord' : 'tenant';
-              const pendingLabel = !landlordSigStatus?.signed_at ? 'Awaiting Landlord' : 'Awaiting Tenant';
+              // No signatures sent yet -> same as check-in
+              if (noSignaturesSentYet) return (
+                <button
+                  onClick={() => setShowSignModal(true)}
+                  className="cta-btn flex-1 py-3 rounded-2xl border-2 border-[#9A88FD] flex items-center justify-center gap-2"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"
+                      stroke="#9A88FD"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span className="text-[13px] font-bold text-[#9A88FD]">
+                    Send for Signature
+                  </span>
+                </button>
+              );
+
+              // One signed, one pending -> Awaiting X
+              const pendingLabel = !landlordSignedStatus ? 'Awaiting Landlord' : 'Awaiting Tenant';
 
               return (
                 <button
-                  onClick={() => handleSign(pendingType)}
+                  onClick={() => setShowSignModal(true)}
                   className="cta-btn flex-1 py-3 rounded-2xl border-2 border-[#D97706] flex items-center justify-center gap-2"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -594,6 +619,97 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
             }}
             onClose={() => setInPersonModal(null)}
           />
+        )}
+
+        {/* Reuse same Send for Signature modal for checkout */}
+        {showSignModal && (
+          <div
+            style={{
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+              zIndex: 9998, display: "flex", alignItems: "flex-end", justifyContent: "center",
+            }}
+            onClick={() => setShowSignModal(false)}
+          >
+            <div
+              style={{
+                background: "#fff", borderRadius: "20px 20px 0 0",
+                width: "100%", maxWidth: 480, padding: 24,
+                paddingBottom: "max(80px, env(safe-area-inset-bottom))",
+                boxShadow: "0 -4px 32px rgba(0,0,0,0.15)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+                <h2 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 18, fontWeight: 800, color: "#1A1A1A", margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                  <PenLine size={18} />
+                  Send for Signature
+                </h2>
+                <button onClick={() => setShowSignModal(false)} style={{ background: "none", border: "none", fontSize: 18, color: "#999", cursor: "pointer", padding: 4 }}>✕</button>
+              </div>
+
+              {/* Landlord */}
+              <div style={{ background: landlordSigned ? "#f1f8f1" : "#F8F7F4", borderRadius: 16, padding: 16, marginBottom: 12 }}>
+                <p style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: 1, margin: "0 0 8px" }}>Landlord</p>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>{tenancy?.landlord_name ?? "—"}</p>
+                <p style={{ fontSize: 13, color: "#666", margin: "4px 0 12px" }}>{tenancy?.landlord_email ?? "—"}</p>
+                {landlordSigned ? (
+                  <div style={{ width: "100%", padding: "10px 0", borderRadius: 12, background: "#e8f5e9", color: "#2e7d32", fontSize: 13, fontWeight: 600, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    <Check size={14} /> Landlord signed
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="button" onClick={() => handleSendOTP("landlord", tenancy?.landlord_email ?? "", tenancy?.landlord_name ?? "")} disabled={sent.landlord || sending}
+                      style={{ flex: 1, padding: "12px 8px", borderRadius: 12, border: "2px solid transparent", fontSize: 11, fontWeight: 600, cursor: sent.landlord || sending ? "default" : "pointer", background: sent.landlord ? "rgba(34,197,94,0.15)" : "#F3F3F8", color: sent.landlord ? "#166534" : "#6B7280", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <Mail size={16} color={sent.landlord ? "#166534" : "#6B7280"} />
+                      <span>{sent.landlord ? "Sent!" : "Remote"}</span>
+                      <span style={{ fontSize: 9, color: "#9CA3AF", fontWeight: 400 }}>Link by email</span>
+                    </button>
+                    <button type="button" onClick={() => { setShowSignModal(false); setTimeout(() => setInPersonModal({ signerType: 'landlord', name: tenancy?.landlord_name || 'Landlord', email: tenancy?.landlord_email || '' }), 200); }}
+                      style={{ flex: 1, padding: "12px 8px", borderRadius: 12, border: "2px solid rgba(154,136,253,0.3)", fontSize: 11, fontWeight: 600, cursor: "pointer", background: "#EDE9FF", color: "#9A88FD", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <Users size={16} color="#9A88FD" />
+                      <span>In person</span>
+                      <span style={{ fontSize: 9, color: "rgba(154,136,253,0.6)", fontWeight: 400 }}>Sign on this device</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Tenant */}
+              <div style={{ background: tenantSigned ? "#f1f8f1" : "#F8F7F4", borderRadius: 16, padding: 16, marginBottom: 24 }}>
+                <p style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: 1, margin: "0 0 8px" }}>Tenant</p>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>{tenancy?.tenant_name ?? "—"}</p>
+                <p style={{ fontSize: 13, color: "#666", margin: "4px 0 12px" }}>{tenancy?.tenant_email ?? "—"}</p>
+                {tenantSigned ? (
+                  <div style={{ width: "100%", padding: "10px 0", borderRadius: 12, background: "#e8f5e9", color: "#2e7d32", fontSize: 13, fontWeight: 600, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    <Check size={14} /> Tenant signed
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="button" onClick={() => handleSendOTP("tenant", tenancy?.tenant_email ?? "", tenancy?.tenant_name ?? "")} disabled={sent.tenant || sending}
+                      style={{ flex: 1, padding: "12px 8px", borderRadius: 12, border: "2px solid transparent", fontSize: 11, fontWeight: 600, cursor: sent.tenant || sending ? "default" : "pointer", background: sent.tenant ? "rgba(34,197,94,0.15)" : "#F3F3F8", color: sent.tenant ? "#166534" : "#6B7280", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <Mail size={16} color={sent.tenant ? "#166534" : "#6B7280"} />
+                      <span>{sent.tenant ? "Sent!" : "Remote"}</span>
+                      <span style={{ fontSize: 9, color: "#9CA3AF", fontWeight: 400 }}>Link by email</span>
+                    </button>
+                    <button type="button" onClick={() => { setShowSignModal(false); setTimeout(() => setInPersonModal({ signerType: 'tenant', name: tenancy?.tenant_name || 'Tenant', email: tenancy?.tenant_email || '' }), 200); }}
+                      style={{ flex: 1, padding: "12px 8px", borderRadius: 12, border: "2px solid rgba(154,136,253,0.3)", fontSize: 11, fontWeight: 600, cursor: "pointer", background: "#EDE9FF", color: "#9A88FD", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <Users size={16} color="#9A88FD" />
+                      <span>In person</span>
+                      <span style={{ fontSize: 9, color: "rgba(154,136,253,0.6)", fontWeight: 400 }}>Sign on this device</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {(sent.landlord || sent.tenant) && !bothSigned && (
+                <div style={{ background: "rgba(154,136,253,0.1)", borderRadius: 12, padding: 12, textAlign: "center" }}>
+                  <p style={{ fontSize: 13, color: "#9A88FD", fontWeight: 500, margin: 0 }}>
+                    {sent.landlord && sent.tenant ? "Both emails sent. Waiting for signatures..." : `Email sent to ${sent.landlord ? "landlord" : "tenant"}. Waiting for signature...`}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </>
     );
@@ -641,8 +757,9 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
             textDecoration: "none",
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="2.5" strokeLinecap="round">
-            <polyline points="15 18 9 12 15 6" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </Link>
       </div>
