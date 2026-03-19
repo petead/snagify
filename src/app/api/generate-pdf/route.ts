@@ -267,7 +267,7 @@ export async function buildPdfAndUpload(
     const isCheckout = inspectionType.toLowerCase().includes("check-out");
 
     let checkinInspectionForPdf: { id: string; created_at: string; document_hash?: string } | null = null;
-    let checkinPhotosById: Map<string, { id: string; url: string; damage_tags?: string[]; ai_analysis?: string | null; width?: number | null; height?: number | null }> = new Map();
+    let checkinPhotosById: Map<string, { id: string; url: string; damage_tags?: string[]; ai_analysis?: string | null; width?: number | null; height?: number | null; taken_at?: string | null }> = new Map();
     let checkinRoomConditionsByName: Map<string, string> = new Map();
     let checkinRoomsForPdf: import("@/lib/generateCheckoutPDF").CheckinRoomPdf[] | undefined = undefined;
 
@@ -293,12 +293,13 @@ export async function buildPdfAndUpload(
         if (checkinPhotoIds.length > 0) {
           const { data: checkinPhotos } = await supabase
             .from("photos")
-            .select("id, url, damage_tags, ai_analysis, width, height")
+            .select("id, url, damage_tags, ai_analysis, width, height, taken_at")
             .in("id", checkinPhotoIds);
           (checkinPhotos ?? []).forEach((p) => {
             checkinPhotosById.set(p.id, {
               id: p.id,
               url: p.url ?? "",
+              taken_at: p.taken_at ?? null,
               damage_tags: p.damage_tags ?? undefined,
               ai_analysis: p.ai_analysis ?? undefined,
               width: p.width ?? undefined,
@@ -321,7 +322,8 @@ export async function buildPdfAndUpload(
               damage_tags,
               ai_analysis,
               width,
-              height
+              height,
+              taken_at
             )
           `
           )
@@ -343,6 +345,7 @@ export async function buildPdfAndUpload(
                 ai_analysis?: string | null;
                 width?: number | null;
                 height?: number | null;
+                taken_at?: string | null;
               }> | null;
             }) => ({
               id: r.id,
@@ -352,6 +355,7 @@ export async function buildPdfAndUpload(
                 .map((p) => ({
                   id: p.id,
                   url: p.url!,
+                  taken_at: p.taken_at ?? null,
                   damage_tags: p.damage_tags ?? [],
                   ai_analysis: p.ai_analysis ?? null,
                   width: p.width ?? null,

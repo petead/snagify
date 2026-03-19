@@ -1176,7 +1176,7 @@ function InspectionReport({
   return (
     <Document>
       {/* PAGE 1 — COVER (hero + body + footer) */}
-      <Page size="A4">
+      <Page size="A4" wrap={false}>
         <View style={[s.coverHero, { backgroundColor: tokens.primary }]}>
           <View style={[s.coverHeroGeoCircle, { borderColor: tokens.primaryDark }]} />
           <View style={[s.coverHeroGeoCircle2, { borderColor: tokens.primaryLight }]} />
@@ -1350,7 +1350,7 @@ function InspectionReport({
       </Page>
 
       {/* PAGE 2 — INSPECTION OVERVIEW */}
-      <Page size="A4">
+      <Page size="A4" wrap={false}>
         <View style={[s.overviewHeader, { backgroundColor: tokens.primary }]}>
           <View>
             <Text style={s.overviewTitleNew}>Inspection Overview</Text>
@@ -1776,7 +1776,7 @@ function InspectionReport({
       })}
 
       {/* SIGNATURE PAGE */}
-      <Page size="A4">
+      <Page size="A4" wrap={false}>
         <View style={[s.sigHero, { backgroundColor: tokens.primary }]}>
           <View style={[s.sigHeroDeco, { borderColor: tokens.primaryDark }]} />
           <View style={s.sigHeroTop}>

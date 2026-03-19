@@ -75,6 +75,7 @@ interface CheckoutPhoto {
   id: string;
   url: string;
   taken_at?: string | null;
+  created_at?: string | null;
   damage_tags?: string[] | null;
   ai_analysis?: string | null;
   width?: number | null;
@@ -85,6 +86,7 @@ interface CheckoutPhoto {
     id?: string;
     url: string;
     taken_at?: string | null;
+    created_at?: string | null;
     damage_tags?: string[] | null;
     ai_analysis?: string | null;
     width?: number | null;
@@ -109,6 +111,7 @@ export type CheckinRoomPdf = {
     id: string;
     url: string;
     taken_at?: string | null;
+    created_at?: string | null;
     damage_tags?: string[] | null;
     ai_analysis?: string | null;
     width?: number | null;
@@ -209,6 +212,34 @@ function formatDate(dateStr?: string | null, withTime = false): string {
   } catch {
     return String(dateStr);
   }
+}
+
+/** Timestamp badge on room photos — check-in / check-out aligned */
+const PHOTO_TIMESTAMP_BADGE = {
+  position: "absolute" as const,
+  bottom: 6,
+  right: 6,
+  backgroundColor: "rgba(0,0,0,0.45)",
+  borderRadius: 3,
+  paddingHorizontal: 5,
+  paddingVertical: 2,
+};
+
+const PHOTO_TIMESTAMP_TEXT = {
+  fontSize: 6.5,
+  color: "#FFFFFF",
+  fontFamily: "Helvetica",
+};
+
+/** Photo taken_at → row created_at → inspection-level fallback (Dubai via formatDate). */
+function photoTimestampLabel(
+  photo: { taken_at?: string | null; created_at?: string | null } | null | undefined,
+  inspectionFallbackIso: string | null | undefined
+): string | null {
+  const raw = photo?.taken_at ?? photo?.created_at ?? inspectionFallbackIso ?? null;
+  if (!raw) return null;
+  const formatted = formatDate(raw, true);
+  return formatted === "—" ? null : formatted;
 }
 
 function capitalise(str?: string | null): string {
@@ -1202,7 +1233,7 @@ export function CheckoutPDFDocument({
   return (
     <Document>
       {/* PAGE 1 — COVER */}
-      <Page size="A4" style={s.page}>
+      <Page size="A4" style={s.page} wrap={false}>
         <View style={[s.coverHero, { backgroundColor: tokens.primary }]}>
           <View style={[s.coverHeroGeoCircle, { borderColor: tokens.primaryDark }]} />
           <View style={[s.coverHeroGeoCircle2, { borderColor: tokens.primaryDark }]} />
@@ -1330,7 +1361,7 @@ export function CheckoutPDFDocument({
       </Page>
 
       {/* PAGE 2 — CHECK-OUT COMPARISON */}
-      <Page size="A4" style={s.page}>
+      <Page size="A4" style={s.page} wrap={false}>
         <View style={[s.overviewHeader, { backgroundColor: tokens.primary }]}>
           <View>
             <Text style={s.overviewTitleNew}>Check-out Comparison</Text>
@@ -1615,7 +1646,7 @@ export function CheckoutPDFDocument({
         const { room, roomIndex, chunk, chunkIdx, totalRoomPages, verdict, coIssues, coPhotoCount } = entry;
 
         return (
-          <Page key={`${room.id}-${chunkIdx}-${globalIdx}`} size="A4" style={s.page}>
+          <Page key={`${room.id}-${chunkIdx}-${globalIdx}`} size="A4" style={s.page} wrap={false}>
             <View
               style={{
                 backgroundColor: tokens.primary,
@@ -1873,7 +1904,7 @@ export function CheckoutPDFDocument({
                                 marginBottom: 2,
                               }}
                             >
-                              Comparison Note
+                              CHECK-IN → CHECK-OUT
                             </Text>
                             <Text style={{ fontSize: 7, color: "#4B4B4B", lineHeight: 1.4 }}>
                               {pair.coPhoto.ai_analysis}
@@ -1934,6 +1965,10 @@ export function CheckoutPDFDocument({
                               {ciHasUrl && pair.ciPhoto ? (
                                 (() => {
                                   const sz = calcPhotoSize(pair.ciPhoto, COL_W, PAIR_MAX_H);
+                                  const ciTs = photoTimestampLabel(
+                                    pair.ciPhoto,
+                                    checkinInspection?.created_at
+                                  );
                                   return (
                                     <View style={{ marginBottom: 5, position: "relative" }}>
                                       <Image
@@ -1947,23 +1982,11 @@ export function CheckoutPDFDocument({
                                           opacity: 0.88,
                                         }}
                                       />
-                                      {pair.ciPhoto.taken_at && (
-                                        <View
-                                          style={{
-                                            position: "absolute",
-                                            bottom: 4,
-                                            right: 4,
-                                            backgroundColor: "rgba(0,0,0,0.45)",
-                                            borderRadius: 3,
-                                            paddingHorizontal: 4,
-                                            paddingVertical: 2,
-                                          }}
-                                        >
-                                          <Text style={{ fontSize: 6, color: "#FFFFFF", fontFamily: "Helvetica" }}>
-                                            {formatDate(pair.ciPhoto.taken_at, true)}
-                                          </Text>
+                                      {ciTs ? (
+                                        <View style={PHOTO_TIMESTAMP_BADGE}>
+                                          <Text style={PHOTO_TIMESTAMP_TEXT}>{ciTs}</Text>
                                         </View>
-                                      )}
+                                      ) : null}
                                     </View>
                                   );
                                 })()
@@ -2066,6 +2089,7 @@ export function CheckoutPDFDocument({
                               {coHasUrl && pair.coPhoto ? (
                                 (() => {
                                   const sz = calcPhotoSize(pair.coPhoto, COL_W, PAIR_MAX_H);
+                                  const coTs = photoTimestampLabel(pair.coPhoto, inspection.created_at);
                                   return (
                                     <View style={{ marginBottom: 5, position: "relative" }}>
                                       <Image
@@ -2080,23 +2104,11 @@ export function CheckoutPDFDocument({
                                           borderColor: tokens.primary,
                                         }}
                                       />
-                                      {pair.coPhoto.taken_at && (
-                                        <View
-                                          style={{
-                                            position: "absolute",
-                                            bottom: 4,
-                                            right: 4,
-                                            backgroundColor: "rgba(0,0,0,0.45)",
-                                            borderRadius: 3,
-                                            paddingHorizontal: 4,
-                                            paddingVertical: 2,
-                                          }}
-                                        >
-                                          <Text style={{ fontSize: 6, color: "#FFFFFF", fontFamily: "Helvetica" }}>
-                                            {formatDate(pair.coPhoto.taken_at, true)}
-                                          </Text>
+                                      {coTs ? (
+                                        <View style={PHOTO_TIMESTAMP_BADGE}>
+                                          <Text style={PHOTO_TIMESTAMP_TEXT}>{coTs}</Text>
                                         </View>
-                                      )}
+                                      ) : null}
                                     </View>
                                   );
                                 })()
@@ -2165,7 +2177,7 @@ export function CheckoutPDFDocument({
                                       marginBottom: 2,
                                     }}
                                   >
-                                    Comparison Note
+                                    CHECK-IN → CHECK-OUT
                                   </Text>
                                   <Text style={{ fontSize: 7, color: "#4B4B4B", lineHeight: 1.4 }}>
                                     {pair.coPhoto.ai_analysis}
@@ -2197,7 +2209,7 @@ export function CheckoutPDFDocument({
       })}
 
       {/* SIGNATURE PAGE */}
-      <Page size="A4" style={s.page}>
+      <Page size="A4" style={s.page} wrap={false}>
         <View style={[s.sigHero, { backgroundColor: tokens.primary }]}>
           <View style={[s.sigHeroDeco, { borderColor: tokens.primaryDark }]} />
           <View style={s.sigHeroTop}>
