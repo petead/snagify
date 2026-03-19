@@ -1,4 +1,5 @@
 import BottomNav from "@/components/layout/BottomNav";
+import { AuthGuard } from "@/components/AuthGuard";
 
 export default function AppLayout({
   children,
@@ -6,11 +7,13 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
-      <div className="min-h-screen bg-[#F8F7F4] pb-16 max-w-lg mx-auto">
-        {children}
-      </div>
-      <BottomNav />
-    </>
+    <AuthGuard>
+      <>
+        <div className="min-h-screen bg-[#F8F7F4] pb-16 max-w-lg mx-auto">
+          {children}
+        </div>
+        <BottomNav />
+      </>
+    </AuthGuard>
   );
 }
