@@ -25,7 +25,8 @@ const AMBER_LIGHT = "#FEF3C7";
 const PAGE_W = 535;
 const COL_W = 262; // (PAGE_W - 10 gap) / 2
 const PAIR_MAX_H = 270; // (702pt − 14 gap) / 2 − ~70pt text ≈ 274 → 270
-const NEW_MAX_H = 400; // full-width new damage — higher cap
+/** @deprecated for room photo rows — new damage uses COL_W + PAIR_MAX_H; kept for CHECKOUT_PDF_LAYOUT export */
+const NEW_MAX_H = 400;
 const PAIR_GAP = 8; // vertical gap between two pairs on same page
 /** Layout reserve (tags + AI under photos), ~65pt — for future pagination tuning */
 const TEXT_AREA = 65;
@@ -39,7 +40,7 @@ function calcPhotoSize(
   const srcH = photo?.height || 900;
   const ratio = srcH / srcW; // height / width
 
-  // Ceiling comes only from maxWidth / maxHeight (PAIR_MAX_H or NEW_MAX_H) — no secondary cap
+  // Ceiling comes only from maxWidth / maxHeight (e.g. PAIR_MAX_H) — no secondary cap
   let displayW = maxWidth;
   let displayH = displayW * ratio;
 
@@ -245,7 +246,7 @@ function getRoomVerdict(
     return {
       label: "Better",
       color: brand.primary,
-      bg: `${brand.primary}22`,
+      bg: `${brand.primary}25`,
     };
   }
   if (coIssues > ciIssues) {
@@ -886,7 +887,6 @@ const s = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#4ADE80",
   },
   sigVerifiedText: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#FFFFFF", letterSpacing: 0.3 },
   sigTitle: {
@@ -1482,7 +1482,7 @@ export function CheckoutPDFDocument({
                     </Text>
                   </View>
 
-                  {/* Returned qty — green or red */}
+                  {/* Returned qty */}
                   <View style={{ flex: 1, alignItems: 'center' }}>
                     <Text style={{
                       fontSize: 10, fontFamily: 'Helvetica-Bold',
@@ -1495,7 +1495,7 @@ export function CheckoutPDFDocument({
                   {/* Status badge */}
                   <View style={{ flex: 1, alignItems: 'center' }}>
                     <View style={{
-                      backgroundColor: k.ok ? `${tokens.primary}22` : '#FEE2E2',
+                      backgroundColor: k.ok ? `${tokens.primary}25` : '#FEE2E2',
                       borderRadius: 20, paddingHorizontal: 6, paddingVertical: 2,
                     }}>
                       <Text style={{
@@ -1515,7 +1515,7 @@ export function CheckoutPDFDocument({
                 return (
                   <View style={{
                     marginTop: 8, flexDirection: 'row', alignItems: 'center',
-                    backgroundColor: allOk ? `${tokens.primary}22` : '#FEE2E2',
+                    backgroundColor: allOk ? `${tokens.primary}25` : '#FEE2E2',
                     borderRadius: 6, padding: '5 10',
                   }}>
                     <View style={{
@@ -1652,121 +1652,14 @@ export function CheckoutPDFDocument({
                   }}
                 >
                   {pair.type === "new" ? (
-                    <View>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          backgroundColor: "#FEE2E2",
-                          borderRadius: 4,
-                          padding: "4 8",
-                          marginBottom: 8,
-                        }}
-                      >
-                        <View
-                          style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: 3,
-                            backgroundColor: "#DC2626",
-                            marginRight: 6,
-                          }}
-                        />
-                        <Text
-                          style={{
-                            fontSize: 7.5,
-                            fontFamily: "Helvetica-Bold",
-                            color: "#DC2626",
-                            textTransform: "uppercase",
-                            letterSpacing: 0.5,
-                          }}
-                        >
-                          New — not present at check-in
-                        </Text>
-                      </View>
-
-                      {isHttpsImageUrl(pair.coPhoto.url) && (() => {
-                        const sz = calcPhotoSize(pair.coPhoto, PAGE_W, NEW_MAX_H);
-                        return (
-                          <View style={{ alignItems: "center", marginBottom: 8 }}>
-                            <Image
-                              src={pair.coPhoto.url}
-                              style={{
-                                width: sz.w,
-                                height: sz.h,
-                                objectFit: "contain",
-                                backgroundColor: "#F8F7F4",
-                                borderRadius: 4,
-                              }}
-                            />
-                          </View>
-                        );
-                      })()}
-
-                      {pair.coPhoto.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            flexWrap: "wrap",
-                            marginBottom: 5,
-                          }}
-                        >
-                          {pair.coPhoto.damage_tags.map((tag, ti) => (
-                            <View
-                              key={ti}
-                              style={{
-                                backgroundColor: "#FEE2E2",
-                                borderRadius: 20,
-                                paddingHorizontal: 6,
-                                paddingVertical: 2,
-                                marginRight: 4,
-                                marginBottom: 3,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: 6.5,
-                                  fontFamily: "Helvetica-Bold",
-                                  color: "#DC2626",
-                                  textTransform: "uppercase",
-                                }}
-                              >
-                                {tag}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-
-                      {pair.coPhoto.ai_analysis && (
-                        <View>
-                          <Text
-                            style={{
-                              fontSize: 7,
-                              fontFamily: "Helvetica-Bold",
-                              color: tokens.primary,
-                              textTransform: "uppercase",
-                              letterSpacing: 0.8,
-                              marginBottom: 3,
-                            }}
-                          >
-                            AI ANALYSIS
-                          </Text>
-                          <Text style={{ fontSize: 7.5, color: "#4B4B4B", lineHeight: 1.5 }}>
-                            {pair.coPhoto.ai_analysis}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  ) : (
                     <View style={{ flexDirection: "row" }}>
                       <View style={{ width: COL_W, marginRight: 10 }}>
                         <View
                           style={{
                             backgroundColor: "#F3F3F8",
                             borderRadius: 3,
-                            paddingHorizontal: 6,
-                            paddingVertical: 2,
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
                             marginBottom: 5,
                             alignSelf: "flex-start",
                           }}
@@ -1775,7 +1668,7 @@ export function CheckoutPDFDocument({
                             style={{
                               fontSize: 6.5,
                               fontFamily: "Helvetica-Bold",
-                              color: "#6B7280",
+                              color: "#9B9BA8",
                               textTransform: "uppercase",
                               letterSpacing: 0.5,
                             }}
@@ -1783,163 +1676,90 @@ export function CheckoutPDFDocument({
                             Check-in
                           </Text>
                         </View>
-
-                        {pair.ciPhoto && isHttpsImageUrl(pair.ciPhoto.url) ? (() => {
-                          const sz = calcPhotoSize(pair.ciPhoto, COL_W, PAIR_MAX_H);
+                        {(() => {
+                          const sz = calcPhotoSize(pair.coPhoto, COL_W, PAIR_MAX_H);
                           return (
-                            <View style={{ marginBottom: 5 }}>
-                              <Image
-                                src={pair.ciPhoto.url}
-                                style={{
-                                  width: sz.w,
-                                  height: sz.h,
-                                  objectFit: "contain",
-                                  backgroundColor: "#F8F7F4",
-                                  borderRadius: 3,
-                                  opacity: 0.88,
-                                }}
-                              />
-                            </View>
-                          );
-                        })() : (
-                          <View
-                            style={{
-                              width: COL_W,
-                              height: 80,
-                              backgroundColor: "#F3F3F8",
-                              borderRadius: 3,
-                              alignItems: "center",
-                              justifyContent: "center",
-                              marginBottom: 5,
-                            }}
-                          >
-                            <Text style={{ fontSize: 7, color: "#C4C4C4" }}>No photo</Text>
-                          </View>
-                        )}
-
-                        {pair.ciPhoto?.damage_tags && pair.ciPhoto.damage_tags.length > 0 && (
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              flexWrap: "wrap",
-                              marginBottom: 4,
-                            }}
-                          >
-                            {pair.ciPhoto.damage_tags.map((tag, ti) => (
-                              <View
-                                key={ti}
-                                style={{
-                                  backgroundColor: "#F3F3F8",
-                                  borderRadius: 20,
-                                  paddingHorizontal: 5,
-                                  paddingVertical: 1.5,
-                                  marginRight: 3,
-                                  marginBottom: 2,
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 6,
-                                    fontFamily: "Helvetica-Bold",
-                                    color: "#6B7280",
-                                    textTransform: "uppercase",
-                                  }}
-                                >
-                                  {tag}
-                                </Text>
-                              </View>
-                            ))}
-                          </View>
-                        )}
-
-                        {pair.ciPhoto?.ai_analysis && (
-                          <View>
-                            <Text
+                            <View
                               style={{
-                                fontSize: 6,
-                                fontFamily: "Helvetica-Bold",
-                                color: "#9B9BA8",
-                                textTransform: "uppercase",
-                                letterSpacing: 0.5,
-                                marginBottom: 2,
+                                width: sz.w,
+                                height: sz.h,
+                                backgroundColor: "#F8F7F4",
+                                borderRadius: 3,
+                                alignItems: "center",
+                                justifyContent: "center",
+                                marginBottom: 5,
                               }}
                             >
-                              Check-in note
-                            </Text>
-                            <Text style={{ fontSize: 7, color: "#9B9BA8", lineHeight: 1.4 }}>
-                              {pair.ciPhoto.ai_analysis}
-                            </Text>
-                          </View>
-                        )}
+                              <Text style={{ fontSize: 7, color: "#C4C4C4" }}>Not photographed</Text>
+                              <Text style={{ fontSize: 6, color: "#D1D5DB", marginTop: 3 }}>
+                                at check-in
+                              </Text>
+                            </View>
+                          );
+                        })()}
                       </View>
 
                       <View style={{ width: COL_W }}>
                         <View
                           style={{
-                            backgroundColor: tokens.primaryUltraLight || "#EDE9FF",
-                            borderRadius: 3,
-                            paddingHorizontal: 6,
-                            paddingVertical: 2,
+                            flexDirection: "row",
+                            alignItems: "center",
                             marginBottom: 5,
-                            alignSelf: "flex-start",
                           }}
                         >
-                          <Text
-                            style={{
-                              fontSize: 6.5,
-                              fontFamily: "Helvetica-Bold",
-                              color: tokens.primary,
-                              textTransform: "uppercase",
-                              letterSpacing: 0.5,
-                            }}
-                          >
-                            Check-out
-                          </Text>
-                        </View>
-
-                        {pair.coPhoto && isHttpsImageUrl(pair.coPhoto.url) ? (() => {
-                          const sz = calcPhotoSize(pair.coPhoto, COL_W, PAIR_MAX_H);
-                          return (
-                            <View style={{ marginBottom: 5 }}>
-                              <Image
-                                src={pair.coPhoto.url}
-                                style={{
-                                  width: sz.w,
-                                  height: sz.h,
-                                  objectFit: "contain",
-                                  backgroundColor: "#F8F7F4",
-                                  borderRadius: 3,
-                                  borderWidth: 1.5,
-                                  borderColor: tokens.primary,
-                                }}
-                              />
-                            </View>
-                          );
-                        })() : (
                           <View
                             style={{
-                              width: COL_W,
-                              height: 80,
-                              backgroundColor: "#EDE9FF",
+                              backgroundColor: "#FEE2E2",
                               borderRadius: 3,
-                              alignItems: "center",
-                              justifyContent: "center",
-                              marginBottom: 5,
+                              paddingHorizontal: 6,
+                              paddingVertical: 2,
+                              marginRight: 4,
                             }}
                           >
-                            <Text style={{ fontSize: 7, color: tokens.primary }}>Not photographed</Text>
+                            <Text
+                              style={{
+                                fontSize: 6.5,
+                                fontFamily: "Helvetica-Bold",
+                                color: "#DC2626",
+                                textTransform: "uppercase",
+                                letterSpacing: 0.5,
+                              }}
+                            >
+                              New damage
+                            </Text>
                           </View>
-                        )}
+                        </View>
+                        {isHttpsImageUrl(pair.coPhoto.url) &&
+                          (() => {
+                            const sz = calcPhotoSize(pair.coPhoto, COL_W, PAIR_MAX_H);
+                            return (
+                              <View style={{ marginBottom: 5 }}>
+                                <Image
+                                  src={pair.coPhoto.url}
+                                  style={{
+                                    width: sz.w,
+                                    height: sz.h,
+                                    objectFit: "contain",
+                                    backgroundColor: "#F8F7F4",
+                                    borderRadius: 3,
+                                    borderWidth: 1.5,
+                                    borderColor: "#DC2626",
+                                  }}
+                                />
+                              </View>
+                            );
+                          })()}
 
-                        {pair.coPhoto?.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
+                        {pair.coPhoto.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
                           <View
                             style={{
                               flexDirection: "row",
                               flexWrap: "wrap",
+                              marginTop: 4,
                               marginBottom: 4,
                             }}
                           >
-                            {pair.coPhoto.damage_tags.map((tag, ti) => (
+                            {pair.coPhoto.damage_tags.map((tag: string, ti: number) => (
                               <View
                                 key={ti}
                                 style={{
@@ -1948,7 +1768,7 @@ export function CheckoutPDFDocument({
                                   paddingHorizontal: 5,
                                   paddingVertical: 1.5,
                                   marginRight: 3,
-                                  marginBottom: 2,
+                                  marginBottom: 3,
                                 }}
                               >
                                 <Text
@@ -1966,13 +1786,13 @@ export function CheckoutPDFDocument({
                           </View>
                         )}
 
-                        {pair.coPhoto?.ai_analysis && (
+                        {pair.coPhoto.ai_analysis && (
                           <View>
                             <Text
                               style={{
                                 fontSize: 6,
                                 fontFamily: "Helvetica-Bold",
-                                color: tokens.primary,
+                                color: "#DC2626",
                                 textTransform: "uppercase",
                                 letterSpacing: 0.5,
                                 marginBottom: 2,
@@ -1986,6 +1806,267 @@ export function CheckoutPDFDocument({
                           </View>
                         )}
                       </View>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: "row" }}>
+                      {(() => {
+                        const coHasUrl =
+                          pair.coPhoto != null && isHttpsImageUrl(pair.coPhoto.url);
+                        const ciHasUrl =
+                          pair.ciPhoto != null && isHttpsImageUrl(pair.ciPhoto.url);
+                        const fallbackSz = calcPhotoSize(
+                          { width: 1200, height: 900 },
+                          COL_W,
+                          PAIR_MAX_H
+                        );
+                        const coSz =
+                          coHasUrl && pair.coPhoto
+                            ? calcPhotoSize(pair.coPhoto, COL_W, PAIR_MAX_H)
+                            : null;
+                        const ciSz =
+                          ciHasUrl && pair.ciPhoto
+                            ? calcPhotoSize(pair.ciPhoto, COL_W, PAIR_MAX_H)
+                            : null;
+                        const noCiBox = coSz ?? fallbackSz;
+                        const noCoBox = ciSz ?? fallbackSz;
+
+                        return (
+                          <>
+                            <View style={{ width: COL_W, marginRight: 10 }}>
+                              <View
+                                style={{
+                                  backgroundColor: "#F3F3F8",
+                                  borderRadius: 3,
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 2,
+                                  marginBottom: 5,
+                                  alignSelf: "flex-start",
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 6.5,
+                                    fontFamily: "Helvetica-Bold",
+                                    color: "#6B7280",
+                                    textTransform: "uppercase",
+                                    letterSpacing: 0.5,
+                                  }}
+                                >
+                                  Check-in
+                                </Text>
+                              </View>
+
+                              {ciHasUrl && pair.ciPhoto ? (
+                                (() => {
+                                  const sz = calcPhotoSize(pair.ciPhoto, COL_W, PAIR_MAX_H);
+                                  return (
+                                    <View style={{ marginBottom: 5 }}>
+                                      <Image
+                                        src={pair.ciPhoto.url}
+                                        style={{
+                                          width: sz.w,
+                                          height: sz.h,
+                                          objectFit: "contain",
+                                          backgroundColor: "#F8F7F4",
+                                          borderRadius: 3,
+                                          opacity: 0.88,
+                                        }}
+                                      />
+                                    </View>
+                                  );
+                                })()
+                              ) : (
+                                <View
+                                  style={{
+                                    width: noCiBox.w,
+                                    height: noCiBox.h,
+                                    backgroundColor: "#F3F3F8",
+                                    borderRadius: 3,
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    marginBottom: 5,
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 7, color: "#C4C4C4" }}>No photo</Text>
+                                </View>
+                              )}
+
+                              {pair.ciPhoto?.damage_tags && pair.ciPhoto.damage_tags.length > 0 && (
+                                <View
+                                  style={{
+                                    flexDirection: "row",
+                                    flexWrap: "wrap",
+                                    marginBottom: 4,
+                                  }}
+                                >
+                                  {pair.ciPhoto.damage_tags.map((tag, ti) => (
+                                    <View
+                                      key={ti}
+                                      style={{
+                                        backgroundColor: "#F3F3F8",
+                                        borderRadius: 20,
+                                        paddingHorizontal: 5,
+                                        paddingVertical: 1.5,
+                                        marginRight: 3,
+                                        marginBottom: 2,
+                                      }}
+                                    >
+                                      <Text
+                                        style={{
+                                          fontSize: 6,
+                                          fontFamily: "Helvetica-Bold",
+                                          color: "#6B7280",
+                                          textTransform: "uppercase",
+                                        }}
+                                      >
+                                        {tag}
+                                      </Text>
+                                    </View>
+                                  ))}
+                                </View>
+                              )}
+
+                              {pair.ciPhoto?.ai_analysis && (
+                                <View>
+                                  <Text
+                                    style={{
+                                      fontSize: 6,
+                                      fontFamily: "Helvetica-Bold",
+                                      color: "#9B9BA8",
+                                      textTransform: "uppercase",
+                                      letterSpacing: 0.5,
+                                      marginBottom: 2,
+                                    }}
+                                  >
+                                    Check-in note
+                                  </Text>
+                                  <Text style={{ fontSize: 7, color: "#9B9BA8", lineHeight: 1.4 }}>
+                                    {pair.ciPhoto.ai_analysis}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+
+                            <View style={{ width: COL_W }}>
+                              <View
+                                style={{
+                                  backgroundColor: tokens.primaryUltraLight || "#EDE9FF",
+                                  borderRadius: 3,
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 2,
+                                  marginBottom: 5,
+                                  alignSelf: "flex-start",
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 6.5,
+                                    fontFamily: "Helvetica-Bold",
+                                    color: tokens.primary,
+                                    textTransform: "uppercase",
+                                    letterSpacing: 0.5,
+                                  }}
+                                >
+                                  Check-out
+                                </Text>
+                              </View>
+
+                              {coHasUrl && pair.coPhoto ? (
+                                (() => {
+                                  const sz = calcPhotoSize(pair.coPhoto, COL_W, PAIR_MAX_H);
+                                  return (
+                                    <View style={{ marginBottom: 5 }}>
+                                      <Image
+                                        src={pair.coPhoto.url}
+                                        style={{
+                                          width: sz.w,
+                                          height: sz.h,
+                                          objectFit: "contain",
+                                          backgroundColor: "#F8F7F4",
+                                          borderRadius: 3,
+                                          borderWidth: 1.5,
+                                          borderColor: tokens.primary,
+                                        }}
+                                      />
+                                    </View>
+                                  );
+                                })()
+                              ) : (
+                                <View
+                                  style={{
+                                    width: noCoBox.w,
+                                    height: noCoBox.h,
+                                    backgroundColor: "#EDE9FF",
+                                    borderRadius: 3,
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    marginBottom: 5,
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 7, color: tokens.primary }}>
+                                    Not photographed
+                                  </Text>
+                                </View>
+                              )}
+
+                              {pair.coPhoto?.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
+                                <View
+                                  style={{
+                                    flexDirection: "row",
+                                    flexWrap: "wrap",
+                                    marginBottom: 4,
+                                  }}
+                                >
+                                  {pair.coPhoto.damage_tags.map((tag, ti) => (
+                                    <View
+                                      key={ti}
+                                      style={{
+                                        backgroundColor: "#FEE2E2",
+                                        borderRadius: 20,
+                                        paddingHorizontal: 5,
+                                        paddingVertical: 1.5,
+                                        marginRight: 3,
+                                        marginBottom: 2,
+                                      }}
+                                    >
+                                      <Text
+                                        style={{
+                                          fontSize: 6,
+                                          fontFamily: "Helvetica-Bold",
+                                          color: "#DC2626",
+                                          textTransform: "uppercase",
+                                        }}
+                                      >
+                                        {tag}
+                                      </Text>
+                                    </View>
+                                  ))}
+                                </View>
+                              )}
+
+                              {pair.coPhoto?.ai_analysis && (
+                                <View>
+                                  <Text
+                                    style={{
+                                      fontSize: 6,
+                                      fontFamily: "Helvetica-Bold",
+                                      color: tokens.primary,
+                                      textTransform: "uppercase",
+                                      letterSpacing: 0.5,
+                                      marginBottom: 2,
+                                    }}
+                                  >
+                                    AI Analysis
+                                  </Text>
+                                  <Text style={{ fontSize: 7, color: "#4B4B4B", lineHeight: 1.4 }}>
+                                    {pair.coPhoto.ai_analysis}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          </>
+                        );
+                      })()}
                     </View>
                   )}
                 </View>
@@ -2027,7 +2108,7 @@ export function CheckoutPDFDocument({
               </View>
             </View>
             <View style={[s.sigVerifiedBadge, { backgroundColor: tokens.primaryLight }]}>
-              <View style={[s.sigVerifiedDot, { marginRight: 5 }]} />
+              <View style={[s.sigVerifiedDot, { marginRight: 5, backgroundColor: tokens.primary }]} />
               <Text style={s.sigVerifiedText}>Verified Document</Text>
             </View>
           </View>
