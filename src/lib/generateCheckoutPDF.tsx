@@ -16,7 +16,7 @@ import {
   G,
 } from "@react-pdf/renderer";
 import QRCode from "qrcode";
-import type { BrandTokens } from "@/lib/pdf/brandTokens";
+import { getBrandTokens, type BrandTokens } from "@/lib/pdf/brandTokens";
 
 const AMBER = "#D97706";
 const AMBER_LIGHT = "#FEF3C7";
@@ -26,7 +26,7 @@ const PAGE_W = 535;
 const COL_W = 262; // (PAGE_W - 10 gap) / 2
 const PAIR_MAX_H = 270; // (702pt − 14 gap) / 2 − ~70pt text ≈ 274 → 270
 const NEW_MAX_H = 400; // full-width new damage — higher cap
-const PAIR_GAP = 16; // vertical gap between two pairs on same page
+const PAIR_GAP = 8; // vertical gap between two pairs on same page
 /** Layout reserve (tags + AI under photos), ~65pt — for future pagination tuning */
 const TEXT_AREA = 65;
 
@@ -226,10 +226,19 @@ function getRoomCondition(photos: { damage_tags?: string[] | null }[]): string {
 
 function getRoomVerdict(
   ciIssues: number,
-  coIssues: number
+  coIssues: number,
+  brand: BrandTokens
 ): { label: string; color: string; bg: string } {
-  if (coIssues < ciIssues) return { label: "Better", color: "#16A34A", bg: "#DCFCE7" };
-  if (coIssues > ciIssues) return { label: "Worse", color: "#DC2626", bg: "#FEE2E2" };
+  if (coIssues < ciIssues) {
+    return {
+      label: "Better",
+      color: brand.primary,
+      bg: `${brand.primary}22`,
+    };
+  }
+  if (coIssues > ciIssues) {
+    return { label: "Worse", color: "#DC2626", bg: "#FEE2E2" };
+  }
   return { label: "Same", color: "#6B7280", bg: "#F3F3F8" };
 }
 
@@ -768,27 +777,6 @@ const s = StyleSheet.create({
     color: "rgba(255,255,255,0.6)",
     marginTop: 3,
   },
-  roomCondBadgeGood: {
-    backgroundColor: "#DCFCE7",
-    borderRadius: 20,
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-  },
-  roomCondBadgeWarn: {
-    backgroundColor: "#FEF9C3",
-    borderRadius: 20,
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-  },
-  roomCondBadgeCritical: {
-    backgroundColor: "#FEE2E2",
-    borderRadius: 20,
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-  },
-  roomCondTextGood: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#15803D" },
-  roomCondTextWarn: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#A16207" },
-  roomCondTextCritical: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#DC2626" },
   roomStatsRow: { flexDirection: "row", marginTop: 7 },
   roomStatItem: { flexDirection: "row", alignItems: "center" },
   roomStatDot: {
@@ -1065,9 +1053,11 @@ export function CheckoutPDFDocument({
   agencyName,
   agencyWebsite,
   agencyLogoUrl,
-  tokens,
+  tokens: tokensProp,
   qrCodeDataUrl,
 }: CheckoutPDFProps) {
+  /** Same derivation as check-in PDF — agency primary + shades */
+  const tokens = getBrandTokens(tokensProp.primary);
   const documentHash = inspection.document_hash || "";
   const shortHash = `${documentHash.slice(0, 8)}…${documentHash.slice(-8)}`;
 
@@ -1089,7 +1079,7 @@ export function CheckoutPDFDocument({
     ).length;
 
     const roomCondition = room.condition || getRoomCondition(room.photos);
-    const verdict = getRoomVerdict(ciIssuesFromLinked, coIssues);
+    const verdict = getRoomVerdict(ciIssuesFromLinked, coIssues, tokens);
 
     return {
       room,
@@ -1314,8 +1304,8 @@ export function CheckoutPDFDocument({
           ].map((stat, i) => {
             const deltaColor = stat.delta != null
               ? (stat.isIssue
-                  ? (stat.delta > 0 ? "#DC2626" : stat.delta < 0 ? "#16A34A" : "#6B7280")
-                  : (stat.delta > 0 ? "#16A34A" : stat.delta < 0 ? "#DC2626" : "#6B7280"))
+                  ? (stat.delta > 0 ? "#DC2626" : stat.delta < 0 ? tokens.primary : "#6B7280")
+                  : (stat.delta > 0 ? tokens.primary : stat.delta < 0 ? "#DC2626" : "#6B7280"))
               : "#6B7280";
             return (
               <View key={i} style={[s.statCard, ...(i < 2 ? [{ marginRight: 10 }] : [])]}>
@@ -1484,7 +1474,7 @@ export function CheckoutPDFDocument({
                   <View style={{ flex: 1, alignItems: 'center' }}>
                     <Text style={{
                       fontSize: 10, fontFamily: 'Helvetica-Bold',
-                      color: k.ok ? '#16A34A' : '#DC2626',
+                      color: k.ok ? tokens.primary : '#DC2626',
                     }}>
                       x{k.returned}
                     </Text>
@@ -1493,12 +1483,12 @@ export function CheckoutPDFDocument({
                   {/* Status badge */}
                   <View style={{ flex: 1, alignItems: 'center' }}>
                     <View style={{
-                      backgroundColor: k.ok ? '#DCFCE7' : '#FEE2E2',
+                      backgroundColor: k.ok ? `${tokens.primary}22` : '#FEE2E2',
                       borderRadius: 20, paddingHorizontal: 6, paddingVertical: 2,
                     }}>
                       <Text style={{
                         fontSize: 6.5, fontFamily: 'Helvetica-Bold',
-                        color: k.ok ? '#16A34A' : '#DC2626',
+                        color: k.ok ? tokens.primary : '#DC2626',
                       }}>
                         {k.ok ? 'Returned' : `Missing x${k.missing}`}
                       </Text>
@@ -1513,17 +1503,17 @@ export function CheckoutPDFDocument({
                 return (
                   <View style={{
                     marginTop: 8, flexDirection: 'row', alignItems: 'center',
-                    backgroundColor: allOk ? '#DCFCE7' : '#FEE2E2',
+                    backgroundColor: allOk ? `${tokens.primary}22` : '#FEE2E2',
                     borderRadius: 6, padding: '5 10',
                   }}>
                     <View style={{
                       width: 6, height: 6, borderRadius: 3,
-                      backgroundColor: allOk ? '#16A34A' : '#DC2626',
+                      backgroundColor: allOk ? tokens.primary : '#DC2626',
                       marginRight: 6,
                     }} />
                     <Text style={{
                       fontSize: 7.5, fontFamily: 'Helvetica-Bold',
-                      color: allOk ? '#16A34A' : '#DC2626',
+                      color: allOk ? tokens.primary : '#DC2626',
                     }}>
                       {allOk
                         ? 'All keys returned'
@@ -1553,12 +1543,6 @@ export function CheckoutPDFDocument({
       {/* ROOM PAGES — max 2 pairs per page, objectFit contain + aspect from DB */}
       {roomPageEntries.map((entry, globalIdx) => {
         const { room, roomIndex, chunk, chunkIdx, totalRoomPages, verdict, coIssues, coPhotoCount } = entry;
-        const verdictSolid =
-          verdict.label === "Better"
-            ? "#16A34A"
-            : verdict.label === "Worse"
-              ? "#DC2626"
-              : "#6B7280";
 
         return (
           <Page key={`${room.id}-${chunkIdx}-${globalIdx}`} size="A4" style={s.page}>
@@ -1627,13 +1611,13 @@ export function CheckoutPDFDocument({
                 {chunkIdx === 0 && (
                   <View
                     style={{
-                      backgroundColor: verdictSolid,
+                      backgroundColor: verdict.bg,
                       borderRadius: 20,
                       paddingHorizontal: 10,
                       paddingVertical: 4,
                     }}
                   >
-                    <Text style={{ fontSize: 8, fontFamily: "Helvetica-Bold", color: "#FFFFFF" }}>
+                    <Text style={{ fontSize: 8, fontFamily: "Helvetica-Bold", color: verdict.color }}>
                       {verdict.label}
                     </Text>
                   </View>

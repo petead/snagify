@@ -387,12 +387,12 @@ const s = StyleSheet.create({
     color: "rgba(255,255,255,0.6)",
     marginTop: 3,
   },
-  roomCondBadgeGood: {
-    backgroundColor: "#DCFCE7",
+  roomCondBadgeBase: {
     borderRadius: 20,
     paddingHorizontal: 11,
     paddingVertical: 5,
   },
+  roomCondTextBase: { fontSize: 7, fontFamily: "Helvetica-Bold" },
   roomCondBadgeWarn: {
     backgroundColor: "#FEF9C3",
     borderRadius: 20,
@@ -405,7 +405,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 5,
   },
-  roomCondTextGood: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#15803D" },
   roomCondTextWarn: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#A16207" },
   roomCondTextCritical: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#DC2626" },
   roomStatsRow: { flexDirection: "row", marginTop: 14 },
@@ -1351,7 +1350,7 @@ function InspectionReport({
             const cond = r.roomCondition?.toLowerCase() || "good";
             const condStyle =
               cond === "good" || cond === "excellent"
-                ? { bg: "#DCFCE7", text: "#15803D" }
+                ? { bg: `${tokens.primary}22`, text: tokens.primary }
                 : cond === "needs attention" || cond === "fair"
                   ? { bg: "#FEF9C3", text: "#A16207" }
                   : { bg: "#FEE2E2", text: "#DC2626" };
@@ -1431,13 +1430,13 @@ function InspectionReport({
         const cond = (r.roomCondition || "good").toLowerCase().replace(/\s+/g, "_");
         const condBadgeStyle =
           cond === "good" || cond === "excellent"
-            ? s.roomCondBadgeGood
+            ? [s.roomCondBadgeBase, { backgroundColor: `${tokens.primary}22` }]
             : cond === "needs_attention" || cond === "fair"
               ? s.roomCondBadgeWarn
               : s.roomCondBadgeCritical;
         const condTextStyle =
           cond === "good" || cond === "excellent"
-            ? s.roomCondTextGood
+            ? [s.roomCondTextBase, { color: tokens.primary }]
             : cond === "needs_attention" || cond === "fair"
               ? s.roomCondTextWarn
               : s.roomCondTextCritical;
