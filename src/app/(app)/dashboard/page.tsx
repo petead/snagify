@@ -61,7 +61,7 @@ export default async function DashboardPage() {
     id: string;
     building_name: string | null;
     unit_number: string | null;
-    address: string | null;
+    location: string | null;
     property_type: string | null;
     created_at: string | null;
     tenancies?: Array<{
@@ -185,7 +185,7 @@ export default async function DashboardPage() {
       .from("properties")
       .select(
         `
-        id, building_name, unit_number, address, property_type, created_at,
+        id, building_name, unit_number, location, property_type, created_at,
         tenancies (id, tenant_name, contract_from, contract_to, actual_end_date),
         inspections (id, type, status, created_at, completed_at)
       `
@@ -200,7 +200,7 @@ export default async function DashboardPage() {
         .from("properties")
         .select(
           `
-          id, building_name, unit_number, address, property_type, created_at,
+          id, building_name, unit_number, location, property_type, created_at,
           inspections (id, type, status, created_at, completed_at)
         `
         )

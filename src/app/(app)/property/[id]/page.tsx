@@ -88,7 +88,7 @@ export default async function PropertyPage({
       id,
       building_name,
       unit_number,
-      address,
+      location,
       property_type,
       tenancies (
         id,
@@ -187,7 +187,7 @@ export default async function PropertyPage({
           id: propertyWithTenancies.id,
           building_name: propertyWithTenancies.building_name,
           unit_number: propertyWithTenancies.unit_number,
-          address: propertyWithTenancies.address,
+          location: propertyWithTenancies.location,
           property_type: propertyWithTenancies.property_type,
           property_size: sizeM2,
         }}
@@ -205,7 +205,7 @@ export default async function PropertyPage({
       id,
       building_name,
       unit_number,
-      address,
+      location,
       property_type,
       inspections (
         id, type, status, created_at, completed_at, report_url, signed_at,
@@ -287,7 +287,7 @@ export default async function PropertyPage({
         id: property.id,
         building_name: property.building_name,
         unit_number: property.unit_number,
-        address: property.address,
+        location: property.location,
         property_type: property.property_type,
         property_size: sizeM2,
       }}

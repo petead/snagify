@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     .from('inspections')
     .select(`
       type, created_at,
-      property:properties(address, unit_number, building_name),
+      property:properties(location, unit_number, building_name),
       agent:profiles(company:companies(name, logo_url, primary_color))
     `)
     .eq('id', inspectionId)
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   const agencyName = (insp?.agent as any)?.company?.name || 'Snagify'
   const primaryColor = (insp?.agent as any)?.company?.primary_color || '#9A88FD'
   const agencyLogo = (insp?.agent as any)?.company?.logo_url
-  const property = insp?.property as { address?: string; building_name?: string; unit_number?: string }
+  const property = insp?.property as { location?: string; building_name?: string; unit_number?: string }
   const propertyAddress = formatPropertyAddress(property)
 
   // Reset opened_at so tracking is fresh

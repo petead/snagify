@@ -15,7 +15,7 @@ export default async function ReportPage({
     .select(
       `
       *,
-      properties (building_name, unit_number, property_type, address),
+      properties (building_name, unit_number, property_type, location),
       tenancies (
         tenant_name, tenant_email, tenant_phone,
         landlord_name, landlord_email, landlord_phone,
@@ -106,7 +106,7 @@ export type PropertyRelation = {
   building_name: string | null;
   unit_number: string | null;
   property_type: string | null;
-  address: string | null;
+  location: string | null;
 };
 
 export type TenancyRelation = {

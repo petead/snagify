@@ -26,7 +26,7 @@ type PropertyRow = {
   id: string;
   building_name: string | null;
   unit_number: string | null;
-  address: string | null;
+  location: string | null;
   property_type: string | null;
   created_at: string | null;
   tenancies?: TenancyRow[] | TenancyRow | null;
@@ -101,7 +101,7 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
           return (
             p.building_name?.toLowerCase().includes(q) ||
             p.unit_number?.toLowerCase().includes(q) ||
-            (p.address ?? "").toLowerCase().includes(q) ||
+            (p.location ?? "").toLowerCase().includes(q) ||
             active?.tenant_name?.toLowerCase().includes(q)
           );
         });
@@ -259,7 +259,7 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
           <input
             className="search-input"
             type="text"
-            placeholder="Search by address, unit, or tenant..."
+            placeholder="Search by location, unit, or tenant..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{
@@ -283,7 +283,7 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
         <div style={{ padding: "16px 24px 0" }}>
           {filtered.map((property, i) => {
             const status = getPropertyStatus(property);
-            const name = property.building_name ?? property.address ?? "Property";
+            const name = property.building_name ?? property.location ?? "Property";
             const unit = property.unit_number ? `Unit ${property.unit_number}` : "—";
             const type = property.property_type ?? "";
 

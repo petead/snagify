@@ -137,7 +137,7 @@ export interface CheckoutPDFProps {
     document_hash?: string;
   } | null;
   property: {
-    address: string;
+    location: string;
     building_name?: string;
     unit_number?: string;
     property_type?: string;
@@ -1176,7 +1176,7 @@ export function CheckoutPDFDocument({
           </View>
 
           <Text style={s.coverAddressMain}>
-            {property.address || (property.building_name && property.unit_number
+            {property.location || (property.building_name && property.unit_number
               ? `${property.building_name}, Unit ${property.unit_number}`
               : "Property Address")}
           </Text>
@@ -1277,7 +1277,7 @@ export function CheckoutPDFDocument({
           <View>
             <Text style={s.overviewTitleNew}>Check-out Comparison</Text>
             <Text style={s.overviewSub}>
-              {property.address ?? "Property"} · {formatDate(inspection.created_at)}
+              {property.location ?? "Property"} · {formatDate(inspection.created_at)}
             </Text>
           </View>
           <View style={{
@@ -2116,7 +2116,7 @@ export function CheckoutPDFDocument({
             This report has been reviewed{"\n"}and agreed upon by all parties.
           </Text>
           <Text style={s.sigSubtitle}>
-            {property.address ?? "Property"} · {formatDate(inspection.created_at)}
+            {property.location ?? "Property"} · {formatDate(inspection.created_at)}
           </Text>
         </View>
 

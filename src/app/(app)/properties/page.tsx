@@ -21,7 +21,12 @@ export default async function PropertiesPage() {
     .from("properties")
     .select(
       `
-      *,
+      id,
+      building_name,
+      unit_number,
+      location,
+      property_type,
+      created_at,
       tenancies (
         id, tenant_name, status, contract_from, contract_to,
         annual_rent,

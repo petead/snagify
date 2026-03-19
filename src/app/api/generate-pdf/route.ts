@@ -35,7 +35,7 @@ function getRoomCondition(photos: { damage_tags?: string[] }[]): string {
 
 function fallbackExecutiveSummary(row: InspectionRow): string {
   const prop = Array.isArray(row.properties) ? row.properties[0] : row.properties;
-  const propertyName = prop?.building_name ?? prop?.address ?? "Property";
+  const propertyName = prop?.building_name ?? prop?.location ?? "Property";
   const unitNumber = prop?.unit_number ?? "";
   const dateStr = row.completed_at ?? row.created_at
     ? new Date((row.completed_at ?? row.created_at) as string).toLocaleDateString("en-GB", {
@@ -109,7 +109,7 @@ type PropRow = {
   building_name?: string | null;
   unit_number?: string | null;
   property_type?: string | null;
-  address?: string | null;
+  location?: string | null;
 };
 
 type TenancyRow = {
@@ -167,7 +167,7 @@ const INSPECTION_SELECT = `
     building_name,
     unit_number,
     property_type,
-    address
+    location
   ),
   tenancies (
     tenant_name,
@@ -404,7 +404,7 @@ export async function buildPdfAndUpload(
         ? {
             building_name: prop.building_name ?? undefined,
             unit_number: prop.unit_number ?? undefined,
-            address: prop.address ?? undefined,
+            location: prop.location ?? undefined,
             property_type: prop.property_type ?? undefined,
           }
         : null,
@@ -528,7 +528,7 @@ export async function buildPdfAndUpload(
         },
         checkinInspection: checkinInspectionForPdf,
         property: {
-          address: prop?.address ?? "",
+          location: prop?.location ?? "",
           building_name: prop?.building_name ?? undefined,
           unit_number: prop?.unit_number ?? undefined,
           property_type: prop?.property_type ?? undefined,

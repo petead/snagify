@@ -41,7 +41,7 @@ async function getInspectionContext(inspectionId: string) {
       id,
       agent_id,
       type,
-      properties (building_name, unit_number, address)
+      properties (building_name, unit_number, location)
     `)
     .eq('id', inspectionId)
     .single();
@@ -61,8 +61,8 @@ export async function notifySignatureSigned(signatureId: string) {
     const inspection = await getInspectionContext(sig.inspection_id);
     if (!inspection) return;
 
-    const prop = (inspection as { properties?: { building_name?: string; unit_number?: string; address?: string } }).properties;
-    const propName = prop?.building_name || prop?.address || 'a property';
+    const prop = (inspection as { properties?: { building_name?: string; unit_number?: string; location?: string } }).properties;
+    const propName = prop?.building_name || prop?.location || 'a property';
     const unit = prop?.unit_number ? ` - Unit ${prop.unit_number}` : '';
     const signerLabel = sig.signer_type === 'tenant' ? 'Tenant' :
                         sig.signer_type === 'landlord' ? 'Landlord' : 'A party';
@@ -101,8 +101,8 @@ export async function notifyAllPartiesSigned(inspectionId: string) {
     const inspection = await getInspectionContext(inspectionId);
     if (!inspection) return;
 
-    const prop = (inspection as { properties?: { building_name?: string; unit_number?: string; address?: string } }).properties;
-    const propName = prop?.building_name || prop?.address || 'a property';
+    const prop = (inspection as { properties?: { building_name?: string; unit_number?: string; location?: string } }).properties;
+    const propName = prop?.building_name || prop?.location || 'a property';
     const unit = prop?.unit_number ? ` - Unit ${prop.unit_number}` : '';
 
     await sendToAgent(inspection.agent_id, {
@@ -133,8 +133,8 @@ export async function notifyOpenedNotSigned() {
       const inspection = await getInspectionContext(sig.inspection_id);
       if (!inspection) continue;
 
-      const prop = (inspection as { properties?: { building_name?: string; unit_number?: string; address?: string } }).properties;
-      const propName = prop?.building_name || prop?.address || 'a property';
+      const prop = (inspection as { properties?: { building_name?: string; unit_number?: string; location?: string } }).properties;
+      const propName = prop?.building_name || prop?.location || 'a property';
       const unit = prop?.unit_number ? ` - Unit ${prop.unit_number}` : '';
       const signerLabel = sig.signer_type === 'tenant' ? 'Tenant' :
                           sig.signer_type === 'landlord' ? 'Landlord' : 'A party';
@@ -175,8 +175,8 @@ export async function notifyExpiringSignatures() {
       const inspection = await getInspectionContext(sig.inspection_id);
       if (!inspection) continue;
 
-      const prop = (inspection as { properties?: { building_name?: string; unit_number?: string; address?: string } }).properties;
-      const propName = prop?.building_name || prop?.address || 'a property';
+      const prop = (inspection as { properties?: { building_name?: string; unit_number?: string; location?: string } }).properties;
+      const propName = prop?.building_name || prop?.location || 'a property';
       const unit = prop?.unit_number ? ` - Unit ${prop.unit_number}` : '';
       const signerLabel = sig.signer_type === 'tenant' ? 'Tenant' :
                           sig.signer_type === 'landlord' ? 'Landlord' : 'A party';

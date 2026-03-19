@@ -32,7 +32,7 @@ export default async function ProfilePage() {
     { count: inspectionsCount },
     { count: reportsCount },
   ] = await Promise.all([
-    supabase.from("properties").select("*", { count: "exact", head: true }).eq("agent_id", user.id),
+    supabase.from("properties").select("id", { count: "exact", head: true }).eq("agent_id", user.id),
     supabase.from("inspections").select("*", { count: "exact", head: true }).eq("agent_id", user.id),
     supabase
       .from("inspections")

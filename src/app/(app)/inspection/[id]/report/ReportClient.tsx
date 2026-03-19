@@ -250,7 +250,7 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
 
   const prop = normalizeOne(inspection.properties) as PropertyRelation | null;
   const tenancy = normalizeOne(inspection.tenancies) as TenancyRelation | null;
-  const buildingName = prop?.building_name ?? prop?.address ?? "Property";
+  const buildingName = prop?.building_name ?? prop?.location ?? "Property";
   const unitNumber = prop?.unit_number;
   const unitLabel = unitNumber ? `Unit ${unitNumber}` : "";
   const rooms = (inspection.rooms ?? []) as Room[];
@@ -401,7 +401,7 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
     const handleShare = async () => {
       const shareUrl = window.location.href;
       const p = normalizeOne(inspection.properties) as PropertyRelation | null;
-      const bName = p?.building_name ?? p?.address ?? "Property";
+      const bName = p?.building_name ?? p?.location ?? "Property";
       const uLabel = p?.unit_number ? `Unit ${p.unit_number}` : "";
       if (navigator.share) {
         await navigator.share({

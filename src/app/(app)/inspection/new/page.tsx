@@ -22,7 +22,7 @@ interface FormData {
   inspectionType: "check-in" | "check-out";
   building_name: string;
   unit_number: string;
-  address: string;
+  location: string;
   property_type: string;
   property_size: string;
   ejari_ref: string;
@@ -44,14 +44,14 @@ type ExistingProperty = {
   building_name: string | null;
   unit_number: string | null;
   property_type: string | null;
-  address: string | null;
+  location: string | null;
 };
 
 const emptyForm: FormData = {
   inspectionType: "check-in",
   building_name: "",
   unit_number: "",
-  address: "",
+  location: "",
   property_type: "",
   property_size: "",
   ejari_ref: "",
@@ -146,7 +146,10 @@ function mapExtracted(raw: Record<string, unknown>): Partial<FormData> {
     inspectionType,
     building_name: s("building_name"),
     unit_number: s("unit_number"),
-    address: s("address"),
+    // location is the physical area/district/location as written in the contract
+    // (fallbacks kept for backward compatibility with older extraction output)
+    location:
+      s("location") || s("area") || s("district"),
     property_type,
     property_size: n("property_size"),
     ejari_ref: s("ejari_ref"),
@@ -300,7 +303,7 @@ function NewInspectionContent() {
       const client = createClient();
       const { data } = await client
         .from("properties")
-        .select("id, building_name, unit_number, property_type, address")
+        .select("id, building_name, unit_number, property_type, location")
         .eq("id", existingPropertyId)
         .single();
       if (data) {
@@ -311,7 +314,7 @@ function NewInspectionContent() {
           building_name: property.building_name ?? "",
           unit_number: property.unit_number ?? "",
           property_type: property.property_type ?? "",
-          address: property.address ?? "",
+          location: property.location ?? "",
         }));
         setMode("upload");
         setStep(1);
@@ -361,7 +364,7 @@ function NewInspectionContent() {
                 building_name: mapped.building_name || d.building_name || "",
                 unit_number: mapped.unit_number || d.unit_number || "",
                 property_type: mapped.property_type || d.property_type || "",
-                address: mapped.address || d.address || "",
+                location: mapped.location || d.location || "",
               }),
           ejari_ref: mapped.ejari_ref || d.ejari_ref || "",
           contract_from: mapped.contract_from || d.contract_from || "",
@@ -513,13 +516,24 @@ function NewInspectionContent() {
             building_name: formData.building_name,
             unit_number: formData.unit_number,
             property_type: propertyType,
-            address: `${formData.building_name}, Unit ${formData.unit_number}`,
+            location: formData.location,
           })
           .select()
           .single();
 
         if (propError) {
           console.error("Property insert error:", propError);
+          if (
+            // unique constraint on normalized_key (building_name + unit_number)
+            (propError as { code?: string }).code === "23505" &&
+            (propError as { message?: string }).message?.includes("properties_unique_normalized")
+          ) {
+            setSaveError(
+              "A property with this building name and unit number already exists in your portfolio."
+            );
+            setSaving(false);
+            return;
+          }
           throw propError;
         }
         propertyId = property.id;
@@ -619,7 +633,7 @@ function NewInspectionContent() {
           </button>
           <div className="flex-1">
             <p className="text-xs text-gray-400 uppercase tracking-wider">
-              New Inspection
+              New Check-in
             </p>
             <p
               className="font-bold text-sm text-gray-900"
@@ -653,10 +667,10 @@ function NewInspectionContent() {
             className="text-xl font-bold mb-1"
             style={{ fontFamily: "Poppins,sans-serif" }}
           >
-            New Inspection
+            New Check-in
           </h2>
           <p className="text-sm text-gray-400 mb-6">
-            How do you want to add contract details?
+            How do you want to set up this check-in?
           </p>
 
           <div className="flex flex-col gap-3">
@@ -710,7 +724,7 @@ function NewInspectionContent() {
                     Enter Manually
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    No contract? Fill in details yourself
+                    No contract? Fill in the details manually
                   </p>
                 </div>
                 <ChevronRight
@@ -724,9 +738,9 @@ function NewInspectionContent() {
           <div className="mt-6 bg-[#F0EDFF] rounded-xl p-3 flex gap-2">
             <span className="text-sm">💡</span>
             <p className="text-xs text-[#7B65FC]">
-              Tip: Upload a PDF for faster setup — AI reads Ejari
-              contracts, standard RERA agreements and most UAE tenancy
-              documents.
+              Tip: Upload a PDF for faster setup — AI reads Ejari contracts,
+              standard RERA agreements and most UAE tenancy documents and
+              auto-fills the check-in details.
             </p>
           </div>
         </div>
@@ -964,11 +978,11 @@ function NewInspectionContent() {
                   )}
                 </select>
               </Field>
-              <Field label="Area / District">
+              <Field label="Location">
                 <input
-                  value={formData.address}
-                  onChange={(e) => set("address", e.target.value)}
-                  placeholder="e.g. JBR, Dubai Marina"
+                  value={formData.location}
+                  onChange={(e) => set("location", e.target.value)}
+                  placeholder="Location (e.g. Dubai Marina, JBR...)"
                   className={inputCls}
                 />
               </Field>
@@ -1150,7 +1164,7 @@ function NewInspectionContent() {
                 </p>
                 <p className="text-xs text-gray-400">
                   {formData.property_type}
-                  {formData.address ? ` • ${formData.address}` : ""}
+                  {formData.location ? ` • ${formData.location}` : ""}
                 </p>
               </div>
             </div>

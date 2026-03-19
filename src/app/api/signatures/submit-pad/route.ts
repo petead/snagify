@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
       .from('inspections')
       .select(`
         id, type, created_at, report_url, pdf_sent_at,
-        property:properties(address, unit_number, building_name),
+        property:properties(location, unit_number, building_name),
         tenancy:tenancies(
           tenant_name, tenant_email,
           landlord_name, landlord_email
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
       try {
         const company = (fullInspection.agent as any)?.company
         const tenancy = fullInspection.tenancy as any
-        const property = fullInspection.property as { address?: string; building_name?: string; unit_number?: string }
+        const property = fullInspection.property as { location?: string; building_name?: string; unit_number?: string }
         const agent = fullInspection.agent as any
 
         const propertyAddress = formatPropertyAddress(property) || 'the property'

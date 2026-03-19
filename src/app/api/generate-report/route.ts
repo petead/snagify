@@ -74,7 +74,7 @@ export async function POST(request: Request) {
       step = "fetch property";
       const { data: property } = await supabase
         .from("properties")
-        .select("building_name, unit_number, address")
+        .select("building_name, unit_number, location")
         .eq("id", inspection.property_id)
         .maybeSingle();
 
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
         await supabase.from("rooms").update({ condition }).eq("id", room.id);
       }
 
-      const propertyName = property?.building_name ?? property?.address ?? "Property";
+      const propertyName = property?.building_name ?? property?.location ?? "Property";
       const unitNumber = property?.unit_number ?? "";
       const inspectionType = (inspection.type ?? "check-in") as string;
       const inspectionDate = inspection.created_at ?? new Date().toISOString();

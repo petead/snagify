@@ -23,6 +23,8 @@ interface SignInspectionData {
   property?: {
     building_name?: string
     unit_number?: string
+    location?: string
+    // legacy
     address?: string
     [key: string]: unknown
   }
@@ -412,7 +414,7 @@ function SignPageContent() {
                 Inspection Report
               </div>
               <div className="text-[11px] text-gray-400 mt-0.5">
-                {property?.building_name || property?.address || 'Property'} ·{' '}
+                {property?.building_name || property?.location || 'Property'} ·{' '}
                 {data?.type === 'check-in' ? 'Check-in' : 'Check-out'}
               </div>
             </div>

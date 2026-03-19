@@ -59,7 +59,7 @@ async function notifyLeaseExpiry() {
       agent_id,
       tenant_name,
       contract_to,
-      properties (building_name, unit_number, address)
+      properties (building_name, unit_number, location)
     `)
     .eq('contract_to', target)
     .eq('status', 'active');
@@ -72,8 +72,8 @@ async function notifyLeaseExpiry() {
   console.log(`[Cron] Lease expiry: ${tenancies?.length ?? 0} tenancies expiring in 30 days`);
 
   for (const tenancy of tenancies ?? []) {
-    const prop = (tenancy as { properties?: { building_name?: string; unit_number?: string; address?: string } }).properties;
-    const propName = prop?.building_name || prop?.address || 'your property';
+    const prop = (tenancy as { properties?: { building_name?: string; unit_number?: string; location?: string } }).properties;
+    const propName = prop?.building_name || prop?.location || 'your property';
     const unit = prop?.unit_number ? ` - Unit ${prop.unit_number}` : '';
     const tenantName = (tenancy as { tenant_name?: string }).tenant_name || 'Your tenant';
     const agentId = (tenancy as { agent_id?: string }).agent_id;

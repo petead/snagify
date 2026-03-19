@@ -11,7 +11,9 @@ PROPERTY fields (physical, never changes):
 - building_name: the building name (e.g. 'Creek Rise Tower 1')
 - unit_number: the Property No field (e.g. '3301') — NOT Premises No
 - property_type: normalize to one of: apartment/villa/studio/townhouse
-- address: building name + ", Unit " + property number (e.g. "Creek Rise Tower 1, Unit 3301"). Do NOT use location/area in address.
+- location: The property location, area or district as written in the contract
+  (e.g. "Dubai Marina", "Downtown Dubai", "Jumeirah Village Circle").
+  Extract verbatim from the contract's location/area field. Return null if not found.
 
 INSPECTION/CONTRACT fields (change per contract):
 - ejari_ref: the contract number (e.g. '3301-CT1-2026')

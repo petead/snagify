@@ -45,7 +45,7 @@ interface PropertyClientProps {
     id: string;
     building_name: string | null;
     unit_number: string | null;
-    address: string | null;
+    location: string | null;
     property_type: string | null;
     property_size: number | null;
   };
@@ -430,7 +430,7 @@ export function PropertyClient({
   };
   const rollbackGroups = () => setTenancyGroups(groupsRollbackRef.current);
 
-  const propertyName = property.building_name ?? property.address ?? "Property";
+  const propertyName = property.building_name ?? property.location ?? "Property";
   const unit = property.unit_number ? `Unit ${property.unit_number}` : "";
   const propertyType = property.property_type ?? "";
 

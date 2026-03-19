@@ -979,7 +979,7 @@ interface InspectionMeta {
   property: {
     building_name?: string;
     unit_number?: string;
-    address?: string;
+    location?: string;
     property_type?: string;
   } | null;
   agent: {
@@ -1159,7 +1159,7 @@ function InspectionReport({
           </View>
 
           <Text style={s.coverAddressMain}>
-            {property.address ?? (property.building_name && property.unit_number
+            {property.location ?? (property.building_name && property.unit_number
               ? `${property.building_name}, Unit ${property.unit_number}`
               : "Property Address")}
           </Text>
@@ -1301,7 +1301,7 @@ function InspectionReport({
           <View>
             <Text style={s.overviewTitleNew}>Inspection Overview</Text>
             <Text style={s.overviewSub}>
-              {property.address ?? "Property"} · {formatDate(inspection.created_at)}
+              {property.location ?? "Property"} · {formatDate(inspection.created_at)}
             </Text>
           </View>
           {agencyLogoUrl ? (
@@ -1623,7 +1623,7 @@ function InspectionReport({
             This report has been reviewed{"\n"}and agreed upon by all parties.
           </Text>
           <Text style={s.sigSubtitle}>
-            {property.address ?? "Property"} · {formatDate(inspection.created_at)}
+            {property.location ?? "Property"} · {formatDate(inspection.created_at)}
           </Text>
         </View>
 

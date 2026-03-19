@@ -30,7 +30,7 @@ type PropertyRow = {
   id: string;
   building_name: string | null;
   unit_number: string | null;
-  address: string | null;
+  location: string | null;
   property_type: string | null;
   created_at: string | null;
   tenancies?: TenancyRow[] | null;

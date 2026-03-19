@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       id, type, status, report_url, signed_at, created_at,
       key_handover, executive_summary,
       property:properties(
-        id, address, unit_number, property_type, building_name
+        id, location, unit_number, property_type, building_name
       ),
       tenancy:tenancies(
         tenant_name, tenant_email,

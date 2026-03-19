@@ -22,7 +22,7 @@ interface Props {
     executive_summary?: string | null
     key_handover?: KeyItem[] | null
     property?: {
-      address?: string | null
+      location?: string | null
       building_name?: string | null
       unit_number?: string | null
       property_type?: string | null
@@ -125,7 +125,7 @@ export function CheckoutReportView({
           className="text-[26px] font-extrabold text-white mb-1"
           style={{ fontFamily: 'Poppins, sans-serif' }}
         >
-          {property?.building_name || property?.address || 'Property'}
+          {property?.building_name || property?.location || 'Property'}
         </h1>
 
         {/* Unit + date */}

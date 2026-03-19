@@ -1,15 +1,18 @@
 /**
- * Build a clean display address from property fields.
- * The DB `address` field may already contain building_name and unit_number.
- * Strategy: if building_name exists, use it + unit_number only.
- * Otherwise fall back to address field as-is.
+ * Build a clean display location from property fields.
+ * Concatenations are for display only — `properties.location` should be the AI-extracted value.
  */
 export function formatPropertyAddress(property: {
+  location?: string | null
+  // legacy
   address?: string | null
   building_name?: string | null
   unit_number?: string | null
 } | null | undefined): string {
   if (!property) return '—'
+
+  if (property.location) return property.location
+  if (property.address) return property.address
 
   if (property.building_name) {
     const parts: string[] = [property.building_name]
@@ -17,5 +20,5 @@ export function formatPropertyAddress(property: {
     return parts.join(', ')
   }
 
-  return property.address || '—'
+  return '—'
 }
