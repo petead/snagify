@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     const { data: fullInspection } = await supabaseAdmin
       .from('inspections')
       .select(`
-        id, type, created_at, report_url, pdf_sent_at,
+        id, type, created_at, report_url, pdf_sent_at, agent_id,
         property:properties(location, unit_number, building_name),
         tenancy:tenancies(
           tenant_name, tenant_email,
@@ -131,6 +131,17 @@ export async function POST(req: NextRequest) {
             day: 'numeric', month: 'long', year: 'numeric',
           })
 
+        let includeInspectorRecipient = true
+        const agentId = (fullInspection as { agent_id?: string | null }).agent_id
+        if (agentId) {
+          const { data: agentPrefs } = await supabaseAdmin
+            .from('profiles')
+            .select('receive_signed_report_email')
+            .eq('id', agentId)
+            .maybeSingle()
+          includeInspectorRecipient = agentPrefs?.receive_signed_report_email !== false
+        }
+
         await sendSignedPdfEmail({
           landlordName:  tenancy?.landlord_name  || 'Landlord',
           landlordEmail: tenancy?.landlord_email || '',
@@ -138,6 +149,7 @@ export async function POST(req: NextRequest) {
           tenantEmail:   tenancy?.tenant_email   || '',
           inspectorName: agent?.full_name        || 'Inspector',
           inspectorEmail: agent?.email           || '',
+          includeInspectorRecipient,
           agencyName:    company?.name           || 'Snagify',
           agencyLogo:    company?.logo_url,
           primaryColor:  company?.primary_color  || '#9A88FD',

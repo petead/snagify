@@ -28,6 +28,8 @@ export type ProfileData = {
   company_trade_license: string | null;
   signature_image_url: string | null;
   company_primary_color: string | null;
+  /** When false, agent does not receive the signed PDF by email (landlord/tenant unchanged). */
+  receive_signed_report_email: boolean;
 };
 
 export type CompanyData = {
@@ -77,6 +79,9 @@ export function ProfileClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loaded, setLoaded] = useState(false);
+  const [receiveSignedReportEmail, setReceiveSignedReportEmail] = useState(
+    profile.receive_signed_report_email
+  );
   const [showBugReport, setShowBugReport] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -90,6 +95,10 @@ export function ProfileClient({
     setLoaded(true);
     trackAction("Viewed Profile");
   }, []);
+
+  useEffect(() => {
+    setReceiveSignedReportEmail(profile.receive_signed_report_email);
+  }, [profile.receive_signed_report_email]);
 
   useEffect(() => {
     if (searchParams.get("section") === "subscription") {
@@ -115,6 +124,27 @@ export function ProfileClient({
       /* sign-out best-effort */
     }
     router.push("/login");
+  };
+
+  const handleToggleSignedReportEmail = async () => {
+    const newValue = !receiveSignedReportEmail;
+    setReceiveSignedReportEmail(newValue);
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setReceiveSignedReportEmail(!newValue);
+      return;
+    }
+    const { error } = await supabase
+      .from("profiles")
+      .update({ receive_signed_report_email: newValue })
+      .eq("id", user.id);
+    if (error) {
+      setReceiveSignedReportEmail(!newValue);
+      alert("Failed to update preference");
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -418,6 +448,54 @@ export function ProfileClient({
               <span style={{ fontSize: 12, fontWeight: 600, color: "#999", background: "#EEEDE9", padding: "4px 12px", borderRadius: 8 }}>
                 English
               </span>
+            </div>
+
+            <div
+              style={{
+                padding: "12px 20px 4px",
+                borderBottom: "1px solid #F0EFEC",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "#BBB",
+                  margin: 0,
+                  fontWeight: 600,
+                  letterSpacing: 1.4,
+                  textTransform: "uppercase",
+                }}
+              >
+                Notifications
+              </p>
+            </div>
+
+            <div className="flex items-start justify-between gap-4 py-4 border-b border-gray-100 px-5">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-semibold text-gray-800">
+                  Receive signed report by email
+                </span>
+                <span className="text-xs text-gray-400 leading-relaxed max-w-xs">
+                  When all parties have signed, a copy of the final PDF report will be sent to your email
+                  address. You can disable this if you prefer to access reports directly from the app.
+                </span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={receiveSignedReportEmail}
+                aria-label="Receive signed report by email"
+                onClick={() => void handleToggleSignedReportEmail()}
+                className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 ${
+                  receiveSignedReportEmail ? "bg-[#9A88FD]" : "bg-gray-200"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                    receiveSignedReportEmail ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
             </div>
 
             {/* Push Notifications */}

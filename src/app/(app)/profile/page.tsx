@@ -75,6 +75,9 @@ export default async function ProfilePage() {
             company_trade_license: (company as { trade_license?: string } | null)?.trade_license ?? (profile as { company_trade_license?: string } | null)?.company_trade_license ?? null,
             signature_image_url: profile?.signature_image_url ?? null,
             company_primary_color: (company as { primary_color?: string } | null)?.primary_color ?? (profile as { company_primary_color?: string } | null)?.company_primary_color ?? null,
+            receive_signed_report_email:
+              (profile as { receive_signed_report_email?: boolean | null } | null)
+                ?.receive_signed_report_email !== false,
           }}
           stats={{
             properties: propertiesCount ?? 0,

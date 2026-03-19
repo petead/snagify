@@ -9,6 +9,8 @@ interface SendSignedPdfEmailParams {
   tenantEmail: string
   inspectorName: string
   inspectorEmail: string
+  /** When false, landlord/tenant still get the PDF; inspector copy is skipped. Default true. */
+  includeInspectorRecipient?: boolean
   agencyName: string
   agencyLogo?: string | null
   primaryColor: string
@@ -23,6 +25,7 @@ export async function sendSignedPdfEmail(params: SendSignedPdfEmailParams) {
     landlordName, landlordEmail,
     tenantName, tenantEmail,
     inspectorName, inspectorEmail,
+    includeInspectorRecipient = true,
     agencyName, agencyLogo, primaryColor,
     propertyAddress, inspectionType, inspectionDate,
     pdfUrl,
@@ -129,9 +132,11 @@ export async function sendSignedPdfEmail(params: SendSignedPdfEmailParams) {
 
   const recipients = [
     { email: landlordEmail, name: landlordName, role: 'landlord' },
-    { email: tenantEmail,   name: tenantName,   role: 'tenant'   },
-    { email: inspectorEmail, name: inspectorName, role: 'inspector' },
-  ].filter(r => r.email)
+    { email: tenantEmail, name: tenantName, role: 'tenant' },
+    ...(includeInspectorRecipient
+      ? [{ email: inspectorEmail, name: inspectorName, role: 'inspector' as const }]
+      : []),
+  ].filter((r) => r.email)
 
   const results = await Promise.allSettled(
     recipients.map(r =>
