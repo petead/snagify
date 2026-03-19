@@ -97,6 +97,15 @@ function formatCardDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
+/** Same rules as ReportsClient `isSigned` — DB uses `completed` (not "pending") for awaiting signatures */
+function inspectionFullySigned(insp: RecentInspectionRow): boolean {
+  if (insp.status === "signed") return true;
+  const sigs = insp.signatures ?? [];
+  const landlordSig = sigs.find((s) => s.signer_type === "landlord");
+  const tenantSig = sigs.find((s) => s.signer_type === "tenant");
+  return !!landlordSig?.signed_at && !!tenantSig?.signed_at;
+}
+
 function normalizeProperties(rows: PropertyRow[]): PropertyRow[] {
   return (rows ?? []).map((p) => ({
     ...p,
@@ -121,7 +130,51 @@ export function DashboardClient({
   const [properties] = useState(() => normalizeProperties(initialProperties));
   const [recentInspections, setRecentInspections] = useState(initialRecentInspections);
   const recentRollbackRef = useRef<RecentInspectionRow[]>([]);
+  const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
   const router = useRouter();
+
+  const handleDownloadPDF = useCallback(async (insp: RecentInspectionRow) => {
+    if (pdfLoadingId) return;
+    setPdfLoadingId(insp.id);
+    try {
+      const response = await fetch("/api/generate-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inspectionId: insp.id }),
+      });
+      if (!response.ok) {
+        let errMsg = "Failed to generate PDF";
+        try {
+          const errData = (await response.json()) as { error?: string };
+          errMsg = errData.error ?? errMsg;
+        } catch {
+          /* ignore */
+        }
+        throw new Error(errMsg);
+      }
+      const blob = await response.blob();
+      if (blob.size === 0) {
+        throw new Error("PDF is empty — please try again");
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Snagify_Report_${insp.id}.pdf`;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 1000);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Download failed";
+      console.error("[DownloadPDF]", msg);
+      alert(msg);
+    } finally {
+      setPdfLoadingId(null);
+    }
+  }, [pdfLoadingId]);
 
   useEffect(() => {
     setLoaded(true);
@@ -925,31 +978,70 @@ export function DashboardClient({
                       {photoCount}
                     </span>
                   </div>
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    className="cta-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/inspection/${insp.id}/report`);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                  {inspectionFullySigned(insp) ? (
+                    <button
+                      type="button"
+                      className="cta-btn flex shrink-0 items-center gap-1.5 rounded-2xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                      disabled={pdfLoadingId === insp.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleDownloadPDF(insp);
+                      }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                      >
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      {pdfLoadingId === insp.id ? "…" : "PDF"}
+                    </button>
+                  ) : insp.status === "completed" && !inspectionFullySigned(insp) ? (
+                    <button
+                      type="button"
+                      className="cta-btn flex shrink-0 items-center gap-1.5 rounded-2xl bg-[#9A88FD] px-4 py-2 text-sm font-semibold text-white"
+                      onClick={(e) => {
                         e.stopPropagation();
                         router.push(`/inspection/${insp.id}/report`);
-                      }
-                    }}
-                    style={{
-                      background: "#9A88FD",
-                      borderRadius: 12,
-                      padding: "10px 18px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <span style={{ fontSize: 12, color: "#fff", fontWeight: 600 }}>Open</span>
-                  </div>
+                      }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                      >
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                      </svg>
+                      Sign
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="cta-btn shrink-0 rounded-2xl bg-[#9A88FD] px-4 py-2 text-sm font-semibold text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/inspection/${insp.id}/report`);
+                      }}
+                    >
+                      Open
+                    </button>
+                  )}
 
                   <div
                     className="trash-btn"
