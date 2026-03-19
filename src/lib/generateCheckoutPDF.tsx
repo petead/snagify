@@ -171,6 +171,7 @@ export interface CheckoutPDFProps {
     full_name?: string;
     rera_number?: string;
     signature_image_url?: string;
+    account_type?: string;
   };
   agencyName: string;
   agencyWebsite: string;
@@ -2321,8 +2322,17 @@ export function CheckoutPDFDocument({
               (s) => s.signer_type === "agent" || s.signer_type === "inspector"
             );
             const inspectorName = profile?.full_name ?? "—";
+            const isIndividual = ((profile as { account_type?: string } | undefined)?.account_type ?? "individual") === "individual";
+
+            const landlordSigForInspector = isIndividual
+              ? (signatures ?? []).find((s) => s.signer_type === "landlord")
+              : null;
+
             const inspectorSignatureUrl =
-              inspectorSig?.signature_data || profile?.signature_image_url || null;
+              inspectorSig?.signature_data ||
+              landlordSigForInspector?.signature_data ||
+              (!isIndividual ? profile?.signature_image_url : null) ||
+              null;
             return (
               <View
                 style={{

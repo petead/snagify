@@ -672,7 +672,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
       </div>
 
       {/* Signature pad modal */}
-      {showSignaturePad && (
+      {profile?.account_type === "pro" && showSignaturePad && (
         <InspectorSignaturePad
           existingUrl={profile?.signature_image_url}
           onSave={handleSignatureSave}

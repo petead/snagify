@@ -1086,6 +1086,7 @@ interface InspectionMeta {
     company_website?: string;
     rera_number?: string;
     signature_image_url?: string;
+    account_type?: string;
   } | null;
   rooms: {
     name: string;
@@ -2007,8 +2008,18 @@ function InspectionReport({
             );
             const profile = meta.agent;
             const inspectorName = profile?.full_name ?? "—";
+            const isIndividual = (profile?.account_type ?? "individual") === "individual";
+
+            // For individual accounts: the owner is also the landlord.
+            const landlordSigForInspector = isIndividual
+              ? (meta.signatures ?? []).find((s) => s.signer_type === "landlord")
+              : null;
+
             const inspectorSignatureUrl =
-              inspectorSig?.signature_data || profile?.signature_image_url || null;
+              inspectorSig?.signature_data ||
+              landlordSigForInspector?.signature_data ||
+              (!isIndividual ? profile?.signature_image_url : null) ||
+              null;
             return (
               <View
                 style={{

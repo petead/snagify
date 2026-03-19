@@ -358,7 +358,7 @@ export async function buildPdfAndUpload(
     const { data: agentRow } = agentId
       ? await supabase
           .from("profiles")
-          .select("full_name, rera_number, signature_image_url, company:companies(*)")
+          .select("full_name, rera_number, signature_image_url, account_type, company:companies(*)")
           .eq("id", agentId)
           .maybeSingle()
       : { data: null };
@@ -375,6 +375,7 @@ export async function buildPdfAndUpload(
           company_website: (agentCompany as { website?: string } | null)?.website ?? undefined,
           rera_number: agentRow.rera_number,
           signature_image_url: agentRow.signature_image_url,
+          account_type: agentRow.account_type ?? "individual",
         }
       : null;
 
@@ -417,6 +418,7 @@ export async function buildPdfAndUpload(
             company_website: (agentData as { company_website?: string }).company_website ?? undefined,
             rera_number: (agentData as { rera_number?: string }).rera_number ?? undefined,
             signature_image_url: (agentData as { signature_image_url?: string }).signature_image_url ?? undefined,
+            account_type: (agentData as { account_type?: string }).account_type ?? "individual",
           }
         : null,
       rooms: (row.rooms ?? [])
@@ -554,6 +556,7 @@ export async function buildPdfAndUpload(
               full_name: agentData.full_name,
               rera_number: (agentData as { rera_number?: string }).rera_number,
               signature_image_url: (agentData as { signature_image_url?: string }).signature_image_url,
+              account_type: (agentData as { account_type?: string }).account_type ?? "individual",
             }
           : undefined,
         agencyName: agentData?.agency_name ?? "Agency",
