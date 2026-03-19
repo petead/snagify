@@ -1631,47 +1631,107 @@ export function InspectionClient({
           {activeReviewRoom === "keys" && (() => {
             const keyItems = keyHandover;
 
-            function getKeyIcon(name: string) {
-              const n = name.toLowerCase();
-              if (n.includes("door") || n.includes("key"))
+            function getKeyHandoverIcon(itemName: string) {
+              const name = (itemName || "").toLowerCase();
+
+              // Door Keys → key icon
+              if (name.includes("door") || name.includes("key")) {
                 return (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <circle cx="7.5" cy="15.5" r="4.5" stroke="#9A88FD" strokeWidth="1.8"/>
-                    <path d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2" stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round"/>
+                    <circle cx="7.5" cy="15.5" r="4.5" stroke="#9A88FD" strokeWidth="1.8" />
+                    <path
+                      d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2"
+                      stroke="#9A88FD"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 );
-              if (n.includes("parking") || n.includes("car"))
+              }
+
+              // Parking Card → car/parking icon
+              if (name.includes("parking") || name.includes("car")) {
                 return (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <rect x="1" y="4" width="22" height="16" rx="2" stroke="#9A88FD" strokeWidth="1.8"/>
-                    <path d="M1 10h22" stroke="#9A88FD" strokeWidth="1.8"/>
+                    <rect x="1" y="3" width="15" height="13" rx="2" stroke="#9A88FD" strokeWidth="1.8" />
+                    <path
+                      d="M16 8h4l3 3v5h-7V8z"
+                      stroke="#9A88FD"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="5.5" cy="18.5" r="2.5" stroke="#9A88FD" strokeWidth="1.8" />
+                    <circle cx="18.5" cy="18.5" r="2.5" stroke="#9A88FD" strokeWidth="1.8" />
                   </svg>
                 );
-              if (n.includes("mailbox") || n.includes("mail"))
+              }
+
+              // Access Card → fingerprint/badge icon
+              if (name.includes("access") || name.includes("fob") || name.includes("badge")) {
                 return (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="#9A88FD" strokeWidth="1.8"/>
-                    <path d="M22 6l-10 7L2 6" stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round"/>
+                    <path
+                      d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+                      stroke="#9A88FD"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 );
-              if (n.includes("access") || n.includes("fob") || n.includes("card"))
+              }
+
+              // Remote Control → remote icon
+              if (name.includes("remote") || name.includes("control")) {
                 return (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <rect x="3" y="11" width="18" height="11" rx="2" stroke="#9A88FD" strokeWidth="1.8"/>
-                    <path d="M7 11V7a5 5 0 0110 0v4" stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round"/>
+                    <rect x="7" y="2" width="10" height="20" rx="3" stroke="#9A88FD" strokeWidth="1.8" />
+                    <path
+                      d="M12 6h.01M12 10h.01M12 14h.01"
+                      stroke="#9A88FD"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 );
-              if (n.includes("remote") || n.includes("control"))
+              }
+
+              // Mailbox → mailbox icon
+              if (name.includes("mailbox") || name.includes("mail")) {
                 return (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <rect x="7" y="2" width="10" height="20" rx="3" stroke="#9A88FD" strokeWidth="1.8"/>
-                    <path d="M12 7h.01M12 11h.01M12 15h.01" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round"/>
+                    <path
+                      d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
+                      stroke="#9A88FD"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M22 6l-10 7L2 6"
+                      stroke="#9A88FD"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 );
+              }
+
+              // Default → key icon
               return (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <circle cx="7.5" cy="15.5" r="4.5" stroke="#9A88FD" strokeWidth="1.8"/>
-                  <path d="M21 2l-9.6 9.6" stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round"/>
+                  <circle cx="7.5" cy="15.5" r="4.5" stroke="#9A88FD" strokeWidth="1.8" />
+                  <path
+                    d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2"
+                    stroke="#9A88FD"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               );
             }
@@ -1764,7 +1824,7 @@ export function InspectionClient({
                               width: 40, height: 40, background: "#EDE9FF", borderRadius: 12,
                               display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                             }}>
-                              {getKeyIcon(item.item || "")}
+                              {getKeyHandoverIcon(item.item || "")}
                             </div>
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e" }}>
@@ -1813,7 +1873,7 @@ export function InspectionClient({
                           width: 40, height: 40, background: "#EDE9FF", borderRadius: 12,
                           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                         }}>
-                          {getKeyIcon(item.item)}
+                          {getKeyHandoverIcon(item.item)}
                         </div>
 
                         {/* Item name */}

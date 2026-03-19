@@ -442,9 +442,37 @@ const IconLogout = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: s
 function getKeyIcon(itemName: string, color: string) {
   const name = (itemName || "").toLowerCase();
   if (name.includes("door") || name.includes("key")) return <IconKey size={13} color={color} />;
-  if (name.includes("parking") || name.includes("car")) return <IconCard size={13} color={color} />;
+
+  // Parking Card → car/parking icon
+  if (name.includes("parking") || name.includes("car")) {
+    return (
+      <PdfIcon size={13} color={color}>
+        <Rect x="1" y="3" width="15" height="13" rx="2" />
+        <Path d="M16 8h4l3 3v5h-7V8z" />
+        <Circle cx="5.5" cy="18.5" r="2.5" />
+        <Circle cx="18.5" cy="18.5" r="2.5" />
+      </PdfIcon>
+    );
+  }
+
+  // Access Card → fingerprint/badge icon (shield path)
+  if (name.includes("access") || name.includes("fob") || name.includes("badge")) {
+    return <IconShield size={13} color={color} />;
+  }
+
+  // Remote Control → remote icon
+  if (name.includes("remote") || name.includes("control")) {
+    return (
+      <PdfIcon size={13} color={color}>
+        <Rect x="7" y="2" width="10" height="20" rx="3" />
+        <Path d="M12 6h.01M12 10h.01M12 14h.01" />
+      </PdfIcon>
+    );
+  }
+
+  // Mailbox → mailbox icon
   if (name.includes("mailbox") || name.includes("mail")) return <IconMailbox size={13} color={color} />;
-  if (name.includes("access") || name.includes("fob")) return <IconLock size={13} color={color} />;
+
   return <IconKey size={13} color={color} />;
 }
 

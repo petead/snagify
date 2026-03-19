@@ -924,14 +924,109 @@ const IconShield = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: s
   </PdfIcon>
 );
 
-function getKeyIcon(itemName: string, color: string) {
+function getKeyHandoverIcon(itemName: string, color: string) {
   const name = (itemName || "").toLowerCase();
-  if (name.includes("door") || name.includes("key")) return <IconKey size={13} color={color} />;
-  if (name.includes("parking") || name.includes("car")) return <IconCard size={13} color={color} />;
-  if (name.includes("mailbox") || name.includes("mail")) return <IconMailbox size={13} color={color} />;
-  if (name.includes("access") || name.includes("fob")) return <IconLock size={13} color={color} />;
-  if (name.includes("remote") || name.includes("control")) return <IconRemote size={13} color={color} />;
-  return <IconKey size={13} color={color} />;
+
+  // Door Keys → key icon
+  if (name.includes("door") || name.includes("key")) {
+    return (
+      <svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+        <circle cx="7.5" cy="15.5" r="4.5" stroke={color} strokeWidth="1.8" />
+        <path
+          d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2"
+          stroke={color}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  // Parking Card → car/parking icon
+  if (name.includes("parking") || name.includes("car")) {
+    return (
+      <svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+        <rect x="1" y="3" width="15" height="13" rx="2" stroke={color} strokeWidth="1.8" />
+        <path
+          d="M16 8h4l3 3v5h-7V8z"
+          stroke={color}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx="5.5" cy="18.5" r="2.5" stroke={color} strokeWidth="1.8" />
+        <circle cx="18.5" cy="18.5" r="2.5" stroke={color} strokeWidth="1.8" />
+      </svg>
+    );
+  }
+
+  // Access Card → fingerprint/badge icon
+  if (name.includes("access") || name.includes("fob") || name.includes("badge")) {
+    return (
+      <svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+        <path
+          d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+          stroke={color}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  // Remote Control → remote icon
+  if (name.includes("remote") || name.includes("control")) {
+    return (
+      <svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+        <rect x="7" y="2" width="10" height="20" rx="3" stroke={color} strokeWidth="1.8" />
+        <path
+          d="M12 6h.01M12 10h.01M12 14h.01"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  // Mailbox → mailbox icon
+  if (name.includes("mailbox") || name.includes("mail")) {
+    return (
+      <svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+        <path
+          d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
+          stroke={color}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M22 6l-10 7L2 6"
+          stroke={color}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  // Default → key icon
+  return (
+    <svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+      <circle cx="7.5" cy="15.5" r="4.5" stroke={color} strokeWidth="1.8" />
+      <path
+        d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 interface ReportData {
@@ -1413,7 +1508,7 @@ function InspectionReport({
                 {keyItems.map((item: any, i: number) => (
                   <View key={i} style={s.keyItem}>
                     <View style={[s.keyIconBox, { backgroundColor: tokens.primaryUltraLight }]}>
-                      {getKeyIcon(item.item || item.label || item.name || "", tokens.primary)}
+                      {getKeyHandoverIcon(item.item || item.label || item.name || "", tokens.primary)}
                     </View>
                     <Text style={s.keyLabel}>{item.item || item.label || item.name}</Text>
                     <Text style={s.keyQty}>×{item.qty ?? item.quantity ?? 1}</Text>
