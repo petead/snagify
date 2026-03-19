@@ -927,105 +927,64 @@ const IconShield = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: s
 function getKeyHandoverIcon(itemName: string, color: string) {
   const name = (itemName || "").toLowerCase();
 
-  // Door Keys → key icon
+  // Door Keys → classic key
   if (name.includes("door") || name.includes("key")) {
     return (
-      <svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-        <circle cx="7.5" cy="15.5" r="4.5" stroke={color} strokeWidth="1.8" />
-        <path
-          d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2"
-          stroke={color}
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <Svg width={13} height={13} viewBox="0 0 24 24">
+        <Circle cx="7.5" cy="15.5" r="4.5" fill="none" stroke={color} strokeWidth={1.8} />
+        <Path d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      </Svg>
     );
   }
 
-  // Parking Card → car/parking icon
-  if (name.includes("parking") || name.includes("car")) {
+  // Parking Card → car with P
+  if (name.includes("parking")) {
     return (
-      <svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-        <rect x="1" y="3" width="15" height="13" rx="2" stroke={color} strokeWidth="1.8" />
-        <path
-          d="M16 8h4l3 3v5h-7V8z"
-          stroke={color}
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <circle cx="5.5" cy="18.5" r="2.5" stroke={color} strokeWidth="1.8" />
-        <circle cx="18.5" cy="18.5" r="2.5" stroke={color} strokeWidth="1.8" />
-      </svg>
+      <Svg width={13} height={13} viewBox="0 0 24 24">
+        <Rect x="2" y="7" width="20" height="14" rx="2" fill="none" stroke={color} strokeWidth={1.8} />
+        <Path d="M5 7V5a2 2 0 012-2h10a2 2 0 012 2v2" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        <Path d="M9 17v-6h3a2 2 0 010 4H9" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      </Svg>
     );
   }
 
-  // Access Card → fingerprint/badge icon
+  // Access Card / Fob → contactless card
   if (name.includes("access") || name.includes("fob") || name.includes("badge")) {
     return (
-      <svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-        <path
-          d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
-          stroke={color}
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <Svg width={13} height={13} viewBox="0 0 24 24">
+        <Rect x="2" y="5" width="20" height="14" rx="2" fill="none" stroke={color} strokeWidth={1.8} />
+        <Path d="M12 10a2 2 0 100 4 2 2 0 000-4z" fill="none" stroke={color} strokeWidth={1.8} />
+        <Path d="M9.5 8.5a5 5 0 015 0M8 7a7 7 0 018 0" fill="none" stroke={color} strokeWidth={1.4} strokeLinecap="round" />
+      </Svg>
     );
   }
 
-  // Remote Control → remote icon
+  // Remote Control → remote
   if (name.includes("remote") || name.includes("control")) {
     return (
-      <svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-        <rect x="7" y="2" width="10" height="20" rx="3" stroke={color} strokeWidth="1.8" />
-        <path
-          d="M12 6h.01M12 10h.01M12 14h.01"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <Svg width={13} height={13} viewBox="0 0 24 24">
+        <Rect x="7" y="2" width="10" height="20" rx="3" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        <Path d="M12 6h.01M12 10h.01M12 14h.01" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      </Svg>
     );
   }
 
-  // Mailbox → mailbox icon
+  // Mailbox
   if (name.includes("mailbox") || name.includes("mail")) {
     return (
-      <svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-        <path
-          d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
-          stroke={color}
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M22 6l-10 7L2 6"
-          stroke={color}
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <Svg width={13} height={13} viewBox="0 0 24 24">
+        <Path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        <Path d="M22 6l-10 7L2 6" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      </Svg>
     );
   }
 
-  // Default → key icon
+  // Default → key
   return (
-    <svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-      <circle cx="7.5" cy="15.5" r="4.5" stroke={color} strokeWidth="1.8" />
-      <path
-        d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2"
-        stroke={color}
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <Svg width={13} height={13} viewBox="0 0 24 24">
+      <Circle cx="7.5" cy="15.5" r="4.5" fill="none" stroke={color} strokeWidth={1.8} />
+      <Path d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
   );
 }
 
@@ -1375,6 +1334,91 @@ function InspectionReport({
               <Text style={[s.summaryLabel, { color: tokens.primary }]}>Executive Summary</Text>
             </View>
             <Text style={s.summaryTextNew}>{report.executive_summary}</Text>
+          </View>
+
+          {/* Table of Contents */}
+          <View
+            style={{
+              marginTop: 14,
+              borderRadius: 8,
+              borderWidth: 0.5,
+              borderColor: "#EEECFF",
+              overflow: "hidden",
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: tokens.primaryUltraLight,
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 7.5,
+                  fontFamily: "Helvetica-Bold",
+                  color: tokens.primary,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.8,
+                }}
+              >
+                Contents
+              </Text>
+            </View>
+            {[
+              { label: "Inspection Overview", page: 2 },
+              ...reportData.rooms.map((room, i) => ({
+                label: room.name,
+                page: 3 + i,
+              })),
+              { label: "Signatures", page: 3 + reportData.rooms.length },
+            ].map((item, i) => (
+              <View
+                key={i}
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  paddingHorizontal: 12,
+                  paddingVertical: 5,
+                  borderTopWidth: 0.5,
+                  borderTopColor: "#F3F3F8",
+                  backgroundColor: i % 2 === 0 ? "#FFFFFF" : "#FAFBFF",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <View
+                    style={{
+                      width: 14, height: 14, borderRadius: 4,
+                      backgroundColor: tokens.primaryUltraLight,
+                      alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 6,
+                        fontFamily: "Helvetica-Bold",
+                        color: tokens.primary,
+                      }}
+                    >
+                      {i + 1}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 8.5, color: "#374151" }}>
+                    {item.label}
+                  </Text>
+                </View>
+                <Text
+                  style={{
+                    fontSize: 8,
+                    color: tokens.primary,
+                    fontFamily: "Helvetica-Bold",
+                  }}
+                >
+                  p.{item.page}
+                </Text>
+              </View>
+            ))}
           </View>
         </View>
 
@@ -1739,17 +1783,37 @@ function InspectionReport({
                           key={photo.id}
                           style={useFull ? s.photoCardFull : s.photoCard}
                         >
-                          {photo.url && (photo.url.startsWith("http") || photo.url.startsWith("data:")) ? (
-                            <Image
-                              src={photo.url}
-                              style={{
-                                width: "100%",
-                                height: imgH,
-                                objectFit: "contain",
-                                backgroundColor: "#F8F8FC",
-                              }}
-                            />
-                          ) : null}
+                          <View style={{ position: "relative" }}>
+                            {photo.url && (photo.url.startsWith("http") || photo.url.startsWith("data:")) ? (
+                              <Image
+                                src={photo.url}
+                                style={{
+                                  width: "100%",
+                                  height: imgH,
+                                  objectFit: "contain",
+                                  backgroundColor: "#F8F8FC",
+                                  borderRadius: 3,
+                                }}
+                              />
+                            ) : null}
+                            {photo.taken_at && (
+                              <View
+                                style={{
+                                  position: "absolute",
+                                  bottom: 4,
+                                  right: 4,
+                                  backgroundColor: "rgba(0,0,0,0.45)",
+                                  borderRadius: 3,
+                                  paddingHorizontal: 4,
+                                  paddingVertical: 2,
+                                }}
+                              >
+                                <Text style={{ fontSize: 6, color: "#FFFFFF", fontFamily: "Helvetica" }}>
+                                  {formatDate(photo.taken_at, true)}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
                           {photo.damage_tags && photo.damage_tags.length > 0 && (
                             <View style={s.photoTagsRow}>
                               {photo.damage_tags.map((tag, ti) => {
@@ -2015,6 +2079,13 @@ function InspectionReport({
               ? (meta.signatures ?? []).find((s) => s.signer_type === "landlord")
               : null;
 
+            // Inspector date logic:
+            // - individual: same signed_at as landlord (same person)
+            // - pro: use inspection created_at (pre-registered signature)
+            const inspectorSignedAt = isIndividual
+              ? (landlordSigForInspector?.signed_at ?? null)
+              : (meta.inspection.created_at ?? null);
+
             const inspectorSignatureUrl =
               inspectorSig?.signature_data ||
               landlordSigForInspector?.signature_data ||
@@ -2069,7 +2140,10 @@ function InspectionReport({
                         }}
                       />
                       <Text style={{ fontSize: 7, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
-                        Report generated on {formatDate(new Date().toISOString(), true)}
+                        {isIndividual
+                          ? (inspectorSignedAt ? `Signed on ${formatDate(inspectorSignedAt, true)}` : "Pending signature")
+                          : `Report generated on ${formatDate(meta.inspection.created_at, true)}`
+                        }
                       </Text>
                     </View>
                   </View>

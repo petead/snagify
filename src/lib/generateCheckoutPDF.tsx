@@ -74,6 +74,7 @@ function isHttpsImageUrl(url: string | null | undefined): boolean {
 interface CheckoutPhoto {
   id: string;
   url: string;
+  taken_at?: string | null;
   damage_tags?: string[] | null;
   ai_analysis?: string | null;
   width?: number | null;
@@ -83,6 +84,7 @@ interface CheckoutPhoto {
   checkin_photo?: {
     id?: string;
     url: string;
+    taken_at?: string | null;
     damage_tags?: string[] | null;
     ai_analysis?: string | null;
     width?: number | null;
@@ -443,39 +445,65 @@ const IconLogout = ({ size = 14, color = "#9A88FD" }: { size?: number; color?: s
 
 function getKeyIcon(itemName: string, color: string) {
   const name = (itemName || "").toLowerCase();
-  if (name.includes("door") || name.includes("key")) return <IconKey size={13} color={color} />;
-
-  // Parking Card → car/parking icon
-  if (name.includes("parking") || name.includes("car")) {
+  // Door Keys → classic key
+  if (name.includes("door") || name.includes("key")) {
     return (
-      <PdfIcon size={13} color={color}>
-        <Rect x="1" y="3" width="15" height="13" rx="2" />
-        <Path d="M16 8h4l3 3v5h-7V8z" />
-        <Circle cx="5.5" cy="18.5" r="2.5" />
-        <Circle cx="18.5" cy="18.5" r="2.5" />
-      </PdfIcon>
+      <Svg width={13} height={13} viewBox="0 0 24 24">
+        <Circle cx="7.5" cy="15.5" r="4.5" fill="none" stroke={color} strokeWidth={1.8} />
+        <Path d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      </Svg>
     );
   }
 
-  // Access Card → fingerprint/badge icon (shield path)
-  if (name.includes("access") || name.includes("fob") || name.includes("badge")) {
-    return <IconShield size={13} color={color} />;
+  // Parking Card → car with P
+  if (name.includes("parking")) {
+    return (
+      <Svg width={13} height={13} viewBox="0 0 24 24">
+        <Rect x="2" y="7" width="20" height="14" rx="2" fill="none" stroke={color} strokeWidth={1.8} />
+        <Path d="M5 7V5a2 2 0 012-2h10a2 2 0 012 2v2" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        <Path d="M9 17v-6h3a2 2 0 010 4H9" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      </Svg>
+    );
   }
 
-  // Remote Control → remote icon
+  // Access Card / Fob → contactless card
+  if (name.includes("access") || name.includes("fob") || name.includes("badge")) {
+    return (
+      <Svg width={13} height={13} viewBox="0 0 24 24">
+        <Rect x="2" y="5" width="20" height="14" rx="2" fill="none" stroke={color} strokeWidth={1.8} />
+        <Path d="M12 10a2 2 0 100 4 2 2 0 000-4z" fill="none" stroke={color} strokeWidth={1.8} />
+        <Path d="M9.5 8.5a5 5 0 015 0M8 7a7 7 0 018 0" fill="none" stroke={color} strokeWidth={1.4} strokeLinecap="round" />
+      </Svg>
+    );
+  }
+
+  // Remote Control → remote
   if (name.includes("remote") || name.includes("control")) {
     return (
-      <PdfIcon size={13} color={color}>
-        <Rect x="7" y="2" width="10" height="20" rx="3" />
-        <Path d="M12 6h.01M12 10h.01M12 14h.01" />
-      </PdfIcon>
+      <Svg width={13} height={13} viewBox="0 0 24 24">
+        <Rect x="7" y="2" width="10" height="20" rx="3" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        <Path d="M12 6h.01M12 10h.01M12 14h.01" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      </Svg>
     );
   }
 
-  // Mailbox → mailbox icon
-  if (name.includes("mailbox") || name.includes("mail")) return <IconMailbox size={13} color={color} />;
+  // Mailbox
+  if (name.includes("mailbox") || name.includes("mail")) {
+    return (
+      <Svg width={13} height={13} viewBox="0 0 24 24">
+        <Path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        <Path d="M22 6l-10 7L2 6" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      </Svg>
+    );
+  }
 
-  return <IconKey size={13} color={color} />;
+  // Default → key
+  return (
+    <Svg width={13} height={13} viewBox="0 0 24 24">
+      <Circle cx="7.5" cy="15.5" r="4.5" fill="none" stroke={color} strokeWidth={1.8} />
+      <Path d="M21 2l-9.6 9.6M15.5 7.5l3 3M18 5l2 2" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
+  );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -1761,7 +1789,7 @@ export function CheckoutPDFDocument({
                           (() => {
                             const sz = calcPhotoSize(pair.coPhoto, COL_W, PAIR_MAX_H);
                             return (
-                              <View style={{ marginBottom: 5 }}>
+                              <View style={{ marginBottom: 5, position: "relative" }}>
                                 <Image
                                   src={pair.coPhoto.url}
                                   style={{
@@ -1774,6 +1802,23 @@ export function CheckoutPDFDocument({
                                     borderColor: "#DC2626",
                                   }}
                                 />
+                                {pair.coPhoto.taken_at && (
+                                  <View
+                                    style={{
+                                      position: "absolute",
+                                      bottom: 4,
+                                      right: 4,
+                                      backgroundColor: "rgba(0,0,0,0.45)",
+                                      borderRadius: 3,
+                                      paddingHorizontal: 4,
+                                      paddingVertical: 2,
+                                    }}
+                                  >
+                                    <Text style={{ fontSize: 6, color: "#FFFFFF", fontFamily: "Helvetica" }}>
+                                      {formatDate(pair.coPhoto.taken_at, true)}
+                                    </Text>
+                                  </View>
+                                )}
                               </View>
                             );
                           })()}
@@ -1888,7 +1933,7 @@ export function CheckoutPDFDocument({
                                 (() => {
                                   const sz = calcPhotoSize(pair.ciPhoto, COL_W, PAIR_MAX_H);
                                   return (
-                                    <View style={{ marginBottom: 5 }}>
+                                    <View style={{ marginBottom: 5, position: "relative" }}>
                                       <Image
                                         src={pair.ciPhoto.url}
                                         style={{
@@ -1900,6 +1945,23 @@ export function CheckoutPDFDocument({
                                           opacity: 0.88,
                                         }}
                                       />
+                                      {pair.ciPhoto.taken_at && (
+                                        <View
+                                          style={{
+                                            position: "absolute",
+                                            bottom: 4,
+                                            right: 4,
+                                            backgroundColor: "rgba(0,0,0,0.45)",
+                                            borderRadius: 3,
+                                            paddingHorizontal: 4,
+                                            paddingVertical: 2,
+                                          }}
+                                        >
+                                          <Text style={{ fontSize: 6, color: "#FFFFFF", fontFamily: "Helvetica" }}>
+                                            {formatDate(pair.ciPhoto.taken_at, true)}
+                                          </Text>
+                                        </View>
+                                      )}
                                     </View>
                                   );
                                 })()
@@ -2003,7 +2065,7 @@ export function CheckoutPDFDocument({
                                 (() => {
                                   const sz = calcPhotoSize(pair.coPhoto, COL_W, PAIR_MAX_H);
                                   return (
-                                    <View style={{ marginBottom: 5 }}>
+                                    <View style={{ marginBottom: 5, position: "relative" }}>
                                       <Image
                                         src={pair.coPhoto.url}
                                         style={{
@@ -2016,6 +2078,23 @@ export function CheckoutPDFDocument({
                                           borderColor: tokens.primary,
                                         }}
                                       />
+                                      {pair.coPhoto.taken_at && (
+                                        <View
+                                          style={{
+                                            position: "absolute",
+                                            bottom: 4,
+                                            right: 4,
+                                            backgroundColor: "rgba(0,0,0,0.45)",
+                                            borderRadius: 3,
+                                            paddingHorizontal: 4,
+                                            paddingVertical: 2,
+                                          }}
+                                        >
+                                          <Text style={{ fontSize: 6, color: "#FFFFFF", fontFamily: "Helvetica" }}>
+                                            {formatDate(pair.coPhoto.taken_at, true)}
+                                          </Text>
+                                        </View>
+                                      )}
                                     </View>
                                   );
                                 })()
@@ -2328,6 +2407,13 @@ export function CheckoutPDFDocument({
               ? (signatures ?? []).find((s) => s.signer_type === "landlord")
               : null;
 
+            // Inspector date logic:
+            // - individual: same signed_at as landlord (same person)
+            // - pro: use inspection created_at (pre-registered signature)
+            const inspectorSignedAt = isIndividual
+              ? (landlordSigForInspector?.signed_at ?? null)
+              : (inspection.created_at ?? null);
+
             const inspectorSignatureUrl =
               inspectorSig?.signature_data ||
               landlordSigForInspector?.signature_data ||
@@ -2382,7 +2468,10 @@ export function CheckoutPDFDocument({
                         }}
                       />
                       <Text style={{ fontSize: 7, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
-                        Report generated on {formatDate(new Date().toISOString(), true)}
+                        {isIndividual
+                          ? (inspectorSignedAt ? `Signed on ${formatDate(inspectorSignedAt, true)}` : "Pending signature")
+                          : `Report generated on ${formatDate(inspection.created_at, true)}`
+                        }
                       </Text>
                     </View>
                   </View>

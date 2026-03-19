@@ -34,19 +34,29 @@ EXAMPLE CHECK-OUT:
 EXAMPLE NO DAMAGE:
 "Check-in inspection of Al Barsha Heights, Unit 204 conducted 5 April 2026 — 7 rooms, 9 photos. All rooms in good condition — no damage, staining, or defects recorded across any surface or fixture. Establishes baseline condition for tenancy 1 April 2026 – 31 March 2027."`;
 
-const SEVERE_TAGS = ["BROKEN", "HOLE", "WATER_DAMAGE", "MOLD"];
-
 function getRoomCondition(photos: { damage_tags?: string[] }[]): string {
-  const photosWithIssues = photos.filter((p) => (p.damage_tags?.length ?? 0) > 0).length;
+  const photosWithIssues = photos.filter(
+    (p) => (p.damage_tags?.length ?? 0) > 0
+  ).length;
+
+  // No damage at all -> Excellent
   if (photosWithIssues === 0) return "Excellent";
 
+  // Any severe tag -> always Needs Attention
+  const SEVERE_TAGS = ["BROKEN", "HOLE", "WATER_DAMAGE", "MOLD", "LEAK", "CRACK", "DAMP"];
   const hasSevere = photos.some((p) =>
-    (p.damage_tags ?? []).some((t) => SEVERE_TAGS.includes(String(t).toUpperCase()))
+    (p.damage_tags ?? []).some((t) =>
+      SEVERE_TAGS.includes(String(t).toUpperCase())
+    )
   );
   if (hasSevere) return "Needs Attention";
 
-  if (photos.length > 0 && photosWithIssues / photos.length >= 0.5) return "Fair";
-  return "Good";
+  // ANY damage tag present (scratch, stain, mark, wear...)
+  // -> at minimum "Needs Attention" for single issue, "Fair" for multiple
+  // Previous logic: "Good" even with 1 scratch - too permissive
+  if (photosWithIssues === 1 && photos.length >= 3) return "Fair";
+  // More than 1 photo with issues OR any issue in small room
+  return "Needs Attention";
 }
 
 export async function POST(request: Request) {

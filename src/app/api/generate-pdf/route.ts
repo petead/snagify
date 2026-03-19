@@ -20,17 +20,28 @@ import {
 export const maxDuration = 60;
 
 function getRoomCondition(photos: { damage_tags?: string[] }[]): string {
-  const photosWithIssues = photos.filter((p) => (p.damage_tags?.length ?? 0) > 0).length;
+  const photosWithIssues = photos.filter(
+    (p) => (p.damage_tags?.length ?? 0) > 0
+  ).length;
+
+  // No damage at all -> Excellent
   if (photosWithIssues === 0) return "Excellent";
 
-  const severeTags = ["BROKEN", "HOLE", "WATER_DAMAGE", "MOLD"];
+  // Any severe tag -> always Needs Attention
+  const SEVERE_TAGS = ["BROKEN", "HOLE", "WATER_DAMAGE", "MOLD", "LEAK", "CRACK", "DAMP"];
   const hasSevere = photos.some((p) =>
-    (p.damage_tags ?? []).some((t) => severeTags.includes(String(t).toUpperCase()))
+    (p.damage_tags ?? []).some((t) =>
+      SEVERE_TAGS.includes(String(t).toUpperCase())
+    )
   );
   if (hasSevere) return "Needs Attention";
 
-  if (photos.length > 0 && photosWithIssues / photos.length >= 0.5) return "Fair";
-  return "Good";
+  // ANY damage tag present (scratch, stain, mark, wear...)
+  // -> at minimum "Needs Attention" for single issue, "Fair" for multiple
+  // Previous logic: "Good" even with 1 scratch - too permissive
+  if (photosWithIssues === 1 && photos.length >= 3) return "Fair";
+  // More than 1 photo with issues OR any issue in small room
+  return "Needs Attention";
 }
 
 function fallbackExecutiveSummary(row: InspectionRow): string {
@@ -493,6 +504,7 @@ export async function buildPdfAndUpload(
             .map((p) => ({
               id: p.id,
               url: p.url!,
+              taken_at: p.taken_at ?? null,
               damage_tags: p.damage_tags,
               ai_analysis: p.ai_analysis ?? undefined,
               width: p.width ?? null,
