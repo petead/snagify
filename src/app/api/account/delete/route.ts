@@ -8,174 +8,99 @@ const supabaseAdmin = createAdminClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const STORAGE_BUCKETS = [
-  "inspection-photos",
-  "reports",
-  "avatars",
-  "logos",
-  "signatures",
-] as const;
-
-function isStorageListFile(item: {
-  id?: string | null;
-  metadata?: { size?: number } | null;
-}): boolean {
-  const size = item.metadata?.size;
-  if (typeof size === "number") return true;
-  return item.id != null && String(item.id).length > 0;
-}
-
-/** Delete all objects under `prefix` (recursive). Prefix is e.g. userId or userId/inspectionId. */
-async function removeStoragePrefix(bucket: string, prefix: string): Promise<void> {
-  const { data: items, error } = await supabaseAdmin.storage.from(bucket).list(prefix, {
-    limit: 1000,
-  });
-  if (error || !items?.length) return;
-
-  const directFiles: string[] = [];
-  for (const item of items) {
-    const childPath = `${prefix}/${item.name}`;
-    if (isStorageListFile(item)) {
-      directFiles.push(childPath);
-    } else {
-      await removeStoragePrefix(bucket, childPath);
-    }
-  }
-  if (directFiles.length > 0) {
-    await supabaseAdmin.storage.from(bucket).remove(directFiles);
-  }
-}
-
-export async function DELETE() {
+export async function DELETE(_req: Request) {
   try {
+    // 1. Verify authenticated user
     const supabase = await createClient();
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
-
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
     const userId = user.id;
+    console.log("[delete-account] Starting deletion for userId:", userId);
 
-    const { data: profile, error: profileErr } = await supabaseAdmin
-      .from("profiles")
-      .select("company_id, role")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (profileErr) {
-      console.error("account/delete profile fetch:", profileErr.message);
-    }
-
-    const { data: inspections, error: inspErr } = await supabaseAdmin
-      .from("inspections")
-      .select(
-        `
-        id,
-        tenancy_id,
-        rooms ( id )
-      `
-      )
-      .eq("agent_id", userId);
-
-    if (inspErr) {
-      return NextResponse.json({ error: inspErr.message }, { status: 500 });
-    }
-
-    const rows = (inspections ?? []) as Array<{
-      id: string;
-      tenancy_id: string | null;
-      rooms: Array<{ id: string }> | null;
-    }>;
-
-    // Nullify storage.objects owner — JS .schema('storage') is unreliable; use RPC instead.
-    const { error: rpcError } = await supabaseAdmin.rpc("delete_user_account", {
-      target_user_id: userId,
-    });
-    if (rpcError) {
-      console.error("RPC cleanup error:", rpcError);
-      // Log but don't block — attempt storage + auth delete anyway
-    }
-
-    // Delete storage files per bucket — all buckets use {userId}/ as first segment (recursive).
-    for (const bucket of STORAGE_BUCKETS) {
-      try {
-        await removeStoragePrefix(bucket, userId);
-      } catch (e) {
-        console.error(`Storage cleanup failed for bucket ${bucket}:`, e);
-      }
-    }
-
-    const inspectionIds = rows.map((r) => r.id);
-
-    // Legacy paths (pre–user-prefix layout)
+    // 2. Nullify storage.objects owner via SQL function
+    // NON-BLOCKING — log error but always continue
     try {
-      await supabaseAdmin.storage
-        .from("avatars")
-        .remove([`signatures/${userId}/inspector-signature.png`]);
-      for (const id of inspectionIds) {
-        await supabaseAdmin.storage.from("reports").remove([`report_${id}.pdf`, `${id}/${id}.pdf`]);
-        await removeStoragePrefix("inspection-photos", `inspections/${id}`);
-      }
+      const { error: rpcError } = await supabaseAdmin.rpc("delete_user_account", {
+        target_user_id: userId,
+      });
+      if (rpcError) console.error("[delete-account] RPC error (non-blocking):", rpcError);
+      else console.log("[delete-account] RPC: storage.objects owner nullified ✅");
     } catch (e) {
-      console.error("Storage cleanup (legacy paths) failed:", e);
+      console.error("[delete-account] RPC exception (non-blocking):", e);
     }
 
-    const roomIds = rows.flatMap((r) => (r.rooms ?? []).map((x) => x.id));
+    // 3. Delete physical files from all buckets
+    // NON-BLOCKING per bucket — one failing bucket won't stop the rest
+    const buckets = ["inspection-photos", "reports", "avatars", "logos", "signatures"];
+    for (const bucket of buckets) {
+      try {
+        const { data: topLevel } = await supabaseAdmin.storage
+          .from(bucket)
+          .list(userId, { limit: 1000 });
 
-    if (inspectionIds.length > 0) {
-      await supabaseAdmin.from("signatures").delete().in("inspection_id", inspectionIds);
-    }
-    if (roomIds.length > 0) {
-      await supabaseAdmin.from("photos").delete().in("room_id", roomIds);
-      await supabaseAdmin.from("rooms").delete().in("id", roomIds);
-    }
-    if (inspectionIds.length > 0) {
-      await supabaseAdmin.from("audit_logs").delete().in("inspection_id", inspectionIds);
-      await supabaseAdmin.from("inspections").delete().in("id", inspectionIds);
-    }
+        if (!topLevel || topLevel.length === 0) continue;
 
-    const tenancyIds = Array.from(
-      new Set(rows.map((r) => r.tenancy_id).filter((id): id is string => Boolean(id)))
-    );
-    for (const tid of tenancyIds) {
-      const { count } = await supabaseAdmin
-        .from("inspections")
-        .select("id", { count: "exact", head: true })
-        .eq("tenancy_id", tid);
-      if (count === 0) {
-        await supabaseAdmin.from("tenancies").delete().eq("id", tid);
+        for (const item of topLevel) {
+          if (item.id === null) {
+            const { data: subLevel } = await supabaseAdmin.storage
+              .from(bucket)
+              .list(`${userId}/${item.name}`, { limit: 1000 });
+            if (subLevel && subLevel.length > 0) {
+              for (const subItem of subLevel) {
+                if (subItem.id === null) {
+                  const { data: deepLevel } = await supabaseAdmin.storage
+                    .from(bucket)
+                    .list(`${userId}/${item.name}/${subItem.name}`, { limit: 1000 });
+                  if (deepLevel && deepLevel.length > 0) {
+                    const deepPaths = deepLevel.map(
+                      (f) => `${userId}/${item.name}/${subItem.name}/${f.name}`
+                    );
+                    await supabaseAdmin.storage.from(bucket).remove(deepPaths);
+                  }
+                }
+              }
+              const subPaths = subLevel
+                .filter((f) => f.id !== null)
+                .map((f) => `${userId}/${item.name}/${f.name}`);
+              if (subPaths.length > 0) {
+                await supabaseAdmin.storage.from(bucket).remove(subPaths);
+              }
+            }
+          }
+        }
+        const topPaths = topLevel
+          .filter((f) => f.id !== null)
+          .map((f) => `${userId}/${f.name}`);
+        if (topPaths.length > 0) {
+          await supabaseAdmin.storage.from(bucket).remove(topPaths);
+        }
+        console.log(`[delete-account] Bucket ${bucket} cleaned ✅`);
+      } catch (e) {
+        console.error(`[delete-account] Bucket ${bucket} cleanup failed (non-blocking):`, e);
       }
     }
 
-    await supabaseAdmin.from("properties").delete().eq("agent_id", userId);
-
-    await supabaseAdmin.from("bug_reports").delete().eq("user_id", userId);
-
-    await supabaseAdmin.from("push_subscriptions").delete().eq("user_id", userId);
-
-    const companyId = profile?.company_id as string | null | undefined;
-    const role = profile?.role as string | null | undefined;
-    if (companyId && role === "owner") {
-      await supabaseAdmin.from("company_invitations").delete().eq("company_id", companyId);
-      await supabaseAdmin.from("companies").delete().eq("id", companyId);
-    }
-
-    await supabaseAdmin.from("profiles").delete().eq("id", userId);
-
+    // 4. Delete auth user — CASCADE automatically deletes profiles + all child tables
+    console.log("[delete-account] Calling auth.admin.deleteUser...");
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
     if (deleteError) {
-      console.error("account/delete auth.admin.deleteUser:", deleteError.message);
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+      console.error("[delete-account] deleteUser FAILED:", deleteError);
+      throw deleteError;
     }
+    console.log("[delete-account] Auth user deleted ✅ — CASCADE handled profiles");
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to delete account";
-    console.error("Account deletion error:", err);
+    console.error("[delete-account] Fatal error:", err);
+    const message =
+      err instanceof Error ? err.message : typeof err === "object" && err && "message" in err
+        ? String((err as { message: unknown }).message)
+        : "Failed to delete account";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
