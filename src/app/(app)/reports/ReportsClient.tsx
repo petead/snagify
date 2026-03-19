@@ -224,9 +224,6 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
           <h1 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 30, fontWeight: 800, margin: 0, color: "#1A1A1A", letterSpacing: -0.5 }}>
             Reports
           </h1>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#9A88FD" }}>
-            {reports.length}
-          </span>
         </div>
       </div>
 
