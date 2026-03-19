@@ -11,7 +11,7 @@ import { PasswordStrengthBar } from '@/components/auth/PasswordStrengthBar'
 import { analyzePassword } from '@/lib/passwordStrength'
 
 type AccountType = 'individual' | 'pro'
-type Step = 1 | 2 | 3
+type Step = 1 | 3
 
 function getErrorMessage(error: string): string {
   if (error.includes('Invalid login credentials'))
@@ -21,31 +21,13 @@ function getErrorMessage(error: string): string {
   if (error.includes('Too many requests'))
     return 'Too many attempts. Please wait a few minutes.'
   if (error.includes('Network')) return 'Connection issue. Check your internet.'
-  if (
-    error.includes('COMPANY_EXISTS') ||
-    error.toLowerCase().includes('company already exists')
-  ) {
-    return 'This company already exists. Please contact your manager to be invited as an inspector.'
+  if (error.includes('COMPANY_EXISTS')) {
+    return 'A company with this name already exists. Please contact your manager to be invited as an inspector.'
+  }
+  if (error.toLowerCase().includes('company already exists')) {
+    return 'A company with this name already exists. Please contact your manager to be invited as an inspector.'
   }
   return error
-}
-
-function HouseIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
-    </svg>
-  )
-}
-
-function BuildingIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
-      <path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M8 10h.01M16 14h.01M8 14h.01" />
-    </svg>
-  )
 }
 
 export default function SignupPage() {
@@ -55,8 +37,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [accountType, setAccountType] = useState<AccountType | null>(null)
-  const [agencyName, setAgencyName] = useState('')
+  const [accountType, setAccountType] = useState<AccountType>('individual')
   const [primaryColor, setPrimaryColor] = useState('#9A88FD')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -77,17 +58,23 @@ export default function SignupPage() {
   const passwordAnalysis = analyzePassword(password)
   const passwordOk = passwordAnalysis.score >= 2
 
+  const proCompanyOk = accountType !== 'pro' || companyName.trim().length > 0
+
   const canContinueStep1 =
     fullName.trim().length > 0 &&
-    companyName.trim().length > 0 &&
     emailValid &&
-    passwordOk
+    passwordOk &&
+    proCompanyOk
 
-  const handleContinueStep1 = (e: React.FormEvent) => {
+  const handleContinueStep1 = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     if (!canContinueStep1) return
-    setCurrentStep(2)
+    if (accountType === 'individual') {
+      await handleSignup()
+    } else {
+      setCurrentStep(3)
+    }
   }
 
   const handleSignup = async () => {
@@ -101,9 +88,8 @@ export default function SignupPage() {
           email,
           password,
           fullName: fullName.trim(),
-          companyName: companyName.trim(),
-          accountType: accountType ?? 'individual',
-          agencyName: accountType === 'pro' ? agencyName.trim() : '',
+          accountType,
+          companyName: accountType === 'pro' ? companyName.trim() : undefined,
           primaryColor: accountType === 'pro' ? primaryColor : '#9A88FD',
         }),
       })
@@ -111,12 +97,9 @@ export default function SignupPage() {
       const data = (await res.json()) as { error?: string }
       if (!res.ok) {
         const msg = data.error || 'Signup failed'
-        if (
-          msg.includes('COMPANY_EXISTS') ||
-          msg.toLowerCase().includes('company already exists')
-        ) {
+        if (msg.includes('COMPANY_EXISTS')) {
           setError(
-            'This company already exists. Please contact your manager to be invited as an inspector.'
+            'A company with this name already exists. Please contact your manager to be invited as an inspector.'
           )
         } else {
           setError(getErrorMessage(msg))
@@ -140,28 +123,20 @@ export default function SignupPage() {
     }
   }
 
-  const handleCreateAccountStep2 = () => {
-    setError(null)
-    if (!accountType) return
-    if (accountType === 'individual') {
-      handleSignup()
-    } else {
-      setCurrentStep(3)
-    }
-  }
-
   const handleCreateAccountStep3 = () => {
     setError(null)
     if (accountType !== 'pro') return
-    if (!agencyName.trim()) {
-      setError('Agency name is required.')
+    if (!companyName.trim()) {
+      setError('Company name is required.')
       return
     }
-    handleSignup()
+    void handleSignup()
   }
 
   const inputClass =
     'w-full px-4 py-3 rounded-xl border text-base transition-all duration-200 outline-none'
+
+  const progressActive = currentStep === 1 ? 1 : 2
 
   return (
     <div className="min-h-screen bg-[#F8F7F4] flex items-center justify-center p-4">
@@ -171,7 +146,6 @@ export default function SignupPage() {
         transition={{ duration: 0.4, ease: 'easeOut' }}
         className="w-full max-w-md"
       >
-        {/* Logo */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -193,14 +167,13 @@ export default function SignupPage() {
           </span>
         </motion.div>
 
-        {/* Animated progress dots */}
         <div className="flex justify-center gap-2 mb-6" aria-label="Progress">
-          {([1, 2, 3] as const).map((step) => (
+          {([1, 2] as const).map((step) => (
             <motion.div
               key={step}
               animate={{
-                width: step === currentStep ? 24 : 8,
-                backgroundColor: step <= currentStep ? '#9A88FD' : '#E5E7EB',
+                width: step === progressActive ? 24 : 8,
+                backgroundColor: step <= progressActive ? '#9A88FD' : '#E5E7EB',
               }}
               transition={{ duration: 0.3 }}
               className="h-2 rounded-full"
@@ -208,7 +181,6 @@ export default function SignupPage() {
           ))}
         </div>
 
-        {/* Card */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -216,7 +188,6 @@ export default function SignupPage() {
           className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100"
         >
           <AnimatePresence mode="wait">
-            {/* Step 1: Credentials */}
             {currentStep === 1 && (
               <motion.div
                 key="step1"
@@ -244,12 +215,11 @@ export default function SignupPage() {
                         exit={{ opacity: 0, height: 0 }}
                         className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600"
                       >
-                        {getErrorMessage(error)}
+                        {error}
                       </motion.div>
                     )}
                   </AnimatePresence>
 
-                  {/* Full name */}
                   <div>
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                       Full name
@@ -264,23 +234,53 @@ export default function SignupPage() {
                     />
                   </div>
 
-                  {/* Company name */}
                   <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
-                      Company name
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Company name"
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      required
-                      autoComplete="organization"
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base bg-white focus:border-[#9A88FD] focus:ring-2 focus:ring-[#9A88FD]/10 outline-none transition-all duration-200"
-                    />
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Account type
+                    </p>
+                    <div className="flex gap-3 mb-1">
+                      <button
+                        type="button"
+                        onClick={() => setAccountType('individual')}
+                        className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-all active:scale-95
+                          ${accountType === 'individual'
+                            ? 'bg-[#9A88FD] text-white border-[#9A88FD]'
+                            : 'bg-white text-gray-500 border-gray-200'
+                          }`}
+                      >
+                        Particulier
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAccountType('pro')}
+                        className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-all active:scale-95
+                          ${accountType === 'pro'
+                            ? 'bg-[#9A88FD] text-white border-[#9A88FD]'
+                            : 'bg-white text-gray-500 border-gray-200'
+                          }`}
+                      >
+                        Pro
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Email */}
+                  {accountType === 'pro' && (
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                        Company name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Company name"
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        required
+                        autoComplete="organization"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base bg-white focus:border-[#9A88FD] focus:ring-2 focus:ring-[#9A88FD]/10 outline-none transition-all duration-200"
+                      />
+                    </div>
+                  )}
+
                   <div>
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                       Email
@@ -328,7 +328,6 @@ export default function SignupPage() {
                     </AnimatePresence>
                   </div>
 
-                  {/* Password */}
                   <div>
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                       Password
@@ -356,23 +355,36 @@ export default function SignupPage() {
 
                   <motion.button
                     type="submit"
-                    disabled={!canContinueStep1}
+                    disabled={!canContinueStep1 || loading}
                     whileTap={{ scale: 0.98 }}
                     className="w-full py-3.5 rounded-xl bg-[#9A88FD] text-white font-semibold text-sm
                       flex items-center justify-center gap-2 transition-all duration-150
                       hover:bg-[#8674FC] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Continue
-                    <ArrowRight size={16} />
+                    {loading ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Creating account...
+                      </>
+                    ) : accountType === 'individual' ? (
+                      <>
+                        Create my account
+                        <ArrowRight size={16} />
+                      </>
+                    ) : (
+                      <>
+                        Continue
+                        <ArrowRight size={16} />
+                      </>
+                    )}
                   </motion.button>
                 </form>
               </motion.div>
             )}
 
-            {/* Step 2: Account type */}
-            {currentStep === 2 && (
+            {currentStep === 3 && accountType === 'pro' && (
               <motion.div
-                key="step2"
+                key="step3"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
@@ -391,10 +403,10 @@ export default function SignupPage() {
                   className="text-xl font-extrabold text-[#1A1A2E] mb-1"
                   style={{ fontFamily: 'var(--font-heading), Poppins, sans-serif' }}
                 >
-                  How will you use Snagify?
+                  Branding
                 </h1>
                 <p className="text-sm text-gray-500 mb-6">
-                  This helps us tailor your experience
+                  Company: <span className="font-semibold text-[#1A1A2E]">{companyName.trim() || '—'}</span>
                 </p>
 
                 <AnimatePresence>
@@ -405,139 +417,12 @@ export default function SignupPage() {
                       exit={{ opacity: 0, height: 0 }}
                       className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600 mb-4"
                     >
-                      {getErrorMessage(error)}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                  <motion.button
-                    type="button"
-                    whileHover={{ scale: 1.02, y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setAccountType('individual')}
-                    className={`text-left p-4 rounded-2xl border-2 transition-all cursor-pointer
-                      ${accountType === 'individual'
-                        ? 'border-[#9A88FD] bg-[#EDE9FF]'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                  >
-                    <HouseIcon className="w-8 h-8 text-[#9A88FD] mb-3" />
-                    <p className="font-extrabold text-base text-[#1A1A2E]" style={{ fontFamily: 'var(--font-heading)' }}>
-                      Property Owner
-                    </p>
-                    <p className="text-sm text-gray-500 mt-0.5">I manage my own properties</p>
-                    <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                      Free to start
-                    </span>
-                  </motion.button>
-
-                  <motion.button
-                    type="button"
-                    whileHover={{ scale: 1.02, y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setAccountType('pro')}
-                    className={`text-left p-4 rounded-2xl border-2 transition-all cursor-pointer
-                      ${accountType === 'pro'
-                        ? 'border-[#9A88FD] bg-[#EDE9FF]'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                  >
-                    <BuildingIcon className="w-8 h-8 text-[#9A88FD] mb-3" />
-                    <p className="font-extrabold text-base text-[#1A1A2E]" style={{ fontFamily: 'var(--font-heading)' }}>
-                      Agent / Agency
-                    </p>
-                    <p className="text-sm text-gray-500 mt-0.5">I work in real estate professionally</p>
-                    <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#EDE9FF] text-[#6D28D9]">
-                      White-label reports
-                    </span>
-                  </motion.button>
-                </div>
-
-                <motion.button
-                  type="button"
-                  onClick={handleCreateAccountStep2}
-                  disabled={!accountType || loading}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full py-3.5 rounded-xl bg-[#9A88FD] text-white font-semibold text-sm
-                    flex items-center justify-center gap-2 transition-all duration-150
-                    hover:bg-[#8674FC] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Creating account...
-                    </>
-                  ) : accountType === 'individual' ? (
-                    <>
-                      Create my account
-                      <ArrowRight size={16} />
-                    </>
-                  ) : (
-                    <>
-                      Continue
-                      <ArrowRight size={16} />
-                    </>
-                  )}
-                </motion.button>
-              </motion.div>
-            )}
-
-            {/* Step 3: Agency setup */}
-            {currentStep === 3 && accountType === 'pro' && (
-              <motion.div
-                key="step3"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.25 }}
-              >
-                <button
-                  type="button"
-                  onClick={() => { setCurrentStep(2); setError(null) }}
-                  className="flex items-center gap-1 text-sm text-[#9A88FD] font-semibold hover:underline mb-4"
-                >
-                  <ArrowLeft size={14} />
-                  Back
-                </button>
-
-                <h1
-                  className="text-xl font-extrabold text-[#1A1A2E] mb-1"
-                  style={{ fontFamily: 'var(--font-heading), Poppins, sans-serif' }}
-                >
-                  Set up your agency
-                </h1>
-                <p className="text-sm text-gray-500 mb-6">
-                  This will appear on all your inspection reports
-                </p>
-
-                <AnimatePresence>
-                  {error && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600 mb-4"
-                    >
-                      {getErrorMessage(error)}
+                      {error}
                     </motion.div>
                   )}
                 </AnimatePresence>
 
                 <div className="space-y-4 mb-6">
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
-                      Agency name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={agencyName}
-                      onChange={(e) => setAgencyName(e.target.value)}
-                      placeholder="MULKEEF Real Estate"
-                      className={`${inputClass} border-gray-200 bg-gray-50 focus:border-[#9A88FD] focus:bg-white focus:ring-2 focus:ring-[#9A88FD]/10`}
-                    />
-                  </div>
-
                   <div>
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                       Brand color
@@ -584,7 +469,6 @@ export default function SignupPage() {
           </AnimatePresence>
         </motion.div>
 
-        {/* Login link */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

@@ -7,6 +7,38 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const DEFAULT_COMPANY_NAME = "Snagify";
+
+/** Shared company row for personal (individual) accounts. */
+async function getDefaultSnagifyCompanyId(): Promise<string> {
+  const { data: existing } = await supabaseAdmin
+    .from("companies")
+    .select("id")
+    .eq("name", DEFAULT_COMPANY_NAME)
+    .maybeSingle();
+
+  if (existing?.id) return existing.id;
+
+  const { data: created, error } = await supabaseAdmin
+    .from("companies")
+    .insert({
+      name: DEFAULT_COMPANY_NAME,
+      primary_color: "#9A88FD",
+      logo_url: "https://app.snagify.net/icon-512x512.png",
+      plan: "free",
+      credits_balance: 0,
+    })
+    .select("id")
+    .single();
+
+  if (error || !created?.id) {
+    throw new Error(
+      error?.message ?? "Could not create or find default Snagify company for individual signups"
+    );
+  }
+  return created.id;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -15,7 +47,6 @@ export async function POST(req: NextRequest) {
       password,
       fullName,
       accountType,
-      agencyName,
       primaryColor,
       companyName,
     } = body as {
@@ -23,7 +54,6 @@ export async function POST(req: NextRequest) {
       password?: string;
       fullName?: string;
       accountType?: string;
-      agencyName?: string;
       primaryColor?: string;
       companyName?: string;
     };
@@ -35,34 +65,54 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const isPro = accountType === "pro";
     const companyNameTrimmed = (companyName ?? "").trim();
-    if (!companyNameTrimmed) {
+
+    if (isPro && !companyNameTrimmed) {
       return NextResponse.json(
-        { error: "Company name is required" },
+        { error: "Company name is required for Pro accounts" },
         { status: 400 }
       );
     }
 
-    const resolvedCompanyName =
-      accountType === "pro"
-        ? (agencyName?.trim() || companyNameTrimmed)
-        : companyNameTrimmed;
+    let companyId: string;
 
-    const nameKey = normalizeCompanyNameKey(resolvedCompanyName);
-    const { data: existingCompanies } = await supabaseAdmin
-      .from("companies")
-      .select("id, name");
-    const duplicate = (existingCompanies ?? []).some(
-      (c) => normalizeCompanyNameKey(c.name ?? "") === nameKey && nameKey.length > 0
-    );
-    if (duplicate) {
-      return NextResponse.json(
-        {
-          error:
-            "COMPANY_EXISTS: This company already exists. Please contact your manager to be invited as an inspector.",
-        },
-        { status: 400 }
+    if (isPro) {
+      const nameKey = normalizeCompanyNameKey(companyNameTrimmed);
+      const { data: existingCompanies } = await supabaseAdmin
+        .from("companies")
+        .select("id, name");
+      const duplicate = (existingCompanies ?? []).some(
+        (c) => normalizeCompanyNameKey(c.name ?? "") === nameKey && nameKey.length > 0
       );
+      if (duplicate) {
+        return NextResponse.json(
+          {
+            error:
+              "COMPANY_EXISTS: A company with this name already exists. Please contact your manager to be invited as an inspector.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const companyColor = primaryColor?.trim() || "#9A88FD";
+
+      const { data: company, error: companyError } = await supabaseAdmin
+        .from("companies")
+        .insert({
+          name: companyNameTrimmed,
+          primary_color: companyColor,
+          logo_url: "https://app.snagify.net/icon-512x512.png",
+          plan: "free",
+          credits_balance: 0,
+        })
+        .select("id")
+        .single();
+      if (companyError) throw companyError;
+      if (!company?.id) throw new Error("Company could not be created");
+      companyId = company.id;
+    } else {
+      companyId = await getDefaultSnagifyCompanyId();
     }
 
     const { data: authData, error: authError } =
@@ -70,40 +120,28 @@ export async function POST(req: NextRequest) {
         email,
         password,
         email_confirm: true,
+        user_metadata: {
+          full_name: fullName.trim(),
+          account_type: accountType,
+          ...(isPro && companyNameTrimmed ? { company_name: companyNameTrimmed } : {}),
+        },
       });
     if (authError) throw authError;
     const userId = authData.user?.id;
     if (!userId) throw new Error("User creation failed");
 
-    // Pro: use chosen color. Individual: always Snagify purple default
-    const companyColor =
-      accountType === "pro" && primaryColor ? primaryColor : "#9A88FD";
-
-    const { data: company, error: companyError } = await supabaseAdmin
-      .from("companies")
-      .insert({
-        name: resolvedCompanyName || null,
-        primary_color: companyColor,
-        // Default logo = Snagify icon (overrideable later by pro users)
-        logo_url: "https://app.snagify.net/icon-512x512.png",
-        plan: "free",
-        credits_balance: 0,
-      })
-      .select("id")
-      .single();
-    if (companyError) throw companyError;
-    if (!company?.id) throw new Error("Company could not be created");
-
     const profileRow: Record<string, unknown> = {
       id: userId,
       full_name: fullName.trim() || null,
       email,
-      company_id: company.id,
+      company_id: companyId,
       onboarding_completed: true,
+      role: "owner",
     };
-    if (accountType === "pro") {
+    if (isPro) {
       profileRow.account_type = "pro";
     }
+
     const { error: profileError } = await supabaseAdmin.from("profiles").insert(profileRow);
     if (profileError) throw profileError;
 
