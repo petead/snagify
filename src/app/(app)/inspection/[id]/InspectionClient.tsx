@@ -1864,10 +1864,18 @@ export function InspectionClient({
                 {editingKeys && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     {editableKeys.map((item, i) => (
-                      <div key={i} style={{
+                      <div
+                        key={i}
+                        className="w-full overflow-hidden"
+                        style={{
                         background: "white", borderRadius: 16, border: "2px solid rgba(154,136,253,0.2)",
-                        padding: 16, display: "flex", alignItems: "center", gap: 12,
-                      }}>
+                        padding: 16,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                      }}
+                      >
                         {/* Icon */}
                         <div style={{
                           width: 40, height: 40, background: "#EDE9FF", borderRadius: 12,
@@ -1886,13 +1894,21 @@ export function InspectionClient({
                             setEditableKeys(next);
                           }}
                           style={{
-                            flex: 1, fontSize: 16, fontWeight: 600, color: "#1a1a2e",
+                            flex: 1,
+                            minWidth: 0,
+                            fontSize: 16,
+                            fontWeight: 600,
+                            color: "#1a1a2e",
                             background: "transparent", border: "none", outline: "none",
                           }}
+                          className="flex-1 min-w-0"
                         />
 
                         {/* Qty controls */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                        <div
+                          className="flex items-center gap-2 flex-shrink-0"
+                          style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}
+                        >
                           <button
                             type="button"
                             onClick={() => {
@@ -1900,18 +1916,34 @@ export function InspectionClient({
                               next[i] = { ...next[i], qty: Math.max(0, next[i].qty - 1) };
                               setEditableKeys(next);
                             }}
+                            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center active:scale-95 transition-transform flex-shrink-0"
                             style={{
-                              width: 32, height: 32, borderRadius: 10, background: "#F3F3F8",
-                              border: "none", cursor: "pointer", fontSize: 18, fontWeight: 700,
-                              color: "#1a1a2e", display: "flex", alignItems: "center", justifyContent: "center",
+                              width: 32,
+                              height: 32,
+                              borderRadius: 9999,
+                              background: "#F3F3F8",
+                              border: "none",
+                              cursor: "pointer",
+                              fontSize: 18,
+                              fontWeight: 700,
+                              color: "#1a1a2e",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
                             }}
                           >
                             −
                           </button>
-                          <span style={{
-                            fontSize: 15, fontWeight: 800, color: "#9A88FD",
-                            width: 24, textAlign: "center",
-                          }}>
+                          <span
+                            className="flex-shrink-0"
+                            style={{
+                              fontSize: 15,
+                              fontWeight: 800,
+                              color: "#9A88FD",
+                              width: 24,
+                              textAlign: "center",
+                            }}
+                          >
                             {item.qty}
                           </span>
                           <button
@@ -1921,10 +1953,20 @@ export function InspectionClient({
                               next[i] = { ...next[i], qty: next[i].qty + 1 };
                               setEditableKeys(next);
                             }}
+                            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center active:scale-95 transition-transform flex-shrink-0"
                             style={{
-                              width: 32, height: 32, borderRadius: 10, background: "#EDE9FF",
-                              border: "none", cursor: "pointer", fontSize: 18, fontWeight: 700,
-                              color: "#9A88FD", display: "flex", alignItems: "center", justifyContent: "center",
+                              width: 32,
+                              height: 32,
+                              borderRadius: 9999,
+                              background: "#EDE9FF",
+                              border: "none",
+                              cursor: "pointer",
+                              fontSize: 18,
+                              fontWeight: 700,
+                              color: "#9A88FD",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
                             }}
                           >
                             +
