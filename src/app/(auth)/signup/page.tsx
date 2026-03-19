@@ -13,6 +13,9 @@ import { analyzePassword } from '@/lib/passwordStrength'
 type AccountType = 'individual' | 'pro'
 type Step = 1 | 3
 
+const inputFocus =
+  'transition-all duration-200 focus:ring-2 focus:ring-[#9A88FD]/40 focus:border-[#9A88FD] focus:shadow-[0_0_0_4px_rgba(154,136,253,0.12)] outline-none'
+
 function getErrorMessage(error: string): string {
   if (error.includes('Invalid login credentials'))
     return 'Wrong email or password. Please try again.'
@@ -42,6 +45,8 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [emailTouched, setEmailTouched] = useState(false)
+  const [ctaStep1Hover, setCtaStep1Hover] = useState(false)
+  const [ctaStep3Hover, setCtaStep3Hover] = useState(false)
   const router = useRouter()
 
   const supabase = useMemo(
@@ -133,23 +138,37 @@ export default function SignupPage() {
     void handleSignup()
   }
 
-  const inputClass =
-    'w-full px-4 py-3 rounded-xl border text-base transition-all duration-200 outline-none'
+  const inputClass = `w-full px-4 py-3 rounded-xl border text-base ${inputFocus}`
 
   const progressActive = currentStep === 1 ? 1 : 2
 
   return (
-    <div className="min-h-screen bg-[#F8F7F4] flex items-center justify-center p-4">
+    <div className="relative min-h-screen overflow-hidden bg-[#F8F7F4] flex items-center justify-center p-4">
+      {/* Animated background blobs */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="w-full max-w-md"
-      >
+        aria-hidden
+        className="pointer-events-none absolute -left-16 -top-16 h-72 w-72 rounded-full bg-[#9A88FD]/20 blur-3xl"
+        animate={{ y: [0, -30, 0], x: [0, 20, 0] }}
+        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-[#9A88FD]/15 blur-3xl"
+        animate={{ y: [0, 25, 0], x: [0, -20, 0] }}
+        transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute right-[10%] top-1/3 h-48 w-48 rounded-full bg-[#FEDE80]/25 blur-2xl"
+        animate={{ y: [0, -20, 0] }}
+        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+      />
+
+      <div className="relative z-10 w-full max-w-md">
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.1 }}
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
           className="flex items-center justify-center gap-2 mb-6"
         >
           <Image
@@ -173,19 +192,20 @@ export default function SignupPage() {
               key={step}
               animate={{
                 width: step === progressActive ? 24 : 8,
-                backgroundColor: step <= progressActive ? '#9A88FD' : '#E5E7EB',
+                backgroundColor:
+                  step === progressActive ? '#9A88FD' : 'rgba(154, 136, 253, 0.25)',
               }}
-              transition={{ duration: 0.3 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
               className="h-2 rounded-full"
             />
           ))}
         </div>
 
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100"
+          initial={{ opacity: 0, y: 40, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+          className="rounded-3xl border border-black/5 bg-white/90 p-8 shadow-2xl shadow-[#9A88FD]/10 ring-1 ring-black/5 backdrop-blur-sm"
         >
           <AnimatePresence mode="wait">
             {currentStep === 1 && (
@@ -196,15 +216,19 @@ export default function SignupPage() {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.25 }}
               >
-                <h1
-                  className="text-2xl font-extrabold text-[#1A1A2E] mb-1"
-                  style={{ fontFamily: 'var(--font-heading), Poppins, sans-serif' }}
+                <motion.div
+                  initial={{ opacity: 0, x: -16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.15, duration: 0.45 }}
                 >
-                  Create your account
-                </h1>
-                <p className="text-sm text-gray-500 mb-6">
-                  Enter your details to get started
-                </p>
+                  <h1
+                    className="text-2xl font-extrabold text-[#1A1A2E] mb-1"
+                    style={{ fontFamily: 'var(--font-heading), Poppins, sans-serif' }}
+                  >
+                    Create your account
+                  </h1>
+                  <p className="text-sm text-gray-500 mb-6">Enter your details to get started</p>
+                </motion.div>
 
                 <form onSubmit={handleContinueStep1} className="space-y-4">
                   <AnimatePresence>
@@ -220,7 +244,11 @@ export default function SignupPage() {
                     )}
                   </AnimatePresence>
 
-                  <div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2, duration: 0.4 }}
+                  >
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                       Full name
                     </label>
@@ -230,58 +258,80 @@ export default function SignupPage() {
                       onChange={(e) => setFullName(e.target.value)}
                       autoComplete="name"
                       placeholder="John Smith"
-                      className={`${inputClass} border-gray-200 bg-gray-50 focus:border-[#9A88FD] focus:bg-white focus:ring-2 focus:ring-[#9A88FD]/10`}
+                      className={`${inputClass} border-gray-200 bg-gray-50 focus:bg-white`}
                     />
-                  </div>
+                  </motion.div>
 
-                  <div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.28, duration: 0.4 }}
+                  >
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                       Account type
                     </p>
-                    <div className="flex gap-3 mb-1">
+                    <div className="relative flex w-full gap-1 rounded-xl bg-gray-100 p-1">
+                      <motion.div
+                        layoutId="accountTypePill"
+                        className="absolute left-1 top-1 bottom-1 z-0 rounded-lg bg-[#9A88FD] shadow-md"
+                        style={{ width: 'calc(50% - 6px)' }}
+                        initial={false}
+                        animate={{
+                          x: accountType === 'individual' ? 0 : 'calc(100% + 4px)',
+                        }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                      />
                       <button
                         type="button"
                         onClick={() => setAccountType('individual')}
-                        className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-all active:scale-95
-                          ${accountType === 'individual'
-                            ? 'bg-[#9A88FD] text-white border-[#9A88FD]'
-                            : 'bg-white text-gray-500 border-gray-200'
-                          }`}
+                        className={`relative z-10 flex-1 rounded-lg py-3 text-sm font-semibold transition-colors duration-200 ${
+                          accountType === 'individual' ? 'text-white' : 'text-gray-500'
+                        }`}
                       >
-                        Particulier
+                        Individual
                       </button>
                       <button
                         type="button"
                         onClick={() => setAccountType('pro')}
-                        className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-all active:scale-95
-                          ${accountType === 'pro'
-                            ? 'bg-[#9A88FD] text-white border-[#9A88FD]'
-                            : 'bg-white text-gray-500 border-gray-200'
-                          }`}
+                        className={`relative z-10 flex-1 rounded-lg py-3 text-sm font-semibold transition-colors duration-200 ${
+                          accountType === 'pro' ? 'text-white' : 'text-gray-500'
+                        }`}
                       >
                         Pro
                       </button>
                     </div>
-                  </div>
+                  </motion.div>
 
-                  {accountType === 'pro' && (
-                    <div>
-                      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
-                        Company name
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Company name"
-                        value={companyName}
-                        onChange={(e) => setCompanyName(e.target.value)}
-                        required
-                        autoComplete="organization"
-                        className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base bg-white focus:border-[#9A88FD] focus:ring-2 focus:ring-[#9A88FD]/10 outline-none transition-all duration-200"
-                      />
-                    </div>
-                  )}
+                  <AnimatePresence>
+                    {accountType === 'pro' && (
+                      <motion.div
+                        key="company-field"
+                        initial={{ opacity: 0, y: 12, height: 0 }}
+                        animate={{ opacity: 1, y: 0, height: 'auto' }}
+                        exit={{ opacity: 0, y: -8, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                          Company name
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Company name"
+                          value={companyName}
+                          onChange={(e) => setCompanyName(e.target.value)}
+                          required
+                          autoComplete="organization"
+                          className={`${inputClass} border-gray-200 bg-white`}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                  <div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.36, duration: 0.4 }}
+                  >
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                       Email
                     </label>
@@ -293,13 +343,13 @@ export default function SignupPage() {
                         onBlur={() => setEmailTouched(true)}
                         autoComplete="email"
                         placeholder="you@example.com"
-                        className={`${inputClass}
-                          ${emailError
-                            ? 'border-red-300 bg-red-50 focus:border-red-400'
+                        className={`${inputClass} ${
+                          emailError
+                            ? 'border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-200'
                             : emailTouched && emailValid
-                              ? 'border-green-300 bg-green-50 focus:border-green-400'
-                              : 'border-gray-200 bg-gray-50 focus:border-[#9A88FD] focus:bg-white focus:ring-2 focus:ring-[#9A88FD]/10'
-                          }`}
+                              ? 'border-green-300 bg-green-50 focus:border-green-400 focus:ring-green-200'
+                              : 'border-gray-200 bg-gray-50 focus:bg-white'
+                        }`}
                       />
                       <AnimatePresence>
                         {emailTouched && emailValid && (
@@ -326,9 +376,13 @@ export default function SignupPage() {
                         </motion.p>
                       )}
                     </AnimatePresence>
-                  </div>
+                  </motion.div>
 
-                  <div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.44, duration: 0.4 }}
+                  >
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                       Password
                     </label>
@@ -339,7 +393,7 @@ export default function SignupPage() {
                         onChange={(e) => setPassword(e.target.value)}
                         autoComplete="new-password"
                         placeholder="••••••••"
-                        className={`${inputClass} pr-10 border-gray-200 bg-gray-50 focus:border-[#9A88FD] focus:bg-white focus:ring-2 focus:ring-[#9A88FD]/10`}
+                        className={`${inputClass} pr-10 border-gray-200 bg-gray-50 focus:bg-white`}
                       />
                       <button
                         type="button"
@@ -351,32 +405,45 @@ export default function SignupPage() {
                       </button>
                     </div>
                     <PasswordStrengthBar password={password} />
-                  </div>
+                  </motion.div>
 
                   <motion.button
                     type="submit"
                     disabled={!canContinueStep1 || loading}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full py-3.5 rounded-xl bg-[#9A88FD] text-white font-semibold text-sm
-                      flex items-center justify-center gap-2 transition-all duration-150
-                      hover:bg-[#8674FC] disabled:opacity-50 disabled:cursor-not-allowed"
+                    whileHover={{
+                      scale: 1.02,
+                      boxShadow: '0 8px 30px rgba(154,136,253,0.45)',
+                    }}
+                    whileTap={{ scale: 0.97 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                    onHoverStart={() => setCtaStep1Hover(true)}
+                    onHoverEnd={() => setCtaStep1Hover(false)}
+                    className="relative mt-2 w-full overflow-hidden rounded-2xl bg-[#9A88FD] py-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {loading ? (
-                      <>
-                        <Loader2 size={18} className="animate-spin" />
-                        Creating account...
-                      </>
-                    ) : accountType === 'individual' ? (
-                      <>
-                        Create my account
-                        <ArrowRight size={16} />
-                      </>
-                    ) : (
-                      <>
-                        Continue
-                        <ArrowRight size={16} />
-                      </>
-                    )}
+                    <motion.div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      initial={{ x: '-100%' }}
+                      animate={{ x: ctaStep1Hover ? '200%' : '-100%' }}
+                      transition={{ duration: 0.6, ease: 'easeInOut' }}
+                    />
+                    <span className="pointer-events-none relative z-10 flex items-center justify-center gap-2">
+                      {loading ? (
+                        <>
+                          <Loader2 size={18} className="animate-spin" />
+                          Creating account...
+                        </>
+                      ) : accountType === 'individual' ? (
+                        <>
+                          Create my account →
+                        </>
+                      ) : (
+                        <>
+                          Continue
+                          <ArrowRight size={16} />
+                        </>
+                      )}
+                    </span>
                   </motion.button>
                 </form>
               </motion.div>
@@ -392,21 +459,25 @@ export default function SignupPage() {
               >
                 <button
                   type="button"
-                  onClick={() => { setCurrentStep(1); setError(null) }}
-                  className="flex items-center gap-1 text-sm text-[#9A88FD] font-semibold hover:underline mb-4"
+                  onClick={() => {
+                    setCurrentStep(1)
+                    setError(null)
+                  }}
+                  className="mb-4 flex items-center gap-1 text-sm font-semibold text-[#9A88FD] hover:underline"
                 >
                   <ArrowLeft size={14} />
                   Back
                 </button>
 
                 <h1
-                  className="text-xl font-extrabold text-[#1A1A2E] mb-1"
+                  className="mb-1 text-xl font-extrabold text-[#1A1A2E]"
                   style={{ fontFamily: 'var(--font-heading), Poppins, sans-serif' }}
                 >
                   Branding
                 </h1>
-                <p className="text-sm text-gray-500 mb-6">
-                  Company: <span className="font-semibold text-[#1A1A2E]">{companyName.trim() || '—'}</span>
+                <p className="mb-6 text-sm text-gray-500">
+                  Company:{' '}
+                  <span className="font-semibold text-[#1A1A2E]">{companyName.trim() || '—'}</span>
                 </p>
 
                 <AnimatePresence>
@@ -415,16 +486,16 @@ export default function SignupPage() {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600 mb-4"
+                      className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
                     >
                       {error}
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                <div className="space-y-4 mb-6">
+                <div className="mb-6 space-y-4">
                   <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Brand color
                     </label>
                     <div className="flex items-center gap-3">
@@ -433,7 +504,7 @@ export default function SignupPage() {
                         value={primaryColor}
                         onChange={(e) => setPrimaryColor(e.target.value)}
                         whileHover={{ scale: 1.05 }}
-                        className="w-12 h-12 rounded-xl border border-gray-200 cursor-pointer p-0 overflow-hidden"
+                        className="h-12 w-12 cursor-pointer overflow-hidden rounded-xl border border-gray-200 p-0"
                       />
                       <span className="font-mono text-sm text-gray-600">{primaryColor}</span>
                     </div>
@@ -447,40 +518,53 @@ export default function SignupPage() {
                   type="button"
                   onClick={handleCreateAccountStep3}
                   disabled={loading}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full py-3.5 rounded-xl bg-[#9A88FD] text-white font-semibold text-sm
-                    flex items-center justify-center gap-2 transition-all duration-150
-                    hover:bg-[#8674FC] disabled:opacity-50 disabled:cursor-not-allowed"
+                  whileHover={{
+                    scale: 1.02,
+                    boxShadow: '0 8px 30px rgba(154,136,253,0.45)',
+                  }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                  onHoverStart={() => setCtaStep3Hover(true)}
+                  onHoverEnd={() => setCtaStep3Hover(false)}
+                  className="relative w-full overflow-hidden rounded-2xl bg-[#9A88FD] py-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {loading ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Creating account...
-                    </>
-                  ) : (
-                    <>
-                      Create my account
-                      <ArrowRight size={16} />
-                    </>
-                  )}
+                  <motion.div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                    initial={{ x: '-100%' }}
+                    animate={{ x: ctaStep3Hover ? '200%' : '-100%' }}
+                    transition={{ duration: 0.6, ease: 'easeInOut' }}
+                  />
+                  <span className="pointer-events-none relative z-10 flex items-center justify-center gap-2">
+                    {loading ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Creating account...
+                      </>
+                    ) : (
+                      <>
+                        Create my account →
+                      </>
+                    )}
+                  </span>
                 </motion.button>
               </motion.div>
             )}
           </AnimatePresence>
         </motion.div>
 
-        <motion.p
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="text-center text-sm text-gray-500 mt-6"
+          transition={{ delay: 0.6, duration: 0.4 }}
+          className="mt-6 text-center text-sm text-gray-500"
         >
           Already have an account?{' '}
-          <Link href="/login" className="text-[#9A88FD] font-semibold hover:underline">
+          <Link href="/login" className="font-semibold text-[#9A88FD] hover:underline">
             Log in
           </Link>
-        </motion.p>
-      </motion.div>
+        </motion.div>
+      </div>
     </div>
   )
 }
