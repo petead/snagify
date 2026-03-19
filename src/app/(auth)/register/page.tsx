@@ -78,7 +78,7 @@ export default function RegisterPage() {
           password,
           fullName: fullName.trim(),
           accountType: agencyName.trim() ? "pro" : "individual",
-          agencyName: agencyName.trim() || "",
+          companyName: agencyName.trim() || "",
           primaryColor: "#9A88FD",
         }),
       });
