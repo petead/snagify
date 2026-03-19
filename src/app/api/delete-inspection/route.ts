@@ -12,7 +12,7 @@ export async function DELETE(request: Request) {
     .from("inspections")
     .select(
       `
-      id, type, status, tenancy_id, property_id, report_url,
+      id, type, status, tenancy_id, property_id, report_url, agent_id,
       signatures (id, signer_type, otp_verified, signed_at),
       rooms (id, photos (id, url))
     `
@@ -86,18 +86,22 @@ export async function DELETE(request: Request) {
       }
     }
 
-    // 2. Delete PDF from reports bucket
-    let reportPath: string | null = null;
+    // 2. Delete PDF from reports bucket (current path + legacy flat names)
+    const agentId = (inspection as { agent_id?: string | null }).agent_id ?? null;
+    const pathsToRemove = new Set<string>();
     if (inspection.report_url) {
-      reportPath =
+      const fromUrl =
         inspection.report_url
           .split("/storage/v1/object/public/reports/")[1]
           ?.split("?")[0] ?? null;
+      if (fromUrl) pathsToRemove.add(fromUrl);
     }
-    if (!reportPath) {
-      reportPath = `${inspectionId}/${inspectionId}.pdf`;
+    if (agentId) {
+      pathsToRemove.add(`${agentId}/${inspectionId}/report.pdf`);
     }
-    await supabase.storage.from("reports").remove([reportPath]);
+    pathsToRemove.add(`report_${inspectionId}.pdf`);
+    pathsToRemove.add(`${inspectionId}/${inspectionId}.pdf`);
+    await supabase.storage.from("reports").remove(Array.from(pathsToRemove));
   } catch (storageErr) {
     console.error("Storage cleanup failed, proceeding with DB delete:", storageErr);
   }

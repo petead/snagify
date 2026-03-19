@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 const AVATARS_BUCKET = "avatars";
+const SIGNATURES_BUCKET = "signatures";
 const MAX_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
@@ -41,12 +42,14 @@ export async function POST(request: Request) {
     }
 
     const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-    const path = `${user.id}/${kind}.${ext}`;
+    const bucket = kind === "signature" ? SIGNATURES_BUCKET : AVATARS_BUCKET;
+    const path =
+      kind === "signature" ? `${user.id}/signature.${ext}` : `${user.id}/${kind}.${ext}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const { error: uploadError } = await supabase.storage
-      .from(AVATARS_BUCKET)
+      .from(bucket)
       .upload(path, buffer, {
         contentType: file.type,
         upsert: true,
@@ -59,7 +62,7 @@ export async function POST(request: Request) {
 
     const {
       data: { publicUrl },
-    } = supabase.storage.from(AVATARS_BUCKET).getPublicUrl(path);
+    } = supabase.storage.from(bucket).getPublicUrl(path);
 
     const profileColumn =
       kind === "avatar"

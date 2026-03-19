@@ -568,14 +568,23 @@ export async function buildPdfAndUpload(
       pdfBuffer = await generateInspectionPDFBuffer(reportData, metaForPdf, documentHash);
     }
 
-    const fileName = `report_${inspectionId}.pdf`;
+    if (!agentId) {
+      throw new Error("Inspection has no agent_id; cannot upload report to user path");
+    }
+    const fileName = `${agentId}/${inspectionId}/report.pdf`;
+    const legacyReportPaths = [
+      `report_${inspectionId}.pdf`,
+      `${inspectionId}/${inspectionId}.pdf`,
+    ];
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const storageClient =
       supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : supabase;
 
-    const { error: removeErr } = await storageClient.storage.from("reports").remove([fileName]);
+    const { error: removeErr } = await storageClient.storage
+      .from("reports")
+      .remove([fileName, ...legacyReportPaths]);
     if (removeErr) {
       console.warn("[generate-pdf] remove old PDF (ok if missing):", removeErr.message);
     }

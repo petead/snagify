@@ -16,6 +16,36 @@ const STORAGE_BUCKETS = [
   "signatures",
 ] as const;
 
+function isStorageListFile(item: {
+  id?: string | null;
+  metadata?: { size?: number } | null;
+}): boolean {
+  const size = item.metadata?.size;
+  if (typeof size === "number") return true;
+  return item.id != null && String(item.id).length > 0;
+}
+
+/** Delete all objects under `prefix` (recursive). Prefix is e.g. userId or userId/inspectionId. */
+async function removeStoragePrefix(bucket: string, prefix: string): Promise<void> {
+  const { data: items, error } = await supabaseAdmin.storage.from(bucket).list(prefix, {
+    limit: 1000,
+  });
+  if (error || !items?.length) return;
+
+  const directFiles: string[] = [];
+  for (const item of items) {
+    const childPath = `${prefix}/${item.name}`;
+    if (isStorageListFile(item)) {
+      directFiles.push(childPath);
+    } else {
+      await removeStoragePrefix(bucket, childPath);
+    }
+  }
+  if (directFiles.length > 0) {
+    await supabaseAdmin.storage.from(bucket).remove(directFiles);
+  }
+}
+
 export async function DELETE() {
   try {
     const supabase = await createClient();
@@ -70,30 +100,27 @@ export async function DELETE() {
       // Log but don't block — attempt storage + auth delete anyway
     }
 
-    // Delete storage files per bucket using list + remove (non-blocking per bucket).
+    // Delete storage files per bucket — all buckets use {userId}/ as first segment (recursive).
     for (const bucket of STORAGE_BUCKETS) {
       try {
-        const { data: files } = await supabaseAdmin.storage.from(bucket).list("", {
-          search: userId,
-        } as { limit?: number; offset?: number; search?: string; sortBy?: { column: string; order: string } });
-
-        if (files && files.length > 0) {
-          const paths = files.map((f) => f.name);
-          await supabaseAdmin.storage.from(bucket).remove(paths);
-        }
-
-        const { data: folderFiles } = await supabaseAdmin.storage.from(bucket).list(userId);
-
-        if (folderFiles && folderFiles.length > 0) {
-          const folderPaths = folderFiles.map((f) => `${userId}/${f.name}`);
-          await supabaseAdmin.storage.from(bucket).remove(folderPaths);
-        }
+        await removeStoragePrefix(bucket, userId);
       } catch (e) {
         console.error(`Storage cleanup failed for bucket ${bucket}:`, e);
       }
     }
 
     const inspectionIds = rows.map((r) => r.id);
+
+    // Legacy paths (pre–user-prefix layout)
+    try {
+      for (const id of inspectionIds) {
+        await supabaseAdmin.storage.from("reports").remove([`report_${id}.pdf`, `${id}/${id}.pdf`]);
+        await removeStoragePrefix("inspection-photos", `inspections/${id}`);
+      }
+    } catch (e) {
+      console.error("Storage cleanup (legacy paths) failed:", e);
+    }
+
     const roomIds = rows.flatMap((r) => (r.rooms ?? []).map((x) => x.id));
 
     if (inspectionIds.length > 0) {

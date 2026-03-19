@@ -679,8 +679,16 @@ export function InspectionClient({
     }]);
 
     try {
-      // ── STEP 2: Upload to Supabase Storage
-      const fileName = `inspections/${inspectionId}/${localRoomId}/${Date.now()}.jpg`;
+      // ── STEP 2: Upload to Supabase Storage ({userId}/inspectionId/roomId/...)
+      const {
+        data: { user },
+        error: authUserErr,
+      } = await supabase.auth.getUser();
+      if (authUserErr || !user?.id) {
+        throw new Error(authUserErr?.message || "Not authenticated");
+      }
+      const userId = user.id;
+      const fileName = `${userId}/${inspectionId}/${localRoomId}/${Date.now()}.jpg`;
       let blob: Blob;
       let localBase64: string;
 

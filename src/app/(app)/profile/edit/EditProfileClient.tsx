@@ -191,15 +191,15 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
     try {
       const supabase = createClient();
       const blob = await fetch(dataUrl).then(r => r.blob());
-      const fileName = `signatures/${userId}/inspector-signature.png`;
+      const fileName = `${userId}/signature.png`;
       const { error: uploadErr } = await supabase.storage
-        .from("avatars")
+        .from("signatures")
         .upload(fileName, blob, { contentType: "image/png", upsert: true });
       if (uploadErr) {
         console.error(uploadErr);
         return;
       }
-      const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(fileName);
+      const { data: { publicUrl } } = supabase.storage.from("signatures").getPublicUrl(fileName);
       const publicUrlWithCacheBust = `${publicUrl}?t=${Date.now()}`;
       await supabase.from("profiles").update({ signature_image_url: publicUrlWithCacheBust }).eq("id", userId);
       setShowSignaturePad(false);
