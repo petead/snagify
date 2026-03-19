@@ -53,11 +53,15 @@ export async function POST(req: NextRequest) {
     })
     .eq('id', sig.id)
 
-  // Fire push notifications (non-blocking)
-  Promise.all([
-    notifySignatureSigned(sig.id),
-    notifyAllPartiesSigned(inspectionId),
-  ]).catch((err) => console.error('[Push] signature notification error:', err))
+  // Await push notifications — must complete before Vercel terminates function
+  try {
+    await Promise.all([
+      notifySignatureSigned(sig.id),
+      notifyAllPartiesSigned(inspectionId),
+    ])
+  } catch (err) {
+    console.error('[Push] signature notification error:', err)
+  }
 
   // Fetch ALL signatures for this inspection
   const { data: allSigs } = await supabaseAdmin

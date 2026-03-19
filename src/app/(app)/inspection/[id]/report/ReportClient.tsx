@@ -235,6 +235,11 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
     setLoaded(true);
   }, []);
 
+  // Fetch on mount so signing_mode is available for bottom bar display
+  useEffect(() => {
+    fetchSignatureStatus()
+  }, [])
+
   useEffect(() => {
     if (showSignModal) {
       fetchSignatureStatus()
@@ -529,12 +534,12 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
           <div className="flex gap-2">
             {/* Signature status */}
             {(() => {
-              const landlordSigStatus = signatures.find(
-                (s) => s.signer_type === 'landlord'
-              );
-              const tenantSigStatus = signatures.find(
-                (s) => s.signer_type === 'tenant'
-              );
+              const landlordSigStatus = signatureStatus.length > 0
+                ? signatureStatus.find((s) => s.signer_type === 'landlord')
+                : signatures.find((s) => s.signer_type === 'landlord');
+              const tenantSigStatus = signatureStatus.length > 0
+                ? signatureStatus.find((s) => s.signer_type === 'tenant')
+                : signatures.find((s) => s.signer_type === 'tenant');
               const bothSignedStatus = !!landlordSigStatus?.signed_at && !!tenantSigStatus?.signed_at;
               const noSignaturesSentYet = !landlordSigStatus && !tenantSigStatus;
               const landlordSignedStatus = !!landlordSigStatus?.signed_at;
