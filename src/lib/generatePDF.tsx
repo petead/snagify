@@ -1093,7 +1093,9 @@ function InspectionReport({
       (mr) => mr.name.toLowerCase() === room.name.toLowerCase()
     );
     const photos = matchingMeta?.photos ?? [];
-    const validPhotos = photos.filter((p) => p.url && p.url.startsWith("https://"));
+    const validPhotos = photos.filter(
+      (p) => p.url && (p.url.startsWith("https://") || p.url.startsWith("data:"))
+    );
     const photosWithIssues = validPhotos.filter(
       (p) => (p.damage_tags?.length ?? 0) > 0
     ).length;
@@ -1531,7 +1533,7 @@ function InspectionReport({
                           key={photo.id}
                           style={useFull ? s.photoCardFull : s.photoCard}
                         >
-                          {photo.url && photo.url.startsWith("http") ? (
+                          {photo.url && (photo.url.startsWith("http") || photo.url.startsWith("data:")) ? (
                             <Image
                               src={photo.url}
                               style={{
