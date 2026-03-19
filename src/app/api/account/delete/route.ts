@@ -113,6 +113,9 @@ export async function DELETE() {
 
     // Legacy paths (pre–user-prefix layout)
     try {
+      await supabaseAdmin.storage
+        .from("avatars")
+        .remove([`signatures/${userId}/inspector-signature.png`]);
       for (const id of inspectionIds) {
         await supabaseAdmin.storage.from("reports").remove([`report_${id}.pdf`, `${id}/${id}.pdf`]);
         await removeStoragePrefix("inspection-photos", `inspections/${id}`);
