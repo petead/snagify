@@ -108,6 +108,7 @@ export type CheckinRoomPdf = {
   photos?: Array<{
     id: string;
     url: string;
+    taken_at?: string | null;
     damage_tags?: string[] | null;
     ai_analysis?: string | null;
     width?: number | null;
@@ -289,6 +290,7 @@ function buildRoomPdfPairs(room: CheckoutRoom, checkinRooms: CheckinRoomPdf[] | 
           ? {
               id: embedded.id ?? coPhoto.checkin_photo_id,
               url: embedded.url,
+              taken_at: embedded.taken_at ?? null,
               damage_tags: embedded.damage_tags,
               ai_analysis: embedded.ai_analysis,
               width: embedded.width,
