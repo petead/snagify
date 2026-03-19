@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
+import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 
 type ReportRow = {
   id: string;
@@ -73,8 +74,26 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
   const [reports, setReports] = useState(initialReports);
   const rollbackRef = useRef<ReportRow[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("All");
   const [search, setSearch] = useState("");
+
+  const handleReportPdfDownload = useCallback(
+    async (id: string) => {
+      if (pdfLoadingId) return;
+      setPdfLoadingId(id);
+      try {
+        await regenerateAndDownloadInspectionPdf(id);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Download failed";
+        console.error("[DownloadPDF]", msg);
+        alert(msg);
+      } finally {
+        setPdfLoadingId(null);
+      }
+    },
+    [pdfLoadingId]
+  );
 
   useEffect(() => {
     setLoaded(true);
@@ -520,21 +539,9 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                         role="button"
                         tabIndex={0}
                         className="cta-btn"
-                        onClick={() => {
-                          if (report.report_url) {
-                            window.open(report.report_url, "_blank");
-                          } else {
-                            router.push(`/inspection/${report.id}/report`);
-                          }
-                        }}
+                        onClick={() => void handleReportPdfDownload(report.id)}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            if (report.report_url) {
-                              window.open(report.report_url, "_blank");
-                            } else {
-                              router.push(`/inspection/${report.id}/report`);
-                            }
-                          }
+                          if (e.key === "Enter") void handleReportPdfDownload(report.id);
                         }}
                         style={{
                           background: "#1A1A1A", borderRadius: 12,

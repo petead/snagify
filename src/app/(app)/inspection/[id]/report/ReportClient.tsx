@@ -15,6 +15,7 @@ import {
 } from "./page";
 import { CheckoutReportView } from "@/components/inspection/CheckoutReportView";
 import { formatPropertyBuildingUnit } from "@/lib/formatPropertyAddress";
+import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 
 interface ReportClientProps {
   inspection: InspectionWithRelations;
@@ -321,43 +322,8 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
   const handleDownloadPDF = async () => {
     if (downloadLoading) return;
     setDownloadLoading(true);
-
     try {
-      const response = await fetch("/api/generate-pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inspectionId }),
-      });
-
-      if (!response.ok) {
-        let errMsg = "Failed to generate PDF";
-        try {
-          const errData = await response.json() as { error?: string };
-          errMsg = errData.error ?? errMsg;
-        } catch {}
-        throw new Error(errMsg);
-      }
-
-      // Get the binary PDF blob
-      const blob = await response.blob();
-      if (blob.size === 0) {
-        throw new Error("PDF is empty — please try again");
-      }
-
-      // Create a temporary object URL and trigger download
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `Snagify_Report_${inspectionId}.pdf`;
-      link.style.display = "none";
-      document.body.appendChild(link);
-      link.click();
-
-      // Cleanup after short delay
-      setTimeout(() => {
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }, 1000);
+      await regenerateAndDownloadInspectionPdf(inspectionId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Download failed";
       console.error("[DownloadPDF]", msg);

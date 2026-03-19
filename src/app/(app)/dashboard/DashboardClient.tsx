@@ -10,6 +10,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
 import { OnboardingTutorial } from "@/components/onboarding/OnboardingTutorial";
 import { trackAction } from "@/lib/breadcrumb";
+import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 
 type InspectionRow = {
   id: string;
@@ -139,36 +140,7 @@ export function DashboardClient({
     if (pdfLoadingId) return;
     setPdfLoadingId(insp.id);
     try {
-      const response = await fetch("/api/generate-pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inspectionId: insp.id }),
-      });
-      if (!response.ok) {
-        let errMsg = "Failed to generate PDF";
-        try {
-          const errData = (await response.json()) as { error?: string };
-          errMsg = errData.error ?? errMsg;
-        } catch {
-          /* ignore */
-        }
-        throw new Error(errMsg);
-      }
-      const blob = await response.blob();
-      if (blob.size === 0) {
-        throw new Error("PDF is empty — please try again");
-      }
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `Snagify_Report_${insp.id}.pdf`;
-      link.style.display = "none";
-      document.body.appendChild(link);
-      link.click();
-      setTimeout(() => {
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }, 1000);
+      await regenerateAndDownloadInspectionPdf(insp.id);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Download failed";
       console.error("[DownloadPDF]", msg);
