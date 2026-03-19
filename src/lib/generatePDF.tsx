@@ -1075,6 +1075,7 @@ interface InspectionMeta {
     building_name?: string;
     unit_number?: string;
     location?: string;
+    address?: string;
     property_type?: string;
   } | null;
   agent: {
@@ -1254,9 +1255,7 @@ function InspectionReport({
           </View>
 
           <Text style={s.coverAddressMain}>
-            {property.location ?? (property.building_name && property.unit_number
-              ? `${property.building_name}, Unit ${property.unit_number}`
-              : "Property Address")}
+            {property.building_name ?? property.address ?? "Property"}
           </Text>
           <Text style={s.coverAddressSub}>
             {[

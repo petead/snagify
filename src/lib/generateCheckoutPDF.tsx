@@ -1205,9 +1205,7 @@ export function CheckoutPDFDocument({
           </View>
 
           <Text style={s.coverAddressMain}>
-            {property.location || (property.building_name && property.unit_number
-              ? `${property.building_name}, Unit ${property.unit_number}`
-              : "Property Address")}
+            {property.building_name ?? property.location ?? "Property"}
           </Text>
           <Text style={s.coverAddressSub}>
             {[
