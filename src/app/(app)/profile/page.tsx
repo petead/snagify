@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { normalizeAccountTier, normalizeProfileRole } from "@/lib/profileLabels";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ProfileClient } from "./ProfileClient";
@@ -40,8 +41,10 @@ export default async function ProfilePage() {
       .in("status", ["completed", "signed"]),
   ]);
 
-  const accountType = (profile as { account_type?: string } | null)?.account_type === "pro" ? "pro" : "individual";
-  const role = (profile as { role?: string } | null)?.role === "inspector" ? "inspector" : "owner";
+  const accountType = normalizeAccountTier(
+    (profile as { account_type?: string } | null)?.account_type
+  );
+  const role = normalizeProfileRole((profile as { role?: string } | null)?.role);
   const companyData = company ? {
     id: (company as { id?: string }).id ?? "",
     plan: (company as { plan?: string }).plan ?? "free",

@@ -7,6 +7,13 @@ import { ImageCropModal } from "@/components/ui/ImageCropModal";
 import { InspectorSignaturePad } from "@/components/profile/InspectorSignaturePad";
 import { ChevronLeft, Pencil, Loader2 } from "lucide-react";
 import type { Company } from "@/types";
+import {
+  formatAccountTierLabel,
+  formatProfileRoleLabel,
+  normalizeAccountTier,
+  normalizeProfileRole,
+  type ProfileRole,
+} from "@/lib/profileLabels";
 
 type ProfileRow = {
   id: string;
@@ -19,7 +26,7 @@ type ProfileRow = {
   signature_image_url: string | null;
   company_id: string | null;
   account_type?: "individual" | "pro" | null;
-  role?: "owner" | "inspector" | null;
+  role?: ProfileRole | null;
   company?: (Company & { plan?: string | null }) | (Company & { plan?: string | null })[] | null;
 };
 
@@ -279,13 +286,9 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
       : profile.company
     : null;
 
-  const planLabel = (() => {
-    const plan = (company as { plan?: string | null })?.plan;
-    if (!plan || plan === "free") return "Free";
-    return plan.replace("pro_", "Pro ").replace(/\b\w/g, (c: string) => c.toUpperCase());
-  })();
-
-  const roleLabel = profile?.role === "inspector" ? "Inspector" : "Owner";
+  /** Subscription tier (not company Stripe plan — that lives in SubscriptionSection). */
+  const accountTierLabel = formatAccountTierLabel(normalizeAccountTier(profile?.account_type));
+  const roleLabel = formatProfileRoleLabel(normalizeProfileRole(profile?.role));
   const initials = form.fullName
     ? form.fullName.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()
     : userEmail?.split("@")[0].slice(0, 2).toUpperCase() || "PA";
@@ -367,7 +370,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
             <div className="inline-flex items-center gap-1.5 bg-[#9A88FD]/20 border border-[#9A88FD]/30 rounded-full px-3 py-1">
               <div className="w-1.5 h-1.5 rounded-full bg-[#9A88FD]" />
               <span className="text-[11px] font-bold text-[#9A88FD] uppercase tracking-wider">
-                {roleLabel} · {planLabel}
+                {roleLabel} · {accountTierLabel}
               </span>
             </div>
           </div>

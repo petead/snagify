@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { normalizeAccountTier } from "@/lib/profileLabels";
 import { DashboardClient } from "./DashboardClient";
 
 export default async function DashboardPage() {
@@ -24,7 +25,7 @@ export default async function DashboardPage() {
       if (profile && (profile as { onboarding_completed?: boolean }).onboarding_completed === false) {
         profileNeedsOnboardingFix = true;
       }
-      const accountType = (profile as { account_type?: string }).account_type;
+      const accountType = normalizeAccountTier((profile as { account_type?: string }).account_type);
       const companyId = (profile as { company_id?: string }).company_id;
       if (accountType === "pro" && companyId) {
         const { data: company } = await supabase

@@ -16,7 +16,10 @@ export interface Profile {
   id: string;
   full_name: string | null;
   phone: string | null;
+  /** Team / permissions: owner | agent | inspector */
   role: string | null;
+  /** Subscription tier: individual | pro */
+  account_type?: string | null;
   created_at: string | null;
   job_title: string | null;
   whatsapp_number: string | null;

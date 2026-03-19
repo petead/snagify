@@ -4,7 +4,7 @@ create table profiles (
   full_name text,
   agency_name text,
   phone text,
-  role text default 'agent',
+  role text default 'owner',
   created_at timestamp default now(),
   primary key (id)
 );

@@ -63,15 +63,17 @@ export async function POST(req: NextRequest) {
     if (companyError) throw companyError;
     if (!company?.id) throw new Error("Company could not be created");
 
-    const { error: profileError } = await supabaseAdmin.from("profiles").insert({
+    const profileRow: Record<string, unknown> = {
       id: userId,
       full_name: fullName.trim() || null,
       email,
-      account_type: accountType,
       company_id: company.id,
       onboarding_completed: true,
-      role: "agent",
-    });
+    };
+    if (accountType === "pro") {
+      profileRow.account_type = "pro";
+    }
+    const { error: profileError } = await supabaseAdmin.from("profiles").insert(profileRow);
     if (profileError) throw profileError;
 
     return NextResponse.json({ success: true });

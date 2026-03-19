@@ -166,10 +166,17 @@ export async function POST(req: NextRequest) {
         </td>
       </tr>
       <tr>
-        <td style="color:#9B9BA8;padding:4px 0;">Role</td>
+        <td style="color:#9B9BA8;padding:4px 0;">Profile role</td>
         <td style="color:#1A1A2E;font-weight:600;text-align:right;
           text-transform:capitalize;">
-          ${profile?.role || '—'} · ${profile?.account_type || '—'}
+          ${profile?.role || '—'}
+        </td>
+      </tr>
+      <tr>
+        <td style="color:#9B9BA8;padding:4px 0;">Account type</td>
+        <td style="color:#1A1A2E;font-weight:600;text-align:right;
+          text-transform:capitalize;">
+          ${profile?.account_type || '—'}
         </td>
       </tr>
       <tr>

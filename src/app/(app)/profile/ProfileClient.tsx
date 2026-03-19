@@ -11,6 +11,7 @@ import { TeamSection } from "@/components/profile/TeamSection";
 import { ReportBugModal } from "@/components/settings/ReportBugModal";
 import { Check } from "lucide-react";
 import { trackAction } from "@/lib/breadcrumb";
+import type { ProfileRole } from "@/lib/profileLabels";
 
 export type ProfileData = {
   full_name: string | null;
@@ -44,7 +45,7 @@ interface ProfileClientProps {
   profile: ProfileData;
   stats: { properties: number; inspections: number; reports: number };
   accountType: "individual" | "pro";
-  role: "owner" | "inspector";
+  role: ProfileRole;
   company: CompanyData;
 }
 

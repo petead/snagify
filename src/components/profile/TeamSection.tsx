@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, UserPlus, X, Mail, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { formatProfileRoleLabel, normalizeProfileRole } from "@/lib/profileLabels";
 
 interface Member {
   id: string;
@@ -158,7 +159,7 @@ export function TeamSection({ company, currentUserId }: Props) {
                   m.role === "owner" ? "bg-[#EDE9FF] text-[#9A88FD]" : "bg-[#F3F3F8] text-[#6B7280]"
                 }`}
               >
-                {m.role === "owner" ? "Owner" : "Inspector"}
+                {formatProfileRoleLabel(normalizeProfileRole(m.role))}
               </span>
               {m.role !== "owner" && m.id !== currentUserId && (
                 <button
