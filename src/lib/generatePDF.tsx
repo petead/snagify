@@ -1367,11 +1367,11 @@ function InspectionReport({
             </View>
             {[
               { label: "Inspection Overview", page: 2 },
-              ...reportData.rooms.map((room, i) => ({
+              ...report.rooms.map((room, i) => ({
                 label: room.name,
                 page: 3 + i,
               })),
-              { label: "Signatures", page: 3 + reportData.rooms.length },
+              { label: "Signatures", page: 3 + report.rooms.length },
             ].map((item, i) => (
               <View
                 key={i}
