@@ -395,7 +395,7 @@ export function DashboardClient({
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            New Inspection
+            New Check-in
           </Link>
         </div>
         <p style={{ fontSize: 13, color: "#BBB", margin: "2px 0 0", fontWeight: 400 }}>
@@ -566,7 +566,7 @@ export function DashboardClient({
         {/* Properties — top-left */}
         <Link
           href="/properties"
-          className="stat-card"
+          className="bg-white rounded-2xl p-4 flex flex-col justify-between h-full"
           style={{
             background: "#fff",
             borderRadius: 18,
@@ -629,39 +629,45 @@ export function DashboardClient({
             cursor: accountType === "individual" ? "pointer" : "default",
           }}
         >
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              background: "#EDE9FF",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 6v12" />
-              <path d="M15 9.5c0-1.38-1.34-2.5-3-2.5s-3 1.12-3 2.5c0 1.93 3 2.5 3 4.5 0 1.38-1.34 2.5-3 2.5" />
-            </svg>
-          </div>
-          <div>
-            <p style={{ fontSize: 30, fontWeight: 800, margin: 0, color: "#9A88FD", fontFamily: "'Poppins', sans-serif", lineHeight: 1 }}>
-              {balance}
-            </p>
-            <p style={{ fontSize: 13, color: "#6B7280", margin: "4px 0 0", fontWeight: 500 }}>
-              Credits
-            </p>
-            {accountType === "individual" && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setShowBuyCredits(true); }}
-                style={{ marginTop: 4, background: "none", border: "none", padding: 0, fontSize: 12, color: "#9A88FD", fontWeight: 600, cursor: "pointer" }}
+          <div className="flex items-start justify-between mb-2">
+            <div className="w-10 h-10 rounded-xl bg-[#EDE9FF] flex items-center justify-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-5 h-5 text-[#9A88FD]"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                Buy credits →
-              </button>
-            )}
+                <line x1="12" y1="1" x2="12" y2="23" />
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+            </div>
+
+            <a
+              href="/credits"
+              className="text-xs font-semibold text-[#9A88FD] active:opacity-70 transition-opacity"
+              onClick={(e) => {
+                // Conserve le comportement historique: uniquement `individual` ouvre le modal.
+                if (accountType !== "individual") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  return;
+                }
+                e.preventDefault();
+                e.stopPropagation();
+                setShowBuyCredits(true);
+              }}
+            >
+              Buy credits →
+            </a>
+          </div>
+
+          <div>
+            <div className="text-3xl font-extrabold text-gray-900">{balance}</div>
+            <p className="text-sm text-gray-400 mt-0.5">Credits</p>
           </div>
         </div>
 
@@ -1130,7 +1136,7 @@ export function DashboardClient({
                   lineHeight: 1.5,
                 }}
               >
-                Tap New Inspection to start your first one
+                Tap New Check-in to start your first one
               </p>
             </div>
           )}
