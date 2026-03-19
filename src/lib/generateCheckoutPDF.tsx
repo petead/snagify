@@ -67,7 +67,8 @@ export const CHECKOUT_PDF_LAYOUT = {
 } as const;
 
 function isHttpsImageUrl(url: string | null | undefined): boolean {
-  return !!url && url.startsWith("https://");
+  // Accept both https:// URLs and data: URLs (compressed images)
+  return !!url && (url.startsWith("https://") || url.startsWith("data:"));
 }
 
 interface CheckoutPhoto {
