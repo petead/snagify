@@ -118,7 +118,6 @@ export function BuyCreditsModal({
   .pack-card.selected { transform: scale(1.015); }
 `;
 
-  const requiredCredits = 2;
   const currentCredits = currentBalance;
   const loading =
     !!selectedPack?.stripe_price_id &&
@@ -147,9 +146,10 @@ export function BuyCreditsModal({
             width: "100%", maxWidth: 480,
             background: "linear-gradient(170deg, #1A1A2E 0%, #12102a 100%)",
             borderRadius: "28px 28px 0 0",
-            paddingBottom: "max(28px, env(safe-area-inset-bottom))",
+            paddingBottom: "max(88px, calc(64px + env(safe-area-inset-bottom) + 16px))",
             boxShadow: "0 -20px 60px rgba(154,136,253,0.25)",
-            overflow: "hidden",
+            overflowY: "auto",
+            maxHeight: "calc(100vh - 80px)",
             position: "relative",
           }}
           onClick={(e) => e.stopPropagation()}
@@ -225,8 +225,8 @@ export function BuyCreditsModal({
             ) : (
               packs.map((pack, i) => {
                 const isSelected = selectedPack?.id === pack.id
-                const isRecommended = i === 1
-                const isSufficient = pack.credits >= (requiredCredits ?? 0)
+                const isBestValue = i === packs.length - 1
+                const isStarter = i === 0
 
                 return (
                   <button
@@ -241,7 +241,7 @@ export function BuyCreditsModal({
                         : "rgba(255,255,255,0.05)",
                       border: isSelected
                         ? "1.5px solid rgba(154,136,253,0.7)"
-                        : isRecommended
+                        : isBestValue
                           ? "1.5px solid rgba(254,222,128,0.4)"
                           : "1.5px solid rgba(255,255,255,0.07)",
                       borderRadius: 18,
@@ -249,40 +249,65 @@ export function BuyCreditsModal({
                       boxShadow: isSelected ? "0 4px 20px rgba(154,136,253,0.2)" : "none",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                      <div style={{
+                        width: 52, height: 52, borderRadius: 16, flexShrink: 0,
+                        background: isSelected
+                          ? "linear-gradient(135deg, #9A88FD, #7B65FC)"
+                          : isBestValue
+                            ? "linear-gradient(135deg, #FEDE80, #D4A800)"
+                            : "rgba(154,136,253,0.2)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        boxShadow: isSelected ? "0 4px 16px rgba(154,136,253,0.4)" : "none",
+                        position: "relative",
+                      }}>
                         <span style={{
-                          fontSize: 16, fontWeight: 800, color: "white",
+                          fontSize: 20, fontWeight: 800,
+                          color: isBestValue && !isSelected ? "#1A1A2E" : "white",
                           fontFamily: "Poppins, sans-serif",
-                          whiteSpace: "nowrap",
+                          lineHeight: 1,
                         }}>
-                          {pack.name}
+                          {pack.credits}
                         </span>
-                        {isRecommended && (
-                          <span style={{
-                            fontSize: 9, fontWeight: 800,
-                            background: "linear-gradient(90deg, #FEDE80, #FFB800)",
-                            color: "#1A1A2E",
-                            padding: "3px 8px", borderRadius: 20,
-                            textTransform: "uppercase", letterSpacing: "0.5px",
-                            whiteSpace: "nowrap",
-                          }}>
-                            ⭐ Best value
-                          </span>
-                        )}
-                        {isSufficient && !isRecommended && (
-                          <span style={{
-                            fontSize: 9, fontWeight: 700,
-                            background: "rgba(154,136,253,0.2)",
-                            color: "#9A88FD",
-                            padding: "3px 8px", borderRadius: 20,
-                            textTransform: "uppercase", letterSpacing: "0.3px",
-                            whiteSpace: "nowrap",
-                          }}>
-                            Covers this ✓
-                          </span>
-                        )}
                       </div>
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                          <span style={{
+                            fontSize: 16, fontWeight: 800, color: "white",
+                            fontFamily: "Poppins, sans-serif",
+                          }}>
+                            {pack.name}
+                          </span>
+                          {isBestValue && (
+                            <span style={{
+                              fontSize: 9, fontWeight: 800,
+                              background: "linear-gradient(90deg, #FEDE80, #FFB800)",
+                              color: "#1A1A2E",
+                              padding: "3px 8px", borderRadius: 20,
+                              textTransform: "uppercase", letterSpacing: "0.5px",
+                              whiteSpace: "nowrap", flexShrink: 0,
+                            }}>
+                              ⭐ Best value
+                            </span>
+                          )}
+                          {isStarter && (
+                            <span style={{
+                              fontSize: 9, fontWeight: 700,
+                              background: "rgba(154,136,253,0.2)",
+                              color: "#9A88FD",
+                              padding: "3px 8px", borderRadius: 20,
+                              whiteSpace: "nowrap", flexShrink: 0,
+                            }}>
+                              Starter
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>
+                          {pack.credits} credit{pack.credits > 1 ? "s" : ""} · AED {Math.round(pack.price_aed / pack.credits)}/cr
+                        </span>
+                      </div>
+
                       <span style={{
                         fontSize: 18, fontWeight: 800,
                         color: isSelected ? "#c4b8ff" : "#9A88FD",
@@ -290,39 +315,6 @@ export function BuyCreditsModal({
                         whiteSpace: "nowrap", flexShrink: 0,
                       }}>
                         AED {pack.price_aed}
-                      </span>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ display: "flex", gap: 3 }}>
-                        {Array.from({ length: Math.min(pack.credits, 5) }).map((_, ci) => (
-                          <div
-                            key={ci}
-                            style={{
-                              width: 18, height: 18, borderRadius: "50%",
-                              background: isSelected
-                                ? `rgba(154,136,253,${0.5 + ci * 0.1})`
-                                : "rgba(154,136,253,0.3)",
-                              border: "1px solid rgba(154,136,253,0.4)",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                            }}
-                          >
-                            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "rgba(255,255,255,0.7)" }} />
-                          </div>
-                        ))}
-                        {pack.credits > 5 && (
-                          <div style={{
-                            width: 18, height: 18, borderRadius: "50%",
-                            background: "rgba(154,136,253,0.2)",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 8, fontWeight: 700, color: "#9A88FD",
-                          }}>
-                            +{pack.credits - 5}
-                          </div>
-                        )}
-                      </div>
-                      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>
-                        {pack.credits} credits · AED {Math.round(pack.price_aed / pack.credits)}/cr
                       </span>
                     </div>
                   </button>
