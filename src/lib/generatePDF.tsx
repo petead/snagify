@@ -937,34 +937,41 @@ function getKeyHandoverIcon(itemName: string, color: string) {
     );
   }
 
-  // Parking Card → car with P
+  // Parking Card → credit card (not vehicle)
   if (name.includes("parking")) {
     return (
       <Svg width={13} height={13} viewBox="0 0 24 24">
-        <Rect x="2" y="7" width="20" height="14" rx="2" fill="none" stroke={color} strokeWidth={1.8} />
-        <Path d="M5 7V5a2 2 0 012-2h10a2 2 0 012 2v2" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-        <Path d="M9 17v-6h3a2 2 0 010 4H9" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        <Path
+          d="M2 5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v2H2V5zm0 4h20v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9zm3 3a1 1 0 0 0 0 2h3a1 1 0 0 0 0-2H5z"
+          fill={color}
+        />
       </Svg>
     );
   }
 
-  // Access Card / Fob → contactless card
+  // Access Card / Fob → ID badge (distinct from parking card)
   if (name.includes("access") || name.includes("fob") || name.includes("badge")) {
     return (
       <Svg width={13} height={13} viewBox="0 0 24 24">
-        <Rect x="2" y="5" width="20" height="14" rx="2" fill="none" stroke={color} strokeWidth={1.8} />
-        <Path d="M12 10a2 2 0 100 4 2 2 0 000-4z" fill="none" stroke={color} strokeWidth={1.8} />
-        <Path d="M9.5 8.5a5 5 0 015 0M8 7a7 7 0 018 0" fill="none" stroke={color} strokeWidth={1.4} strokeLinecap="round" />
+        <Path
+          d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4zm8 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm-4 8c0-2.21 1.79-4 4-4s4 1.79 4 4H8z"
+          fill={color}
+        />
       </Svg>
     );
   }
 
-  // Remote Control → remote
+  // Remote Control → rectangle + button dots
   if (name.includes("remote") || name.includes("control")) {
     return (
       <Svg width={13} height={13} viewBox="0 0 24 24">
-        <Rect x="7" y="2" width="10" height="20" rx="3" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-        <Path d="M12 6h.01M12 10h.01M12 14h.01" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+        <Rect x="5" y="5" width="14" height="14" rx="2" fill="none" stroke={color} strokeWidth={1.8} />
+        <Circle cx="9" cy="10" r="1.4" fill={color} />
+        <Circle cx="12" cy="10" r="1.4" fill={color} />
+        <Circle cx="15" cy="10" r="1.4" fill={color} />
+        <Circle cx="9" cy="14" r="1.4" fill={color} />
+        <Circle cx="12" cy="14" r="1.4" fill={color} />
+        <Circle cx="15" cy="14" r="1.4" fill={color} />
       </Svg>
     );
   }
