@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
       accountType,
       primaryColor,
       companyName,
+      reraNumber,
     } = body as {
       email?: string;
       password?: string;
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
       accountType?: string;
       primaryColor?: string;
       companyName?: string;
+      reraNumber?: string;
     };
 
     if (!email || !password || !fullName || !accountType) {
@@ -67,6 +69,7 @@ export async function POST(req: NextRequest) {
 
     const isPro = accountType === "pro";
     const companyNameTrimmed = (companyName ?? "").trim();
+    const reraTrimmed = (reraNumber ?? "").trim();
 
     if (isPro && !companyNameTrimmed) {
       return NextResponse.json(
@@ -140,6 +143,9 @@ export async function POST(req: NextRequest) {
     };
     if (isPro) {
       profileRow.account_type = "pro";
+    }
+    if (reraTrimmed) {
+      profileRow.rera_number = reraTrimmed;
     }
 
     const { error: profileError } = await supabaseAdmin.from("profiles").insert(profileRow);
