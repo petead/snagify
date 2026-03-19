@@ -783,7 +783,7 @@ export function CheckoutReportView({
           <DeleteInspectionButton
             inspectionId={inspection.id}
             inspectionType={(inspection.type ?? 'check-out') as 'check-in' | 'check-out'}
-            status={inspection.status}
+            status={inspection.status ?? null}
             signatures={
               (signatures ?? []) as {
                 signer_type: string
