@@ -77,11 +77,13 @@ export default function GhostCamera({
     let mounted = true;
     const startCamera = async () => {
       try {
+        // No width/height constraints — let the device use its native
+        // camera resolution (e.g. iPhone 1440x1920 portrait).
+        // Constraining to 1920x1080 forces landscape ratio and causes
+        // inconsistent dimensions across check-in/check-out flows.
         const mediaStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: "environment",
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
           },
           audio: false,
         });
