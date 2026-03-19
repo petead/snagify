@@ -255,6 +255,7 @@ export async function buildPdfAndUpload(
     let checkinInspectionForPdf: { id: string; created_at: string; document_hash?: string } | null = null;
     let checkinPhotosById: Map<string, { id: string; url: string; damage_tags?: string[]; ai_analysis?: string | null; width?: number | null; height?: number | null }> = new Map();
     let checkinRoomConditionsByName: Map<string, string> = new Map();
+    let checkinRoomsForPdf: import("@/lib/generateCheckoutPDF").CheckinRoomPdf[] | undefined = undefined;
 
     if (isCheckout && row.tenancy_id) {
       const { data: checkinInspection } = await supabase
@@ -292,13 +293,58 @@ export async function buildPdfAndUpload(
           });
         }
 
-        const { data: checkinRooms } = await supabase
+        const { data: checkinRoomsRows } = await supabase
           .from("rooms")
-          .select("name, condition")
-          .eq("inspection_id", checkinInspection.id);
-        (checkinRooms ?? []).forEach((r: { name: string; condition?: string | null }) => {
+          .select(
+            `
+            id,
+            name,
+            condition,
+            order_index,
+            photos (
+              id,
+              url,
+              damage_tags,
+              ai_analysis,
+              width,
+              height
+            )
+          `
+          )
+          .eq("inspection_id", checkinInspection.id)
+          .order("order_index", { ascending: true });
+        (checkinRoomsRows ?? []).forEach((r: { name: string; condition?: string | null }) => {
           if (r.name) checkinRoomConditionsByName.set(r.name, r.condition ?? "");
         });
+        checkinRoomsForPdf = (checkinRoomsRows ?? [])
+          .filter((r: { name?: string | null }) => r.name)
+          .map(
+            (r: {
+              id: string;
+              name: string;
+              photos?: Array<{
+                id: string;
+                url: string | null;
+                damage_tags?: string[] | null;
+                ai_analysis?: string | null;
+                width?: number | null;
+                height?: number | null;
+              }> | null;
+            }) => ({
+              id: r.id,
+              name: r.name,
+              photos: (r.photos ?? [])
+                .filter((p) => p.url && String(p.url).startsWith("https://"))
+                .map((p) => ({
+                  id: p.id,
+                  url: p.url!,
+                  damage_tags: p.damage_tags ?? [],
+                  ai_analysis: p.ai_analysis ?? null,
+                  width: p.width ?? null,
+                  height: p.height ?? null,
+                })),
+            })
+          );
       }
     }
 
@@ -452,6 +498,7 @@ export async function buildPdfAndUpload(
       const checkinKeyHandoverForPdf = checkinKeyHandoverSafe.map((k) => ({ label: k.item, quantity: k.qty }));
 
       const checkoutProps: CheckoutPDFProps = {
+        checkinRooms: checkinRoomsForPdf,
         inspection: {
           id: row.id,
           type: row.type ?? "check-out",

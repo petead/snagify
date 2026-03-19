@@ -17,10 +17,56 @@ import {
 } from "@react-pdf/renderer";
 import QRCode from "qrcode";
 import type { BrandTokens } from "@/lib/pdf/brandTokens";
-import { getPdfImageHeight } from "@/lib/photos/getImageDimensions";
 
 const AMBER = "#D97706";
 const AMBER_LIGHT = "#FEF3C7";
+
+/** Usable content width (A4 595pt − 30×2 margins) */
+const PAGE_W = 535;
+const COL_W = 262; // (PAGE_W - 10 gap) / 2
+const PAIR_MAX_H = 185;
+const NEW_MAX_H = 280;
+const PAIR_GAP = 14;
+/** Layout reserve (tags + AI under photos), ~65pt — for future pagination tuning */
+const TEXT_AREA = 65;
+
+function calcPhotoSize(
+  photo: { width?: number | null; height?: number | null } | null | undefined,
+  maxWidth: number,
+  maxHeight: number
+): { w: number; h: number } {
+  const srcW = photo?.width || 1200;
+  const srcH = photo?.height || 900;
+  const ratio = srcH / srcW;
+
+  let displayW = maxWidth;
+  let displayH = displayW * ratio;
+
+  if (displayH > maxHeight) {
+    displayH = maxHeight;
+    displayW = displayH / ratio;
+  }
+  if (displayW > maxWidth) {
+    displayW = maxWidth;
+    displayH = displayW * ratio;
+  }
+
+  return { w: Math.round(displayW), h: Math.round(displayH) };
+}
+
+/** Exported layout constants (TEXT_AREA documented for pagination tuning) */
+export const CHECKOUT_PDF_LAYOUT = {
+  PAGE_W,
+  COL_W,
+  PAIR_MAX_H,
+  NEW_MAX_H,
+  PAIR_GAP,
+  TEXT_AREA,
+} as const;
+
+function isHttpsImageUrl(url: string | null | undefined): boolean {
+  return !!url && url.startsWith("https://");
+}
 
 interface CheckoutPhoto {
   id: string;
@@ -49,6 +95,20 @@ interface CheckoutRoom {
   checkin_condition?: string;
   photos: CheckoutPhoto[];
 }
+
+/** Check-in room + photos for PDF pairing (optional; enables “not photographed at checkout” rows) */
+export type CheckinRoomPdf = {
+  id: string;
+  name: string;
+  photos?: Array<{
+    id: string;
+    url: string;
+    damage_tags?: string[] | null;
+    ai_analysis?: string | null;
+    width?: number | null;
+    height?: number | null;
+  }>;
+};
 
 interface KeyHandoverItem {
   label?: string;
@@ -96,6 +156,8 @@ export interface CheckoutPDFProps {
     status?: string;
   };
   rooms: CheckoutRoom[];
+  /** When set, full check-in room photos are used for matching + unreferenced check-in photos */
+  checkinRooms?: CheckinRoomPdf[] | null;
   signatures?: {
     signer_type: string;
     signer_name?: string;
@@ -170,26 +232,66 @@ function getRoomVerdict(
   return { label: "Same", color: "#6B7280", bg: "#F3F3F8" };
 }
 
-interface PhotoPair {
-  ciPhoto: CheckoutPhoto["checkin_photo"] | null;
-  coPhoto: CheckoutPhoto;
-  isNew: boolean;
+type CiPdfPhoto = NonNullable<CheckinRoomPdf["photos"]>[number];
+
+type RoomPdfPair =
+  | { type: "match"; ciPhoto: CiPdfPhoto | null; coPhoto: CheckoutPhoto | null }
+  | { type: "new"; coPhoto: CheckoutPhoto };
+
+function findCheckinRoomPdf(
+  checkinRooms: CheckinRoomPdf[] | null | undefined,
+  roomName: string
+): CheckinRoomPdf | undefined {
+  return checkinRooms?.find((r) => r.name.toLowerCase() === roomName.toLowerCase());
 }
 
-function buildPhotoPairs(checkoutRoom: CheckoutRoom, checkinPhotosMap?: Map<string, CheckoutPhoto["checkin_photo"]>): PhotoPair[] {
-  const pairs: PhotoPair[] = [];
-  
-  for (const coPhoto of checkoutRoom.photos || []) {
-    if (coPhoto.checkin_photo_id && coPhoto.checkin_photo) {
-      pairs.push({ ciPhoto: coPhoto.checkin_photo, coPhoto, isNew: false });
-    } else if (coPhoto.checkin_photo_id && checkinPhotosMap) {
-      const ciPhoto = checkinPhotosMap.get(coPhoto.checkin_photo_id) || null;
-      pairs.push({ ciPhoto, coPhoto, isNew: false });
+/** Build ordered pairs for room PDF pages (matched, new damage, then unreferenced check-in photos). */
+function buildRoomPdfPairs(room: CheckoutRoom, checkinRooms: CheckinRoomPdf[] | null | undefined): RoomPdfPair[] {
+  const ciRoom = findCheckinRoomPdf(checkinRooms, room.name);
+  const ciPhotos = ciRoom?.photos ?? [];
+  const coPhotos = room.photos ?? [];
+  const pairs: RoomPdfPair[] = [];
+
+  for (const coPhoto of coPhotos) {
+    if (coPhoto.checkin_photo_id) {
+      const fromRoom = ciPhotos.find((p) => p.id === coPhoto.checkin_photo_id) ?? null;
+      const embedded = coPhoto.checkin_photo;
+      const ciPhoto: CiPdfPhoto | null = fromRoom
+        ? fromRoom
+        : embedded
+          ? {
+              id: embedded.id ?? coPhoto.checkin_photo_id,
+              url: embedded.url,
+              damage_tags: embedded.damage_tags,
+              ai_analysis: embedded.ai_analysis,
+              width: embedded.width,
+              height: embedded.height,
+            }
+          : null;
+      pairs.push({ type: "match", ciPhoto, coPhoto });
     } else {
-      pairs.push({ ciPhoto: null, coPhoto, isNew: true });
+      pairs.push({ type: "new", coPhoto });
     }
   }
+
+  const referencedCiIds = new Set(
+    coPhotos.map((p) => p.checkin_photo_id).filter(Boolean) as string[]
+  );
+  for (const ciPhoto of ciPhotos) {
+    if (!referencedCiIds.has(ciPhoto.id)) {
+      pairs.push({ type: "match", ciPhoto, coPhoto: null });
+    }
+  }
+
   return pairs;
+}
+
+function chunkByTwo<T>(items: T[]): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) {
+    chunks.push(items.slice(i, i + 2));
+  }
+  return chunks.length > 0 ? chunks : [[]];
 }
 
 function getKeyLabel(item: KeyHandoverItem): string {
@@ -956,6 +1058,7 @@ export function CheckoutPDFDocument({
   property,
   tenancy,
   rooms,
+  checkinRooms,
   signatures,
   profile,
   agencyName,
@@ -964,7 +1067,6 @@ export function CheckoutPDFDocument({
   tokens,
   qrCodeDataUrl,
 }: CheckoutPDFProps) {
-  const totalPages = rooms.length + 3;
   const documentHash = inspection.document_hash || "";
   const shortHash = `${documentHash.slice(0, 8)}…${documentHash.slice(-8)}`;
 
@@ -1006,6 +1108,24 @@ export function CheckoutPDFDocument({
 
   const photoDelta = totalCoPhotos - totalCiPhotos;
   const issueDelta = totalCoIssues - totalCiIssues;
+
+  const roomPageEntries = rooms.flatMap((room, roomIndex) => {
+    const pairs = buildRoomPdfPairs(room, checkinRooms ?? null);
+    const chunks = chunkByTwo(pairs);
+    const rs = roomStats[roomIndex];
+    return chunks.map((chunk, chunkIdx) => ({
+      room,
+      roomIndex,
+      chunk,
+      chunkIdx,
+      totalRoomPages: chunks.length,
+      verdict: rs.verdict,
+      coIssues: rs.coIssues,
+      coPhotoCount: rs.coPhotos,
+    }));
+  });
+
+  const totalPages = 3 + roomPageEntries.length;
 
   // Tenancy fields
   const tenancyFields: Array<{ label: string; value: string }> = [];
@@ -1429,261 +1549,452 @@ export function CheckoutPDFDocument({
         </View>
       </Page>
 
-      {/* ROOM PAGES — 2-column check-in vs check-out comparison */}
-      {roomStats.map((r, roomIndex) => {
-        const room = r.room;
-        const pairs = buildPhotoPairs(room);
-        const issueCount = room.photos.filter((p) => (p.damage_tags?.length ?? 0) > 0).length;
-        
-        const verdict = r.verdict;
-        const verdictColor = verdict.label === "Better" || verdict.label === "Same"
-          ? "#16A34A" : verdict.label === "Worse" ? "#DC2626" : "#F59E0B";
-        const verdictBg = verdict.label === "Better" || verdict.label === "Same"
-          ? "#DCFCE7" : verdict.label === "Worse" ? "#FEE2E2" : "#FEF9C3";
+      {/* ROOM PAGES — max 2 pairs per page, objectFit contain + aspect from DB */}
+      {roomPageEntries.map((entry, globalIdx) => {
+        const { room, roomIndex, chunk, chunkIdx, totalRoomPages, verdict, coIssues, coPhotoCount } = entry;
+        const verdictSolid =
+          verdict.label === "Better"
+            ? "#16A34A"
+            : verdict.label === "Worse"
+              ? "#DC2626"
+              : "#6B7280";
 
         return (
-          <Page key={roomIndex} size="A4" style={s.page}>
-            {/* Room header */}
-            <View style={[s.roomHero, { backgroundColor: tokens.primary }]}>
-              <View style={[s.roomHeroDecoOuter, { borderColor: tokens.primaryDark }]} />
-              <View style={[s.roomHeroDecoInner, { borderColor: tokens.primaryLight }]} />
-              <View style={s.roomHeroTop}>
+          <Page key={`${room.id}-${chunkIdx}-${globalIdx}`} size="A4" style={s.page}>
+            <View
+              style={{
+                backgroundColor: tokens.primary,
+                paddingTop: 14,
+                paddingBottom: 12,
+                paddingHorizontal: 30,
+                marginBottom: 14,
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <View
+                style={{
+                  position: "absolute",
+                  right: -20,
+                  top: -20,
+                  width: 80,
+                  height: 80,
+                  borderRadius: 40,
+                  borderWidth: 16,
+                  borderColor: "rgba(255,255,255,0.06)",
+                }}
+              />
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                }}
+              >
                 <View>
-                  <Text style={s.roomNumber}>
+                  <Text
+                    style={{
+                      fontSize: 7,
+                      color: "rgba(255,255,255,0.6)",
+                      textTransform: "uppercase",
+                      letterSpacing: 1,
+                      marginBottom: 3,
+                    }}
+                  >
                     ROOM {String(roomIndex + 1).padStart(2, "0")} OF {String(roomStats.length).padStart(2, "0")}
+                    {totalRoomPages > 1 ? ` · Page ${chunkIdx + 1}/${totalRoomPages}` : ""}
                   </Text>
-                  <Text style={s.roomTitle}>{room.name}</Text>
-                  <Text style={s.roomDate}>Inspected on {formatDate(inspection.created_at)}</Text>
-                </View>
-                <View style={{ backgroundColor: verdictBg, borderRadius: 20, paddingHorizontal: 11, paddingVertical: 5 }}>
-                  <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold", color: verdictColor }}>
-                    {verdict.label}
+                  <Text
+                    style={{
+                      fontSize: 18,
+                      fontFamily: "Helvetica-Bold",
+                      color: "#FFFFFF",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {room.name}
                   </Text>
+                  <View style={{ flexDirection: "row" }}>
+                    <Text style={{ fontSize: 7, color: "rgba(255,255,255,0.6)", marginRight: 14 }}>
+                      {coPhotoCount} photos captured
+                    </Text>
+                    <Text style={{ fontSize: 7, color: "rgba(255,255,255,0.6)" }}>
+                      {coIssues} {coIssues === 1 ? "issue" : "issues"} flagged
+                    </Text>
+                  </View>
                 </View>
-              </View>
-              <View style={s.roomStatsRow}>
-                <View style={[s.roomStatItem, { marginRight: 16 }]}>
-                  <View style={[s.roomStatDot, { marginRight: 5 }]} />
-                  <Text style={s.roomStatText}>
-                    {room.photos.length} photo{room.photos.length !== 1 ? "s" : ""} captured
-                  </Text>
-                </View>
-                <View style={s.roomStatItem}>
-                  <View style={[s.roomStatDot, { marginRight: 5 }]} />
-                  <Text style={s.roomStatText}>
-                    {issueCount} {issueCount === 1 ? "issue" : "issues"} flagged
-                  </Text>
-                </View>
+                {chunkIdx === 0 && (
+                  <View
+                    style={{
+                      backgroundColor: verdictSolid,
+                      borderRadius: 20,
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                    }}
+                  >
+                    <Text style={{ fontSize: 8, fontFamily: "Helvetica-Bold", color: "#FFFFFF" }}>
+                      {verdict.label}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 
-            {/* Photo pairs — check-in LEFT / check-out RIGHT */}
-            <View style={s.roomBody}>
-              {pairs.map((pair, pairIdx) => (
-                <View key={pairIdx} style={{
-                  marginBottom: 12,
-                  borderBottomWidth: pairIdx < pairs.length - 1 ? 0.5 : 0,
-                  borderBottomColor: "#F3F3F8",
-                  paddingBottom: pairIdx < pairs.length - 1 ? 12 : 0,
-                }}>
-
-                  {pair.isNew ? (
-                    /* NEW DAMAGE: full width photo + warning banner */
+            <View style={{ paddingHorizontal: 30, flex: 1 }}>
+              {chunk.length === 0 && (
+                <Text style={{ fontSize: 8, color: "#9B9BA8" }}>No photos in this room.</Text>
+              )}
+              {chunk.map((pair, pairIdx) => (
+                <View
+                  key={pairIdx}
+                  style={{
+                    marginBottom: pairIdx < chunk.length - 1 ? PAIR_GAP : 0,
+                    paddingBottom: pairIdx < chunk.length - 1 ? PAIR_GAP : 0,
+                    borderBottomWidth: pairIdx < chunk.length - 1 ? 0.5 : 0,
+                    borderBottomColor: "#EEECFF",
+                  }}
+                >
+                  {pair.type === "new" ? (
                     <View>
-                      <View style={{
-                        backgroundColor: "#FEE2E2",
-                        borderRadius: 6, padding: "6 10",
-                        flexDirection: "row", alignItems: "center",
-                        marginBottom: 4,
-                      }}>
-                        <View style={{
-                          width: 8, height: 8, borderRadius: 4,
-                          backgroundColor: "#DC2626", marginRight: 6,
-                        }} />
-                        <Text style={{
-                          fontSize: 8, fontFamily: "Helvetica-Bold",
-                          color: "#DC2626", textTransform: "uppercase",
-                          letterSpacing: 0.5,
-                        }}>
-                          New damage - not present at check-in
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          backgroundColor: "#FEE2E2",
+                          borderRadius: 4,
+                          padding: "4 8",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: 3,
+                            backgroundColor: "#DC2626",
+                            marginRight: 6,
+                          }}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 7.5,
+                            fontFamily: "Helvetica-Bold",
+                            color: "#DC2626",
+                            textTransform: "uppercase",
+                            letterSpacing: 0.5,
+                          }}
+                        >
+                          New — not present at check-in
                         </Text>
                       </View>
 
-                      {/* Full-width checkout photo */}
-                      {pair.coPhoto.url && pair.coPhoto.url.startsWith("http") && (
-                        <View style={{ width: "100%", height: 200, borderRadius: 6, overflow: "hidden" }}>
-                          <Image
-                            src={pair.coPhoto.url}
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "cover",
-                              objectPosition: "center",
-                            }}
-                          />
-                        </View>
-                      )}
+                      {isHttpsImageUrl(pair.coPhoto.url) && (() => {
+                        const sz = calcPhotoSize(pair.coPhoto, PAGE_W, NEW_MAX_H);
+                        return (
+                          <View style={{ alignItems: "center", marginBottom: 8 }}>
+                            <Image
+                              src={pair.coPhoto.url}
+                              style={{
+                                width: sz.w,
+                                height: sz.h,
+                                objectFit: "contain",
+                                backgroundColor: "#F8F7F4",
+                                borderRadius: 4,
+                              }}
+                            />
+                          </View>
+                        );
+                      })()}
 
-                      {/* Damage tags */}
                       {pair.coPhoto.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
-                        <View style={{
-                          flexDirection: "row", flexWrap: "wrap",
-                          marginTop: 3,
-                        }}>
-                          {pair.coPhoto.damage_tags.map((tag, ti) => {
-                            const ts = tagStyle(tag);
-                            return (
-                              <View key={ti} style={[s.photoTag, { backgroundColor: ts.bg, marginRight: 3, marginBottom: 2 }]}>
-                                <Text style={[s.photoTagText, { color: ts.text }]}>{tag.toUpperCase()}</Text>
-                              </View>
-                            );
-                          })}
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            flexWrap: "wrap",
+                            marginBottom: 5,
+                          }}
+                        >
+                          {pair.coPhoto.damage_tags.map((tag, ti) => (
+                            <View
+                              key={ti}
+                              style={{
+                                backgroundColor: "#FEE2E2",
+                                borderRadius: 20,
+                                paddingHorizontal: 6,
+                                paddingVertical: 2,
+                                marginRight: 4,
+                                marginBottom: 3,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 6.5,
+                                  fontFamily: "Helvetica-Bold",
+                                  color: "#DC2626",
+                                  textTransform: "uppercase",
+                                }}
+                              >
+                                {tag}
+                              </Text>
+                            </View>
+                          ))}
                         </View>
                       )}
 
-                      {/* AI analysis */}
                       {pair.coPhoto.ai_analysis && (
-                        <View style={{ marginTop: 3 }}>
-                          <Text style={[s.photoAiLabel, { color: tokens.primary }]}>AI ANALYSIS</Text>
-                          <Text style={[s.photoAiText, { fontSize: 7.5 }]}>{pair.coPhoto.ai_analysis}</Text>
+                        <View>
+                          <Text
+                            style={{
+                              fontSize: 7,
+                              fontFamily: "Helvetica-Bold",
+                              color: tokens.primary,
+                              textTransform: "uppercase",
+                              letterSpacing: 0.8,
+                              marginBottom: 3,
+                            }}
+                          >
+                            AI ANALYSIS
+                          </Text>
+                          <Text style={{ fontSize: 7.5, color: "#4B4B4B", lineHeight: 1.5 }}>
+                            {pair.coPhoto.ai_analysis}
+                          </Text>
                         </View>
                       )}
                     </View>
                   ) : (
-                    /* MATCHED: 2-column check-in LEFT / check-out RIGHT */
-                    <View style={{ flexDirection: "row", gap: 10 }}>
-
-                      {/* CHECK-IN column */}
-                      <View style={{ flex: 1 }}>
-                        <View style={{
-                          backgroundColor: "#F3F3F8",
-                          borderRadius: 4, padding: "3 8",
-                          marginBottom: 3, alignSelf: "flex-start",
-                        }}>
-                          <Text style={{
-                            fontSize: 7, fontFamily: "Helvetica-Bold",
-                            color: "#6B7280", textTransform: "uppercase",
-                            letterSpacing: 0.5,
-                          }}>
+                    <View style={{ flexDirection: "row" }}>
+                      <View style={{ width: COL_W, marginRight: 10 }}>
+                        <View
+                          style={{
+                            backgroundColor: "#F3F3F8",
+                            borderRadius: 3,
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            marginBottom: 5,
+                            alignSelf: "flex-start",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 6.5,
+                              fontFamily: "Helvetica-Bold",
+                              color: "#6B7280",
+                              textTransform: "uppercase",
+                              letterSpacing: 0.5,
+                            }}
+                          >
                             Check-in
                           </Text>
                         </View>
 
-                        {pair.ciPhoto?.url ? (
-                          <View style={{ width: "100%", height: 160, borderRadius: 6, overflow: "hidden" }}>
-                            <Image
-                              src={pair.ciPhoto.url}
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                objectPosition: "center",
-                              }}
-                            />
-                          </View>
-                        ) : (
-                          <View style={{
-                            width: "100%", height: 160,
-                            backgroundColor: "#F3F3F8", borderRadius: 6,
-                            alignItems: "center", justifyContent: "center",
-                          }}>
-                            <Text style={{ fontSize: 8, color: "#C4C4C4" }}>
-                              No check-in photo
-                            </Text>
+                        {pair.ciPhoto && isHttpsImageUrl(pair.ciPhoto.url) ? (() => {
+                          const sz = calcPhotoSize(pair.ciPhoto, COL_W, PAIR_MAX_H);
+                          return (
+                            <View style={{ marginBottom: 5 }}>
+                              <Image
+                                src={pair.ciPhoto.url}
+                                style={{
+                                  width: sz.w,
+                                  height: sz.h,
+                                  objectFit: "contain",
+                                  backgroundColor: "#F8F7F4",
+                                  borderRadius: 3,
+                                  opacity: 0.88,
+                                }}
+                              />
+                            </View>
+                          );
+                        })() : (
+                          <View
+                            style={{
+                              width: COL_W,
+                              height: 80,
+                              backgroundColor: "#F3F3F8",
+                              borderRadius: 3,
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginBottom: 5,
+                            }}
+                          >
+                            <Text style={{ fontSize: 7, color: "#C4C4C4" }}>No photo</Text>
                           </View>
                         )}
 
-                        {/* Check-in damage tags */}
                         {pair.ciPhoto?.damage_tags && pair.ciPhoto.damage_tags.length > 0 && (
-                          <View style={{
-                            flexDirection: "row", flexWrap: "wrap",
-                            marginTop: 2,
-                          }}>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              flexWrap: "wrap",
+                              marginBottom: 4,
+                            }}
+                          >
                             {pair.ciPhoto.damage_tags.map((tag, ti) => (
-                              <View key={ti} style={[s.photoTag, { backgroundColor: "#F3F3F8", marginRight: 3, marginBottom: 2 }]}>
-                                <Text style={[s.photoTagText, { color: "#6B7280" }]}>{tag.toUpperCase()}</Text>
+                              <View
+                                key={ti}
+                                style={{
+                                  backgroundColor: "#F3F3F8",
+                                  borderRadius: 20,
+                                  paddingHorizontal: 5,
+                                  paddingVertical: 1.5,
+                                  marginRight: 3,
+                                  marginBottom: 2,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 6,
+                                    fontFamily: "Helvetica-Bold",
+                                    color: "#6B7280",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
+                                  {tag}
+                                </Text>
                               </View>
                             ))}
                           </View>
                         )}
 
-                        {/* Check-in AI note */}
                         {pair.ciPhoto?.ai_analysis && (
-                          <View style={{ marginTop: 3 }}>
-                            <Text style={[s.photoAiLabel, { color: "#9B9BA8" }]}>CHECK-IN NOTE</Text>
-                            <Text style={[s.photoAiText, { color: "#9B9BA8", fontSize: 7.5 }]}>
+                          <View>
+                            <Text
+                              style={{
+                                fontSize: 6,
+                                fontFamily: "Helvetica-Bold",
+                                color: "#9B9BA8",
+                                textTransform: "uppercase",
+                                letterSpacing: 0.5,
+                                marginBottom: 2,
+                              }}
+                            >
+                              Check-in note
+                            </Text>
+                            <Text style={{ fontSize: 7, color: "#9B9BA8", lineHeight: 1.4 }}>
                               {pair.ciPhoto.ai_analysis}
                             </Text>
                           </View>
                         )}
                       </View>
 
-                      {/* CHECK-OUT column */}
-                      <View style={{ flex: 1 }}>
-                        <View style={{
-                          backgroundColor: tokens.primaryUltraLight || "#EDE9FF",
-                          borderRadius: 4, padding: "3 8",
-                          marginBottom: 3, alignSelf: "flex-start",
-                        }}>
-                          <Text style={{
-                            fontSize: 7, fontFamily: "Helvetica-Bold",
-                            color: tokens.primary, textTransform: "uppercase",
-                            letterSpacing: 0.5,
-                          }}>
+                      <View style={{ width: COL_W }}>
+                        <View
+                          style={{
+                            backgroundColor: tokens.primaryUltraLight || "#EDE9FF",
+                            borderRadius: 3,
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            marginBottom: 5,
+                            alignSelf: "flex-start",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 6.5,
+                              fontFamily: "Helvetica-Bold",
+                              color: tokens.primary,
+                              textTransform: "uppercase",
+                              letterSpacing: 0.5,
+                            }}
+                          >
                             Check-out
                           </Text>
                         </View>
 
-                        {pair.coPhoto.url && pair.coPhoto.url.startsWith("http") && (
-                          <View style={{
-                            width: "100%", height: 160, borderRadius: 6, overflow: "hidden",
-                            borderWidth: 1.5, borderColor: tokens.primary,
-                          }}>
-                            <Image
-                              src={pair.coPhoto.url}
+                        {pair.coPhoto && isHttpsImageUrl(pair.coPhoto.url) ? (() => {
+                          const sz = calcPhotoSize(pair.coPhoto, COL_W, PAIR_MAX_H);
+                          return (
+                            <View style={{ marginBottom: 5 }}>
+                              <Image
+                                src={pair.coPhoto.url}
+                                style={{
+                                  width: sz.w,
+                                  height: sz.h,
+                                  objectFit: "contain",
+                                  backgroundColor: "#F8F7F4",
+                                  borderRadius: 3,
+                                  borderWidth: 1.5,
+                                  borderColor: tokens.primary,
+                                }}
+                              />
+                            </View>
+                          );
+                        })() : (
+                          <View
+                            style={{
+                              width: COL_W,
+                              height: 80,
+                              backgroundColor: "#EDE9FF",
+                              borderRadius: 3,
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginBottom: 5,
+                            }}
+                          >
+                            <Text style={{ fontSize: 7, color: tokens.primary }}>Not photographed</Text>
+                          </View>
+                        )}
+
+                        {pair.coPhoto?.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              flexWrap: "wrap",
+                              marginBottom: 4,
+                            }}
+                          >
+                            {pair.coPhoto.damage_tags.map((tag, ti) => (
+                              <View
+                                key={ti}
+                                style={{
+                                  backgroundColor: "#FEE2E2",
+                                  borderRadius: 20,
+                                  paddingHorizontal: 5,
+                                  paddingVertical: 1.5,
+                                  marginRight: 3,
+                                  marginBottom: 2,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 6,
+                                    fontFamily: "Helvetica-Bold",
+                                    color: "#DC2626",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
+                                  {tag}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+
+                        {pair.coPhoto?.ai_analysis && (
+                          <View>
+                            <Text
                               style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                objectPosition: "center",
+                                fontSize: 6,
+                                fontFamily: "Helvetica-Bold",
+                                color: tokens.primary,
+                                textTransform: "uppercase",
+                                letterSpacing: 0.5,
+                                marginBottom: 2,
                               }}
-                            />
-                          </View>
-                        )}
-
-                        {/* Check-out damage tags */}
-                        {pair.coPhoto.damage_tags && pair.coPhoto.damage_tags.length > 0 && (
-                          <View style={{
-                            flexDirection: "row", flexWrap: "wrap",
-                            marginTop: 2,
-                          }}>
-                            {pair.coPhoto.damage_tags.map((tag, ti) => {
-                              const ts = tagStyle(tag);
-                              return (
-                                <View key={ti} style={[s.photoTag, { backgroundColor: ts.bg, marginRight: 3, marginBottom: 2 }]}>
-                                  <Text style={[s.photoTagText, { color: ts.text }]}>{tag.toUpperCase()}</Text>
-                                </View>
-                              );
-                            })}
-                          </View>
-                        )}
-
-                        {/* Check-out AI analysis */}
-                        {pair.coPhoto.ai_analysis && (
-                          <View style={{ marginTop: 3 }}>
-                            <Text style={[s.photoAiLabel, { color: tokens.primary }]}>AI ANALYSIS</Text>
-                            <Text style={[s.photoAiText, { fontSize: 7.5 }]}>{pair.coPhoto.ai_analysis}</Text>
+                            >
+                              AI Analysis
+                            </Text>
+                            <Text style={{ fontSize: 7, color: "#4B4B4B", lineHeight: 1.4 }}>
+                              {pair.coPhoto.ai_analysis}
+                            </Text>
                           </View>
                         )}
                       </View>
-
                     </View>
                   )}
                 </View>
               ))}
             </View>
 
-            {/* Footer */}
             <View style={[s.pdfFooter, { backgroundColor: tokens.primary }]}>
               <View style={s.footerLeft}>
                 <Text style={s.footerAgency}>{agencyName.toUpperCase()}</Text>
@@ -1691,7 +2002,7 @@ export function CheckoutPDFDocument({
                 <Text style={s.footerUrl}>{agencyWebsite}</Text>
               </View>
               <Text style={s.footerRight}>
-                SHA-256: {shortHash} · Page {roomIndex + 3} of {roomStats.length + 3}
+                SHA-256: {shortHash} · Page {3 + globalIdx} of {totalPages}
               </Text>
             </View>
           </Page>
@@ -1824,7 +2135,7 @@ export function CheckoutPDFDocument({
             <Text style={s.footerUrl}>{agencyWebsite}</Text>
           </View>
           <Text style={s.footerRight}>
-            {formatDate(inspection.created_at)} · Page {roomStats.length + 3} of {roomStats.length + 3}
+            {formatDate(inspection.created_at)} · Page {totalPages} of {totalPages}
           </Text>
         </View>
       </Page>
