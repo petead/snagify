@@ -39,6 +39,14 @@ async function getDefaultSnagifyCompanyId(): Promise<string> {
   return created.id;
 }
 
+function buildFullAddress(
+  line1: string,
+  city: string,
+  country: string
+): string {
+  return [line1.trim(), city.trim(), country.trim()].filter(Boolean).join(", ");
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -50,6 +58,13 @@ export async function POST(req: NextRequest) {
       primaryColor,
       companyName,
       reraNumber,
+      companyEmail,
+      phone,
+      addressLine1,
+      city,
+      country,
+      tradeLicense,
+      website,
     } = body as {
       email?: string;
       password?: string;
@@ -58,6 +73,13 @@ export async function POST(req: NextRequest) {
       primaryColor?: string;
       companyName?: string;
       reraNumber?: string;
+      companyEmail?: string;
+      phone?: string;
+      addressLine1?: string;
+      city?: string;
+      country?: string;
+      tradeLicense?: string;
+      website?: string;
     };
 
     if (!email || !password || !fullName || !accountType) {
@@ -70,12 +92,43 @@ export async function POST(req: NextRequest) {
     const isPro = accountType === "pro";
     const companyNameTrimmed = (companyName ?? "").trim();
     const reraTrimmed = (reraNumber ?? "").trim();
+    const companyEmailTrimmed = (companyEmail ?? "").trim();
+    const phoneTrimmed = (phone ?? "").trim();
+    const line1Trimmed = (addressLine1 ?? "").trim();
+    const cityTrimmed = (city ?? "").trim();
+    const countryTrimmed = (country ?? "").trim();
+    const tradeTrimmed = (tradeLicense ?? "").trim();
+    let websiteTrimmed = (website ?? "").trim();
+    if (websiteTrimmed && !/^https?:\/\//i.test(websiteTrimmed)) {
+      websiteTrimmed = `https://${websiteTrimmed}`;
+    }
 
     if (isPro && !companyNameTrimmed) {
       return NextResponse.json(
         { error: "Company name is required for Pro accounts" },
         { status: 400 }
       );
+    }
+
+    if (isPro) {
+      if (!companyEmailTrimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyEmailTrimmed)) {
+        return NextResponse.json(
+          { error: "Valid company email is required for Pro accounts" },
+          { status: 400 }
+        );
+      }
+      if (!phoneTrimmed) {
+        return NextResponse.json(
+          { error: "Phone number is required for Pro accounts" },
+          { status: 400 }
+        );
+      }
+      if (!line1Trimmed || !cityTrimmed || !countryTrimmed) {
+        return NextResponse.json(
+          { error: "Address, city, and country are required for Pro accounts" },
+          { status: 400 }
+        );
+      }
     }
 
     let companyId: string;
@@ -99,6 +152,7 @@ export async function POST(req: NextRequest) {
       }
 
       const companyColor = primaryColor?.trim() || "#9A88FD";
+      const fullAddress = buildFullAddress(line1Trimmed, cityTrimmed, countryTrimmed);
 
       const { data: company, error: companyError } = await supabaseAdmin
         .from("companies")
@@ -108,6 +162,9 @@ export async function POST(req: NextRequest) {
           logo_url: "https://app.snagify.net/icon-512x512.png",
           plan: "free",
           credits_balance: 0,
+          website: websiteTrimmed || null,
+          address: fullAddress || null,
+          trade_license: tradeTrimmed || null,
         })
         .select("id")
         .single();
@@ -143,6 +200,16 @@ export async function POST(req: NextRequest) {
     };
     if (isPro) {
       profileRow.account_type = "pro";
+      profileRow.company_email = companyEmailTrimmed;
+      profileRow.whatsapp_number = phoneTrimmed;
+      profileRow.company_address = buildFullAddress(
+        line1Trimmed,
+        cityTrimmed,
+        countryTrimmed
+      );
+      profileRow.company_trade_license = tradeTrimmed || null;
+      profileRow.company_website = websiteTrimmed || null;
+      profileRow.company_primary_color = (primaryColor?.trim() || "#9A88FD") as string;
     }
     if (reraTrimmed) {
       profileRow.rera_number = reraTrimmed;
@@ -151,7 +218,7 @@ export async function POST(req: NextRequest) {
     const { error: profileError } = await supabaseAdmin.from("profiles").insert(profileRow);
     if (profileError) throw profileError;
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, userId });
   } catch (err: unknown) {
     console.error("Signup error:", err);
     const message =
