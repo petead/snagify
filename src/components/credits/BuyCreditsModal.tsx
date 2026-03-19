@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 interface BuyCreditsModalProps {
   isOpen: boolean;
@@ -52,11 +52,6 @@ export function BuyCreditsModal({
     void fetchPacks();
   }, [isOpen]);
 
-  const firstCoveringPackId = useMemo(() => {
-    const first = packs.find((p) => Number(p.credits ?? 0) >= 2);
-    return first?.id ?? null;
-  }, [packs]);
-
   async function handleBuy(priceId: string, packId: string) {
     setLoadingPriceId(priceId);
     try {
@@ -92,277 +87,293 @@ export function BuyCreditsModal({
   }
 
   const modalStyles = `
-  @keyframes modalSlideUp {
-    from { opacity: 0; transform: translateY(100%); }
+  @keyframes sheetUp {
+    from { opacity: 0; transform: translateY(60px); }
     to { opacity: 1; transform: translateY(0); }
   }
   @keyframes coinFloat {
-    0%, 100% { transform: translateY(0) rotate(-5deg); }
-    50% { transform: translateY(-8px) rotate(5deg); }
+    0%, 100% { transform: translateY(0) rotate(-4deg); }
+    50% { transform: translateY(-7px) rotate(4deg); }
   }
-  @keyframes shimmer {
+  @keyframes shimmerPrimary {
     0% { background-position: -200% center; }
     100% { background-position: 200% center; }
   }
-  @keyframes pulse-ring {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(154,136,253,0.4); }
-    70% { transform: scale(1); box-shadow: 0 0 0 12px rgba(154,136,253,0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(154,136,253,0); }
+  .buy-sheet {
+    animation: sheetUp 0.4s cubic-bezier(0.34, 1.4, 0.64, 1);
   }
-  @keyframes badgePop {
-    0% { transform: scale(0) rotate(-10deg); }
-    60% { transform: scale(1.15) rotate(3deg); }
-    100% { transform: scale(1) rotate(0deg); }
+  .coin-icon {
+    animation: coinFloat 3s ease-in-out infinite;
   }
-  .credit-pack-card {
-    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  .credit-pack-card:active {
-    transform: scale(0.97);
-  }
-  .credit-pack-card.selected {
-    transform: scale(1.02);
-  }
-  .shimmer-btn {
-    background: linear-gradient(90deg, #9A88FD 0%, #b8a9ff 40%, #9A88FD 60%, #7B65FC 100%);
+  .shimmer-cta {
+    background: linear-gradient(90deg, #9A88FD 0%, #c4b8ff 45%, #9A88FD 60%, #7B65FC 100%);
     background-size: 200% auto;
-    animation: shimmer 2.5s linear infinite;
+    animation: shimmerPrimary 2.5s linear infinite;
   }
+  .pack-card {
+    transition: all 0.2s cubic-bezier(0.34, 1.4, 0.64, 1);
+    cursor: pointer;
+  }
+  .pack-card:active { transform: scale(0.98); }
+  .pack-card.selected { transform: scale(1.015); }
 `;
 
   const requiredCredits = 2;
   const currentCredits = currentBalance;
-  const isPurchasingSelected =
+  const loading =
     !!selectedPack?.stripe_price_id &&
     loadingPriceId === selectedPack.stripe_price_id;
+  const handlePurchase = () => {
+    if (!selectedPack?.stripe_price_id) return;
+    void handleBuy(selectedPack.stripe_price_id, selectedPack.id);
+  };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
-      style={{ background: "rgba(15,12,30,0.6)", backdropFilter: "blur(8px)" }}
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-    >
+    <>
       <style>{modalStyles}</style>
 
       <div
-        className="w-full max-w-sm rounded-t-[32px] overflow-hidden relative"
         style={{
-          background: "linear-gradient(160deg, #1A1A2E 0%, #16123a 100%)",
-          animation: "modalSlideUp 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)",
-          paddingBottom: "max(32px, env(safe-area-inset-bottom))",
-          boxShadow: "0 -20px 60px rgba(154,136,253,0.25)",
-          maxHeight: "92vh",
-          overflowY: "auto",
+          position: "fixed", inset: 0, zIndex: 50,
+          background: "rgba(10,8,25,0.65)",
+          backdropFilter: "blur(8px)",
+          display: "flex", alignItems: "flex-end", justifyContent: "center",
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={onClose}
       >
         <div
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 pointer-events-none"
+          className="buy-sheet"
           style={{
-            background: "radial-gradient(ellipse, rgba(154,136,253,0.3) 0%, transparent 70%)",
-            filter: "blur(20px)",
+            width: "100%", maxWidth: 480,
+            background: "linear-gradient(170deg, #1A1A2E 0%, #12102a 100%)",
+            borderRadius: "28px 28px 0 0",
+            paddingBottom: "max(28px, env(safe-area-inset-bottom))",
+            boxShadow: "0 -20px 60px rgba(154,136,253,0.25)",
+            overflow: "hidden",
+            position: "relative",
           }}
-        />
-
-        <div className="flex justify-end px-5 pt-4 pb-0 relative">
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ background: "rgba(255,255,255,0.1)" }}
-            type="button"
-            aria-label="Close"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex flex-col items-center px-6 pt-2 pb-5 relative">
+          onClick={(e) => e.stopPropagation()}
+        >
           <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
             style={{
-              background: "linear-gradient(135deg, #9A88FD, #7B65FC)",
-              animation: "coinFloat 3s ease-in-out infinite",
-              boxShadow: "0 8px 32px rgba(154,136,253,0.5)",
+              position: "absolute", top: -30, left: "50%",
+              transform: "translateX(-50%)",
+              width: 260, height: 120, pointerEvents: "none",
+              background: "radial-gradient(ellipse, rgba(154,136,253,0.25) 0%, transparent 70%)",
+              filter: "blur(16px)",
             }}
-          >
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" />
-              <path d="M12 6v1m0 10v1M9 12h1m4 0h1" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-              <path
-                d="M10 9.5C10 8.67 10.9 8 12 8s2 .67 2 1.5c0 .76-.64 1.39-1.5 1.5h-1C10.67 11 10 11.67 10 12.5c0 .83.9 1.5 2 1.5s2-.67 2-1.5"
-                stroke="white"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
+          />
+
+          <div style={{ display: "flex", justifyContent: "center", paddingTop: 10, marginBottom: 4 }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.12)" }} />
           </div>
 
-          <h2
-            className="text-[26px] text-white mb-1 tracking-tight"
-            style={{ fontFamily: "Poppins, sans-serif", fontWeight: 800 }}
-          >
-            Buy Credits
-          </h2>
-          <p className="text-[13px] text-white/50">
-            {currentCredits > 0
-              ? `You have ${currentCredits} credit${currentCredits > 1 ? "s" : ""} remaining`
-              : "Top up to generate your reports"}
-          </p>
-        </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 16px 0" }}>
+            <button
+              onClick={onClose}
+              style={{
+                width: 32, height: 32, borderRadius: "50%",
+                background: "rgba(255,255,255,0.08)",
+                border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+              type="button"
+              aria-label="Close"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6l12 12" stroke="rgba(255,255,255,0.6)" strokeWidth="2.5" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
 
-        <div className="px-4 space-y-3">
-          {loadingCatalog ? (
-            <p className="text-[12px] text-white/60 text-center py-4">Loading offers...</p>
-          ) : (
-            packs.map((pack, i) => {
-              const isSelected = selectedPack?.id === pack.id;
-              const isRecommended = i === 1;
-              const isSufficient = pack.credits >= requiredCredits;
+          <div style={{ textAlign: "center", padding: "4px 24px 20px", position: "relative" }}>
+            <div
+              className="coin-icon"
+              style={{
+                width: 64, height: 64, borderRadius: 18,
+                background: "linear-gradient(135deg, #9A88FD, #7B65FC)",
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                marginBottom: 14,
+                boxShadow: "0 8px 28px rgba(154,136,253,0.45)",
+              }}
+            >
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+                <line x1="12" y1="1" x2="12" y2="23" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+                <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"
+                  stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <h2 style={{
+              fontSize: 26, fontWeight: 800, color: "white",
+              margin: "0 0 6px", fontFamily: "Poppins, sans-serif",
+              letterSpacing: "-0.3px",
+            }}>
+              Buy Credits
+            </h2>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", margin: 0 }}>
+              {currentCredits > 0
+                ? `You have ${currentCredits} credit${currentCredits !== 1 ? "s" : ""} remaining`
+                : "Top up to generate your reports"}
+            </p>
+          </div>
 
-              return (
-                <button
-                  key={pack.id}
-                  type="button"
-                  onClick={() => setSelectedPack(pack)}
-                  className={`credit-pack-card w-full text-left rounded-2xl p-4 relative overflow-hidden ${isSelected ? "selected" : ""}`}
-                  style={{
-                    background: isSelected
-                      ? "linear-gradient(135deg, rgba(154,136,253,0.25), rgba(123,101,252,0.15))"
-                      : "rgba(255,255,255,0.06)",
-                    border: isSelected
-                      ? "1.5px solid rgba(154,136,253,0.8)"
-                      : "1.5px solid rgba(255,255,255,0.08)",
-                    boxShadow: isSelected ? "0 4px 20px rgba(154,136,253,0.2)" : "none",
-                    animation: isSelected ? "pulse-ring 2s infinite" : "none",
-                  }}
-                >
-                  {isRecommended && (
-                    <div
-                      className="absolute top-3 right-3 text-[9px] font-extrabold uppercase tracking-wider px-2 py-1 rounded-full"
-                      style={{
-                        background: "linear-gradient(90deg, #FEDE80, #FFB800)",
-                        color: "#1A1A2E",
-                        animation: "badgePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
-                      }}
-                    >
-                      ⭐ Best value
-                    </div>
-                  )}
+          <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+            {loadingCatalog ? (
+              <p style={{ margin: "8px 0", textAlign: "center", fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+                Loading offers...
+              </p>
+            ) : (
+              packs.map((pack, i) => {
+                const isSelected = selectedPack?.id === pack.id
+                const isRecommended = i === 1
+                const isSufficient = pack.credits >= (requiredCredits ?? 0)
 
-                  {isSufficient && !isRecommended && (
-                    <div
-                      className="absolute top-3 right-3 text-[9px] font-bold uppercase tracking-wide px-2 py-1 rounded-full"
-                      style={{ background: "rgba(154,136,253,0.2)", color: "#9A88FD" }}
-                    >
-                      Covers this ✓
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between pr-20">
-                    <div>
-                      <div
-                        className="text-[16px] font-extrabold text-white mb-1"
-                        style={{ fontFamily: "Poppins, sans-serif" }}
-                      >
-                        {pack.name}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex -space-x-1">
-                          {Array.from({ length: Math.min(pack.credits, 5) }).map((_, ci) => (
-                            <div
-                              key={ci}
-                              className="w-5 h-5 rounded-full border border-[#1A1A2E] flex items-center justify-center"
-                              style={{
-                                background: "linear-gradient(135deg, #9A88FD, #7B65FC)",
-                                opacity: 0.7 + ci * 0.06,
-                              }}
-                            >
-                              <svg width="8" height="8" viewBox="0 0 12 12" fill="none">
-                                <circle cx="6" cy="6" r="4" stroke="white" strokeWidth="1.5" />
-                              </svg>
-                            </div>
-                          ))}
-                          {pack.credits > 5 && (
-                            <div
-                              className="w-5 h-5 rounded-full border border-[#1A1A2E] flex items-center justify-center text-[7px] font-bold text-white"
-                              style={{ background: "rgba(154,136,253,0.4)" }}
-                            >
-                              +{pack.credits - 5}
-                            </div>
-                          )}
-                        </div>
-                        <span className="text-[12px] text-white/40">
-                          {pack.credits} credit{pack.credits > 1 ? "s" : ""} · AED {Math.round(pack.price_aed / pack.credits)}/cr
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <span
-                        className="text-[20px] font-extrabold"
-                        style={{
+                return (
+                  <button
+                    key={pack.id}
+                    type="button"
+                    onClick={() => setSelectedPack(pack)}
+                    className={`pack-card${isSelected ? " selected" : ""}`}
+                    style={{
+                      width: "100%", textAlign: "left",
+                      background: isSelected
+                        ? "rgba(154,136,253,0.18)"
+                        : "rgba(255,255,255,0.05)",
+                      border: isSelected
+                        ? "1.5px solid rgba(154,136,253,0.7)"
+                        : isRecommended
+                          ? "1.5px solid rgba(254,222,128,0.4)"
+                          : "1.5px solid rgba(255,255,255,0.07)",
+                      borderRadius: 18,
+                      padding: "14px 16px",
+                      boxShadow: isSelected ? "0 4px 20px rgba(154,136,253,0.2)" : "none",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                        <span style={{
+                          fontSize: 16, fontWeight: 800, color: "white",
                           fontFamily: "Poppins, sans-serif",
-                          color: isSelected ? "#b8a9ff" : "#9A88FD",
-                        }}
-                      >
+                          whiteSpace: "nowrap",
+                        }}>
+                          {pack.name}
+                        </span>
+                        {isRecommended && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 800,
+                            background: "linear-gradient(90deg, #FEDE80, #FFB800)",
+                            color: "#1A1A2E",
+                            padding: "3px 8px", borderRadius: 20,
+                            textTransform: "uppercase", letterSpacing: "0.5px",
+                            whiteSpace: "nowrap",
+                          }}>
+                            ⭐ Best value
+                          </span>
+                        )}
+                        {isSufficient && !isRecommended && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 700,
+                            background: "rgba(154,136,253,0.2)",
+                            color: "#9A88FD",
+                            padding: "3px 8px", borderRadius: 20,
+                            textTransform: "uppercase", letterSpacing: "0.3px",
+                            whiteSpace: "nowrap",
+                          }}>
+                            Covers this ✓
+                          </span>
+                        )}
+                      </div>
+                      <span style={{
+                        fontSize: 18, fontWeight: 800,
+                        color: isSelected ? "#c4b8ff" : "#9A88FD",
+                        fontFamily: "Poppins, sans-serif",
+                        whiteSpace: "nowrap", flexShrink: 0,
+                      }}>
                         AED {pack.price_aed}
                       </span>
                     </div>
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
 
-        <div className="px-4 mt-5">
-          <button
-            type="button"
-            onClick={() =>
-              selectedPack?.stripe_price_id &&
-              void handleBuy(selectedPack.stripe_price_id, selectedPack.id)
-            }
-            disabled={!selectedPack || isPurchasingSelected || !selectedPack.stripe_price_id}
-            className="shimmer-btn w-full py-4 rounded-2xl text-white font-extrabold text-[16px] flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none"
-            style={{
-              fontFamily: "Poppins, sans-serif",
-              boxShadow: selectedPack ? "0 8px 32px rgba(154,136,253,0.5)" : "none",
-            }}
-          >
-            {isPurchasingSelected ? (
-              <>
-                <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2.5" opacity="0.25" />
-                  <path d="M12 2a10 10 0 0110 10" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-                </svg>
-                Processing…
-              </>
-            ) : selectedPack ? (
-              <>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14l-4-4 1.41-1.41L11 13.17l6.59-6.59L19 8l-8 8z"
-                    fill="white"
-                  />
-                </svg>
-                Buy {selectedPack.credits} credits · AED {selectedPack.price_aed}
-              </>
-            ) : (
-              "Choose a pack above"
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ display: "flex", gap: 3 }}>
+                        {Array.from({ length: Math.min(pack.credits, 5) }).map((_, ci) => (
+                          <div
+                            key={ci}
+                            style={{
+                              width: 18, height: 18, borderRadius: "50%",
+                              background: isSelected
+                                ? `rgba(154,136,253,${0.5 + ci * 0.1})`
+                                : "rgba(154,136,253,0.3)",
+                              border: "1px solid rgba(154,136,253,0.4)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                          >
+                            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "rgba(255,255,255,0.7)" }} />
+                          </div>
+                        ))}
+                        {pack.credits > 5 && (
+                          <div style={{
+                            width: 18, height: 18, borderRadius: "50%",
+                            background: "rgba(154,136,253,0.2)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 8, fontWeight: 700, color: "#9A88FD",
+                          }}>
+                            +{pack.credits - 5}
+                          </div>
+                        )}
+                      </div>
+                      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>
+                        {pack.credits} credits · AED {Math.round(pack.price_aed / pack.credits)}/cr
+                      </span>
+                    </div>
+                  </button>
+                )
+              })
             )}
-          </button>
-
-          <div className="flex items-center justify-center gap-4 mt-3">
-            {["🔒 Secure payment", "⚡ Instant activation", "🇦🇪 AED pricing"].map((t, i) => (
-              <span key={i} className="text-[10px] text-white/30 font-medium">{t}</span>
-            ))}
           </div>
+
+          <div style={{ padding: "16px 16px 0" }}>
+            <button
+              type="button"
+              onClick={handlePurchase}
+              disabled={!selectedPack || loading}
+              className={selectedPack && !loading ? "shimmer-cta" : ""}
+              style={{
+                width: "100%", border: "none", borderRadius: 18,
+                padding: "16px 0", fontSize: 15, fontWeight: 800,
+                color: "white", cursor: selectedPack ? "pointer" : "default",
+                fontFamily: "Poppins, sans-serif",
+                background: selectedPack && !loading
+                  ? undefined
+                  : "rgba(154,136,253,0.2)",
+                opacity: !selectedPack || loading ? 0.5 : 1,
+                boxShadow: selectedPack ? "0 8px 28px rgba(154,136,253,0.4)" : "none",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              }}
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2.5" opacity="0.25"/>
+                    <path d="M12 2a10 10 0 0110 10" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+                  </svg>
+                  Processing…
+                </>
+              ) : selectedPack ? (
+                `Buy ${selectedPack.credits} credits · AED ${selectedPack.price_aed}`
+              ) : (
+                "Choose a pack above"
+              )}
+            </button>
+
+            <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 12 }}>
+              {["🔒 Secure", "⚡ Instant", "🇦🇪 AED"].map((t, i) => (
+                <span key={i} style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", fontWeight: 500 }}>{t}</span>
+              ))}
+            </div>
+          </div>
+
         </div>
       </div>
-    </div>
+    </>
   );
 }
