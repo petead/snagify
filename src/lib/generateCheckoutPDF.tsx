@@ -163,6 +163,7 @@ export interface CheckoutPDFProps {
     signer_type: string;
     signer_name?: string;
     signature_data?: string;
+    signed_at?: string | null;
   }[];
   profile?: {
     full_name?: string;
@@ -180,16 +181,27 @@ export interface CheckoutPDFProps {
    Helper Functions
    ───────────────────────────────────────────────────────────────────────────── */
 
-function formatDate(dateStr?: string | null): string {
+function formatDate(dateStr?: string | null, withTime = false): string {
   if (!dateStr) return "—";
   try {
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      day: "2-digit",
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return String(dateStr);
+    const datePart = d.toLocaleDateString("en-AE", {
+      day: "numeric",
       month: "long",
       year: "numeric",
+      timeZone: "Asia/Dubai",
     });
+    if (!withTime) return datePart;
+    const timeStr = d.toLocaleTimeString("en-AE", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Dubai",
+    });
+    return `${datePart} at ${timeStr}`;
   } catch {
-    return dateStr;
+    return String(dateStr);
   }
 }
 
@@ -2044,52 +2056,251 @@ export function CheckoutPDFDocument({
           )}
 
           <View style={s.sigPartiesRow}>
-            {[
-              { role: "Landlord", name: tenancy.landlord_name, sigType: "landlord" },
-              { role: "Tenant", name: tenancy.tenant_name, sigType: "tenant" },
-            ].map((party, i) => {
-              const sig = (signatures ?? []).find((s) => s.signer_type === party.sigType);
+            {(() => {
+              const landlordSig = (signatures ?? []).find((s) => s.signer_type === "landlord");
+              const tenantSig = (signatures ?? []).find((s) => s.signer_type === "tenant");
+              const sigBoxStyle = {
+                borderWidth: 1,
+                borderStyle: "solid" as const,
+                borderColor: "#E5E7EB",
+                borderRadius: 4,
+                height: 60,
+                alignItems: "center" as const,
+                justifyContent: "center" as const,
+                backgroundColor: "#FAFAFA",
+                marginBottom: 6,
+              };
               return (
-                <View key={i} style={[s.sigPartyCard, ...(i === 0 ? [{ marginRight: 8 }] : [])]}>
-                  <Text style={[s.sigPartyRole, { color: tokens.primary }]}>{party.role.toUpperCase()}</Text>
-                  <Text style={s.sigPartyName}>{party.name ?? "—"}</Text>
-                  <View style={s.sigSignArea}>
-                    {sig?.signature_data ? (
-                      <Image src={sig.signature_data} style={s.sigSignImage} />
+                <>
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text
+                      style={{
+                        fontSize: 7,
+                        color: tokens.primary,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.8,
+                        fontFamily: "Helvetica-Bold",
+                        marginBottom: 4,
+                      }}
+                    >
+                      Landlord
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 9,
+                        fontFamily: "Helvetica-Bold",
+                        color: "#1A1A2E",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {tenancy.landlord_name ?? "—"}
+                    </Text>
+                    <View style={sigBoxStyle}>
+                      {landlordSig?.signature_data ? (
+                        <Image
+                          src={landlordSig.signature_data}
+                          style={{ width: 140, height: 50, objectFit: "contain" }}
+                        />
+                      ) : (
+                        <Text style={{ fontSize: 8, color: "#C4C4C4", fontFamily: "Helvetica-Oblique" }}>
+                          Pending Signature
+                        </Text>
+                      )}
+                    </View>
+                    {landlordSig?.signed_at ? (
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <View
+                          style={{
+                            width: 5,
+                            height: 5,
+                            borderRadius: 2.5,
+                            backgroundColor: tokens.primary,
+                            marginRight: 4,
+                          }}
+                        />
+                        <Text style={{ fontSize: 7, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
+                          Signed on {formatDate(landlordSig.signed_at, true)}
+                        </Text>
+                      </View>
                     ) : (
-                      <Text style={s.sigSignPending}>Pending Signature</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <View
+                          style={{
+                            width: 5,
+                            height: 5,
+                            borderRadius: 2.5,
+                            backgroundColor: "#E5E7EB",
+                            marginRight: 4,
+                          }}
+                        />
+                        <Text style={{ fontSize: 7, color: "#9B9BA8" }}>Awaiting signature</Text>
+                      </View>
                     )}
                   </View>
-                </View>
+
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text
+                      style={{
+                        fontSize: 7,
+                        color: tokens.primary,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.8,
+                        fontFamily: "Helvetica-Bold",
+                        marginBottom: 4,
+                      }}
+                    >
+                      Tenant
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 9,
+                        fontFamily: "Helvetica-Bold",
+                        color: "#1A1A2E",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {tenancy.tenant_name ?? "—"}
+                    </Text>
+                    <View style={sigBoxStyle}>
+                      {tenantSig?.signature_data ? (
+                        <Image
+                          src={tenantSig.signature_data}
+                          style={{ width: 140, height: 50, objectFit: "contain" }}
+                        />
+                      ) : (
+                        <Text style={{ fontSize: 8, color: "#C4C4C4", fontFamily: "Helvetica-Oblique" }}>
+                          Pending Signature
+                        </Text>
+                      )}
+                    </View>
+                    {tenantSig?.signed_at ? (
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <View
+                          style={{
+                            width: 5,
+                            height: 5,
+                            borderRadius: 2.5,
+                            backgroundColor: tokens.primary,
+                            marginRight: 4,
+                          }}
+                        />
+                        <Text style={{ fontSize: 7, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
+                          Signed on {formatDate(tenantSig.signed_at, true)}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <View
+                          style={{
+                            width: 5,
+                            height: 5,
+                            borderRadius: 2.5,
+                            backgroundColor: "#E5E7EB",
+                            marginRight: 4,
+                          }}
+                        />
+                        <Text style={{ fontSize: 7, color: "#9B9BA8" }}>Awaiting signature</Text>
+                      </View>
+                    )}
+                  </View>
+                </>
               );
-            })}
+            })()}
           </View>
 
           {(() => {
             const inspectorSig = (signatures ?? []).find(
               (s) => s.signer_type === "agent" || s.signer_type === "inspector"
             );
+            const inspectorName = profile?.full_name ?? "—";
+            const inspectorSignatureUrl =
+              inspectorSig?.signature_data || profile?.signature_image_url || null;
             return (
-              <View style={s.sigInspectorCard}>
-                <View style={[s.sigInspectorLeft, { marginRight: 12 }]}>
-                  <Text style={[s.sigInspectorRole, { color: tokens.primary }]}>INSPECTOR</Text>
-                  <Text style={s.sigInspectorName}>{profile?.full_name ?? "—"}</Text>
-                  <Text style={s.sigInspectorAgency}>
-                    {agencyName}
-                    {profile?.rera_number ? ` · RERA #${profile.rera_number}` : ""}
-                  </Text>
-                </View>
-                <View style={s.sigInspectorRight}>
-                  <View style={s.sigInspectorSignBox}>
-                    {inspectorSig?.signature_data ? (
-                      <Image src={inspectorSig.signature_data} style={s.sigSignImage} />
-                    ) : profile?.signature_image_url ? (
-                      <Image src={profile.signature_image_url} style={s.sigSignImage} />
-                    ) : (
-                      <Text style={s.sigSignPending}>—</Text>
-                    )}
+              <View
+                style={{
+                  borderTopWidth: 0.5,
+                  borderTopColor: "#E5E7EB",
+                  paddingTop: 14,
+                  marginTop: 14,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 7,
+                    color: tokens.primary,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.8,
+                    fontFamily: "Helvetica-Bold",
+                    marginBottom: 4,
+                  }}
+                >
+                  Inspector
+                </Text>
+
+                <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                  <View style={{ flex: 1, marginRight: 20 }}>
+                    <Text
+                      style={{
+                        fontSize: 9,
+                        fontFamily: "Helvetica-Bold",
+                        color: "#1A1A2E",
+                        marginBottom: 2,
+                      }}
+                    >
+                      {inspectorName}
+                    </Text>
+                    <Text style={{ fontSize: 8, color: "#6B7280", marginBottom: 6 }}>
+                      {agencyName}
+                      {profile?.rera_number ? ` · RERA #${profile.rera_number}` : ""}
+                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <View
+                        style={{
+                          width: 5,
+                          height: 5,
+                          borderRadius: 2.5,
+                          backgroundColor: tokens.primary,
+                          marginRight: 4,
+                        }}
+                      />
+                      <Text style={{ fontSize: 7, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
+                        Report generated on {formatDate(new Date().toISOString(), true)}
+                      </Text>
+                    </View>
                   </View>
-                  <Text style={s.sigInspectorSignLabel}>Inspector signature</Text>
+
+                  <View style={{ width: 160 }}>
+                    <View
+                      style={{
+                        borderWidth: 1,
+                        borderStyle: "solid",
+                        borderColor: "#E5E7EB",
+                        borderRadius: 4,
+                        height: 56,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: "#FAFAFA",
+                        marginBottom: 4,
+                      }}
+                    >
+                      {inspectorSignatureUrl ? (
+                        <Image
+                          src={inspectorSignatureUrl}
+                          style={{ width: 130, height: 46, objectFit: "contain" }}
+                        />
+                      ) : (
+                        <Text
+                          style={{
+                            fontSize: 7,
+                            color: "#C4C4C4",
+                            fontFamily: "Helvetica-Oblique",
+                          }}
+                        >
+                          Inspector signature
+                        </Text>
+                      )}
+                    </View>
+                  </View>
                 </View>
               </View>
             );

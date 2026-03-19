@@ -530,6 +530,7 @@ export async function buildPdfAndUpload(
           signer_type: s.signer_type,
           signer_name: undefined,
           signature_data: s.signature_data ?? undefined,
+          signed_at: s.signed_at ?? null,
         })),
         profile: agentData
           ? {
