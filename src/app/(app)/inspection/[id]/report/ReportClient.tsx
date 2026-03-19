@@ -460,6 +460,8 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
             inspection={{
               ...inspection,
               property: normalizeOne(inspection.properties) as PropertyRelation | null,
+              document_hash: inspection.document_hash ?? null,
+              property_id: inspection.property_id ?? null,
               rooms: (inspection.rooms ?? []).map(r => ({
                 id: r.id,
                 name: r.name ?? "",

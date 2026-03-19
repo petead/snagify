@@ -11,6 +11,7 @@ import {
   type RoomPhoto,
   type KeyItem,
 } from '@/lib/inspectionCompare'
+import DeleteInspectionButton from '@/components/inspection/DeleteInspectionButton'
 
 interface Props {
   inspection: {
@@ -20,7 +21,9 @@ interface Props {
     signed_at?: string | null
     created_at?: string | null
     executive_summary?: string | null
+    document_hash?: string | null
     key_handover?: KeyItem[] | null
+    property_id?: string | null
     property?: {
       location?: string | null
       building_name?: string | null
@@ -764,6 +767,37 @@ export function CheckoutReportView({
               )
             })}
           </div>
+        </div>
+
+        {/* ── SHA-256 HASH — identical to check-in ── */}
+        {inspection.document_hash && (
+          <div className="mx-4 mb-3 text-center">
+            <p className="text-[11px] text-[#CCC] font-mono">
+              SHA-256: {inspection.document_hash.slice(0, 16)}...{inspection.document_hash.slice(-8)}
+            </p>
+          </div>
+        )}
+
+        {/* ── DELETE INSPECTION — identical to check-in ── */}
+        <div className="mx-4 mb-3">
+          <DeleteInspectionButton
+            inspectionId={inspection.id}
+            inspectionType={(inspection.type ?? 'check-out') as 'check-in' | 'check-out'}
+            status={inspection.status}
+            signatures={
+              (signatures ?? []) as {
+                signer_type: string
+                otp_verified: boolean
+                signed_at?: string | null
+              }[]
+            }
+            redirectTo={
+              inspection.property_id
+                ? `/property/${inspection.property_id}`
+                : '/dashboard'
+            }
+            variant="button"
+          />
         </div>
       </div>
     </div>
