@@ -2143,7 +2143,7 @@ export function CheckoutPDFDocument({
             This report has been reviewed{"\n"}and agreed upon by all parties.
           </Text>
           <Text style={s.sigSubtitle}>
-            {property.location ?? "Property"} · {formatDate(inspection.created_at)}
+            {property.building_name ?? property.location ?? "Property"} · {formatDate(inspection.created_at)}
           </Text>
         </View>
 
