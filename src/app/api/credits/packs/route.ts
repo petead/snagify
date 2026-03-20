@@ -23,10 +23,10 @@ export async function GET(req: NextRequest) {
   const { data: plans } = await supabase
     .from("subscription_plans")
     .select(
-      "id, slug, name, price_aed_monthly, credits_per_month, stripe_price_id, white_label, max_users"
+      "id, slug, name, price_aed_monthly, credits_per_month, stripe_price_id, white_label, max_users, highlight, extra_credit_price_aed, sort_order"
     )
     .eq("is_active", true)
-    .order("price_aed_monthly");
+    .order("sort_order");
 
   return NextResponse.json({
     packs: packs || [],

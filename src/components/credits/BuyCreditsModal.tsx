@@ -23,6 +23,14 @@ type Pack = {
   sort_order?: number | null;
 };
 
+function mapPackDisplayName(name: string): string {
+  const n = name.trim().toLowerCase();
+  if (n === "découverte" || n === "decouverte") return "Starter";
+  if (n === "essentiel") return "Essential";
+  if (n === "sérénité" || n === "serenite") return "Serenity";
+  return name;
+}
+
 export function BuyCreditsModal({
   isOpen,
   onClose,
@@ -363,7 +371,7 @@ export function BuyCreditsModal({
                                     fontFamily: "Poppins, sans-serif",
                                   }}
                                 >
-                                  {pack.name}
+                                  {mapPackDisplayName(pack.name)}
                                 </span>
                                 {isBestValue && (
                                   <span

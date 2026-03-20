@@ -6,37 +6,43 @@ import { Loader2, Check, Zap, Building2, Crown } from 'lucide-react'
 const PLANS = [
   {
     slug: 'pro_solo',
-    name: 'Pro Solo',
-    price: 399,
-    credits: 20,
+    name: 'Starter',
+    price: 149,
+    credits: 10,
     users: '1 user',
+    highlight: '5 complete cycles/month',
+    extraCredits: 'Extra credits: AED 18/cr',
     priceId: 'price_1TC1CrKIsjOh5d33lCuUGmcd',
     icon: Zap,
     color: '#9A88FD',
-    features: ['20 credits/month', 'White-label PDF', '1 inspector'],
+    features: ['10 credits/month', 'White-label PDF', '1 inspector'],
   },
   {
     slug: 'pro_agency',
-    name: 'Pro Agency',
-    price: 799,
-    credits: 60,
-    users: 'Up to 5 users',
+    name: 'Growth',
+    price: 249,
+    credits: 20,
+    users: 'Up to 3 users',
+    highlight: '10 complete cycles/month',
+    extraCredits: 'Extra credits: AED 15/cr',
     priceId: 'price_1TC1D3KIsjOh5d33oEd1E3T1',
     icon: Building2,
     color: '#9A88FD',
     popular: true,
-    features: ['60 credits/month', 'White-label PDF', 'Up to 5 inspectors'],
+    features: ['20 credits/month', 'White-label PDF', 'Up to 3 inspectors'],
   },
   {
     slug: 'pro_max',
-    name: 'Pro Max',
-    price: 1499,
-    credits: 120,
+    name: 'Agency',
+    price: 349,
+    credits: 30,
     users: 'Unlimited users',
+    highlight: '15 complete cycles/month',
+    extraCredits: 'Extra credits: AED 13/cr',
     priceId: 'price_1TC1DPKIsjOh5d33hlQhhUTf',
     icon: Crown,
     color: '#9A88FD',
-    features: ['120 credits/month', 'White-label PDF', 'Unlimited inspectors'],
+    features: ['30 credits/month', 'White-label PDF', 'Unlimited inspectors'],
   },
 ]
 
@@ -239,8 +245,26 @@ export function SubscriptionSection({ company }: Props) {
                       <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E' }}>
                         {plan.name}
                       </div>
+                      <div
+                        style={{
+                          marginTop: 4,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          borderRadius: 999,
+                          background: '#EDE9FF',
+                          color: '#6D5BD0',
+                          padding: '2px 8px',
+                          fontSize: 10,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {plan.highlight}
+                      </div>
                       <div style={{ fontSize: 11, color: '#9CA3AF' }}>
                         {plan.users}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#6B7280', marginTop: 4 }}>
+                        {plan.extraCredits}
                       </div>
                     </div>
                   </div>
