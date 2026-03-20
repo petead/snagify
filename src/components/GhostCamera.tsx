@@ -85,6 +85,7 @@ export default function GhostCamera({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [prepopulatedHintVisible, setPrepopulatedHintVisible] = useState(false);
   const [autoZoomApplied, setAutoZoomApplied] = useState(false);
+  const [videoAspectRatio, setVideoAspectRatio] = useState<string | undefined>(undefined);
   /** Display + capture: match active entry photo (or 4:3 in “New finding”). */
   const targetAspectRatio = useMemo(() => {
     if (isAdditionalMode) return 4 / 3;
@@ -359,19 +360,24 @@ export default function GhostCamera({
   };
 
   return (
-    <div className="fixed inset-0 z-[999] bg-black">
-      {/* Full-bleed video layer — behind all overlays (header z-30) */}
-      <div className="absolute inset-0">
+    <div className="fixed inset-0 z-[999] bg-black flex flex-col">
+      {/* Video container — ratio-locked to stream natural dimensions */}
+      <div
+        className="relative w-full"
+        style={{ aspectRatio: videoAspectRatio ?? "3 / 4" }}
+      >
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          className="block"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
+          className="block w-full h-full"
+          style={{ objectFit: "cover" }}
+          onLoadedMetadata={() => {
+            const v = videoRef.current;
+            if (v && v.videoWidth && v.videoHeight) {
+              setVideoAspectRatio(`${v.videoWidth} / ${v.videoHeight}`);
+            }
           }}
         />
 
@@ -386,7 +392,7 @@ export default function GhostCamera({
                 inset: 0,
                 width: "100%",
                 height: "100%",
-                objectFit: "contain",
+                objectFit: "cover",
                 opacity: ghostOpacity,
                 pointerEvents: "none",
                 zIndex: 1,
@@ -489,7 +495,7 @@ export default function GhostCamera({
                   )}
               </AnimatePresence>
 
-              {/* Ghost opacity slider — overlaid on bottom of video */}
+              {/* Ghost slider — overlaid on bottom of video */}
               {checkinPhotos.length > 0 && !isAdditionalMode && (
                 <div
                   style={{
@@ -503,7 +509,7 @@ export default function GhostCamera({
                     gap: 8,
                   }}
                 >
-                  <span style={{ fontSize: 13, lineHeight: 1 }}>👻</span>
+                  <span style={{ fontSize: 13 }}>👻</span>
                   <input
                     type="range"
                     min={0}
@@ -517,7 +523,7 @@ export default function GhostCamera({
                     style={{
                       color: "rgba(255,255,255,0.5)",
                       fontSize: 11,
-                      minWidth: 28,
+                      minWidth: 30,
                       textAlign: "right",
                     }}
                   >
