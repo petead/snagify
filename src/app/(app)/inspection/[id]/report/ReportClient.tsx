@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PenLine, Link as LinkIcon, Check, Mail, Users } from "lucide-react";
@@ -16,6 +16,7 @@ import {
 import { CheckoutReportView } from "@/components/inspection/CheckoutReportView";
 import { formatPropertyBuildingUnit } from "@/lib/formatPropertyAddress";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
+import { createClient } from "@/lib/supabase/client";
 
 interface ReportClientProps {
   inspection: InspectionWithRelations;
@@ -32,17 +33,6 @@ const formatDate = (d: string | null | undefined) =>
       })
     : "—";
 
-function formatRelative(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  if (hours < 24) return `${hours}h ago`
-  return `${days}d ago`
-}
-
 type SignatureStatus = {
   signer_type: string
   signed_at: string | null
@@ -53,24 +43,605 @@ type SignatureStatus = {
   expires_at: string | null
 }
 
+function formatOpenedAtLine(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    const dayPart = d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    const timePart = d.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    return `Opened · ${dayPart} at ${timePart}`;
+  } catch {
+    return "Opened";
+  }
+}
+
 function getRemoteStatus(sig?: SignatureStatus | null) {
-  if (!sig) return null
-  if (sig.signing_mode !== 'remote') return null
-  if (sig.signed_at) return null
-  if (sig.opened_at) return {
-    label: 'Link opened',
-    sub: `Opened ${formatRelative(sig.opened_at)}`,
-    color: 'text-[#9A88FD]',
-    bg: 'bg-[#EDE9FF]',
-    dot: 'bg-[#9A88FD]',
+  if (!sig) return null;
+  if (sig.signing_mode !== "remote") return null;
+  if (sig.signed_at) return null;
+  if (sig.opened_at) {
+    return {
+      label: "Link sent",
+      sub: formatOpenedAtLine(sig.opened_at),
+      color: "text-[#9A88FD]",
+      bg: "bg-[#EDE9FF]",
+      dot: "bg-[#9A88FD]",
+    };
   }
   return {
-    label: 'Link sent',
-    sub: 'Not opened yet',
-    color: 'text-amber-600',
-    bg: 'bg-amber-50',
-    dot: 'bg-amber-400',
-  }
+    label: "Link sent",
+    sub: "Not opened yet",
+    color: "text-amber-600",
+    bg: "bg-amber-50",
+    dot: "bg-amber-400",
+  };
+}
+
+function RemoteLinkTracking({
+  remoteStatus,
+}: {
+  remoteStatus: NonNullable<ReturnType<typeof getRemoteStatus>>;
+}) {
+  return (
+    <div className={`mt-2 px-3 py-2 rounded-xl ${remoteStatus.bg}`}>
+      <div
+        className={`text-[11px] font-semibold ${remoteStatus.color} flex items-center gap-1`}
+      >
+        <span aria-hidden>📧</span>
+        {remoteStatus.label}
+      </div>
+      <div className="flex items-start gap-2 mt-1">
+        <div
+          className={`mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0 ${remoteStatus.dot}`}
+        />
+        <span className="text-[10px] text-gray-500 leading-snug">{remoteStatus.sub}</span>
+      </div>
+    </div>
+  );
+}
+
+/** Shared landlord + tenant rows + footers — check-in and check-out modals use the same UI. */
+function SendForSignaturePartySections({
+  tenancy,
+  landlordSigned,
+  tenantSigned,
+  landlordSig,
+  tenantSig,
+  signatureStatus,
+  sent,
+  sending,
+  resendLoading,
+  resendDone,
+  bothSigned,
+  handleSendOTP,
+  handleResend,
+  setShowSignModal,
+  setInPersonModal,
+}: {
+  tenancy: TenancyRelation | null;
+  landlordSigned: boolean;
+  tenantSigned: boolean;
+  landlordSig?: { signed_at?: string | null };
+  tenantSig?: { signed_at?: string | null };
+  signatureStatus: SignatureStatus[];
+  sent: { landlord: boolean; tenant: boolean };
+  sending: boolean;
+  resendLoading: "landlord" | "tenant" | null;
+  resendDone: ("landlord" | "tenant")[];
+  bothSigned: boolean;
+  handleSendOTP: (
+    signerType: "landlord" | "tenant",
+    email: string,
+    signerName: string
+  ) => void | Promise<void>;
+  handleResend: (signerType: "landlord" | "tenant") => void | Promise<void>;
+  setShowSignModal: (open: boolean) => void;
+  setInPersonModal: (
+    v: { signerType: "landlord" | "tenant"; name: string; email: string } | null
+  ) => void;
+}) {
+  const landlordStatusSig = signatureStatus.find((s) => s.signer_type === "landlord");
+  const tenantStatusSig = signatureStatus.find((s) => s.signer_type === "tenant");
+  const landlordRemoteStatus = getRemoteStatus(landlordStatusSig);
+  const tenantRemoteStatus = getRemoteStatus(tenantStatusSig);
+
+  return (
+    <>
+      <div
+        style={{
+          background: landlordSigned ? "#f1f8f1" : "#F8F7F4",
+          borderRadius: 16,
+          padding: 16,
+          marginBottom: 12,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 8,
+          }}
+        >
+          <p
+            style={{
+              fontSize: 10,
+              color: "#999",
+              textTransform: "uppercase",
+              letterSpacing: 1,
+              margin: 0,
+            }}
+          >
+            Landlord
+          </p>
+          {landlordSigned && (
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: "#2e7d32",
+                background: "#e8f5e9",
+                padding: "3px 10px",
+                borderRadius: 100,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <Check size={11} /> Signed
+            </span>
+          )}
+        </div>
+        <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
+          {tenancy?.landlord_name ?? "—"}
+        </p>
+        <p style={{ fontSize: 13, color: "#666", margin: "4px 0 12px" }}>
+          {tenancy?.landlord_email ?? "—"}
+        </p>
+        {landlordSigned ? (
+          <div
+            style={{
+              width: "100%",
+              padding: "10px 0",
+              borderRadius: 12,
+              background: "#e8f5e9",
+              color: "#2e7d32",
+              fontSize: 13,
+              fontWeight: 600,
+              textAlign: "center",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+            }}
+          >
+            <Check size={14} />
+            Landlord signed
+            {landlordSig?.signed_at && (
+              <span style={{ fontWeight: 400, fontSize: 11, color: "#4a8c5c" }}>
+                — {formatDate(landlordSig.signed_at)}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() =>
+                  handleSendOTP(
+                    "landlord",
+                    tenancy?.landlord_email ?? "",
+                    tenancy?.landlord_name ?? ""
+                  )
+                }
+                disabled={sent.landlord || sending}
+                style={{
+                  flex: 1,
+                  padding: "12px 8px",
+                  borderRadius: 12,
+                  border: "2px solid transparent",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: sent.landlord || sending ? "default" : "pointer",
+                  background: sent.landlord ? "rgba(34,197,94,0.15)" : "#F3F3F8",
+                  color: sent.landlord ? "#166534" : "#6B7280",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Mail size={16} color={sent.landlord ? "#166534" : "#6B7280"} />
+                <span>{sent.landlord ? "Sent!" : "Remote"}</span>
+                <span
+                  style={{
+                    fontSize: 9,
+                    color: sent.landlord ? "#166534" : "#9CA3AF",
+                    fontWeight: 400,
+                  }}
+                >
+                  Link by email
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSignModal(false);
+                  setTimeout(() => {
+                    setInPersonModal({
+                      signerType: "landlord",
+                      name: tenancy?.landlord_name || "Landlord",
+                      email: tenancy?.landlord_email || "",
+                    });
+                  }, 200);
+                }}
+                style={{
+                  flex: 1,
+                  padding: "12px 8px",
+                  borderRadius: 12,
+                  border: "2px solid rgba(154,136,253,0.3)",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: "#EDE9FF",
+                  color: "#9A88FD",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Users size={16} color="#9A88FD" />
+                <span>In person</span>
+                <span
+                  style={{
+                    fontSize: 9,
+                    color: "rgba(154,136,253,0.6)",
+                    fontWeight: 400,
+                  }}
+                >
+                  Sign on this device
+                </span>
+              </button>
+            </div>
+            {landlordRemoteStatus && (
+              <RemoteLinkTracking remoteStatus={landlordRemoteStatus} />
+            )}
+            {landlordStatusSig?.signing_mode === "remote" &&
+              !landlordStatusSig?.signed_at && (
+                <button
+                  type="button"
+                  onClick={() => void handleResend("landlord")}
+                  disabled={resendLoading === "landlord"}
+                  className="flex items-center gap-2 text-[12px] font-semibold text-[#9A88FD] mt-2 mx-auto disabled:opacity-50"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: resendLoading === "landlord" ? "default" : "pointer",
+                  }}
+                >
+                  {resendLoading === "landlord" ? (
+                    <svg
+                      className="animate-spin"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="#9A88FD"
+                        strokeWidth="2"
+                        opacity="0.25"
+                      />
+                      <path
+                        d="M12 2a10 10 0 0110 10"
+                        stroke="#9A88FD"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  ) : resendDone.includes("landlord") ? (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M20 6L9 17l-5-5"
+                        stroke="#16A34A"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M23 3l-9.5 9.5M23 3H16M23 3v7"
+                        stroke="#9A88FD"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                  {resendDone.includes("landlord") ? "Reminder sent!" : "Resend link"}
+                </button>
+              )}
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          background: tenantSigned ? "#f1f8f1" : "#F8F7F4",
+          borderRadius: 16,
+          padding: 16,
+          marginBottom: 24,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 8,
+          }}
+        >
+          <p
+            style={{
+              fontSize: 10,
+              color: "#999",
+              textTransform: "uppercase",
+              letterSpacing: 1,
+              margin: 0,
+            }}
+          >
+            Tenant
+          </p>
+          {tenantSigned && (
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: "#2e7d32",
+                background: "#e8f5e9",
+                padding: "3px 10px",
+                borderRadius: 100,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <Check size={11} /> Signed
+            </span>
+          )}
+        </div>
+        <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
+          {tenancy?.tenant_name ?? "—"}
+        </p>
+        <p style={{ fontSize: 13, color: "#666", margin: "4px 0 12px" }}>
+          {tenancy?.tenant_email ?? "—"}
+        </p>
+        {tenantSigned ? (
+          <div
+            style={{
+              width: "100%",
+              padding: "10px 0",
+              borderRadius: 12,
+              background: "#e8f5e9",
+              color: "#2e7d32",
+              fontSize: 13,
+              fontWeight: 600,
+              textAlign: "center",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+            }}
+          >
+            <Check size={14} />
+            Tenant signed
+            {tenantSig?.signed_at && (
+              <span style={{ fontWeight: 400, fontSize: 11, color: "#4a8c5c" }}>
+                — {formatDate(tenantSig.signed_at)}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() =>
+                  handleSendOTP(
+                    "tenant",
+                    tenancy?.tenant_email ?? "",
+                    tenancy?.tenant_name ?? ""
+                  )
+                }
+                disabled={sent.tenant || sending}
+                style={{
+                  flex: 1,
+                  padding: "12px 8px",
+                  borderRadius: 12,
+                  border: "2px solid transparent",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: sent.tenant || sending ? "default" : "pointer",
+                  background: sent.tenant ? "rgba(34,197,94,0.15)" : "#F3F3F8",
+                  color: sent.tenant ? "#166534" : "#6B7280",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Mail size={16} color={sent.tenant ? "#166534" : "#6B7280"} />
+                <span>{sent.tenant ? "Sent!" : "Remote"}</span>
+                <span
+                  style={{
+                    fontSize: 9,
+                    color: sent.tenant ? "#166534" : "#9CA3AF",
+                    fontWeight: 400,
+                  }}
+                >
+                  Link by email
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSignModal(false);
+                  setTimeout(() => {
+                    setInPersonModal({
+                      signerType: "tenant",
+                      name: tenancy?.tenant_name || "Tenant",
+                      email: tenancy?.tenant_email || "",
+                    });
+                  }, 200);
+                }}
+                style={{
+                  flex: 1,
+                  padding: "12px 8px",
+                  borderRadius: 12,
+                  border: "2px solid rgba(154,136,253,0.3)",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: "#EDE9FF",
+                  color: "#9A88FD",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Users size={16} color="#9A88FD" />
+                <span>In person</span>
+                <span
+                  style={{
+                    fontSize: 9,
+                    color: "rgba(154,136,253,0.6)",
+                    fontWeight: 400,
+                  }}
+                >
+                  Sign on this device
+                </span>
+              </button>
+            </div>
+            {tenantRemoteStatus && (
+              <RemoteLinkTracking remoteStatus={tenantRemoteStatus} />
+            )}
+            {tenantStatusSig?.signing_mode === "remote" &&
+              !tenantStatusSig?.signed_at && (
+                <button
+                  type="button"
+                  onClick={() => void handleResend("tenant")}
+                  disabled={resendLoading === "tenant"}
+                  className="flex items-center gap-2 text-[12px] font-semibold text-[#9A88FD] mt-2 mx-auto disabled:opacity-50"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: resendLoading === "tenant" ? "default" : "pointer",
+                  }}
+                >
+                  {resendLoading === "tenant" ? (
+                    <svg
+                      className="animate-spin"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="#9A88FD"
+                        strokeWidth="2"
+                        opacity="0.25"
+                      />
+                      <path
+                        d="M12 2a10 10 0 0110 10"
+                        stroke="#9A88FD"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  ) : resendDone.includes("tenant") ? (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M20 6L9 17l-5-5"
+                        stroke="#16A34A"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M23 3l-9.5 9.5M23 3H16M23 3v7"
+                        stroke="#9A88FD"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                  {resendDone.includes("tenant") ? "Reminder sent!" : "Resend link"}
+                </button>
+              )}
+          </div>
+        )}
+      </div>
+
+      {bothSigned && (
+        <div
+          style={{
+            background: "#e8f5e9",
+            borderRadius: 12,
+            padding: 12,
+            textAlign: "center",
+          }}
+        >
+          <p
+            style={{
+              fontSize: 13,
+              color: "#2e7d32",
+              fontWeight: 600,
+              margin: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+            }}
+          >
+            <Check size={14} />
+            Report fully signed
+          </p>
+        </div>
+      )}
+      {!bothSigned && (sent.landlord || sent.tenant) && (
+        <div
+          style={{
+            background: "rgba(154,136,253,0.1)",
+            borderRadius: 12,
+            padding: 12,
+            textAlign: "center",
+          }}
+        >
+          <p style={{ fontSize: 13, color: "#9A88FD", fontWeight: 500, margin: 0 }}>
+            {sent.landlord && sent.tenant
+              ? "Both emails sent. Waiting for signatures..."
+              : `Email sent to ${sent.landlord ? "landlord" : "tenant"}. Waiting for signature...`}
+          </p>
+        </div>
+      )}
+    </>
+  );
 }
 
 const formatDateShort = (d: string | null | undefined) =>
@@ -213,13 +784,13 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
   const [resendDone, setResendDone] = useState<('landlord' | 'tenant')[]>([]);
   const inspectionId = inspection.id;
 
-  const fetchSignatureStatus = async () => {
-    const res = await fetch(`/api/signatures/status?inspectionId=${inspectionId}`)
+  const fetchSignatureStatus = useCallback(async () => {
+    const res = await fetch(`/api/signatures/status?inspectionId=${inspectionId}`);
     if (res.ok) {
-      const { signatures } = await res.json()
-      setSignatureStatus(signatures)
+      const { signatures } = await res.json();
+      setSignatureStatus(signatures);
     }
-  }
+  }, [inspectionId]);
 
   const handleResend = async (signerType: 'landlord' | 'tenant') => {
     setResendLoading(signerType)
@@ -237,17 +808,39 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
     setLoaded(true);
   }, []);
 
-  // Fetch on mount so signing_mode is available for bottom bar display
   useEffect(() => {
-    fetchSignatureStatus()
-  }, [])
+    void fetchSignatureStatus();
+  }, [fetchSignatureStatus]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`signatures-${inspectionId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "signatures",
+          filter: `inspection_id=eq.${inspectionId}`,
+        },
+        () => {
+          void fetchSignatureStatus();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [inspectionId, fetchSignatureStatus]);
 
   useEffect(() => {
     if (showSignModal) {
-      fetchSignatureStatus()
-      setResendDone([])
+      void fetchSignatureStatus();
+      setResendDone([]);
     }
-  }, [showSignModal]);
+  }, [showSignModal, fetchSignatureStatus]);
   useEffect(() => {
     setReportUrl(inspection.report_url ?? null);
     setExecSummary(
@@ -627,67 +1220,23 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
                 <button onClick={() => setShowSignModal(false)} style={{ background: "none", border: "none", fontSize: 18, color: "#999", cursor: "pointer", padding: 4 }}>✕</button>
               </div>
 
-              {/* Landlord */}
-              <div style={{ background: landlordSigned ? "#f1f8f1" : "#F8F7F4", borderRadius: 16, padding: 16, marginBottom: 12 }}>
-                <p style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: 1, margin: "0 0 8px" }}>Landlord</p>
-                <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>{tenancy?.landlord_name ?? "—"}</p>
-                <p style={{ fontSize: 13, color: "#666", margin: "4px 0 12px" }}>{tenancy?.landlord_email ?? "—"}</p>
-                {landlordSigned ? (
-                  <div style={{ width: "100%", padding: "10px 0", borderRadius: 12, background: "#e8f5e9", color: "#2e7d32", fontSize: 13, fontWeight: 600, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                    <Check size={14} /> Landlord signed
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button type="button" onClick={() => handleSendOTP("landlord", tenancy?.landlord_email ?? "", tenancy?.landlord_name ?? "")} disabled={sent.landlord || sending}
-                      style={{ flex: 1, padding: "12px 8px", borderRadius: 12, border: "2px solid transparent", fontSize: 11, fontWeight: 600, cursor: sent.landlord || sending ? "default" : "pointer", background: sent.landlord ? "rgba(34,197,94,0.15)" : "#F3F3F8", color: sent.landlord ? "#166534" : "#6B7280", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                      <Mail size={16} color={sent.landlord ? "#166534" : "#6B7280"} />
-                      <span>{sent.landlord ? "Sent!" : "Remote"}</span>
-                      <span style={{ fontSize: 9, color: "#9CA3AF", fontWeight: 400 }}>Link by email</span>
-                    </button>
-                    <button type="button" onClick={() => { setShowSignModal(false); setTimeout(() => setInPersonModal({ signerType: 'landlord', name: tenancy?.landlord_name || 'Landlord', email: tenancy?.landlord_email || '' }), 200); }}
-                      style={{ flex: 1, padding: "12px 8px", borderRadius: 12, border: "2px solid rgba(154,136,253,0.3)", fontSize: 11, fontWeight: 600, cursor: "pointer", background: "#EDE9FF", color: "#9A88FD", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                      <Users size={16} color="#9A88FD" />
-                      <span>In person</span>
-                      <span style={{ fontSize: 9, color: "rgba(154,136,253,0.6)", fontWeight: 400 }}>Sign on this device</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Tenant */}
-              <div style={{ background: tenantSigned ? "#f1f8f1" : "#F8F7F4", borderRadius: 16, padding: 16, marginBottom: 24 }}>
-                <p style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: 1, margin: "0 0 8px" }}>Tenant</p>
-                <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>{tenancy?.tenant_name ?? "—"}</p>
-                <p style={{ fontSize: 13, color: "#666", margin: "4px 0 12px" }}>{tenancy?.tenant_email ?? "—"}</p>
-                {tenantSigned ? (
-                  <div style={{ width: "100%", padding: "10px 0", borderRadius: 12, background: "#e8f5e9", color: "#2e7d32", fontSize: 13, fontWeight: 600, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                    <Check size={14} /> Tenant signed
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button type="button" onClick={() => handleSendOTP("tenant", tenancy?.tenant_email ?? "", tenancy?.tenant_name ?? "")} disabled={sent.tenant || sending}
-                      style={{ flex: 1, padding: "12px 8px", borderRadius: 12, border: "2px solid transparent", fontSize: 11, fontWeight: 600, cursor: sent.tenant || sending ? "default" : "pointer", background: sent.tenant ? "rgba(34,197,94,0.15)" : "#F3F3F8", color: sent.tenant ? "#166534" : "#6B7280", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                      <Mail size={16} color={sent.tenant ? "#166534" : "#6B7280"} />
-                      <span>{sent.tenant ? "Sent!" : "Remote"}</span>
-                      <span style={{ fontSize: 9, color: "#9CA3AF", fontWeight: 400 }}>Link by email</span>
-                    </button>
-                    <button type="button" onClick={() => { setShowSignModal(false); setTimeout(() => setInPersonModal({ signerType: 'tenant', name: tenancy?.tenant_name || 'Tenant', email: tenancy?.tenant_email || '' }), 200); }}
-                      style={{ flex: 1, padding: "12px 8px", borderRadius: 12, border: "2px solid rgba(154,136,253,0.3)", fontSize: 11, fontWeight: 600, cursor: "pointer", background: "#EDE9FF", color: "#9A88FD", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                      <Users size={16} color="#9A88FD" />
-                      <span>In person</span>
-                      <span style={{ fontSize: 9, color: "rgba(154,136,253,0.6)", fontWeight: 400 }}>Sign on this device</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {(sent.landlord || sent.tenant) && !bothSigned && (
-                <div style={{ background: "rgba(154,136,253,0.1)", borderRadius: 12, padding: 12, textAlign: "center" }}>
-                  <p style={{ fontSize: 13, color: "#9A88FD", fontWeight: 500, margin: 0 }}>
-                    {sent.landlord && sent.tenant ? "Both emails sent. Waiting for signatures..." : `Email sent to ${sent.landlord ? "landlord" : "tenant"}. Waiting for signature...`}
-                  </p>
-                </div>
-              )}
+              <SendForSignaturePartySections
+                tenancy={tenancy}
+                landlordSigned={landlordSigned}
+                tenantSigned={tenantSigned}
+                landlordSig={landlordSig}
+                tenantSig={tenantSig}
+                signatureStatus={signatureStatus}
+                sent={sent}
+                sending={sending}
+                resendLoading={resendLoading}
+                resendDone={resendDone}
+                bothSigned={bothSigned}
+                handleSendOTP={handleSendOTP}
+                handleResend={handleResend}
+                setShowSignModal={setShowSignModal}
+                setInPersonModal={setInPersonModal}
+              />
             </div>
           </div>
         )}
@@ -1599,359 +2148,25 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
               </button>
             </div>
 
-            {/* Landlord row */}
-            <div style={{ background: landlordSigned ? "#f1f8f1" : "#F8F7F4", borderRadius: 16, padding: 16, marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <p style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: 1, margin: 0 }}>
-                  Landlord
-                </p>
-                {landlordSigned && (
-                  <span style={{
-                    fontSize: 10, fontWeight: 600, color: "#2e7d32",
-                    background: "#e8f5e9", padding: "3px 10px", borderRadius: 100,
-                    display: "inline-flex", alignItems: "center", gap: 4,
-                  }}>
-                    <Check size={11} /> Signed
-                  </span>
-                )}
-              </div>
-              <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
-                {tenancy?.landlord_name ?? "—"}
-              </p>
-              <p style={{ fontSize: 13, color: "#666", margin: "4px 0 12px" }}>
-                {tenancy?.landlord_email ?? "—"}
-              </p>
-              {(() => {
-                const landlordStatusSig = signatureStatus.find(s => s.signer_type === 'landlord')
-                const landlordRemoteStatus = getRemoteStatus(landlordStatusSig)
-                
-                if (landlordSigned) {
-                  return (
-                    <div style={{
-                      width: "100%", padding: "10px 0", borderRadius: 12,
-                      background: "#e8f5e9", color: "#2e7d32",
-                      fontSize: 13, fontWeight: 600, textAlign: "center",
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                    }}>
-                      <Check size={14} />
-                      Landlord signed
-                      {landlordSig?.signed_at && (
-                        <span style={{ fontWeight: 400, fontSize: 11, color: "#4a8c5c" }}>
-                          — {formatDate(landlordSig.signed_at)}
-                        </span>
-                      )}
-                    </div>
-                  )
-                }
-                
-                return (
-                  <div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {/* Remote option */}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleSendOTP(
-                            "landlord",
-                            tenancy?.landlord_email ?? "",
-                            tenancy?.landlord_name ?? ""
-                          )
-                        }
-                        disabled={sent.landlord || sending}
-                        style={{
-                          flex: 1,
-                          padding: "12px 8px",
-                          borderRadius: 12,
-                          border: "2px solid transparent",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: sent.landlord || sending ? "default" : "pointer",
-                          background: sent.landlord ? "rgba(34,197,94,0.15)" : "#F3F3F8",
-                          color: sent.landlord ? "#166534" : "#6B7280",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: 4,
-                        }}
-                      >
-                        <Mail size={16} color={sent.landlord ? "#166534" : "#6B7280"} />
-                        <span>{sent.landlord ? "Sent!" : "Remote"}</span>
-                        <span style={{ fontSize: 9, color: sent.landlord ? "#166534" : "#9CA3AF", fontWeight: 400 }}>
-                          Link by email
-                        </span>
-                      </button>
-                      {/* In person option */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowSignModal(false);
-                          setTimeout(() => {
-                            setInPersonModal({
-                              signerType: 'landlord',
-                              name: tenancy?.landlord_name || 'Landlord',
-                              email: tenancy?.landlord_email || '',
-                            });
-                          }, 200);
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: "12px 8px",
-                          borderRadius: 12,
-                          border: "2px solid rgba(154,136,253,0.3)",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          background: "#EDE9FF",
-                          color: "#9A88FD",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: 4,
-                        }}
-                      >
-                        <Users size={16} color="#9A88FD" />
-                        <span>In person</span>
-                        <span style={{ fontSize: 9, color: "rgba(154,136,253,0.6)", fontWeight: 400 }}>
-                          Sign on this device
-                        </span>
-                      </button>
-                    </div>
 
-                    {/* Status indicator for remote */}
-                    {landlordRemoteStatus && (
-                      <div className={`flex items-center gap-2 mt-2 px-3 py-2 rounded-xl ${landlordRemoteStatus.bg}`}>
-                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${landlordRemoteStatus.dot}`} />
-                        <div>
-                          <div className={`text-[11px] font-semibold ${landlordRemoteStatus.color}`}>
-                            {landlordRemoteStatus.label}
-                          </div>
-                          <div className="text-[10px] text-gray-400">{landlordRemoteStatus.sub}</div>
-                        </div>
-                      </div>
-                    )}
+            <SendForSignaturePartySections
+              tenancy={tenancy}
+              landlordSigned={landlordSigned}
+              tenantSigned={tenantSigned}
+              landlordSig={landlordSig}
+              tenantSig={tenantSig}
+              signatureStatus={signatureStatus}
+              sent={sent}
+              sending={sending}
+              resendLoading={resendLoading}
+              resendDone={resendDone}
+              bothSigned={bothSigned}
+              handleSendOTP={handleSendOTP}
+              handleResend={handleResend}
+              setShowSignModal={setShowSignModal}
+              setInPersonModal={setInPersonModal}
+            />
 
-                    {/* Resend button */}
-                    {landlordStatusSig?.signing_mode === 'remote' && !landlordStatusSig?.signed_at && (
-                      <button
-                        onClick={() => handleResend('landlord')}
-                        disabled={resendLoading === 'landlord'}
-                        className="flex items-center gap-2 text-[12px] font-semibold text-[#9A88FD] mt-2 mx-auto disabled:opacity-50"
-                        style={{ background: 'none', border: 'none', cursor: resendLoading === 'landlord' ? 'default' : 'pointer' }}
-                      >
-                        {resendLoading === 'landlord' ? (
-                          <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none">
-                            <circle cx="12" cy="12" r="10" stroke="#9A88FD" strokeWidth="2" opacity="0.25"/>
-                            <path d="M12 2a10 10 0 0110 10" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round"/>
-                          </svg>
-                        ) : resendDone.includes('landlord') ? (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                            <path d="M20 6L9 17l-5-5" stroke="#16A34A" strokeWidth="2" strokeLinecap="round"/>
-                          </svg>
-                        ) : (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                            <path d="M23 3l-9.5 9.5M23 3H16M23 3v7" stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        )}
-                        {resendDone.includes('landlord') ? 'Reminder sent!' : 'Resend link'}
-                      </button>
-                    )}
-                  </div>
-                )
-              })()}
-            </div>
-
-            {/* Tenant row */}
-            <div style={{ background: tenantSigned ? "#f1f8f1" : "#F8F7F4", borderRadius: 16, padding: 16, marginBottom: 24 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <p style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: 1, margin: 0 }}>
-                  Tenant
-                </p>
-                {tenantSigned && (
-                  <span style={{
-                    fontSize: 10, fontWeight: 600, color: "#2e7d32",
-                    background: "#e8f5e9", padding: "3px 10px", borderRadius: 100,
-                    display: "inline-flex", alignItems: "center", gap: 4,
-                  }}>
-                    <Check size={11} /> Signed
-                  </span>
-                )}
-              </div>
-              <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
-                {tenancy?.tenant_name ?? "—"}
-              </p>
-              <p style={{ fontSize: 13, color: "#666", margin: "4px 0 12px" }}>
-                {tenancy?.tenant_email ?? "—"}
-              </p>
-              {(() => {
-                const tenantStatusSig = signatureStatus.find(s => s.signer_type === 'tenant')
-                const tenantRemoteStatus = getRemoteStatus(tenantStatusSig)
-                
-                if (tenantSigned) {
-                  return (
-                    <div style={{
-                      width: "100%", padding: "10px 0", borderRadius: 12,
-                      background: "#e8f5e9", color: "#2e7d32",
-                      fontSize: 13, fontWeight: 600, textAlign: "center",
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                    }}>
-                      <Check size={14} />
-                      Tenant signed
-                      {tenantSig?.signed_at && (
-                        <span style={{ fontWeight: 400, fontSize: 11, color: "#4a8c5c" }}>
-                          — {formatDate(tenantSig.signed_at)}
-                        </span>
-                      )}
-                    </div>
-                  )
-                }
-                
-                return (
-                  <div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {/* Remote option */}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleSendOTP(
-                            "tenant",
-                            tenancy?.tenant_email ?? "",
-                            tenancy?.tenant_name ?? ""
-                          )
-                        }
-                        disabled={sent.tenant || sending}
-                        style={{
-                          flex: 1,
-                          padding: "12px 8px",
-                          borderRadius: 12,
-                          border: "2px solid transparent",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: sent.tenant || sending ? "default" : "pointer",
-                          background: sent.tenant ? "rgba(34,197,94,0.15)" : "#F3F3F8",
-                          color: sent.tenant ? "#166534" : "#6B7280",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: 4,
-                        }}
-                      >
-                        <Mail size={16} color={sent.tenant ? "#166534" : "#6B7280"} />
-                        <span>{sent.tenant ? "Sent!" : "Remote"}</span>
-                        <span style={{ fontSize: 9, color: sent.tenant ? "#166534" : "#9CA3AF", fontWeight: 400 }}>
-                          Link by email
-                        </span>
-                      </button>
-                      {/* In person option */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowSignModal(false);
-                          setTimeout(() => {
-                            setInPersonModal({
-                              signerType: 'tenant',
-                              name: tenancy?.tenant_name || 'Tenant',
-                              email: tenancy?.tenant_email || '',
-                            });
-                          }, 200);
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: "12px 8px",
-                          borderRadius: 12,
-                          border: "2px solid rgba(154,136,253,0.3)",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          background: "#EDE9FF",
-                          color: "#9A88FD",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: 4,
-                        }}
-                      >
-                        <Users size={16} color="#9A88FD" />
-                        <span>In person</span>
-                        <span style={{ fontSize: 9, color: "rgba(154,136,253,0.6)", fontWeight: 400 }}>
-                          Sign on this device
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* Status indicator for remote */}
-                    {tenantRemoteStatus && (
-                      <div className={`flex items-center gap-2 mt-2 px-3 py-2 rounded-xl ${tenantRemoteStatus.bg}`}>
-                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${tenantRemoteStatus.dot}`} />
-                        <div>
-                          <div className={`text-[11px] font-semibold ${tenantRemoteStatus.color}`}>
-                            {tenantRemoteStatus.label}
-                          </div>
-                          <div className="text-[10px] text-gray-400">{tenantRemoteStatus.sub}</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Resend button */}
-                    {tenantStatusSig?.signing_mode === 'remote' && !tenantStatusSig?.signed_at && (
-                      <button
-                        onClick={() => handleResend('tenant')}
-                        disabled={resendLoading === 'tenant'}
-                        className="flex items-center gap-2 text-[12px] font-semibold text-[#9A88FD] mt-2 mx-auto disabled:opacity-50"
-                        style={{ background: 'none', border: 'none', cursor: resendLoading === 'tenant' ? 'default' : 'pointer' }}
-                      >
-                        {resendLoading === 'tenant' ? (
-                          <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none">
-                            <circle cx="12" cy="12" r="10" stroke="#9A88FD" strokeWidth="2" opacity="0.25"/>
-                            <path d="M12 2a10 10 0 0110 10" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round"/>
-                          </svg>
-                        ) : resendDone.includes('tenant') ? (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                            <path d="M20 6L9 17l-5-5" stroke="#16A34A" strokeWidth="2" strokeLinecap="round"/>
-                          </svg>
-                        ) : (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                            <path d="M23 3l-9.5 9.5M23 3H16M23 3v7" stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        )}
-                        {resendDone.includes('tenant') ? 'Reminder sent!' : 'Resend link'}
-                      </button>
-                    )}
-                  </div>
-                )
-              })()}
-            </div>
-
-            {bothSigned && (
-              <div
-                style={{
-                  background: "#e8f5e9",
-                  borderRadius: 12,
-                  padding: 12,
-                  textAlign: "center",
-                }}
-              >
-                <p style={{ fontSize: 13, color: "#2e7d32", fontWeight: 600, margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                  <Check size={14} />
-                  Report fully signed
-                </p>
-              </div>
-            )}
-            {!bothSigned && (sent.landlord || sent.tenant) && (
-              <div
-                style={{
-                  background: "rgba(154,136,253,0.1)",
-                  borderRadius: 12,
-                  padding: 12,
-                  textAlign: "center",
-                }}
-              >
-                <p style={{ fontSize: 13, color: "#9A88FD", fontWeight: 500, margin: 0 }}>
-                  {sent.landlord && sent.tenant
-                    ? "Both emails sent. Waiting for signatures..."
-                    : `Email sent to ${sent.landlord ? "landlord" : "tenant"}. Waiting for signature...`}
-                </p>
-              </div>
-            )}
           </div>
         </div>
       )}
