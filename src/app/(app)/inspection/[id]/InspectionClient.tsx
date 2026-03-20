@@ -1704,17 +1704,39 @@ export function InspectionClient({
             padding: "14px 16px 12px",
           }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <button
-                type="button"
-                onClick={handleAbandonHeaderClick}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100"
-                aria-label="Close inspection"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
+              {isCheckout ? (
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100"
+                  aria-label="Back"
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#111827"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleAbandonHeaderClick}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100"
+                  aria-label="Close inspection"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
               <div style={{ textAlign: "center" }}>
                 <p style={{
                   fontFamily: "Poppins, sans-serif", fontWeight: 700,
