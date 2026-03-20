@@ -85,6 +85,8 @@ export default function GhostCamera({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [prepopulatedHintVisible, setPrepopulatedHintVisible] = useState(false);
   const [autoZoomApplied, setAutoZoomApplied] = useState(false);
+  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
+  const [activeDeviceId, setActiveDeviceId] = useState<string | undefined>(undefined);
 
   /** Display + capture: match active entry photo (or 4:3 in “New finding”). */
   const targetAspectRatio = useMemo(() => {
@@ -128,32 +130,138 @@ export default function GhostCamera({
 
   const zoomPresets = useMemo(() => {
     const { min, max, hasZoom } = zoomCapabilities;
-    if (!hasZoom) {
-      return [{ label: "1×" as const, value: 1 }];
-    }
-    const availableZooms = ZOOM_PRESETS.filter((p) => p.value >= min && p.value <= max);
+    const ultraWideAvailable = cameraDevices.length > 1;
+    const availableZooms = ZOOM_PRESETS.filter((p) => {
+      if (p.value === 0.5) return ultraWideAvailable;
+      if (!hasZoom) return p.value === 1;
+      return p.value >= min && p.value <= max;
+    });
     return availableZooms.length > 0 ? [...availableZooms] : [{ label: "1×" as const, value: 1 }];
-  }, [zoomCapabilities]);
+  }, [zoomCapabilities, cameraDevices.length]);
 
-  const applyZoom = useCallback(async (value: number) => {
-    const track = trackRef.current;
-    if (!track) return;
+  const syncCapabilitiesFromTrack = useCallback((vt: MediaStreamTrack | null | undefined) => {
+    if (!vt) return;
     try {
-      const caps = track.getCapabilities() as MediaTrackCapabilities & {
+      const capabilities = vt.getCapabilities?.() as MediaTrackCapabilities & {
         zoom?: { min?: number; max?: number };
+        torch?: boolean;
       };
-      if (!("zoom" in caps) || caps.zoom == null) return;
-      const zMin = caps.zoom.min ?? 1;
-      const zMax = caps.zoom.max ?? 1;
-      const clamped = Math.min(Math.max(value, zMin), zMax);
-      await track.applyConstraints({
-        advanced: [{ zoom: clamped } as MediaTrackConstraintSet],
-      });
-      setCurrentZoom(clamped);
-    } catch (e) {
-      console.warn("[GhostCamera] Zoom not supported:", e);
+      if (capabilities) {
+        const hasZoom = "zoom" in capabilities && capabilities.zoom != null;
+        const zoomMin = capabilities.zoom?.min ?? 1;
+        const zoomMax = capabilities.zoom?.max ?? 1;
+        setZoomCapabilities({ hasZoom, min: zoomMin, max: zoomMax });
+        setHasTorch(capabilities.torch === true);
+      } else {
+        setZoomCapabilities({ hasZoom: false, min: 1, max: 1 });
+        setHasTorch(false);
+      }
+    } catch {
+      setZoomCapabilities({ hasZoom: false, min: 1, max: 1 });
+      setHasTorch(false);
     }
   }, []);
+
+  const applyZoom = useCallback(
+    async (value: number) => {
+      const w = photoW;
+      const h = photoH;
+
+      if (value === 0.5 && cameraDevices.length > 1) {
+        const currentDeviceId = activeDeviceId;
+        for (const device of cameraDevices) {
+          if (device.deviceId === currentDeviceId) continue;
+          try {
+            const testStream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                deviceId: { exact: device.deviceId },
+                width: { ideal: w },
+                height: { ideal: h },
+              },
+              audio: false,
+            });
+
+            streamRef.current?.getTracks().forEach((t) => t.stop());
+
+            streamRef.current = testStream;
+            setStream(testStream);
+            const newTrack = testStream.getVideoTracks()[0];
+            trackRef.current = newTrack;
+
+            if (videoRef.current) {
+              videoRef.current.srcObject = testStream;
+              videoRef.current.play().catch(() => {});
+            }
+
+            setActiveDeviceId(device.deviceId);
+            setTorchOn(false);
+            syncCapabilitiesFromTrack(newTrack);
+            setCurrentZoom(0.5);
+            return;
+          } catch {
+            continue;
+          }
+        }
+      }
+
+      if (value >= 1 && activeDeviceId !== undefined) {
+        const mainDevice = cameraDevices[0];
+        if (mainDevice && activeDeviceId !== mainDevice.deviceId) {
+          try {
+            const mainStream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                deviceId: { exact: mainDevice.deviceId },
+                width: { ideal: w },
+                height: { ideal: h },
+              },
+              audio: false,
+            });
+
+            streamRef.current?.getTracks().forEach((t) => t.stop());
+            streamRef.current = mainStream;
+            setStream(mainStream);
+            const mainTrack = mainStream.getVideoTracks()[0];
+            trackRef.current = mainTrack;
+
+            if (videoRef.current) {
+              videoRef.current.srcObject = mainStream;
+              videoRef.current.play().catch(() => {});
+            }
+
+            setActiveDeviceId(mainDevice.deviceId);
+            setTorchOn(false);
+            syncCapabilitiesFromTrack(mainTrack);
+          } catch {
+            /* stay on current device */
+          }
+        }
+      }
+
+      const track = trackRef.current;
+      if (!track || value <= 1) {
+        setCurrentZoom(value);
+        return;
+      }
+      try {
+        const caps = track.getCapabilities() as MediaTrackCapabilities & {
+          zoom?: { min?: number; max?: number };
+        };
+        if (!("zoom" in caps) || caps.zoom == null) {
+          setCurrentZoom(value);
+          return;
+        }
+        const clamped = Math.min(Math.max(value, caps.zoom.min ?? 1), caps.zoom.max ?? value);
+        await track.applyConstraints({
+          advanced: [{ zoom: clamped } as MediaTrackConstraintSet],
+        });
+        setCurrentZoom(value === 1 ? 1 : clamped);
+      } catch (e) {
+        console.warn("[GhostCamera] Zoom constraint failed:", e);
+        setCurrentZoom(value);
+      }
+    },
+    [cameraDevices, activeDeviceId, photoW, photoH, syncCapabilitiesFromTrack]
+  );
 
   const toggleTorch = useCallback(async () => {
     const track = trackRef.current;
@@ -219,25 +327,19 @@ export default function GhostCamera({
         trackRef.current = vt ?? null;
         setCurrentZoom(1);
         setTorchOn(false);
+        syncCapabilitiesFromTrack(vt);
+
         try {
-          const capabilities = vt?.getCapabilities?.() as MediaTrackCapabilities & {
-            zoom?: { min?: number; max?: number };
-            torch?: boolean;
-          };
-          if (vt && capabilities) {
-            const hasZoom = "zoom" in capabilities && capabilities.zoom != null;
-            const zoomMin = capabilities.zoom?.min ?? 1;
-            const zoomMax = capabilities.zoom?.max ?? 1;
-            setZoomCapabilities({ hasZoom, min: zoomMin, max: zoomMax });
-            setHasTorch(capabilities.torch === true);
-          } else {
-            setZoomCapabilities({ hasZoom: false, min: 1, max: 1 });
-            setHasTorch(false);
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter((d) => d.kind === "videoinput");
+          setCameraDevices(videoDevices);
+          const currentTrack = mediaStream.getVideoTracks()[0];
+          const currentSettings = currentTrack?.getSettings();
+          if (currentSettings?.deviceId) {
+            setActiveDeviceId(currentSettings.deviceId);
           }
-        } catch (capErr) {
-          console.warn("[GhostCamera] getCapabilities failed:", capErr);
-          setZoomCapabilities({ hasZoom: false, min: 1, max: 1 });
-          setHasTorch(false);
+        } catch {
+          /* enumerateDevices failed */
         }
 
         if (videoRef.current) {
@@ -260,11 +362,11 @@ export default function GhostCamera({
       trackRef.current = null;
       setStream(null);
     };
-  }, [photoW, photoH]);
+  }, [photoW, photoH, syncCapabilitiesFromTrack]);
 
   /** Match live camera zoom to check-in photo when ghost is selected. */
   useEffect(() => {
-    if (!stream || isAdditionalMode || !activeGhostId) return;
+    if (!stream || !cameraDevices.length || isAdditionalMode || !activeGhostId) return;
 
     let cancelled = false;
     let hideBadgeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -307,7 +409,7 @@ export default function GhostCamera({
       cancelled = true;
       if (hideBadgeTimer) clearTimeout(hideBadgeTimer);
     };
-  }, [stream, isAdditionalMode, activeGhostId, activeGhostZoomLevel]);
+  }, [stream, cameraDevices, isAdditionalMode, activeGhostId, activeGhostZoomLevel]);
 
   const handleShutter = async () => {
     if (!videoRef.current || !canvasRef.current || capturing) return;
