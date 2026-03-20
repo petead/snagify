@@ -3,6 +3,12 @@ import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  /** Service-role onboarding must not be blocked by session checks. */
+  if (path.startsWith("/api/onboarding")) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -28,7 +34,6 @@ export async function middleware(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const isAuthenticated = data?.claims?.role === "authenticated";
 
-  const path = request.nextUrl.pathname;
   const publicRoutes = [
     "/login",
     "/register",
@@ -83,5 +88,7 @@ export const config = {
     "/signup",
     "/api/invite/verify",
     "/api/invite/accept",
+    /** Unified onboarding (service role); early-return in middleware body — no auth gate */
+    "/api/onboarding/:path*",
   ],
 };

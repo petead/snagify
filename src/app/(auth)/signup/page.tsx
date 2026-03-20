@@ -338,7 +338,7 @@ export default function SignupPage() {
       })
       if (authError) throw authError
       const newUser = authData.user
-      if (!newUser) throw new Error('User creation failed')
+      if (!newUser) throw new Error('No user returned from signUp')
 
       let session = authData.session
       if (!session) {
@@ -347,6 +347,17 @@ export default function SignupPage() {
         if (signInError) throw signInError
         session = signInData.session
       }
+
+      let attempts = 0
+      while (!session?.access_token && attempts < 10) {
+        const { data } = await supabase.auth.getSession()
+        session = data.session ?? null
+        if (!session?.access_token) {
+          await new Promise((r) => setTimeout(r, 300))
+        }
+        attempts++
+      }
+
       const accessToken = session?.access_token
       if (!accessToken) {
         throw new Error(
@@ -354,90 +365,54 @@ export default function SignupPage() {
         )
       }
 
-      const authHeaders = {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      } as const
-
-      let companyId: string | undefined
-
-      if (isPro) {
-        let websiteTrimmed = proWebsite.trim() || undefined
-        if (websiteTrimmed && !/^https?:\/\//i.test(websiteTrimmed)) {
-          websiteTrimmed = `https://${websiteTrimmed}`
-        }
-        const companyRes = await fetch('/api/onboarding/create-company', {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({
-            userId: newUser.id,
-            companyName: companyNameTrimmed,
-            companyEmail: companyEmail.trim(),
-            phone: companyPhone.trim(),
-            addressLine1: addressLine1.trim(),
-            city: city.trim(),
-            country: country.trim(),
-            tradeLicense: tradeLicense.trim() || undefined,
-            primaryColor: brandPrimaryColor,
-            website: websiteTrimmed,
-            reraNumber: reraNumber.trim() || undefined,
-          }),
-        })
-        const companyJson = (await companyRes.json()) as {
-          error?: string
-          companyId?: string
-        }
-        if (!companyRes.ok) {
-          const msg = companyJson.error || 'Could not create company'
-          if (msg.includes('COMPANY_EXISTS')) {
-            setError(
-              'A company with this name already exists. Please contact your manager to be invited as an inspector.'
-            )
-          } else {
-            setError(getErrorMessage(msg))
-          }
-          return
-        }
-        if (!companyJson.companyId) {
-          setError('Could not create company. Please try again.')
-          return
-        }
-        companyId = companyJson.companyId
+      let websiteTrimmed = proWebsite.trim() || undefined
+      if (isPro && websiteTrimmed && !/^https?:\/\//i.test(websiteTrimmed)) {
+        websiteTrimmed = `https://${websiteTrimmed}`
       }
 
-      const profileRes = await fetch('/api/onboarding/create-profile', {
+      const completeBody: Record<string, unknown> = {
+        userId: newUser.id,
+        fullName: fullName.trim(),
+        email,
+        accountType,
+      }
+
+      if (isPro) {
+        Object.assign(completeBody, {
+          companyName: companyNameTrimmed,
+          companyEmail: companyEmail.trim(),
+          phone: companyPhone.trim(),
+          address: addressLine1.trim(),
+          city: city.trim(),
+          country: country.trim(),
+          tradeLicense: tradeLicense.trim() || undefined,
+          primaryColor: brandPrimaryColor,
+          website: websiteTrimmed,
+          reraNumber: reraNumber.trim() || undefined,
+        })
+      } else {
+        completeBody.individualRole = individualRole
+      }
+
+      const res = await fetch('/api/onboarding/complete', {
         method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          userId: newUser.id,
-          fullName: fullName.trim(),
-          email,
-          accountType,
-          companyId: isPro ? companyId : null,
-          individualRole:
-            accountType === 'individual' && individualRole ? individualRole : undefined,
-          ...(isPro
-            ? {
-                companyEmail: companyEmail.trim(),
-                phone: companyPhone.trim(),
-                addressLine1: addressLine1.trim(),
-                city: city.trim(),
-                country: country.trim(),
-                tradeLicense: tradeLicense.trim() || undefined,
-                primaryColor: brandPrimaryColor,
-                website: (() => {
-                  let w = proWebsite.trim()
-                  if (w && !/^https?:\/\//i.test(w)) w = `https://${w}`
-                  return w || undefined
-                })(),
-                reraNumber: reraNumber.trim() || undefined,
-              }
-            : {}),
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(completeBody),
       })
-      const profileJson = (await profileRes.json()) as { error?: string }
-      if (!profileRes.ok) {
-        setError(getErrorMessage(profileJson.error || 'Could not create profile'))
+
+      const result = (await res.json()) as { error?: string }
+      if (!res.ok) {
+        const msg = result.error || 'Onboarding failed'
+        if (msg.includes('COMPANY_EXISTS')) {
+          setError(
+            'A company with this name already exists. Please contact your manager to be invited as an inspector.'
+          )
+        } else {
+          setError(getErrorMessage(msg))
+        }
         return
       }
 
