@@ -512,21 +512,14 @@ export default function SignupPage() {
           })
         }
         if (sigBlob) {
-          const sigFile = new File([sigBlob], 'signature.png', { type: 'image/png' })
-          const sigPath = `signatures/${user.id}/profile-signature.png`
-          const { error: sigErr } = await supabase.storage
-            .from('signatures')
-            .upload(sigPath, sigFile, { upsert: true })
-          if (sigErr) {
-            console.error('Signature upload failed:', sigErr)
-          } else {
-            const {
-              data: { publicUrl },
-            } = supabase.storage.from('signatures').getPublicUrl(sigPath)
-            await supabase
-              .from('profiles')
-              .update({ signature_image_url: `${publicUrl}?t=${Date.now()}` })
-              .eq('id', user.id)
+          const fd = new FormData()
+          fd.append('signature', sigBlob, 'signature.png')
+          const sigRes = await fetch('/api/profile/inspector-signature', {
+            method: 'POST',
+            body: fd,
+          })
+          if (!sigRes.ok) {
+            console.error('[signup] Inspector signature upload failed')
           }
         }
       }

@@ -1,0 +1,3 @@
+{"sessionId":"116434","runId":"signup-onboarding-pre-fix","hypothesisId":"H2","location":"src/app/(auth)/signup/page.tsx:394","message":"handleSubmit start","data":{"accountType":"pro","hasIndividualRole":false},"timestamp":1773993898675}
+{"sessionId":"116434","runId":"signup-onboarding-pre-fix","hypothesisId":"H2","location":"src/app/(auth)/signup/page.tsx:417","message":"signUp result","data":{"hasUser":true,"hasSession":true},"timestamp":1773993899859}
+{"sessionId":"116434","runId":"signup-onboarding-pre-fix","hypothesisId":"H2","location":"src/app/(auth)/signup/page.tsx:494","message":"onboarding API response status","data":{"status":200,"ok":true},"timestamp":1773993904274}
