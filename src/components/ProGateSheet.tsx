@@ -92,7 +92,7 @@ export function ProGateSheet({
                 <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />
               </svg>
             </div>
-            <h3 className="mb-2 text-xl font-bold">You're out of credits</h3>
+            <h3 className="mb-2 text-xl font-bold">{"You're out of credits"}</h3>
             <p className="mb-5 text-sm text-white/70">
               Your {plan} plan has {balance} credit{balance !== 1 ? "s" : ""} remaining.
               Top up to continue inspecting.

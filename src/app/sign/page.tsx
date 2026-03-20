@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import { Loader2, FileText, Check, RotateCcw, ShieldCheck } from 'lucide-react'
 import { formatPropertyBuildingUnit } from '@/lib/formatPropertyAddress'
 
@@ -296,9 +297,11 @@ function SignPageContent() {
       <div className="px-5 pt-5 pb-6" style={{ background: primaryColor }}>
         <div className="flex items-center gap-3">
           {agencyLogo ? (
-            <img
+            <Image
               src={agencyLogo}
               alt={agencyName}
+              width={48}
+              height={48}
               className="w-12 h-12 rounded-2xl object-contain bg-white/20"
             />
           ) : (

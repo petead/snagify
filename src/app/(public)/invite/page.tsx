@@ -2,6 +2,7 @@
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { Loader2, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -143,9 +144,11 @@ function InvitePageInner() {
       <div className="w-full max-w-md">
         <div className="rounded-2xl p-5 mb-6 flex items-center gap-3" style={{ background: primaryColor }}>
           {invite?.company?.logo_url ? (
-            <img
+            <Image
               src={invite.company.logo_url}
               alt={agencyName}
+              width={44}
+              height={44}
               className="w-11 h-11 rounded-xl object-contain bg-white/20"
             />
           ) : (

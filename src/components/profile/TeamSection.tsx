@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { Loader2, UserPlus, X, Mail, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatProfileRoleLabel, normalizeProfileRole } from "@/lib/profileLabels";
@@ -135,7 +136,13 @@ export function TeamSection({ company, currentUserId }: Props) {
             <div key={m.id} className="flex items-center gap-3 px-4 py-3">
               <div className="w-9 h-9 rounded-full bg-[#EDE9FF] flex items-center justify-center text-[12px] font-bold text-[#9A88FD] flex-shrink-0 overflow-hidden">
                 {m.avatar_url ? (
-                  <img src={m.avatar_url} className="w-9 h-9 rounded-full object-cover" alt="" />
+                  <Image
+                    src={m.avatar_url}
+                    className="w-9 h-9 rounded-full object-cover"
+                    alt=""
+                    width={36}
+                    height={36}
+                  />
                 ) : (
                   (m.full_name ?? "")
                     .split(" ")

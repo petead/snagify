@@ -449,9 +449,11 @@ export function CheckoutReportView({
                             </div>
                             <div className="flex items-center gap-2 px-2 py-2 bg-[#FFFBEB]">
                               <div className="w-14 h-14 rounded-lg overflow-hidden border-2 border-[#D97706]/40 flex-shrink-0">
-                                <img
+                                <Image
                                   src={pair.coPhoto.url}
                                   alt="new damage"
+                                  width={56}
+                                  height={56}
                                   className="w-full h-full object-cover"
                                 />
                               </div>
@@ -480,9 +482,11 @@ export function CheckoutReportView({
                               </span>
                               {pair.ciPhoto ? (
                                 <div className="w-full aspect-square rounded-lg overflow-hidden border border-gray-200 opacity-70">
-                                  <img
+                                  <Image
                                     src={pair.ciPhoto.url}
                                     alt="check-in"
+                                    width={112}
+                                    height={112}
                                     className="w-full h-full object-cover"
                                   />
                                 </div>
@@ -521,9 +525,11 @@ export function CheckoutReportView({
                               </span>
                               {pair.coPhoto ? (
                                 <div className="w-full aspect-square rounded-lg overflow-hidden border-2 border-[#9A88FD]/40">
-                                  <img
+                                  <Image
                                     src={pair.coPhoto.url}
                                     alt="check-out"
+                                    width={112}
+                                    height={112}
                                     className="w-full h-full object-cover"
                                   />
                                 </div>
@@ -558,9 +564,11 @@ export function CheckoutReportView({
                   <div className="flex gap-2 overflow-x-auto">
                     {coPhotos.slice(0, 4).map((photo, i) => (
                       <div key={i} className="w-14 h-14 rounded-lg overflow-hidden border-2 border-[#9A88FD]/40 flex-shrink-0">
-                        <img
+                        <Image
                           src={photo.url}
                           alt="check-out"
+                          width={56}
+                          height={56}
                           className="w-full h-full object-cover"
                         />
                       </div>
