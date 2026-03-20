@@ -537,14 +537,13 @@ export default function GhostCamera({
             </div>
           </div>
 
-      {/* ── LAYER 2: TOP BAR overlay ── */}
+      {/* ── LAYER 2: TOP BAR overlay — floats over full-bleed video (same stacking context as root) */}
       <div
-        className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-4"
+        className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-4"
         style={{
-          paddingTop: "env(safe-area-inset-top, 0px)",
-          paddingBottom: 4,
-          minHeight: 0,
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)",
+          paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
+          paddingBottom: 8,
+          background: "linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)",
         }}
       >
         <button
