@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { PropertiesClient } from "./PropertiesClient";
 
+/** Pull-to-refresh is implemented in `PropertiesClient` (hook + indicator). */
+
 export default async function PropertiesPage() {
   const supabase = await createClient();
   const {

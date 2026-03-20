@@ -6,6 +6,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 
 type ReportRow = {
   id: string;
@@ -115,6 +117,14 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
     return signedCount;
   };
 
+  const handleRefresh = useCallback(async () => {
+    router.refresh();
+  }, [router]);
+
+  const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  });
+
   const filtered = reports.filter((r) => {
     const prop = first(r.properties) as { building_name?: string | null; unit_number?: string | null } | null;
     const ten = first(r.tenancies) as { tenant_name?: string | null } | null;
@@ -134,16 +144,27 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
 
   return (
     <div
+      ref={containerRef}
+      className="scroll-hide relative"
       style={{
         maxWidth: 480,
         margin: "0 auto",
-        minHeight: "100vh",
+        height: "calc(100dvh - 4rem)",
+        maxHeight: "calc(100dvh - 4rem)",
+        overflowY: "auto",
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
-        paddingBottom: 100,
+        paddingBottom: 24,
+        transform: `translateY(${pullDistance}px)`,
+        transition: isRefreshing ? "transform 0.2s ease" : "none",
       }}
     >
+      <PullToRefreshIndicator
+        pullDistance={pullDistance}
+        isRefreshing={isRefreshing}
+        isTriggered={isTriggered}
+      />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -318,7 +339,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
       </div>
 
       {/* Report Cards */}
-      <div className="scroll-hide" style={{ overflowY: "auto", paddingBottom: 24 }}>
+      <div style={{ paddingBottom: 24 }}>
         <div style={{ padding: "14px 24px 0" }}>
 
           {filtered.length === 0 ? (

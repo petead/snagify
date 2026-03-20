@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -13,6 +13,8 @@ import { Check } from "lucide-react";
 import { trackAction } from "@/lib/breadcrumb";
 import type { ProfileRole } from "@/lib/profileLabels";
 import { motion } from "framer-motion";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 
 export type ProfileData = {
   full_name: string | null;
@@ -214,18 +216,37 @@ export function ProfileClient({
     }
   };
 
+  const handleRefresh = useCallback(async () => {
+    router.refresh();
+  }, [router]);
+
+  const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  });
+
   return (
     <div
+      ref={containerRef}
+      className="scroll-hide relative"
       style={{
         maxWidth: 480,
         margin: "0 auto",
-        minHeight: "100vh",
+        height: "calc(100dvh - 4rem)",
+        maxHeight: "calc(100dvh - 4rem)",
+        overflowY: "auto",
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
-        paddingBottom: 100,
+        paddingBottom: 24,
+        transform: `translateY(${pullDistance}px)`,
+        transition: isRefreshing ? "transform 0.2s ease" : "none",
       }}
     >
+      <PullToRefreshIndicator
+        pullDistance={pullDistance}
+        isRefreshing={isRefreshing}
+        isTriggered={isTriggered}
+      />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -284,7 +305,7 @@ export function ProfileClient({
         </h1>
       </div>
 
-      <div className="scroll-hide" style={{ overflowY: "auto", paddingBottom: 24 }}>
+      <div style={{ paddingBottom: 24 }}>
         {/* Success banner for subscription */}
         {justSubscribed && (
           <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: "0.08s" }}>

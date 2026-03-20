@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { ReportsClient } from "./ReportsClient";
 
+/** Pull-to-refresh is implemented in `ReportsClient` (hook + indicator). */
+
 export default async function ReportsPage() {
   const supabase = await createClient();
   const {

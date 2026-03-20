@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { normalizeAccountTier } from "@/lib/profileLabels";
 import { DashboardClient } from "./DashboardClient";
 
+/** Pull-to-refresh is implemented in `DashboardClient` (hook + indicator). */
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {

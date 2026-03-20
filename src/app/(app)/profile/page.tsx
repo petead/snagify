@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ProfileClient } from "./ProfileClient";
 
+/** Pull-to-refresh is implemented in `ProfileClient` (hook + indicator). */
+
 export default async function ProfilePage() {
   const supabase = await createClient();
   const {

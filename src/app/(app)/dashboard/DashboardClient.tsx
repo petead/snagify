@@ -10,6 +10,8 @@ import { useCredits } from "@/hooks/useCredits";
 import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
 import { OnboardingTutorial } from "@/components/onboarding/OnboardingTutorial";
 import { trackAction } from "@/lib/breadcrumb";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 import { createClient } from "@/lib/supabase/client";
 
@@ -137,7 +139,7 @@ export function DashboardClient({
   const [showBuyCredits, setShowBuyCredits] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [properties] = useState(() => normalizeProperties(initialProperties));
+  const [properties, setProperties] = useState(() => normalizeProperties(initialProperties));
   const [recentInspections, setRecentInspections] = useState(initialRecentInspections);
   const recentRollbackRef = useRef<RecentInspectionRow[]>([]);
   const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
@@ -178,6 +180,19 @@ export function DashboardClient({
     setRecentInspections(initialRecentInspections);
   }, [initialRecentInspections]);
 
+  useEffect(() => {
+    setProperties(normalizeProperties(initialProperties));
+  }, [initialProperties]);
+
+  const handleRefresh = useCallback(async () => {
+    await refreshCredits();
+    router.refresh();
+  }, [refreshCredits, router]);
+
+  const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  });
+
   const allInspections = properties?.flatMap((p) => p.inspections ?? []) ?? [];
   const totalProperties = properties.length;
   const totalInspections = allInspections.length;
@@ -201,16 +216,27 @@ export function DashboardClient({
 
   return (
     <div
+      ref={containerRef}
+      className="scroll-hide relative"
       style={{
         maxWidth: 480,
         margin: "0 auto",
-        minHeight: "100vh",
+        height: "calc(100dvh - 4rem)",
+        maxHeight: "calc(100dvh - 4rem)",
+        overflowY: "auto",
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
-        paddingBottom: 100,
+        paddingBottom: 24,
+        transform: `translateY(${pullDistance}px)`,
+        transition: isRefreshing ? "transform 0.2s ease" : "none",
       }}
     >
+      <PullToRefreshIndicator
+        pullDistance={pullDistance}
+        isRefreshing={isRefreshing}
+        isTriggered={isTriggered}
+      />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -761,10 +787,7 @@ export function DashboardClient({
       </div>
 
       {/* Recent Inspections */}
-      <div
-        className="scroll-hide"
-        style={{ overflowY: "auto", maxHeight: 420, paddingBottom: 24 }}
-      >
+      <div style={{ paddingBottom: 24 }}>
         <div
           className={loaded ? "fade-up" : ""}
           style={{ padding: "24px 24px 0", animationDelay: "0.22s" }}

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getTenancyStatus } from "@/lib/tenancy";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 
 type InspectionRow = {
   id: string;
@@ -110,18 +112,37 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
   const vacantCount = properties.filter((p) => getPropertyStatus(p) === "vacant").length;
   const initials = getInitials(fullName, userEmail);
 
+  const handleRefresh = useCallback(async () => {
+    router.refresh();
+  }, [router]);
+
+  const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  });
+
   return (
     <div
+      ref={containerRef}
+      className="scroll-hide relative"
       style={{
         maxWidth: 480,
         margin: "0 auto",
-        minHeight: "100vh",
+        height: "calc(100dvh - 4rem)",
+        maxHeight: "calc(100dvh - 4rem)",
+        overflowY: "auto",
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
         paddingBottom: 24,
+        transform: `translateY(${pullDistance}px)`,
+        transition: isRefreshing ? "transform 0.2s ease" : "none",
       }}
     >
+      <PullToRefreshIndicator
+        pullDistance={pullDistance}
+        isRefreshing={isRefreshing}
+        isTriggered={isTriggered}
+      />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -279,7 +300,7 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
       </div>
 
       {/* Property Cards */}
-      <div className="scroll-hide" style={{ overflowY: "auto", maxHeight: 520, paddingBottom: 100 }}>
+      <div style={{ paddingBottom: 24 }}>
         <div style={{ padding: "16px 24px 0" }}>
           {filtered.map((property, i) => {
             const status = getPropertyStatus(property);
