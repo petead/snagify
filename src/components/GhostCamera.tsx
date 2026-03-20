@@ -361,7 +361,7 @@ export default function GhostCamera({
   return (
     <div className="fixed inset-0 z-[999] overflow-hidden bg-black">
       {/* Video viewport — full sensor, no forced aspect ratio */}
-      <div className="absolute inset-0 bg-black">
+      <div className="absolute inset-0 flex items-start justify-center bg-black">
         <div
           style={{
             position: "relative",
@@ -499,9 +499,20 @@ export default function GhostCamera({
               </AnimatePresence>
 
               {/* Ghost opacity slider — overlaid on bottom of video */}
-              {checkinPhotos.length > 0 && (
-                <div className="absolute bottom-3 left-4 right-4 z-20 flex items-center gap-2">
-                  <span style={{ fontSize: 13 }}>👻</span>
+              {checkinPhotos.length > 0 && !isAdditionalMode && (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 8,
+                    left: 16,
+                    right: 16,
+                    zIndex: 20,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 13, lineHeight: 1 }}>👻</span>
                   <input
                     type="range"
                     min={0}
@@ -515,7 +526,7 @@ export default function GhostCamera({
                     style={{
                       color: "rgba(255,255,255,0.5)",
                       fontSize: 11,
-                      minWidth: 30,
+                      minWidth: 28,
                       textAlign: "right",
                     }}
                   >
@@ -530,8 +541,9 @@ export default function GhostCamera({
       <div
         className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-4"
         style={{
-          paddingTop: "env(safe-area-inset-top, 12px)",
-          paddingBottom: 8,
+          paddingTop: "env(safe-area-inset-top, 0px)",
+          paddingBottom: 4,
+          minHeight: 0,
           background: "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)",
         }}
       >
@@ -620,9 +632,9 @@ export default function GhostCamera({
 
       {/* ── LAYER 6: BOTTOM CONTROLS overlay ── */}
       <div
-        className="absolute bottom-0 left-0 right-0 z-20 flex flex-col gap-3 px-5 pb-10 pt-4"
+        className="absolute bottom-0 left-0 right-0 z-20 flex flex-col gap-2 px-4 pb-8 pt-3"
         style={{
-          background: "linear-gradient(to top, rgba(0,0,0,0.88) 70%, transparent 100%)",
+          background: "rgba(0,0,0,0.88)",
         }}
       >
         {checkinPhotos.length > 1 && (
