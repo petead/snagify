@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import type SignatureCanvas from 'react-signature-canvas'
+import { ProSignupSignaturePad } from '@/components/auth/ProSignupSignaturePad'
 import Cropper, { type Area } from 'react-easy-crop'
 import 'react-easy-crop/react-easy-crop.css'
 import { Eye, EyeOff, Loader2, ArrowRight, UploadCloud, Check } from 'lucide-react'
@@ -17,7 +19,7 @@ import { getCroppedImg } from '@/utils/cropImage'
 type AccountType = 'individual' | 'pro'
 type IndividualRole = 'owner' | 'tenant'
 type Step = 1 | 2 | 3
-type ProSubStep = 1 | 2 | 3
+type ProSubStep = 1 | 2 | 3 | 4
 
 const LOGO_MAX_BYTES = 5 * 1024 * 1024
 const LOGO_ACCEPT_TYPES = [
@@ -206,9 +208,11 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [emailTouched, setEmailTouched] = useState(false)
-  const [ctaFinalHover, setCtaFinalHover] = useState(false)
   const [logoHover, setLogoHover] = useState(false)
   const [proFieldErrors, setProFieldErrors] = useState<Record<string, string>>({})
+  const sigPadRef = useRef<SignatureCanvas | null>(null)
+  const [signatureBlob, setSignatureBlob] = useState<Blob | null>(null)
+  const [isSigEmpty, setIsSigEmpty] = useState(true)
   const router = useRouter()
 
   const supabase = useMemo(
@@ -369,6 +373,27 @@ export default function SignupPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser()
+
+      if (user?.id && isPro) {
+        const pad = sigPadRef.current
+        if (pad && !pad.isEmpty()) {
+          const blob: Blob | null = await new Promise((resolve) => {
+            pad.getTrimmedCanvas().toBlob((b) => resolve(b), 'image/png')
+          })
+          if (blob) {
+            const fd = new FormData()
+            fd.append('signature', blob, 'signature.png')
+            const sigRes = await fetch('/api/profile/inspector-signature', {
+              method: 'POST',
+              body: fd,
+            })
+            if (!sigRes.ok) {
+              console.error('[signup] Inspector signature upload failed')
+            }
+          }
+        }
+      }
+
       if (user?.id && isPro && croppedLogoBlob) {
         await uploadLogoAfterSignup(user.id)
       }
@@ -411,7 +436,7 @@ export default function SignupPage() {
     return Object.keys(err).length === 0
   }
 
-  const handleProFinalSubmit = (e: React.FormEvent) => {
+  const handleProStep3Next = (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     clearProError('website')
@@ -426,7 +451,7 @@ export default function SignupPage() {
         return
       }
     }
-    void handleSubmit()
+    setProSubStep(4)
   }
 
   const onLogoFileChosen = (file: File | null) => {
@@ -485,7 +510,7 @@ export default function SignupPage() {
 
   const totalSteps = accountType === 'pro' ? 3 : 2
 
-  const proProgressWidth = `${(proSubStep / 3) * 100}%`
+  const proProgressWidth = `${(proSubStep / 4) * 100}%`
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#F8F7F4] p-4">
@@ -938,9 +963,13 @@ export default function SignupPage() {
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.25 }}
                   onClick={() => {
-                    setCurrentStep(2)
-                    setProSubStep(1)
                     setError(null)
+                    if (proSubStep > 1) {
+                      setProSubStep((s) => (s - 1) as ProSubStep)
+                    } else {
+                      setCurrentStep(2)
+                      setProSubStep(1)
+                    }
                   }}
                   className="mb-4 text-sm font-semibold text-[#9A88FD] hover:underline"
                 >
@@ -1261,7 +1290,7 @@ export default function SignupPage() {
                         Your brand will appear on all inspection reports.
                       </p>
 
-                      <form onSubmit={handleProFinalSubmit} className="space-y-4">
+                      <form onSubmit={handleProStep3Next} className="space-y-4">
                         <AnimatePresence>
                           {error && (
                             <motion.div
@@ -1426,42 +1455,201 @@ export default function SignupPage() {
 
                         <motion.button
                           type="submit"
-                          disabled={loading}
                           whileHover={{
                             scale: 1.02,
                             boxShadow: `0 8px 30px ${hexToRgba(brandPrimaryColor || '#9A88FD', 0.45)}`,
                           }}
                           whileTap={{ scale: 0.97 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                          onHoverStart={() => setCtaFinalHover(true)}
-                          onHoverEnd={() => setCtaFinalHover(false)}
                           style={{
                             backgroundColor: brandPrimaryColor?.trim() || '#9A88FD',
                           }}
-                          className="relative mt-4 w-full overflow-hidden rounded-2xl py-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                          className="relative mt-4 w-full overflow-hidden rounded-2xl py-4 text-base font-semibold text-white"
                         >
-                          <motion.div
-                            aria-hidden
-                            className="pointer-events-none absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                            initial={{ x: '-100%' }}
-                            animate={{ x: ctaFinalHover ? '200%' : '-100%' }}
-                            transition={{ duration: 0.6, ease: 'easeInOut' }}
-                          />
                           <span className="pointer-events-none relative z-10 flex items-center justify-center gap-2">
-                            {loading ? (
-                              <>
-                                <Loader2 size={18} className="animate-spin" />
-                                Creating account...
-                              </>
-                            ) : (
-                              <>
-                                Create my account
-                                <ArrowRight size={18} />
-                              </>
-                            )}
+                            Next
+                            <ArrowRight size={18} />
                           </span>
                         </motion.button>
                       </form>
+                    </motion.div>
+                  )}
+
+                  {proSubStep === 4 && (
+                    <motion.div
+                      key="pro-sub-4"
+                      initial={{ opacity: 0, x: 40 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -40 }}
+                      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                      className="space-y-4"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setProSubStep(3)}
+                        className="text-sm font-semibold text-[#9A88FD] hover:underline"
+                      >
+                        ← Back
+                      </button>
+
+                      <motion.h2
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.05 }}
+                        className="mb-1 text-xl font-bold text-gray-900"
+                      >
+                        Your signature ✍️
+                      </motion.h2>
+
+                      <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.1 }}
+                        className="mb-6 text-sm text-gray-400"
+                      >
+                        This will appear on all your inspection reports. Draw it once — use it forever.
+                      </motion.p>
+
+                      <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.15 }}
+                        className="relative overflow-hidden rounded-2xl border-2 border-dashed border-[#9A88FD]/40 bg-white"
+                        style={{ height: 200 }}
+                      >
+                        <div className="pointer-events-none absolute bottom-12 left-6 right-6 border-b border-dashed border-gray-200" />
+
+                        <AnimatePresence>
+                          {isSigEmpty && (
+                            <motion.div
+                              key="sig-hint"
+                              initial={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2"
+                            >
+                              <span className="text-3xl">✍️</span>
+                              <span className="text-sm text-gray-300">Draw your signature here</span>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        <ProSignupSignaturePad
+                          ref={sigPadRef}
+                          penColor="#1a1a1a"
+                          canvasProps={{
+                            className: 'w-full h-full',
+                            style: { width: '100%', height: '100%' },
+                          }}
+                          onBegin={() => setIsSigEmpty(false)}
+                          onEnd={() => {
+                            sigPadRef.current?.getTrimmedCanvas().toBlob(
+                              (blob) => setSignatureBlob(blob),
+                              'image/png'
+                            )
+                          }}
+                          backgroundColor="rgba(0,0,0,0)"
+                          dotSize={2}
+                          minWidth={1.5}
+                          maxWidth={3}
+                          velocityFilterWeight={0.7}
+                        />
+                      </motion.div>
+
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.2 }}
+                        className="mb-6 mt-3 flex items-center justify-between"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sigPadRef.current?.clear()
+                            setSignatureBlob(null)
+                            setIsSigEmpty(true)
+                          }}
+                          className="flex items-center gap-1.5 text-sm text-gray-400 transition-colors hover:text-red-400"
+                        >
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6l-1 14H6L5 6" />
+                            <path d="M10 11v6M14 11v6" />
+                            <path d="M9 6V4h6v2" />
+                          </svg>
+                          Clear
+                        </button>
+
+                        <AnimatePresence>
+                          {!isSigEmpty && signatureBlob && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.8 }}
+                              className="flex items-center gap-1.5 rounded-full bg-[#9A88FD]/10 px-3 py-1 text-xs text-[#9A88FD]"
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-[#9A88FD]" />
+                              Signature captured
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+
+                      <p className="mb-2 text-center text-xs text-gray-300">
+                        You can also add or update your signature later in Settings.
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => void handleSubmit()}
+                        disabled={loading}
+                        className="mb-4 w-full text-center text-sm font-semibold text-[#9A88FD] transition-colors hover:underline disabled:opacity-50"
+                      >
+                        Skip for now →
+                      </button>
+
+                      <motion.button
+                        type="button"
+                        whileHover={{
+                          scale: 1.02,
+                          boxShadow: '0 8px 30px rgba(154,136,253,0.45)',
+                        }}
+                        whileTap={{ scale: 0.97 }}
+                        disabled={loading || (isSigEmpty && !signatureBlob)}
+                        onClick={() => void handleSubmit()}
+                        className={cn(
+                          'relative w-full overflow-hidden rounded-2xl bg-[#9A88FD] py-4 text-base font-semibold text-white',
+                          (isSigEmpty && !signatureBlob) || loading
+                            ? 'cursor-not-allowed opacity-50'
+                            : ''
+                        )}
+                      >
+                        <motion.div
+                          className="pointer-events-none absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                          initial={{ x: '-100%' }}
+                          whileHover={{ x: '200%' }}
+                          transition={{ duration: 0.6 }}
+                        />
+                        <span className="relative z-10 flex items-center justify-center gap-2">
+                          {loading ? (
+                            <>
+                              <Loader2 size={18} className="animate-spin" />
+                              Creating account...
+                            </>
+                          ) : (
+                            <>
+                              Create my account
+                              <ArrowRight size={18} />
+                            </>
+                          )}
+                        </span>
+                      </motion.button>
                     </motion.div>
                   )}
                 </AnimatePresence>

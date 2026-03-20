@@ -18,8 +18,10 @@ import {
 } from "@/lib/compressImageForPdf";
 import {
   buildPdfSignatureEmbeds,
+  normalizeSignatureToDataUrl,
   resolveCreatorPdfRole,
   type CreatorPdfRole,
+  type PdfSignatureEmbeds,
   type SignatureRow,
 } from "@/lib/pdf/inspectionSignatureEmbeds";
 
@@ -428,12 +430,46 @@ export async function buildPdfAndUpload(
       freshSignatureRows = ((row.signatures ?? []) as unknown as SignatureRow[]) ?? [];
     }
 
-    const signatureEmbeds = await buildPdfSignatureEmbeds({
+    let signatureEmbeds: PdfSignatureEmbeds = await buildPdfSignatureEmbeds({
       rows: freshSignatureRows,
-      profileSignatureUrl: agentData?.signature_image_url ?? null,
-      inspectionCreatedAt: row.created_at != null ? String(row.created_at) : null,
       creatorPdfRole,
     });
+
+    if (creatorPdfRole === "inspector" && supabaseAdmin && agentId) {
+      const { data: profileSig, error: profileSigErr } = await supabaseAdmin
+        .from("signatures")
+        .select("signature_url, signature_data, created_at")
+        .eq("user_id", agentId)
+        .is("inspection_id", null)
+        .maybeSingle();
+
+      if (profileSigErr) {
+        console.warn("[generate-pdf] Profile signature row fetch:", profileSigErr.message);
+      }
+
+      const ps = profileSig as {
+        signature_url?: string | null;
+        signature_data?: string | null;
+      } | null;
+      const raw = ps?.signature_url ?? ps?.signature_data ?? null;
+
+      let inspectorBase64 = raw ? await normalizeSignatureToDataUrl(raw) : null;
+      if (!inspectorBase64 && agentData?.signature_image_url) {
+        inspectorBase64 = await normalizeSignatureToDataUrl(
+          agentData.signature_image_url
+        );
+      }
+
+      const inspectorSignedAt = inspectorBase64 ? new Date().toISOString() : null;
+
+      signatureEmbeds = {
+        ...signatureEmbeds,
+        inspector: {
+          base64: inspectorBase64,
+          signedAt: inspectorSignedAt,
+        },
+      };
+    }
 
     const meta: InspectionMeta = {
       inspection: {
