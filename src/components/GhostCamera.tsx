@@ -430,7 +430,7 @@ export default function GhostCamera({
                   style={{
                     position: "absolute",
                     top: 12,
-                    left: 12,
+                    right: 12,
                     zIndex: 5,
                     background: "rgba(255,138,101,0.7)",
                     borderRadius: 8,
