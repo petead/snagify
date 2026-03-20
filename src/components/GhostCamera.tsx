@@ -441,7 +441,7 @@ export default function GhostCamera({
                   style={{
                     position: "absolute",
                     top: 12,
-                    left: 12,
+                    right: 12,
                     zIndex: 5,
                     background: "rgba(0,0,0,0.55)",
                     borderRadius: 8,
@@ -588,7 +588,7 @@ export default function GhostCamera({
       {(showZoomBar || showTorchBtn) && (
         <div
           className="pointer-events-auto absolute left-3 z-20 flex flex-col items-center gap-2"
-          style={{ top: "50%", transform: "translateY(-50%)" }}
+          style={{ top: "25%" }}
         >
           {showTorchBtn && (
             <motion.button
