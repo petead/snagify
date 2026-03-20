@@ -200,7 +200,6 @@ export async function POST(req: Request) {
     if (isPro) {
       profilePayload.company_email = (companyEmail ?? "").trim() || null;
       profilePayload.whatsapp_number = (phone ?? "").trim() || null;
-      profilePayload.company_address = buildFullAddress(line1, cityT, countryT);
       profilePayload.company_trade_license = (tradeLicense ?? "").trim() || null;
       profilePayload.company_website = websiteT || null;
       profilePayload.company_primary_color =
