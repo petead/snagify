@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { getVideoCaptureDimensions } from "@/lib/getImageDimensions";
 
 const ZOOM_PRESETS = [
@@ -22,6 +22,8 @@ export type GhostPhoto = {
   url: string;
   width?: number | null;
   height?: number | null;
+  /** Zoom factor saved at check-in capture (for ghost mode auto-match). */
+  zoom_level?: number | null;
   storage_path?: string | null;
   damage_tags?: string[];
   ai_analysis?: string | null;
@@ -41,7 +43,9 @@ export interface GhostCameraProps {
     blob: Blob,
     linkedCheckinPhotoId: string | null,
     isAdditional: boolean,
-    damageTags: string[]
+    damageTags: string[],
+    /** Live camera zoom at shutter (saved on check-out photo row). */
+    captureZoom?: number
   ) => void;
   onClose: () => void;
   roomName: string;
@@ -80,6 +84,7 @@ export default function GhostCamera({
   const [isAdditionalMode, setIsAdditionalMode] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [prepopulatedHintVisible, setPrepopulatedHintVisible] = useState(false);
+  const [autoZoomApplied, setAutoZoomApplied] = useState(false);
 
   /** Display + capture: match active entry photo (or 4:3 in “New finding”). */
   const targetAspectRatio = useMemo(() => {
@@ -88,13 +93,8 @@ export default function GhostCamera({
     return aspectRatioFromPhoto(ph ?? null);
   }, [isAdditionalMode, activeGhostIndex, checkinPhotos]);
 
-  /** Hint for getUserMedia — first entry photo that has dimensions, else 4:3. */
-  const aspectForStream = useMemo(() => {
-    const withDims = checkinPhotos.find(
-      (p) => p.width && p.height && p.width > 0 && p.height > 0
-    );
-    return aspectRatioFromPhoto(withDims ?? null);
-  }, [checkinPhotos]);
+  const activeGhostId = checkinPhotos[activeGhostIndex]?.id;
+  const activeGhostZoomLevel = checkinPhotos[activeGhostIndex]?.zoom_level;
 
   /** Sync tags from the active check-in ghost photo (entry photo strip / index). */
   useEffect(() => {
@@ -162,15 +162,11 @@ export default function GhostCamera({
     let mounted = true;
     const startCamera = async () => {
       try {
-        const ar = Math.max(0.25, Math.min(4, aspectForStream));
-        const widthIdeal = 1920;
-        const heightIdeal = Math.round(widthIdeal * ar);
         const mediaConstraints: MediaStreamConstraints = {
           video: {
-            facingMode: "environment",
-            width: { ideal: widthIdeal },
-            height: { ideal: heightIdeal },
-            aspectRatio: { ideal: 1 / ar },
+            facingMode: { ideal: "environment" },
+            width: { ideal: 3840 },
+            height: { ideal: 2160 },
           },
           audio: false,
         };
@@ -180,7 +176,7 @@ export default function GhostCamera({
           mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
         } catch {
           mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" },
+            video: { facingMode: { ideal: "environment" } },
             audio: false,
           });
         }
@@ -236,7 +232,54 @@ export default function GhostCamera({
       trackRef.current = null;
       setStream(null);
     };
-  }, [aspectForStream]);
+  }, []);
+
+  /** Match live camera zoom to check-in photo when ghost is selected. */
+  useEffect(() => {
+    if (!stream || isAdditionalMode || !activeGhostId) return;
+
+    let cancelled = false;
+    let hideBadgeTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const applyInitialZoom = async () => {
+      const track = stream.getVideoTracks()[0] ?? trackRef.current;
+      if (!track) return;
+      trackRef.current = track;
+
+      const targetZoom = activeGhostZoomLevel ?? 1;
+
+      try {
+        const caps = track.getCapabilities() as MediaTrackCapabilities & {
+          zoom?: { min?: number; max?: number };
+        };
+        if (!("zoom" in caps) || caps.zoom == null) return;
+
+        const zMin = caps.zoom.min ?? 1;
+        const zMax = caps.zoom.max ?? 1;
+        const clamped = Math.min(Math.max(targetZoom, zMin), zMax);
+        await track.applyConstraints({
+          advanced: [{ zoom: clamped } as MediaTrackConstraintSet],
+        });
+        if (cancelled) return;
+        setCurrentZoom(clamped);
+        if (Math.abs(clamped - 1) > 0.05) {
+          setAutoZoomApplied(true);
+          hideBadgeTimer = setTimeout(() => setAutoZoomApplied(false), 2500);
+        } else {
+          setAutoZoomApplied(false);
+        }
+      } catch (e) {
+        console.warn("Auto-zoom failed:", e);
+      }
+    };
+
+    void applyInitialZoom();
+
+    return () => {
+      cancelled = true;
+      if (hideBadgeTimer) clearTimeout(hideBadgeTimer);
+    };
+  }, [stream, isAdditionalMode, activeGhostId, activeGhostZoomLevel]);
 
   const handleShutter = async () => {
     if (!videoRef.current || !canvasRef.current || capturing) return;
@@ -281,7 +324,7 @@ export default function GhostCamera({
           const linkedId = isAdditionalMode
             ? null
             : (checkinPhotos[activeGhostIndex]?.id ?? null);
-          onPhotoTaken(blob, linkedId, isAdditionalMode, tagsSnapshot);
+          onPhotoTaken(blob, linkedId, isAdditionalMode, tagsSnapshot, currentZoom);
           if (linkedId) {
             setCoveredCheckinIds((prev) => new Set(Array.from(prev).concat(linkedId)));
           }
@@ -324,166 +367,96 @@ export default function GhostCamera({
   };
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 999,
-        background: "#0e0e14",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <div className="fixed inset-0 z-[999] flex flex-col bg-black">
       {/* TOP BAR */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "16px 16px 8px",
-          background: "rgba(0,0,0,0.6)",
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-        }}
-      >
+      <div className="flex shrink-0 items-center justify-between px-4 pb-3 pt-12">
         <button
           type="button"
           onClick={handleClose}
-          style={{
-            color: "white",
-            background: "none",
-            border: "none",
-            fontSize: 24,
-            cursor: "pointer",
-            padding: 4,
-          }}
+          className="cursor-pointer border-none bg-transparent p-1 text-2xl text-white"
         >
           ✕
         </button>
-        <div style={{ textAlign: "center" }}>
-          <p
-            style={{
-              color: "white",
-              fontWeight: 700,
-              fontSize: 14,
-              fontFamily: "Poppins, sans-serif",
-              margin: 0,
-            }}
-          >
+        <div className="text-center">
+          <p className="m-0 text-sm font-bold text-white" style={{ fontFamily: "Poppins, sans-serif" }}>
             {roomName}
           </p>
-          <p
-            style={{
-              color: "#FF8A65",
-              fontSize: 11,
-              fontWeight: 600,
-              margin: "2px 0 0",
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-            }}
-          >
+          <p className="mb-0 mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#FF8A65]">
             Check-out
           </p>
         </div>
-        <div style={{ width: 32 }} />
+        <div className="w-8" />
       </div>
 
-      {/* CAMERA + GHOST LAYER — ratio-locked to active check-in photo (H/W) */}
-      <div
-        style={{
-          position: "relative",
-          flex: 1,
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          minHeight: 0,
-        }}
-      >
-        <div
-          className="relative w-full overflow-hidden bg-black"
-          style={{ paddingBottom: `${targetAspectRatio * 100}%` }}
-        >
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="absolute inset-0 z-0 h-full w-full object-cover"
-            style={{ transform: "scaleX(1)" }}
-          />
+      {/* CAMERA AREA — fills space between top bar and bottom controls */}
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <AnimatePresence>
+          {autoZoomApplied &&
+            activeGhost &&
+            activeGhost.zoom_level != null &&
+            Math.abs(Number(activeGhost.zoom_level) - 1) > 0.05 && (
+              <motion.div
+                key="auto-zoom-badge"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm"
+              >
+                Zoom matched to check-in: {Number(activeGhost.zoom_level).toFixed(2)}×
+              </motion.div>
+            )}
+        </AnimatePresence>
 
-          {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={activeGhost.url}
-                alt="Check-in ghost"
-                className="pointer-events-none absolute inset-0 z-[1] h-full w-full object-cover"
-                style={{
-                  opacity: ghostOpacity,
-                  mixBlendMode: "normal",
-                }}
-              />
-            </>
-          )}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="absolute inset-0 z-0 h-full w-full object-cover"
+        />
+
+        {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={activeGhost.url}
+              alt=""
+              className="pointer-events-none absolute inset-0 z-[1] h-full w-full object-cover"
+              style={{ opacity: ghostOpacity }}
+            />
+          </>
+        )}
 
         {activeGhost && !isAdditionalMode && (
           <div
-            style={{
-              position: "absolute",
-              top: 64,
-              left: 12,
-              background: "rgba(0,0,0,0.55)",
-              borderRadius: 8,
-              padding: "4px 10px",
-            }}
+            className="absolute left-3 top-4 z-[5] rounded-lg px-2.5 py-1"
+            style={{ background: "rgba(0,0,0,0.55)" }}
           >
-            <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: 600, margin: 0 }}>
-              👻 Entry photo
-            </p>
+            <p className="m-0 text-[11px] font-semibold text-white/70">👻 Entry photo</p>
           </div>
         )}
         {isAdditionalMode && (
           <div
-            style={{
-              position: "absolute",
-              top: 64,
-              left: 12,
-              background: "rgba(255,138,101,0.7)",
-              borderRadius: 8,
-              padding: "4px 10px",
-            }}
+            className="absolute left-3 top-4 z-[5] rounded-lg px-2.5 py-1"
+            style={{ background: "rgba(255,138,101,0.7)" }}
           >
-            <p style={{ color: "white", fontSize: 11, fontWeight: 600, margin: 0 }}>
-              📸 New finding — no entry reference
-            </p>
+            <p className="m-0 text-[11px] font-semibold text-white">📸 New finding — no entry reference</p>
           </div>
         )}
 
         {checkinPhotos.length === 0 && (
           <div
-            style={{
-              position: "absolute",
-              top: 64,
-              left: 12,
-              background: "rgba(0,0,0,0.45)",
-              borderRadius: 8,
-              padding: "4px 10px",
-            }}
+            className="absolute left-3 top-4 z-[5] rounded-lg px-2.5 py-1"
+            style={{ background: "rgba(0,0,0,0.45)" }}
           >
-            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, margin: 0 }}>
-              No entry photos for this room
-            </p>
+            <p className="m-0 text-[11px] font-semibold text-white/50">No entry photos for this room</p>
           </div>
         )}
 
         {(showZoomBar || showTorchBtn) && (
           <div
-            className={`pointer-events-auto absolute bottom-20 left-0 right-0 z-20 flex items-center px-4 ${
+            className={`pointer-events-auto absolute bottom-4 left-0 right-0 z-20 flex items-center px-4 ${
               showZoomBar && showTorchBtn
                 ? "justify-between"
                 : showTorchBtn
@@ -546,20 +519,13 @@ export default function GhostCamera({
           </div>
         )}
 
-        </div>
-
-        <canvas ref={canvasRef} style={{ display: "none" }} />
+        <canvas ref={canvasRef} className="hidden" />
       </div>
 
       {/* BOTTOM CONTROLS */}
       <div
-        style={{
-          background: "rgba(0,0,0,0.85)",
-          padding: "12px 16px 32px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-        }}
+        className="flex shrink-0 flex-col gap-3 px-6 pb-10 pt-4"
+        style={{ background: "rgba(0,0,0,0.85)" }}
       >
         {checkinPhotos.length > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

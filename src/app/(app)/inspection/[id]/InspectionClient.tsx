@@ -66,6 +66,7 @@ type GhostPhoto = {
   url: string;
   width?: number | null;
   height?: number | null;
+  zoom_level?: number | null;
   damage_tags?: string[];
   ai_analysis?: string | null;
 };
@@ -687,7 +688,7 @@ export function InspectionClient({
       const roomIds = liveRooms.map((r) => r.id);
       const { data } = await supabase
         .from("photos")
-        .select("id, room_id, url, width, height, damage_tags, notes, checkin_photo_id, is_additional")
+        .select("id, room_id, url, width, height, zoom_level, damage_tags, notes, checkin_photo_id, is_additional")
         .in("room_id", roomIds)
         .order("taken_at", { ascending: true });
       if (data) {
@@ -747,6 +748,7 @@ export function InspectionClient({
             url,
             width,
             height,
+            zoom_level,
             damage_tags,
             ai_analysis
           )
@@ -763,6 +765,7 @@ export function InspectionClient({
             url: p.url,
             width: (p as { width?: number | null }).width ?? null,
             height: (p as { height?: number | null }).height ?? null,
+            zoom_level: (p as { zoom_level?: number | null }).zoom_level ?? null,
             damage_tags: p.damage_tags,
             ai_analysis: p.ai_analysis,
           }));
@@ -827,7 +830,9 @@ export function InspectionClient({
     roomName: string,
     checkinPhotoId?: string | null,
     isAdditional: boolean = false,
-    prefillDamageTags: string[] = []
+    prefillDamageTags: string[] = [],
+    /** Camera zoom at capture (1 = default; check-in file upload uses 1). */
+    captureZoomLevel: number = 1
   ) => {
     const localPreviewUrl =
       typeof imageInput === "string" ? imageInput : URL.createObjectURL(imageInput);
@@ -913,6 +918,7 @@ export function InspectionClient({
         url: publicUrl,
         width: dimensions.width,
         height: dimensions.height,
+        zoom_level: captureZoomLevel,
         damage_tags: [...prefillDamageTags],
         notes: "",
         taken_at: new Date().toISOString(),
@@ -930,7 +936,7 @@ export function InspectionClient({
       if (dbError) {
         console.error("[photos insert] DB ERROR:", dbError.message, dbError.details);
         const missingNewColumns =
-          /checkin_photo_id|is_additional/i.test(dbError.message ?? "");
+          /checkin_photo_id|is_additional|zoom_level/i.test(dbError.message ?? "");
         if (missingNewColumns) {
           console.warn(
             "[photos insert] Missing columns in DB. Run migration for checkin_photo_id/is_additional."
@@ -1036,7 +1042,7 @@ export function InspectionClient({
       const roomIds = liveRooms.map((r) => r.id);
       const { data } = await supabase
         .from("photos")
-        .select("id, room_id, url, width, height, damage_tags, notes, checkin_photo_id, is_additional")
+        .select("id, room_id, url, width, height, zoom_level, damage_tags, notes, checkin_photo_id, is_additional")
         .in("room_id", roomIds)
         .order("taken_at", { ascending: true });
       if (data && data.length > 0) {
@@ -1637,7 +1643,7 @@ export function InspectionClient({
                   .map(p => p.checkin_photo_id as string)
               }
               onClose={() => setIsCameraOpen(false)}
-              onPhotoTaken={async (blob, linkedCheckinPhotoId, isAdditional, damageTags) => {
+              onPhotoTaken={async (blob, linkedCheckinPhotoId, isAdditional, damageTags, captureZoom) => {
                 setIsCameraOpen(false);
                 await handlePhotoCapture(
                   blob,
@@ -1645,7 +1651,8 @@ export function InspectionClient({
                   currentRoom.name,
                   linkedCheckinPhotoId,
                   isAdditional,
-                  damageTags
+                  damageTags,
+                  captureZoom ?? 1
                 );
               }}
             />
