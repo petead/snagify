@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import type { ProAccessState } from "@/lib/checkProAccess";
 
 interface ProGateSheetProps {
@@ -26,7 +26,14 @@ export function ProGateSheet({
   onClose,
 }: ProGateSheetProps) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
 
   const closeAndGo = (url: string) => {
     onClose();
@@ -43,18 +50,22 @@ export function ProGateSheet({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-end justify-center">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <motion.div
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        exit={{ y: "100%" }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="relative w-full max-w-[430px] rounded-t-3xl bg-[#12102A] px-5 pb-6 pt-5 text-white"
-      >
+    <AnimatePresence>
+      <div className="fixed inset-0 z-[9999] flex items-end justify-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={onClose}
+        />
+        <motion.div
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "100%" }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="relative w-full max-w-[430px] rounded-t-3xl bg-[#12102A] px-5 pb-6 pt-5 text-white"
+        >
         {state === "no_subscription" && (
           <>
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
@@ -149,8 +160,9 @@ export function ProGateSheet({
             </button>
           </>
         )}
-      </motion.div>
-    </div>,
+        </motion.div>
+      </div>
+    </AnimatePresence>,
     document.body
   );
 }
