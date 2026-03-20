@@ -1,43 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { getDefaultSnagifyCompanyId } from "@/lib/onboarding/defaultSnagifyCompany";
 import { normalizeCompanyNameKey } from "@/lib/profileLabels";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
-
-const DEFAULT_COMPANY_NAME = "Snagify";
-
-/** Shared company row for personal (individual) accounts. */
-async function getDefaultSnagifyCompanyId(): Promise<string> {
-  const { data: existing } = await supabaseAdmin
-    .from("companies")
-    .select("id")
-    .eq("name", DEFAULT_COMPANY_NAME)
-    .maybeSingle();
-
-  if (existing?.id) return existing.id;
-
-  const { data: created, error } = await supabaseAdmin
-    .from("companies")
-    .insert({
-      name: DEFAULT_COMPANY_NAME,
-      primary_color: "#9A88FD",
-      logo_url: "https://app.snagify.net/icon-512x512.png",
-      plan: "free",
-      credits_balance: 0,
-    })
-    .select("id")
-    .single();
-
-  if (error || !created?.id) {
-    throw new Error(
-      error?.message ?? "Could not create or find default Snagify company for individual signups"
-    );
-  }
-  return created.id;
-}
 
 function buildFullAddress(
   line1: string,
@@ -184,7 +153,7 @@ export async function POST(req: NextRequest) {
       if (!company?.id) throw new Error("Company could not be created");
       companyId = company.id;
     } else {
-      companyId = await getDefaultSnagifyCompanyId();
+      companyId = await getDefaultSnagifyCompanyId(supabaseAdmin);
     }
 
     const { data: authData, error: authError } =

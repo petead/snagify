@@ -323,52 +323,123 @@ export default function SignupPage() {
     setError(null)
     try {
       const isPro = accountType === 'pro'
-      const body: Record<string, unknown> = {
+      const companyNameTrimmed = companyName.trim()
+
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
-        fullName: fullName.trim(),
-        accountType,
-        individualRole:
-          accountType === 'individual' && individualRole ? individualRole : undefined,
-      }
-      if (isPro) {
-        body.reraNumber = reraNumber.trim() || undefined
-        body.companyName = companyName.trim()
-        body.primaryColor = brandPrimaryColor
-        body.companyEmail = companyEmail.trim()
-        body.phone = companyPhone.trim()
-        body.addressLine1 = addressLine1.trim()
-        body.city = city.trim()
-        body.country = country.trim()
-        body.tradeLicense = tradeLicense.trim() || undefined
-        body.website = proWebsite.trim() || undefined
-      }
-
-      const res = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        options: {
+          data: {
+            full_name: fullName.trim(),
+            account_type: accountType,
+            ...(isPro && companyNameTrimmed ? { company_name: companyNameTrimmed } : {}),
+          },
+        },
       })
+      if (authError) throw authError
+      const newUser = authData.user
+      if (!newUser) throw new Error('User creation failed')
 
-      const data = (await res.json()) as { error?: string; userId?: string }
-      if (!res.ok) {
-        const msg = data.error || 'Signup failed'
-        if (msg.includes('COMPANY_EXISTS')) {
-          setError(
-            'A company with this name already exists. Please contact your manager to be invited as an inspector.'
-          )
-        } else {
-          setError(getErrorMessage(msg))
+      let session = authData.session
+      if (!session) {
+        const { data: signInData, error: signInError } =
+          await supabase.auth.signInWithPassword({ email, password })
+        if (signInError) throw signInError
+        session = signInData.session
+      }
+      const accessToken = session?.access_token
+      if (!accessToken) {
+        throw new Error(
+          'Session could not be established. If email confirmation is required, confirm your email and try signing in.'
+        )
+      }
+
+      const authHeaders = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      } as const
+
+      let companyId: string | undefined
+
+      if (isPro) {
+        let websiteTrimmed = proWebsite.trim() || undefined
+        if (websiteTrimmed && !/^https?:\/\//i.test(websiteTrimmed)) {
+          websiteTrimmed = `https://${websiteTrimmed}`
         }
-        setLoading(false)
+        const companyRes = await fetch('/api/onboarding/create-company', {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({
+            userId: newUser.id,
+            companyName: companyNameTrimmed,
+            companyEmail: companyEmail.trim(),
+            phone: companyPhone.trim(),
+            addressLine1: addressLine1.trim(),
+            city: city.trim(),
+            country: country.trim(),
+            tradeLicense: tradeLicense.trim() || undefined,
+            primaryColor: brandPrimaryColor,
+            website: websiteTrimmed,
+            reraNumber: reraNumber.trim() || undefined,
+          }),
+        })
+        const companyJson = (await companyRes.json()) as {
+          error?: string
+          companyId?: string
+        }
+        if (!companyRes.ok) {
+          const msg = companyJson.error || 'Could not create company'
+          if (msg.includes('COMPANY_EXISTS')) {
+            setError(
+              'A company with this name already exists. Please contact your manager to be invited as an inspector.'
+            )
+          } else {
+            setError(getErrorMessage(msg))
+          }
+          return
+        }
+        if (!companyJson.companyId) {
+          setError('Could not create company. Please try again.')
+          return
+        }
+        companyId = companyJson.companyId
+      }
+
+      const profileRes = await fetch('/api/onboarding/create-profile', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          userId: newUser.id,
+          fullName: fullName.trim(),
+          email,
+          accountType,
+          companyId: isPro ? companyId : null,
+          individualRole:
+            accountType === 'individual' && individualRole ? individualRole : undefined,
+          ...(isPro
+            ? {
+                companyEmail: companyEmail.trim(),
+                phone: companyPhone.trim(),
+                addressLine1: addressLine1.trim(),
+                city: city.trim(),
+                country: country.trim(),
+                tradeLicense: tradeLicense.trim() || undefined,
+                primaryColor: brandPrimaryColor,
+                website: (() => {
+                  let w = proWebsite.trim()
+                  if (w && !/^https?:\/\//i.test(w)) w = `https://${w}`
+                  return w || undefined
+                })(),
+                reraNumber: reraNumber.trim() || undefined,
+              }
+            : {}),
+        }),
+      })
+      const profileJson = (await profileRes.json()) as { error?: string }
+      if (!profileRes.ok) {
+        setError(getErrorMessage(profileJson.error || 'Could not create profile'))
         return
       }
-
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      if (signInError) throw signInError
 
       const {
         data: { user },
@@ -403,6 +474,7 @@ export default function SignupPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       setError(getErrorMessage(msg))
+    } finally {
       setLoading(false)
     }
   }
