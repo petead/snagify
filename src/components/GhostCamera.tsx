@@ -29,7 +29,7 @@ export type GhostPhoto = {
   ai_analysis?: string | null;
 };
 
-/** height / width; fallback 4:3 when DB has no dimensions (legacy photos). */
+/** height / width (e.g. 1920/1440 ≈ 1.33 portrait); fallback 4:3 when DB has no dimensions. */
 function aspectRatioFromPhoto(ph: GhostPhoto | null | undefined): number {
   const w = ph?.width;
   const h = ph?.height;
@@ -95,6 +95,17 @@ export default function GhostCamera({
 
   const activeGhostId = checkinPhotos[activeGhostIndex]?.id;
   const activeGhostZoomLevel = checkinPhotos[activeGhostIndex]?.zoom_level;
+
+  /** Native resolution hints for getUserMedia — match active check-in photo (or defaults). */
+  const { photoW, photoH } = useMemo(() => {
+    const activePhoto = checkinPhotos[activeGhostIndex] ?? checkinPhotos[0];
+    const w = activePhoto?.width;
+    const h = activePhoto?.height;
+    return {
+      photoW: w && w > 0 ? w : 1440,
+      photoH: h && h > 0 ? h : 1920,
+    };
+  }, [checkinPhotos, activeGhostIndex]);
 
   /** Sync tags from the active check-in ghost photo (entry photo strip / index). */
   useEffect(() => {
@@ -165,8 +176,9 @@ export default function GhostCamera({
         const mediaConstraints: MediaStreamConstraints = {
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: 3840 },
-            height: { ideal: 2160 },
+            width: { ideal: photoW },
+            height: { ideal: photoH },
+            aspectRatio: { ideal: photoH / photoW },
           },
           audio: false,
         };
@@ -232,7 +244,7 @@ export default function GhostCamera({
       trackRef.current = null;
       setStream(null);
     };
-  }, []);
+  }, [photoW, photoH]);
 
   /** Match live camera zoom to check-in photo when ghost is selected. */
   useEffect(() => {
@@ -368,24 +380,24 @@ export default function GhostCamera({
 
   return (
     <div className="fixed inset-0 z-[999] overflow-hidden bg-black">
-      {/* ── LAYER 0: VIDEO fills 100% of screen ── */}
+      {/* ── LAYER 0–1: VIDEO + ghost — same box, same object-fit: cover → aligned overlay ── */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
-        className="absolute inset-0 z-0 h-full w-full object-cover"
+        className="absolute inset-0 z-0 h-full w-full"
+        style={{ objectFit: "cover" }}
       />
 
-      {/* ── LAYER 1: Ghost overlay image ── */}
       {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={activeGhost.url}
             alt=""
-            className="pointer-events-none absolute inset-0 z-[1] h-full w-full object-cover"
-            style={{ opacity: ghostOpacity }}
+            className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
+            style={{ objectFit: "cover", opacity: ghostOpacity }}
           />
         </>
       )}
