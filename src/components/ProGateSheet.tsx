@@ -65,8 +65,8 @@ export function ProGateSheet({
             </div>
             <h3 className="mb-2 text-xl font-bold">Activate your plan</h3>
             <p className="mb-5 text-sm text-white/70">
-              You need an active Pro subscription to use this feature.
-              Choose a plan that fits your workflow.
+              You need an active Pro subscription to inspect properties.
+              Choose the plan that fits your workflow.
             </p>
             <button
               type="button"
@@ -99,7 +99,7 @@ export function ProGateSheet({
             </p>
             <button
               type="button"
-              onClick={() => closeAndGo("/profile?tab=subscription#topup")}
+              onClick={() => closeAndGo("/profile?tab=subscription")}
               className="mb-2 w-full rounded-2xl bg-[#9A88FD] py-3 font-bold"
             >
               Buy credits →

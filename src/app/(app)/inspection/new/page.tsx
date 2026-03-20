@@ -11,6 +11,8 @@ import {
   Lock,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { ProGateSheet } from "@/components/ProGateSheet";
+import { checkProAccess, type ProAccessState } from "@/lib/checkProAccess";
 
 // ─────────────────────────────────────────
 // Types
@@ -297,6 +299,16 @@ function NewInspectionContent() {
   // Key handover state (step 4)
   const [keyHandover, setKeyHandover] = useState<{ item: string; qty: number }[]>([]);
   const [customItemInput, setCustomItemInput] = useState("");
+  const [profile, setProfile] = useState<{
+    account_type: "individual" | "pro";
+    company_id: string | null;
+  } | null>(null);
+  const [gateState, setGateState] = useState<"no_subscription" | "no_credits" | "ok" | null>(null);
+  const [gateCost, setGateCost] = useState(1);
+  const [gateBalance, setGateBalance] = useState(0);
+  const [gatePlan, setGatePlan] = useState("free");
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [showGate, setShowGate] = useState(false);
 
   const toggleRoom = (room: string) =>
     setSelectedRooms((prev) =>
@@ -306,6 +318,28 @@ function NewInspectionContent() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [step]);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("account_type, company_id")
+        .eq("id", user.id)
+        .single();
+      if (data) {
+        setProfile({
+          account_type:
+            data.account_type === "pro" ? "pro" : "individual",
+          company_id: data.company_id ?? null,
+        });
+      }
+    };
+    void loadProfile();
+  }, [supabase]);
 
   useEffect(() => {
     if (!selectedPropertyId) return;
@@ -335,6 +369,38 @@ function NewInspectionContent() {
 
   const set = (k: keyof FormData, v: string) =>
     setFormData((d) => ({ ...d, [k]: v }));
+
+  const handleStartCheckin = async (proceedFn: () => void) => {
+    if (profile?.account_type !== "pro") {
+      proceedFn();
+      return;
+    }
+    if (!profile.company_id) {
+      setGateState("no_subscription");
+      setGateBalance(0);
+      setGatePlan("free");
+      setGateCost(1);
+      setPendingAction(() => proceedFn);
+      setShowGate(true);
+      return;
+    }
+
+    const { data: costData } = await supabase
+      .from("credit_costs")
+      .select("credits")
+      .eq("action", "pro_checkin")
+      .eq("is_active", true)
+      .single();
+    const cost = Number(costData?.credits ?? 1) || 1;
+
+    const access = await checkProAccess(profile.company_id, cost, supabase);
+    setGateState(access.state as ProAccessState);
+    setGateBalance(access.balance);
+    setGatePlan(access.plan);
+    setGateCost(cost);
+    setPendingAction(() => proceedFn);
+    setShowGate(true);
+  };
 
   const handleBack = () => {
     if (step === 0) router.back();
@@ -721,10 +787,12 @@ function NewInspectionContent() {
           <div className="flex flex-col gap-3">
             <button
               type="button"
-              onClick={() => {
-                setMode("upload");
-                setStep(1);
-              }}
+              onClick={() =>
+                void handleStartCheckin(() => {
+                  setMode("upload");
+                  setStep(1);
+                })
+              }
               className="bg-white rounded-2xl border-2 border-[#9A88FD] p-5 text-left active:scale-[0.98] transition-transform shadow-sm"
             >
               <div className="flex items-center gap-4">
@@ -751,10 +819,12 @@ function NewInspectionContent() {
 
             <button
               type="button"
-              onClick={() => {
-                setMode("manual");
-                setStep(2);
-              }}
+              onClick={() =>
+                void handleStartCheckin(() => {
+                  setMode("manual");
+                  setStep(2);
+                })
+              }
               className="bg-white rounded-2xl border-2 border-gray-200 p-5 text-left active:scale-[0.98] transition-transform shadow-sm"
             >
               <div className="flex items-center gap-4">
@@ -856,10 +926,12 @@ function NewInspectionContent() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setMode("manual");
-                  setStep(2);
-                }}
+                onClick={() =>
+                  void handleStartCheckin(() => {
+                    setMode("manual");
+                    setStep(2);
+                  })
+                }
                 className="w-full py-3 rounded-xl border border-gray-200 text-sm text-gray-500 font-medium"
               >
                 Enter details manually instead →
@@ -1595,6 +1667,24 @@ function NewInspectionContent() {
             </div>
           </div>
         </div>
+      )}
+
+      {showGate && gateState && (
+        <ProGateSheet
+          state={gateState}
+          balance={gateBalance}
+          plan={gatePlan}
+          cost={gateCost}
+          actionLabel="Start Check-in"
+          onConfirm={() => {
+            setShowGate(false);
+            pendingAction?.();
+          }}
+          onClose={() => {
+            setShowGate(false);
+            setPendingAction(null);
+          }}
+        />
       )}
     </div>
   );
