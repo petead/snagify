@@ -24,7 +24,7 @@ export function SubscriptionSheet({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[9999] flex flex-col justify-end">
+        <div className="fixed inset-0 z-[9999] flex flex-col">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -38,8 +38,7 @@ export function SubscriptionSheet({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="relative z-10 flex flex-col rounded-t-3xl bg-[#F8F7F4]"
-            style={{ maxHeight: "92vh" }}
+            className="relative z-10 bg-[#F8F7F4] flex flex-col w-full h-full"
           >
             <div className="relative shrink-0 px-5 pb-3 pt-4 flex items-center justify-between">
               <div className="absolute left-1/2 top-3 h-1 w-10 -translate-x-1/2 rounded-full bg-gray-200" />
