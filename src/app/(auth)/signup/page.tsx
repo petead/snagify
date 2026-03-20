@@ -291,6 +291,79 @@ export default function SignupPage() {
     (accountType === 'individual' && individualRole !== null) ||
     accountType === 'pro'
 
+  const plans = useMemo(
+    () =>
+      [
+        {
+          id: 'individual' as const,
+          title: 'Individual',
+          subtitle: 'Perfect for landlords & tenants',
+          icon: (
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+          ),
+          color: '#9A88FD',
+          tag: null as string | null,
+          tagColor: null as string | null,
+          price: 'Free to start',
+          priceDetail: 'Pay per inspection',
+          features: [
+            { icon: '🏠', text: 'Up to 3 properties' },
+            { icon: '📋', text: 'Digital inspection reports' },
+            { icon: '✍️', text: 'E-signature included' },
+            { icon: '📸', text: 'AI photo analysis' },
+          ],
+          highlight: 'Great for managing your own rental',
+        },
+        {
+          id: 'pro' as const,
+          title: 'Pro',
+          subtitle: 'Built for agents & managers',
+          icon: (
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="2" y="7" width="20" height="14" rx="2" />
+              <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+              <line x1="12" y1="12" x2="12" y2="16" />
+              <line x1="10" y1="14" x2="14" y2="14" />
+            </svg>
+          ),
+          color: '#7C3AED',
+          tag: '⭐ Most Popular',
+          tagColor: 'bg-gradient-to-r from-[#7C3AED] to-[#9A88FD]',
+          price: 'Credits based',
+          priceDetail: 'Volume discounts available',
+          features: [
+            { icon: '∞', text: 'Unlimited properties' },
+            { icon: '🎨', text: 'White-label reports' },
+            { icon: '👥', text: 'Team collaboration' },
+            { icon: '✍️', text: 'Saved inspector signature' },
+          ],
+          highlight: 'Trusted by 500+ agents in Dubai',
+        },
+      ] as const,
+    []
+  )
+
   const uploadLogoAfterSignup = async (userId: string) => {
     if (!croppedLogoBlob) return
     const path = `${userId}/logos/company-logo.png`
@@ -817,353 +890,310 @@ export default function SignupPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.05 }}
                   >
-                    <h2 className="text-2xl font-bold leading-tight text-gray-900">
+                    <h2 className="text-2xl font-bold text-gray-900">
                       How will you use Snagify?
                     </h2>
                     <p className="mt-1 text-sm text-gray-400">
-                      We&apos;ll tailor your experience accordingly.
+                      Pick the plan that fits your world.
                     </p>
                   </motion.div>
 
-                  <div className="flex flex-col gap-3">
-                    <motion.div
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 }}
-                      onClick={() => setAccountType('individual')}
-                      className="cursor-pointer"
-                    >
+                  <div className="mt-5 flex flex-col gap-3">
+                    {plans.map((plan, idx) => (
                       <motion.div
-                        animate={{
-                          borderColor: accountType === 'individual' ? '#9A88FD' : '#E5E7EB',
-                          backgroundColor:
-                            accountType === 'individual'
-                              ? 'rgba(154,136,253,0.05)'
-                              : '#FFFFFF',
+                        key={plan.id}
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.08 + idx * 0.06, ease: [0.16, 1, 0.3, 1] }}
+                        whileHover={{ y: -2, transition: { duration: 0.2 } }}
+                        onClick={() => {
+                          setAccountType(plan.id)
+                          setIndividualRole(null)
                         }}
-                        transition={{ duration: 0.2 }}
-                        className="relative overflow-hidden rounded-2xl border-2 p-5"
+                        className="cursor-pointer"
                       >
-                        {accountType === 'individual' && (
-                          <motion.div
-                            layoutId="cardGlow"
-                            className="absolute inset-0 rounded-2xl"
-                            style={{
-                              boxShadow:
-                                '0 0 0 2px #9A88FD, 0 4px 20px rgba(154,136,253,0.15)',
-                            }}
-                          />
-                        )}
-
-                        <div className="flex items-start gap-4">
+                        <motion.div
+                          animate={{
+                            borderColor: accountType === plan.id ? plan.color : '#E5E7EB',
+                            boxShadow:
+                              accountType === plan.id
+                                ? `0 0 0 2px ${plan.color}33, 0 8px 32px ${plan.color}28`
+                                : '0 2px 8px rgba(0,0,0,0.04)',
+                          }}
+                          whileHover={{
+                            boxShadow: `0 4px 24px ${plan.color}40`,
+                            borderColor: `${plan.color}80`,
+                          }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden rounded-2xl border-2 bg-white"
+                        >
                           <motion.div
                             animate={{
-                              backgroundColor:
-                                accountType === 'individual' ? '#9A88FD' : '#F3F4F6',
+                              opacity: accountType === plan.id ? 1 : 0,
                             }}
-                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                          >
-                            <svg
-                              width="22"
-                              height="22"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke={accountType === 'individual' ? '#fff' : '#9CA3AF'}
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                              <polyline points="9 22 9 12 15 12 15 22" />
-                            </svg>
-                          </motion.div>
+                            className="h-1 w-full"
+                            style={{
+                              background:
+                                accountType === plan.id
+                                  ? `linear-gradient(90deg, ${plan.color}, ${plan.color}99)`
+                                  : 'transparent',
+                            }}
+                          />
 
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between">
-                              <p className="text-base font-bold text-gray-900">Individual</p>
-                              <motion.div
-                                animate={{
-                                  borderColor:
-                                    accountType === 'individual' ? '#9A88FD' : '#D1D5DB',
-                                  backgroundColor:
-                                    accountType === 'individual' ? '#9A88FD' : 'transparent',
-                                }}
-                                className="flex h-5 w-5 items-center justify-center rounded-full border-2"
-                              >
-                                {accountType === 'individual' && (
-                                  <motion.div
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    className="h-2 w-2 rounded-full bg-white"
-                                  />
-                                )}
-                              </motion.div>
-                            </div>
-                            <p className="mt-0.5 text-xs text-gray-400">Landlord or tenant</p>
-
-                            <div className="mt-3 flex flex-col gap-1.5">
-                              {[
-                                'Up to 3 properties',
-                                'Digital inspection reports',
-                                'E-signature included',
-                              ].map((feat, i) => (
+                          <div className="p-5">
+                            <div className="mb-3 flex items-start justify-between">
+                              <div className="flex items-center gap-3">
                                 <motion.div
-                                  key={feat}
-                                  initial={{ opacity: 0, x: -8 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  transition={{ delay: 0.12 + i * 0.05 }}
-                                  className="flex items-center gap-2"
+                                  animate={{
+                                    backgroundColor:
+                                      accountType === plan.id ? plan.color : '#F3F4F6',
+                                    color: accountType === plan.id ? '#fff' : '#9CA3AF',
+                                  }}
+                                  transition={{ duration: 0.2 }}
+                                  className="flex h-11 w-11 items-center justify-center rounded-xl"
                                 >
-                                  <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="#9A88FD"
-                                    strokeWidth="2.5"
-                                    strokeLinecap="round"
-                                  >
-                                    <polyline points="20 6 9 17 4 12" />
-                                  </svg>
-                                  <span className="text-xs text-gray-500">{feat}</span>
+                                  {plan.icon}
                                 </motion.div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
 
-                        <AnimatePresence>
-                          {accountType === 'individual' && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                              animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
-                              exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                              className="overflow-hidden"
-                            >
-                              <div className="border-t border-gray-100 pt-4">
-                                <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                                  I am a...
-                                </p>
-                                <div className="grid grid-cols-2 gap-2">
-                                  {(
-                                    [
-                                      {
-                                        value: 'owner' as const,
-                                        label: 'Owner',
-                                        sub: 'I own a property',
-                                        icon: (
-                                          <svg
-                                            width="18"
-                                            height="18"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="1.8"
-                                            strokeLinecap="round"
-                                          >
-                                            <circle cx="12" cy="8" r="4" />
-                                            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-                                          </svg>
-                                        ),
-                                      },
-                                      {
-                                        value: 'tenant' as const,
-                                        label: 'Tenant',
-                                        sub: 'I rent a property',
-                                        icon: (
-                                          <svg
-                                            width="18"
-                                            height="18"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="1.8"
-                                            strokeLinecap="round"
-                                          >
-                                            <rect x="2" y="7" width="20" height="14" rx="2" />
-                                            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-                                          </svg>
-                                        ),
-                                      },
-                                    ] as const
-                                  ).map((opt) => (
-                                    <motion.button
-                                      key={opt.value}
-                                      type="button"
-                                      whileTap={{ scale: 0.97 }}
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setIndividualRole(opt.value)
-                                      }}
-                                      animate={{
-                                        borderColor:
-                                          individualRole === opt.value ? '#9A88FD' : '#E5E7EB',
-                                        backgroundColor:
-                                          individualRole === opt.value
-                                            ? 'rgba(154,136,253,0.08)'
-                                            : '#F9FAFB',
-                                        color:
-                                          individualRole === opt.value ? '#9A88FD' : '#6B7280',
-                                      }}
-                                      className="flex flex-col items-center gap-1.5 rounded-xl border-2 px-2 py-3.5 text-center transition-none"
-                                    >
-                                      {opt.icon}
-                                      <span className="text-sm font-semibold">{opt.label}</span>
-                                      <span className="text-[10px] opacity-70">{opt.sub}</span>
-                                    </motion.button>
-                                  ))}
+                                <div>
+                                  <p className="text-[15px] font-bold text-gray-900">{plan.title}</p>
+                                  <p className="text-xs text-gray-400">{plan.subtitle}</p>
                                 </div>
                               </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
-                    </motion.div>
 
-                    <motion.div
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.15 }}
-                      onClick={() => {
-                        setAccountType('pro')
-                        setIndividualRole(null)
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <motion.div
-                        animate={{
-                          borderColor: accountType === 'pro' ? '#9A88FD' : '#E5E7EB',
-                          backgroundColor:
-                            accountType === 'pro' ? 'rgba(154,136,253,0.05)' : '#FFFFFF',
-                        }}
-                        transition={{ duration: 0.2 }}
-                        className="relative overflow-hidden rounded-2xl border-2 p-5"
-                      >
-                        {accountType === 'pro' && (
-                          <motion.div
-                            layoutId="cardGlow"
-                            className="absolute inset-0 rounded-2xl"
-                            style={{
-                              boxShadow:
-                                '0 0 0 2px #9A88FD, 0 4px 20px rgba(154,136,253,0.15)',
-                            }}
-                          />
-                        )}
-
-                        <div className="absolute right-4 top-4">
-                          <motion.div
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ delay: 0.2, type: 'spring', stiffness: 400 }}
-                            className="rounded-full bg-[#9A88FD] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white"
-                          >
-                            Most Popular
-                          </motion.div>
-                        </div>
-
-                        <div className="flex items-start gap-4">
-                          <motion.div
-                            animate={{
-                              backgroundColor: accountType === 'pro' ? '#9A88FD' : '#F3F4F6',
-                            }}
-                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                          >
-                            <svg
-                              width="22"
-                              height="22"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke={accountType === 'pro' ? '#fff' : '#9CA3AF'}
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <rect x="2" y="3" width="20" height="14" rx="2" />
-                              <path d="M8 21h8M12 17v4" />
-                            </svg>
-                          </motion.div>
-
-                          <div className="min-w-0 flex-1 pr-20">
-                            <div className="flex items-center justify-between">
-                              <p className="text-base font-bold text-gray-900">Pro</p>
-                              <motion.div
-                                animate={{
-                                  borderColor: accountType === 'pro' ? '#9A88FD' : '#D1D5DB',
-                                  backgroundColor:
-                                    accountType === 'pro' ? '#9A88FD' : 'transparent',
-                                }}
-                                className="flex h-5 w-5 items-center justify-center rounded-full border-2"
-                              >
-                                {accountType === 'pro' && (
-                                  <motion.div
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    className="h-2 w-2 rounded-full bg-white"
-                                  />
-                                )}
-                              </motion.div>
-                            </div>
-                            <p className="mt-0.5 text-xs text-gray-400">
-                              Agent or property manager
-                            </p>
-
-                            <div className="mt-3 flex flex-col gap-1.5">
-                              {[
-                                'Unlimited properties',
-                                'White-label reports',
-                                'Team collaboration',
-                              ].map((feat, i) => (
-                                <motion.div
-                                  key={feat}
-                                  initial={{ opacity: 0, x: -8 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  transition={{ delay: 0.17 + i * 0.05 }}
-                                  className="flex items-center gap-2"
-                                >
-                                  <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="#9A88FD"
-                                    strokeWidth="2.5"
-                                    strokeLinecap="round"
+                              <div className="flex flex-col items-end gap-1.5">
+                                {plan.tag && plan.tagColor ? (
+                                  <motion.span
+                                    initial={{ scale: 0.8, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{
+                                      delay: 0.15 + idx * 0.06,
+                                      type: 'spring',
+                                      stiffness: 400,
+                                    }}
+                                    className={cn(
+                                      'rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-white',
+                                      plan.tagColor
+                                    )}
                                   >
-                                    <polyline points="20 6 9 17 4 12" />
-                                  </svg>
-                                  <span className="text-xs text-gray-500">{feat}</span>
+                                    {plan.tag}
+                                  </motion.span>
+                                ) : null}
+                                <motion.div
+                                  animate={{
+                                    borderColor:
+                                      accountType === plan.id ? plan.color : '#D1D5DB',
+                                    backgroundColor:
+                                      accountType === plan.id ? plan.color : 'transparent',
+                                  }}
+                                  className="flex h-5 w-5 items-center justify-center rounded-full border-2"
+                                >
+                                  <AnimatePresence>
+                                    {accountType === plan.id && (
+                                      <motion.div
+                                        key="radio-dot"
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                        exit={{ scale: 0 }}
+                                        className="h-2 w-2 rounded-full bg-white"
+                                      />
+                                    )}
+                                  </AnimatePresence>
+                                </motion.div>
+                              </div>
+                            </div>
+
+                            <motion.div
+                              animate={{
+                                color: accountType === plan.id ? plan.color : '#6B7280',
+                              }}
+                              className="mb-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1"
+                              style={{
+                                backgroundColor:
+                                  accountType === plan.id ? `${plan.color}18` : '#F9FAFB',
+                              }}
+                            >
+                              <span className="text-xs font-semibold">{plan.price}</span>
+                              <span className="text-[10px] opacity-70">· {plan.priceDetail}</span>
+                            </motion.div>
+
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                              {plan.features.map((feat, fi) => (
+                                <motion.div
+                                  key={feat.text}
+                                  initial={{ opacity: 0, x: -6 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: 0.1 + idx * 0.06 + fi * 0.04 }}
+                                  className="flex items-center gap-1.5"
+                                >
+                                  <span className="text-sm">{feat.icon}</span>
+                                  <span className="text-[11px] leading-tight text-gray-500">
+                                    {feat.text}
+                                  </span>
                                 </motion.div>
                               ))}
                             </div>
+
+                            <motion.div
+                              animate={{
+                                opacity: accountType === plan.id ? 1 : 0,
+                                height: accountType === plan.id ? 'auto' : 0,
+                                marginTop: accountType === plan.id ? 14 : 0,
+                              }}
+                              transition={{ duration: 0.25 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill={plan.color}>
+                                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                                </svg>
+                                <span className="text-[11px] font-medium" style={{ color: plan.color }}>
+                                  {plan.highlight}
+                                </span>
+                              </div>
+                            </motion.div>
                           </div>
-                        </div>
+
+                          <AnimatePresence>
+                            {plan.id === 'individual' && accountType === 'individual' && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                                className="overflow-hidden border-t border-gray-100"
+                              >
+                                <div className="px-5 py-4">
+                                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                    I am a...
+                                  </p>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {(
+                                      [
+                                        {
+                                          value: 'owner' as const,
+                                          label: 'Owner',
+                                          sub: 'I own a property',
+                                          icon: (
+                                            <svg
+                                              width="16"
+                                              height="16"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              strokeWidth="2"
+                                              strokeLinecap="round"
+                                            >
+                                              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                                              <polyline points="9 22 9 12 15 12 15 22" />
+                                            </svg>
+                                          ),
+                                        },
+                                        {
+                                          value: 'tenant' as const,
+                                          label: 'Tenant',
+                                          sub: 'I rent a property',
+                                          icon: (
+                                            <svg
+                                              width="16"
+                                              height="16"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              strokeWidth="2"
+                                              strokeLinecap="round"
+                                            >
+                                              <circle cx="12" cy="8" r="4" />
+                                              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                                            </svg>
+                                          ),
+                                        },
+                                      ] as const
+                                    ).map((opt) => (
+                                      <motion.button
+                                        key={opt.value}
+                                        type="button"
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.97 }}
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setIndividualRole(opt.value)
+                                        }}
+                                        animate={{
+                                          borderColor:
+                                            individualRole === opt.value ? '#9A88FD' : '#E5E7EB',
+                                          backgroundColor:
+                                            individualRole === opt.value
+                                              ? 'rgba(154,136,253,0.08)'
+                                              : '#FAFAFA',
+                                          color:
+                                            individualRole === opt.value ? '#9A88FD' : '#6B7280',
+                                          boxShadow:
+                                            individualRole === opt.value
+                                              ? '0 2px 12px rgba(154,136,253,0.2)'
+                                              : 'none',
+                                        }}
+                                        transition={{ duration: 0.15 }}
+                                        className="flex flex-col items-center gap-1.5 rounded-xl border-2 py-3.5"
+                                      >
+                                        {opt.icon}
+                                        <span className="text-[13px] font-bold">{opt.label}</span>
+                                        <span className="text-[10px] opacity-60">{opt.sub}</span>
+                                        {individualRole === opt.value && (
+                                          <motion.div
+                                            initial={{ scale: 0 }}
+                                            animate={{ scale: 1 }}
+                                            className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#9A88FD]"
+                                          >
+                                            <svg
+                                              width="8"
+                                              height="8"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              stroke="white"
+                                              strokeWidth="3"
+                                            >
+                                              <polyline points="20 6 9 17 4 12" />
+                                            </svg>
+                                          </motion.div>
+                                        )}
+                                      </motion.button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </motion.div>
                       </motion.div>
-                    </motion.div>
+                    ))}
                   </div>
 
                   <motion.button
                     type="button"
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.25 }}
+                    transition={{ delay: 0.28 }}
                     whileHover={
                       canContinueStep2 && !loading
-                        ? { scale: 1.02, boxShadow: '0 8px 30px rgba(154,136,253,0.4)' }
+                        ? {
+                            scale: 1.02,
+                            boxShadow: '0 8px 32px rgba(154,136,253,0.45)',
+                          }
                         : {}
                     }
                     whileTap={canContinueStep2 && !loading ? { scale: 0.98 } : {}}
                     disabled={!canContinueStep2 || loading}
                     onClick={() => void handleStep2Continue()}
                     className={cn(
-                      'relative w-full overflow-hidden rounded-2xl py-4 text-base font-semibold text-white transition-opacity',
-                      canContinueStep2 && !loading ? 'bg-[#9A88FD]' : 'bg-[#9A88FD]/40',
+                      'relative mt-4 w-full overflow-hidden rounded-2xl py-4 text-base font-semibold text-white transition-all duration-200',
+                      canContinueStep2 && !loading ? 'bg-[#9A88FD]' : 'bg-[#9A88FD]/35',
                       !canContinueStep2 && !loading && 'cursor-not-allowed',
                       loading && 'cursor-wait'
                     )}
                   >
                     <motion.div
-                      className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/25 to-transparent"
                       initial={{ x: '-100%' }}
                       whileHover={{ x: '200%' }}
                       transition={{ duration: 0.55 }}
@@ -1175,14 +1205,12 @@ export default function SignupPage() {
                           Creating account...
                         </>
                       ) : (
-                        <>
-                          Continue
-                          <ArrowRight size={18} />
-                        </>
+                        <>Continue →</>
                       )}
                     </span>
                   </motion.button>
                 </motion.div>
+
               </motion.div>
             )}
 
