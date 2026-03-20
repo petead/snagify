@@ -1,8 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Image from "next/image";
+import { motion } from "framer-motion";
 import { getVideoCaptureDimensions } from "@/lib/getImageDimensions";
+
+const ZOOM_PRESETS = [
+  { label: "0.5×", value: 0.5 },
+  { label: "1×", value: 1 },
+  { label: "2×", value: 2 },
+  { label: "3×", value: 3 },
+] as const;
 
 /** Same list as InspectionClient PhotoCard */
 const DAMAGE_TAGS = [
@@ -42,7 +50,16 @@ export default function GhostCamera({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const trackRef = useRef<MediaStreamTrack | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [currentZoom, setCurrentZoom] = useState(1);
+  const [hasTorch, setHasTorch] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [zoomCapabilities, setZoomCapabilities] = useState({
+    hasZoom: false,
+    min: 1,
+    max: 1,
+  });
   const [ghostOpacity, setGhostOpacity] = useState(0.35);
   const [activeGhostIndex, setActiveGhostIndex] = useState(0);
   const [capturing, setCapturing] = useState(false);
@@ -73,6 +90,49 @@ export default function GhostCamera({
     }
   }, [isCheckout, isAdditionalMode, activeGhostIndex, checkinPhotos]);
 
+  const zoomPresets = useMemo(() => {
+    const { min, max, hasZoom } = zoomCapabilities;
+    if (!hasZoom) {
+      return [{ label: "1×" as const, value: 1 }];
+    }
+    const availableZooms = ZOOM_PRESETS.filter((p) => p.value >= min && p.value <= max);
+    return availableZooms.length > 0 ? [...availableZooms] : [{ label: "1×" as const, value: 1 }];
+  }, [zoomCapabilities]);
+
+  const applyZoom = useCallback(async (value: number) => {
+    const track = trackRef.current;
+    if (!track) return;
+    try {
+      const caps = track.getCapabilities() as MediaTrackCapabilities & {
+        zoom?: { min?: number; max?: number };
+      };
+      if (!("zoom" in caps) || caps.zoom == null) return;
+      const zMin = caps.zoom.min ?? 1;
+      const zMax = caps.zoom.max ?? 1;
+      const clamped = Math.min(Math.max(value, zMin), zMax);
+      await track.applyConstraints({
+        advanced: [{ zoom: clamped } as MediaTrackConstraintSet],
+      });
+      setCurrentZoom(clamped);
+    } catch (e) {
+      console.warn("[GhostCamera] Zoom not supported:", e);
+    }
+  }, []);
+
+  const toggleTorch = useCallback(async () => {
+    const track = trackRef.current;
+    if (!track || !hasTorch) return;
+    const next = !torchOn;
+    try {
+      await track.applyConstraints({
+        advanced: [{ torch: next } as MediaTrackConstraintSet],
+      });
+      setTorchOn(next);
+    } catch (e) {
+      console.warn("[GhostCamera] Torch not supported:", e);
+    }
+  }, [hasTorch, torchOn]);
+
   useEffect(() => {
     let mounted = true;
     const startCamera = async () => {
@@ -93,6 +153,32 @@ export default function GhostCamera({
         }
         streamRef.current = mediaStream;
         setStream(mediaStream);
+
+        const vt = mediaStream.getVideoTracks()[0];
+        trackRef.current = vt ?? null;
+        setCurrentZoom(1);
+        setTorchOn(false);
+        try {
+          const capabilities = vt?.getCapabilities?.() as MediaTrackCapabilities & {
+            zoom?: { min?: number; max?: number };
+            torch?: boolean;
+          };
+          if (vt && capabilities) {
+            const hasZoom = "zoom" in capabilities && capabilities.zoom != null;
+            const zoomMin = capabilities.zoom?.min ?? 1;
+            const zoomMax = capabilities.zoom?.max ?? 1;
+            setZoomCapabilities({ hasZoom, min: zoomMin, max: zoomMax });
+            setHasTorch(capabilities.torch === true);
+          } else {
+            setZoomCapabilities({ hasZoom: false, min: 1, max: 1 });
+            setHasTorch(false);
+          }
+        } catch (capErr) {
+          console.warn("[GhostCamera] getCapabilities failed:", capErr);
+          setZoomCapabilities({ hasZoom: false, min: 1, max: 1 });
+          setHasTorch(false);
+        }
+
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream;
           videoRef.current.play().catch(() => {});
@@ -104,8 +190,13 @@ export default function GhostCamera({
     startCamera();
     return () => {
       mounted = false;
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      const t = trackRef.current;
+      if (t) {
+        t.applyConstraints({ advanced: [{ torch: false } as MediaTrackConstraintSet] }).catch(() => {});
+      }
+      streamRef.current?.getTracks().forEach((tr) => tr.stop());
       streamRef.current = null;
+      trackRef.current = null;
       setStream(null);
     };
   }, []);
@@ -154,13 +245,22 @@ export default function GhostCamera({
   };
 
   const handleClose = () => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    const t = trackRef.current;
+    if (t) {
+      t.applyConstraints({ advanced: [{ torch: false } as MediaTrackConstraintSet] }).catch(() => {});
+    }
+    streamRef.current?.getTracks().forEach((tr) => tr.stop());
     streamRef.current = null;
+    trackRef.current = null;
     setStream(null);
+    setTorchOn(false);
     onClose();
   };
 
   const activeGhost = checkinPhotos[activeGhostIndex] ?? null;
+
+  const showZoomBar = isCheckout && stream && zoomPresets.length > 1;
+  const showTorchBtn = isCheckout && stream && hasTorch;
 
   const toggleTag = (tag: string) => {
     setPrepopulatedHintVisible(false);
@@ -320,6 +420,71 @@ export default function GhostCamera({
             <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, margin: 0 }}>
               No entry photos for this room
             </p>
+          </div>
+        )}
+
+        {(showZoomBar || showTorchBtn) && (
+          <div
+            className={`pointer-events-auto absolute bottom-20 left-0 right-0 z-20 flex items-center px-4 ${
+              showZoomBar && showTorchBtn
+                ? "justify-between"
+                : showTorchBtn
+                  ? "justify-end"
+                  : "justify-start"
+            }`}
+          >
+            {showZoomBar && (
+              <div className="flex items-center gap-1.5 rounded-full bg-black/40 px-2 py-1.5 backdrop-blur-sm">
+                {zoomPresets.map((preset) => (
+                  <motion.button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => void applyZoom(preset.value)}
+                    animate={{
+                      backgroundColor:
+                        Math.abs(currentZoom - preset.value) < 0.1
+                          ? "rgba(255,255,255,0.25)"
+                          : "transparent",
+                      scale: Math.abs(currentZoom - preset.value) < 0.1 ? 1.1 : 1,
+                    }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                    className="rounded-full px-2.5 py-1"
+                  >
+                    <span
+                      className={`text-xs font-bold ${
+                        Math.abs(currentZoom - preset.value) < 0.1 ? "text-yellow-300" : "text-white/70"
+                      }`}
+                    >
+                      {preset.label}
+                    </span>
+                  </motion.button>
+                ))}
+              </div>
+            )}
+            {showTorchBtn && (
+              <motion.button
+                type="button"
+                onClick={() => void toggleTorch()}
+                animate={{
+                  backgroundColor: torchOn ? "rgba(254,222,128,0.3)" : "rgba(0,0,0,0.4)",
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-sm"
+                whileTap={{ scale: 0.9 }}
+                aria-label={torchOn ? "Turn flash off" : "Turn flash on"}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill={torchOn ? "#FEDE80" : "none"}
+                  stroke={torchOn ? "#FEDE80" : "white"}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+              </motion.button>
+            )}
           </div>
         )}
 
