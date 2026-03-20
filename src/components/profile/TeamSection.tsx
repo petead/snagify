@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Loader2, UserPlus, X, Mail, Clock } from "lucide-react";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import { formatProfileRoleLabel, normalizeProfileRole } from "@/lib/profileLabels";
+import { normalizeProfileRole } from "@/lib/profileLabels";
 
 interface TeamMember {
   id: string;
@@ -43,6 +45,10 @@ export function TeamSection({ company, currentUserId }: Props) {
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteDone, setInviteDone] = useState(false);
+  const [deletingMember, setDeletingMember] = useState<TeamMember | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [portalMounted, setPortalMounted] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const fetchTeamMembers = useCallback(async () => {
     if (!company.id) return;
@@ -100,6 +106,16 @@ export function TeamSection({ company, currentUserId }: Props) {
   }, [company.id, currentUserId, supabase]);
 
   useEffect(() => {
+    setPortalMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  useEffect(() => {
     void fetchTeamMembers();
 
     if (!company.id) return;
@@ -149,16 +165,6 @@ export function TeamSection({ company, currentUserId }: Props) {
     setTimeout(() => setInviteDone(false), 3000);
   }
 
-  async function handleRemove(userId: string) {
-    if (!window.confirm("Remove this inspector from your team?")) return;
-    try {
-      await fetch(`/api/team/${userId}`, { method: "DELETE" });
-      await fetchTeamMembers();
-    } catch (err) {
-      console.error("Failed to remove team member:", err);
-    }
-  }
-
   async function handleCancelInvite(inviteId: string) {
     try {
       await fetch(`/api/team/invite/${inviteId}`, { method: "DELETE" });
@@ -171,6 +177,10 @@ export function TeamSection({ company, currentUserId }: Props) {
   const maxUsers = company.max_users || 1;
   const memberCount = teamMembers.length;
   const atCapacity = memberCount >= maxUsers;
+
+  const currentUserMember = teamMembers.find((m) => m.id === currentUserId);
+  const isCurrentUserOwner =
+    !!currentUserMember && normalizeProfileRole(currentUserMember.role) === "owner";
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden border border-gray-100">
@@ -252,15 +262,32 @@ export function TeamSection({ company, currentUserId }: Props) {
               >
                 {m.displayRole}
               </span>
-              {normalizeProfileRole(m.role) !== "owner" && m.id !== currentUserId && (
-                <button
-                  type="button"
-                  onClick={() => void handleRemove(m.id)}
-                  className="w-7 h-7 rounded-lg bg-[#FEF2F2] flex items-center justify-center flex-shrink-0"
-                >
-                  <X size={12} color="#EF4444" />
-                </button>
-              )}
+              {isCurrentUserOwner &&
+                !m.isCurrentUser &&
+                normalizeProfileRole(m.role) !== "owner" && (
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setDeletingMember(m)}
+                    className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center shrink-0 ml-2 hover:bg-red-100 transition-colors"
+                    aria-label="Remove inspector"
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#EF4444"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    >
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-1 14H6L5 6" />
+                      <path d="M10 11v6M14 11v6" />
+                      <path d="M9 6V4h6v2" />
+                    </svg>
+                  </motion.button>
+                )}
             </div>
           ))
         )}
@@ -348,6 +375,158 @@ export function TeamSection({ company, currentUserId }: Props) {
 
         {inviteError && <p className="text-[12px] text-red-500 mt-2">{inviteError}</p>}
       </div>
+
+      {portalMounted &&
+        deletingMember &&
+        createPortal(
+          <motion.div
+            className="fixed inset-0 z-[9999] flex items-center justify-center px-5"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              onClick={() => !deleteLoading && setDeletingMember(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              className="relative z-10 w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+                <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mb-5 mx-auto">
+                  <svg
+                    width="26"
+                    height="26"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#EF4444"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  >
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                    <path d="M10 11v6M14 11v6" />
+                    <path d="M9 6V4h6v2" />
+                  </svg>
+                </div>
+
+                <h3 className="text-lg font-black text-gray-900 text-center mb-2">
+                  Remove {deletingMember.full_name || "this inspector"}?
+                </h3>
+
+                <p className="text-sm text-gray-500 text-center leading-relaxed mb-1">
+                  This will permanently delete all data associated with this inspector:
+                </p>
+
+                <div className="bg-red-50 rounded-2xl p-4 mb-6 mt-3">
+                  <div className="flex flex-col gap-2">
+                    {[
+                      `${deletingMember.propertiesCount} propert${deletingMember.propertiesCount !== 1 ? "ies" : "y"}`,
+                      `${deletingMember.inspectionsCount} inspection${deletingMember.inspectionsCount !== 1 ? "s" : ""}`,
+                      `${deletingMember.reportsCount} report${deletingMember.reportsCount !== 1 ? "s" : ""}`,
+                      "All photos & signatures",
+                      "Account access",
+                    ].map((item) => (
+                      <div key={item} className="flex items-center gap-2">
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#EF4444"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                        >
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                        <span className="text-xs text-red-700 font-medium">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-red-500 mt-3 font-semibold text-center">
+                    This action cannot be undone.
+                  </p>
+                </div>
+
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.97 }}
+                  disabled={deleteLoading}
+                  onClick={async () => {
+                    setDeleteLoading(true);
+                    try {
+                      const res = await fetch("/api/team/remove-inspector", {
+                        method: "DELETE",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          inspectorId: deletingMember.id,
+                          companyId: company.id,
+                        }),
+                      });
+                      const result = (await res.json()) as { error?: string };
+                      if (!res.ok) throw new Error(result.error || "Failed to remove inspector");
+
+                      setToast({
+                        type: "success",
+                        message: `${deletingMember.full_name || "Inspector"} removed from team`,
+                      });
+                      setDeletingMember(null);
+                      await fetchTeamMembers();
+                    } catch (err: unknown) {
+                      setToast({
+                        type: "error",
+                        message: err instanceof Error ? err.message : "Failed to remove inspector",
+                      });
+                    } finally {
+                      setDeleteLoading(false);
+                    }
+                  }}
+                  className="w-full bg-red-500 text-white font-bold py-3.5 rounded-2xl text-sm mb-3 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {deleteLoading ? (
+                    <svg
+                      className="animate-spin"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="2"
+                    >
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                  ) : null}
+                  {deleteLoading ? "Removing..." : "Yes, remove inspector"}
+                </motion.button>
+
+                <button
+                  type="button"
+                  onClick={() => !deleteLoading && setDeletingMember(null)}
+                  className="w-full text-gray-400 text-sm py-2"
+                >
+                  Cancel
+                </button>
+            </motion.div>
+          </motion.div>,
+          document.body
+        )}
+
+      {toast && (
+        <div
+          className={`fixed bottom-24 left-1/2 z-[10000] max-w-[min(90vw,360px)] -translate-x-1/2 rounded-2xl px-4 py-3 text-center text-sm font-semibold shadow-lg ${
+            toast.type === "success" ? "bg-gray-900 text-white" : "bg-red-600 text-white"
+          }`}
+          role="status"
+        >
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }
