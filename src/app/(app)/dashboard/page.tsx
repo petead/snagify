@@ -9,23 +9,26 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
 
   let fullName: string | null = null;
+  let accountType: "pro" | "individual" = "individual";
+  let tourCompleted = true;
   let profileLoading = false;
   let profileNeedsOnboardingFix = false;
   let showProUpgradeBanner = false;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("full_name, onboarding_completed, account_type, company_id")
+      .select("full_name, onboarding_completed, account_type, company_id, tour_completed")
       .eq("id", user.id)
       .single();
     if (!profile) {
       profileLoading = true;
     } else {
       fullName = profile?.full_name ?? null;
+      tourCompleted = Boolean((profile as { tour_completed?: boolean | null }).tour_completed);
       if (profile && (profile as { onboarding_completed?: boolean }).onboarding_completed === false) {
         profileNeedsOnboardingFix = true;
       }
-      const accountType = normalizeAccountTier((profile as { account_type?: string }).account_type);
+      accountType = normalizeAccountTier((profile as { account_type?: string }).account_type);
       const companyId = (profile as { company_id?: string }).company_id;
       if (accountType === "pro" && companyId) {
         const { data: company } = await supabase
@@ -244,9 +247,12 @@ export default async function DashboardPage() {
   return (
     <main className="min-h-screen" style={{ background: "#F8F7F4" }}>
       <DashboardClient
+        userId={user?.id ?? null}
         displayName={displayName}
         fullName={fullName}
         userEmail={user?.email ?? null}
+        accountType={accountType}
+        tourCompleted={tourCompleted}
         profileLoading={profileLoading}
         showProUpgradeBanner={showProUpgradeBanner}
         properties={propertiesData}

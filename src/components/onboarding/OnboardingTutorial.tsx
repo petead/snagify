@@ -2,51 +2,6 @@
 
 import { useState } from 'react'
 
-const STORAGE_KEY = 'snagify_onboarding_v1_done'
-
-const steps = [
-  {
-    id: 'checkin',
-    emoji: '📋',
-    accentColor: '#9A88FD',
-    accentLight: '#EDE9FF',
-    badge: 'Step 1 of 4',
-    title: 'Start with a Check-in',
-    desc: 'When a tenant moves in, tap + and create a check-in. Take photos room by room — we handle the rest.',
-    screen: 'checkin',
-  },
-  {
-    id: 'sign',
-    emoji: '✍️',
-    accentColor: '#9A88FD',
-    accentLight: '#EDE9FF',
-    badge: 'Step 2 of 4',
-    title: 'Get it signed digitally',
-    desc: 'Send the report to landlord & tenant by email. They sign remotely in one tap — or in person on your device.',
-    screen: 'sign',
-  },
-  {
-    id: 'checkout',
-    emoji: '🏠',
-    accentColor: '#D97706',
-    accentLight: '#FEF3C7',
-    badge: 'Step 3 of 4',
-    title: 'Check-out from the property',
-    desc: 'When they leave, open the property page. A "Start Check-out" button appears automatically once the check-in is signed.',
-    screen: 'checkout',
-  },
-  {
-    id: 'compare',
-    emoji: '🔍',
-    accentColor: '#9A88FD',
-    accentLight: '#EDE9FF',
-    badge: 'Step 4 of 4',
-    title: 'Auto comparison report',
-    desc: 'We compare every room side-by-side with the check-in. New damage, missing keys — all documented and dispute-proof.',
-    screen: 'compare',
-  },
-]
-
 function ScreenCheckin() {
   return (
     <div style={{ background: '#F8F7F4', borderRadius: 12, overflow: 'hidden', border: '1.5px solid #EDE9FF' }}>
@@ -151,7 +106,82 @@ const SCREENS = {
   compare: ScreenCompare,
 }
 
-export function OnboardingTutorial({ onDone }: { onDone: () => void }) {
+export function OnboardingTutorial({
+  accountType,
+  onDone,
+}: {
+  accountType: 'pro' | 'individual';
+  onDone: () => void;
+}) {
+  const steps = [
+    {
+      id: 'welcome',
+      emoji: '👋',
+      accentColor: '#9A88FD',
+      accentLight: '#EDE9FF',
+      badge: 'Step 1',
+      title: 'Welcome to Snagify!',
+      desc: 'Your digital inspection platform for Dubai real estate.',
+      screen: 'checkin',
+      show: 'all' as const,
+    },
+    {
+      id: 'property',
+      emoji: '🏢',
+      accentColor: '#9A88FD',
+      accentLight: '#EDE9FF',
+      badge: 'Step 2',
+      title: 'Add your first property',
+      desc: 'Tap Properties to add a property and start inspecting.',
+      screen: 'checkin',
+      show: 'all' as const,
+    },
+    {
+      id: 'checkin',
+      emoji: '📋',
+      accentColor: '#9A88FD',
+      accentLight: '#EDE9FF',
+      badge: 'Step 3',
+      title: 'Start an inspection',
+      desc: 'Tap + to begin a check-in. AI will analyse every photo.',
+      screen: 'checkin',
+      show: 'all' as const,
+    },
+    {
+      id: 'report',
+      emoji: '🔒',
+      accentColor: '#9A88FD',
+      accentLight: '#EDE9FF',
+      badge: 'Step 4',
+      title: 'Generate your report',
+      desc: 'Once done, generate a SHA-256 verified PDF in one tap.',
+      screen: 'compare',
+      show: 'all' as const,
+    },
+    {
+      id: 'plan',
+      emoji: '⚡',
+      accentColor: '#16A34A',
+      accentLight: '#DCFCE7',
+      badge: 'Step 5',
+      title: 'Activate your plan',
+      desc: 'Each inspection uses 1 credit. Go to Profile → Subscription to choose your plan.',
+      screen: 'checkout',
+      show: 'pro' as const,
+    },
+    {
+      id: 'sign',
+      emoji: '✍️',
+      accentColor: '#9A88FD',
+      accentLight: '#EDE9FF',
+      badge: 'Step 6',
+      title: 'Send for signature',
+      desc: 'Share the report by email or sign in-person. Track opens and get auto-reminders.',
+      screen: 'sign',
+      show: 'all' as const,
+    },
+  ].filter((s) => s.show === 'all' || s.show === accountType)
+
   const [current, setCurrent] = useState(0)
   const [animating, setAnimating] = useState(false)
   const [direction, setDirection] = useState<'left' | 'right'>('left')
@@ -172,7 +202,6 @@ export function OnboardingTutorial({ onDone }: { onDone: () => void }) {
 
   const handleNext = () => {
     if (isLast) {
-      localStorage.setItem(STORAGE_KEY, '1')
       onDone()
     } else {
       goTo(current + 1, 'left')
@@ -184,7 +213,6 @@ export function OnboardingTutorial({ onDone }: { onDone: () => void }) {
   }
 
   const handleSkip = () => {
-    localStorage.setItem(STORAGE_KEY, '1')
     onDone()
   }
 

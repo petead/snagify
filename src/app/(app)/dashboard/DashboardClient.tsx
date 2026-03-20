@@ -11,6 +11,7 @@ import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
 import { OnboardingTutorial } from "@/components/onboarding/OnboardingTutorial";
 import { trackAction } from "@/lib/breadcrumb";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
+import { createClient } from "@/lib/supabase/client";
 
 type InspectionRow = {
   id: string;
@@ -62,9 +63,12 @@ type RecentInspectionRow = {
 };
 
 interface DashboardClientProps {
+  userId: string | null;
   displayName: string;
   fullName: string | null;
   userEmail: string | null;
+  accountType: "pro" | "individual";
+  tourCompleted: boolean;
   profileLoading?: boolean;
   showProUpgradeBanner?: boolean;
   properties: PropertyRow[];
@@ -116,15 +120,19 @@ function normalizeProperties(rows: PropertyRow[]): PropertyRow[] {
 }
 
 export function DashboardClient({
+  userId,
   displayName,
   fullName,
   userEmail,
+  accountType: profileAccountType,
+  tourCompleted,
   profileLoading = false,
   showProUpgradeBanner = false,
   properties: initialProperties,
   alerts = [],
   recentInspections: initialRecentInspections = [],
 }: DashboardClientProps) {
+  const supabase = createClient();
   const { balance, plan, accountType, refresh: refreshCredits } = useCredits();
   const [showBuyCredits, setShowBuyCredits] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -178,13 +186,18 @@ export function DashboardClient({
   const initials = getInitials(fullName, userEmail);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const done = localStorage.getItem("snagify_onboarding_v1_done");
-    if (!done && allInspections.length === 0) {
+    const shouldShowTour = Boolean(userId && !tourCompleted);
+    if (shouldShowTour) {
       const t = setTimeout(() => setShowOnboarding(true), 600);
       return () => clearTimeout(t);
     }
-  }, [allInspections.length]);
+  }, [userId, tourCompleted]);
+
+  const completeTour = async () => {
+    setShowOnboarding(false);
+    if (!userId) return;
+    await supabase.from("profiles").update({ tour_completed: true }).eq("id", userId);
+  };
 
   return (
     <div
@@ -1137,7 +1150,12 @@ export function DashboardClient({
         plan={plan}
       />
       {showOnboarding && (
-        <OnboardingTutorial onDone={() => setShowOnboarding(false)} />
+        <OnboardingTutorial
+          accountType={profileAccountType}
+          onDone={() => {
+            void completeTour();
+          }}
+        />
       )}
     </div>
   );
