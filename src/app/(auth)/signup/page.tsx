@@ -364,40 +364,12 @@ export default function SignupPage() {
     []
   )
 
-  const uploadLogoAfterSignup = async (userId: string) => {
-    if (!croppedLogoBlob) return
-    const path = `${userId}/logos/company-logo.png`
-    const { error: upErr } = await supabase.storage
-      .from('avatars')
-      .upload(path, croppedLogoBlob, { upsert: true, contentType: 'image/png' })
-    if (upErr) {
-      console.error('Logo upload failed:', upErr)
-      return
-    }
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from('avatars').getPublicUrl(path)
-    await supabase.from('profiles').update({ company_logo_url: publicUrl }).eq('id', userId)
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('company_id')
-      .eq('id', userId)
-      .maybeSingle()
-    const cid = prof?.company_id as string | undefined
-    if (cid) {
-      await supabase.from('companies').update({ logo_url: publicUrl }).eq('id', cid)
-    }
-  }
-
   const handleSubmit = async () => {
     if (!accountType) return
     if (accountType === 'individual' && individualRole === null) return
     setLoading(true)
     setError(null)
     try {
-      const isPro = accountType === 'pro'
-      const companyNameTrimmed = companyName.trim()
-
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -405,122 +377,122 @@ export default function SignupPage() {
           data: {
             full_name: fullName.trim(),
             account_type: accountType,
-            ...(isPro && companyNameTrimmed ? { company_name: companyNameTrimmed } : {}),
           },
         },
       })
-      if (authError) throw authError
-      const newUser = authData.user
-      if (!newUser) throw new Error('No user returned from signUp')
 
-      let session = authData.session
-      if (!session) {
-        const { data: signInData, error: signInError } =
-          await supabase.auth.signInWithPassword({ email, password })
-        if (signInError) throw signInError
-        session = signInData.session
-      }
+      if (authError) throw new Error(authError.message)
+      const user = authData?.user
+      if (!user) throw new Error('Signup failed — no user returned')
 
-      let attempts = 0
-      while (!session?.access_token && attempts < 10) {
-        const { data } = await supabase.auth.getSession()
-        session = data.session ?? null
-        if (!session?.access_token) {
-          await new Promise((r) => setTimeout(r, 300))
-        }
-        attempts++
-      }
-
-      const accessToken = session?.access_token
-      if (!accessToken) {
-        throw new Error(
-          'Session could not be established. If email confirmation is required, confirm your email and try signing in.'
-        )
-      }
-
-      let websiteTrimmed = proWebsite.trim() || undefined
-      if (isPro && websiteTrimmed && !/^https?:\/\//i.test(websiteTrimmed)) {
-        websiteTrimmed = `https://${websiteTrimmed}`
-      }
-
-      const completeBody: Record<string, unknown> = {
-        userId: newUser.id,
-        fullName: fullName.trim(),
-        email,
-        accountType,
-      }
-
-      if (isPro) {
-        Object.assign(completeBody, {
-          companyName: companyNameTrimmed,
-          companyEmail: companyEmail.trim(),
-          phone: companyPhone.trim(),
-          address: addressLine1.trim(),
-          city: city.trim(),
-          country: country.trim(),
-          tradeLicense: tradeLicense.trim() || undefined,
-          primaryColor: brandPrimaryColor,
-          website: websiteTrimmed,
-          reraNumber: reraNumber.trim() || undefined,
+      if (!authData.session) {
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email,
+          password,
         })
-      } else {
-        completeBody.individualRole = individualRole
+        if (signInErr) throw new Error(signInErr.message)
+      }
+
+      let websiteTrimmed = proWebsite.trim()
+      if (
+        accountType === 'pro' &&
+        websiteTrimmed &&
+        !/^https?:\/\//i.test(websiteTrimmed)
+      ) {
+        websiteTrimmed = `https://${websiteTrimmed}`
       }
 
       const res = await fetch('/api/onboarding/complete', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify(completeBody),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          fullName: fullName.trim(),
+          email,
+          accountType,
+          individualRole: accountType === 'individual' ? individualRole : null,
+          companyName: accountType === 'pro' ? companyName.trim() : undefined,
+          companyEmail: accountType === 'pro' ? companyEmail.trim() : undefined,
+          phone: accountType === 'pro' ? companyPhone.trim() : undefined,
+          address: accountType === 'pro' ? addressLine1.trim() : undefined,
+          city: accountType === 'pro' ? city.trim() : undefined,
+          country: accountType === 'pro' ? country.trim() : undefined,
+          tradeLicense: accountType === 'pro' ? tradeLicense.trim() || undefined : undefined,
+          primaryColor: accountType === 'pro' ? brandPrimaryColor : undefined,
+          website: accountType === 'pro' ? websiteTrimmed || undefined : undefined,
+          reraNumber: accountType === 'pro' ? reraNumber.trim() || undefined : undefined,
+        }),
       })
 
-      const result = (await res.json()) as { error?: string }
-      if (!res.ok) {
-        const msg = result.error || 'Onboarding failed'
-        if (msg.includes('COMPANY_EXISTS')) {
-          setError(
-            'A company with this name already exists. Please contact your manager to be invited as an inspector.'
-          )
-        } else {
-          setError(getErrorMessage(msg))
-        }
-        return
+      const result = (await res.json()) as {
+        error?: string
+        companyId?: string
+        success?: boolean
       }
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      if (!res.ok) {
+        const raw = result.error || 'Onboarding failed'
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[signup] /api/onboarding/complete failed:', res.status, raw)
+        }
+        throw new Error(raw)
+      }
 
-      if (user?.id && isPro) {
+      if (accountType === 'pro' && croppedLogoBlob && result.companyId) {
+        const logoFile = new File([croppedLogoBlob], 'logo.png', { type: 'image/png' })
+        const logoPath = `logos/${user.id}/company-logo.png`
+        const { error: logoErr } = await supabase.storage
+          .from('avatars')
+          .upload(logoPath, logoFile, { upsert: true })
+        if (logoErr) {
+          console.error('Logo upload failed:', logoErr)
+        } else {
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from('avatars').getPublicUrl(logoPath)
+          await supabase.from('profiles').update({ company_logo_url: publicUrl }).eq('id', user.id)
+          await supabase
+            .from('companies')
+            .update({ logo_url: publicUrl })
+            .eq('id', result.companyId)
+        }
+      }
+
+      if (accountType === 'pro') {
         const pad = sigPadRef.current
-        if (pad && !pad.isEmpty()) {
-          const blob: Blob | null = await new Promise((resolve) => {
+        let sigBlob: Blob | null = signatureBlob
+        if (!sigBlob && pad && !pad.isEmpty()) {
+          sigBlob = await new Promise<Blob | null>((resolve) => {
             pad.getTrimmedCanvas().toBlob((b) => resolve(b), 'image/png')
           })
-          if (blob) {
-            const fd = new FormData()
-            fd.append('signature', blob, 'signature.png')
-            const sigRes = await fetch('/api/profile/inspector-signature', {
-              method: 'POST',
-              body: fd,
-            })
-            if (!sigRes.ok) {
-              console.error('[signup] Inspector signature upload failed')
-            }
+        }
+        if (sigBlob) {
+          const sigFile = new File([sigBlob], 'signature.png', { type: 'image/png' })
+          const sigPath = `signatures/${user.id}/profile-signature.png`
+          const { error: sigErr } = await supabase.storage
+            .from('signatures')
+            .upload(sigPath, sigFile, { upsert: true })
+          if (sigErr) {
+            console.error('Signature upload failed:', sigErr)
+          } else {
+            const {
+              data: { publicUrl },
+            } = supabase.storage.from('signatures').getPublicUrl(sigPath)
+            await supabase
+              .from('profiles')
+              .update({ signature_image_url: `${publicUrl}?t=${Date.now()}` })
+              .eq('id', user.id)
           }
         }
-      }
-
-      if (user?.id && isPro && croppedLogoBlob) {
-        await uploadLogoAfterSignup(user.id)
       }
 
       router.push('/dashboard')
       router.refresh()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Signup error:', err)
+      }
       setError(getErrorMessage(msg))
     } finally {
       setLoading(false)
@@ -1909,6 +1881,19 @@ export default function SignupPage() {
                           )}
                         </span>
                       </motion.button>
+                      <AnimatePresence>
+                        {error && (
+                          <motion.p
+                            key="signup-final-error"
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            className="mt-2 text-center text-sm text-red-500"
+                          >
+                            {error}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
                     </motion.div>
                   )}
                 </AnimatePresence>

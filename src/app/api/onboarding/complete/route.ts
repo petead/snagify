@@ -1,7 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getDefaultSnagifyCompanyId } from "@/lib/onboarding/defaultSnagifyCompany";
-import { normalizeCompanyNameKey } from "@/lib/profileLabels";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,65 +16,28 @@ function buildFullAddress(
 }
 
 export async function POST(req: Request) {
-  const token = req.headers
-    .get("authorization")
-    ?.replace(/^Bearer\s+/i, "")
-    .trim();
-  if (!token) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const {
-    data: { user },
-    error: tokenErr,
-  } = await admin.auth.getUser(token);
-  if (tokenErr || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  let createdCompanyId: string | null = null;
-
   try {
-    const body = (await req.json()) as {
-      userId?: string;
-      fullName?: string;
-      email?: string;
-      accountType?: string;
-      companyName?: string;
-      companyEmail?: string;
-      phone?: string;
-      address?: string;
-      addressLine1?: string;
-      city?: string;
-      country?: string;
-      tradeLicense?: string;
-      primaryColor?: string;
-      website?: string;
-      reraNumber?: string;
-      individualRole?: string;
-    };
-
+    const body = await req.json();
     const {
       userId,
       fullName,
       email,
       accountType,
+      individualRole,
       companyName,
       companyEmail,
       phone,
       address,
-      addressLine1,
       city,
       country,
       tradeLicense,
       primaryColor,
       website,
       reraNumber,
-      individualRole,
-    } = body;
+    } = body as Record<string, string | undefined | null>;
 
-    if (!userId || userId !== user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!userId) {
+      return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
 
     if (!email || !fullName || !accountType) {
@@ -86,12 +48,10 @@ export async function POST(req: Request) {
     }
 
     const isPro = accountType === "pro";
-    const individualRoleTrimmed = (individualRole ?? "").trim();
+    const individualRoleTrimmed = String(individualRole ?? "").trim();
+
     if (!isPro) {
-      if (
-        individualRoleTrimmed !== "owner" &&
-        individualRoleTrimmed !== "tenant"
-      ) {
+      if (individualRoleTrimmed !== "owner" && individualRoleTrimmed !== "tenant") {
         return NextResponse.json(
           { error: "Please choose whether you are an owner or a tenant" },
           { status: 400 }
@@ -99,28 +59,18 @@ export async function POST(req: Request) {
       }
     }
 
-    const line1Trimmed = (addressLine1 ?? address ?? "").trim();
-    const cityTrimmed = (city ?? "").trim();
-    const countryTrimmed = (country ?? "").trim();
-    const companyNameTrimmed = (companyName ?? "").trim();
-    const companyEmailTrimmed = (companyEmail ?? "").trim();
-    const phoneTrimmed = (phone ?? "").trim();
-    const tradeTrimmed = (tradeLicense ?? "").trim();
-    const reraTrimmed = (reraNumber ?? "").trim();
-    let websiteTrimmed = (website ?? "").trim();
-    if (websiteTrimmed && !/^https?:\/\//i.test(websiteTrimmed)) {
-      websiteTrimmed = `https://${websiteTrimmed}`;
-    }
+    let companyId: string | null = null;
 
-    let companyId: string;
-
+    // ── 1. Create company for Pro accounts ──
     if (isPro) {
-      if (!companyNameTrimmed) {
+      const name = (companyName ?? "").trim();
+      if (!name) {
         return NextResponse.json(
           { error: "Company name is required for Pro accounts" },
           { status: 400 }
         );
       }
+      const companyEmailTrimmed = (companyEmail ?? "").trim();
       if (
         !companyEmailTrimmed ||
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyEmailTrimmed)
@@ -130,137 +80,102 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+      const phoneTrimmed = (phone ?? "").trim();
       if (!phoneTrimmed) {
         return NextResponse.json(
           { error: "Phone number is required for Pro accounts" },
           { status: 400 }
         );
       }
-      if (!line1Trimmed || !cityTrimmed || !countryTrimmed) {
+
+      const line1 = (address ?? "").trim();
+      const cityT = (city ?? "").trim();
+      const countryT = (country ?? "").trim();
+      if (!line1 || !cityT || !countryT) {
         return NextResponse.json(
           { error: "Address, city, and country are required for Pro accounts" },
           { status: 400 }
         );
       }
 
-      const nameKey = normalizeCompanyNameKey(companyNameTrimmed);
-      const { data: existingCompanies } = await admin
-        .from("companies")
-        .select("id, name");
-      const duplicate = (existingCompanies ?? []).some(
-        (c) =>
-          normalizeCompanyNameKey(c.name ?? "") === nameKey && nameKey.length > 0
-      );
-      if (duplicate) {
-        await admin.auth.admin.deleteUser(userId);
-        return NextResponse.json(
-          {
-            error:
-              "COMPANY_EXISTS: A company with this name already exists. Please contact your manager to be invited as an inspector.",
-          },
-          { status: 400 }
-        );
+      let websiteT = (website ?? "").trim();
+      if (websiteT && !/^https?:\/\//i.test(websiteT)) {
+        websiteT = `https://${websiteT}`;
       }
-
-      const companyColor = primaryColor?.trim() || "#9A88FD";
-      const fullAddress = buildFullAddress(
-        line1Trimmed,
-        cityTrimmed,
-        countryTrimmed
-      );
 
       const { data: company, error: companyError } = await admin
         .from("companies")
         .insert({
-          name: companyNameTrimmed,
-          primary_color: companyColor,
+          name,
+          address: buildFullAddress(line1, cityT, countryT) || null,
+          trade_license: (tradeLicense ?? "").trim() || null,
+          primary_color: (primaryColor ?? "").trim() || "#9A88FD",
+          website: websiteT || null,
           logo_url: "https://app.snagify.net/icon-512x512.png",
-          plan: "free",
-          credits_balance: 0,
-          website: websiteTrimmed || null,
-          address: fullAddress || null,
-          trade_license: tradeTrimmed || null,
         })
         .select("id")
         .single();
 
       if (companyError) {
-        console.error("[onboarding/complete] company:", companyError);
-        await admin.auth.admin.deleteUser(userId);
+        console.error("Company error:", companyError);
         return NextResponse.json(
           { error: `Company creation failed: ${companyError.message}` },
           { status: 500 }
         );
       }
-      if (!company?.id) {
-        await admin.auth.admin.deleteUser(userId);
-        return NextResponse.json(
-          { error: "Company could not be created" },
-          { status: 500 }
-        );
-      }
       companyId = company.id;
-      createdCompanyId = company.id;
     } else {
       companyId = await getDefaultSnagifyCompanyId(admin);
     }
 
-    const profileRow: Record<string, unknown> = {
+    const line1 = (address ?? "").trim();
+    const cityT = (city ?? "").trim();
+    const countryT = (country ?? "").trim();
+    let websiteT = (website ?? "").trim();
+    if (websiteT && !/^https?:\/\//i.test(websiteT)) {
+      websiteT = `https://${websiteT}`;
+    }
+
+    // ── 2. Upsert profile (DB trigger may have created a minimal row) ──
+    const profilePayload: Record<string, unknown> = {
       id: userId,
-      full_name: fullName.trim() || null,
+      full_name: (fullName ?? "").trim() || null,
       email,
+      account_type: accountType,
+      individual_role: isPro ? null : individualRoleTrimmed,
       company_id: companyId,
+      rera_number: (reraNumber ?? "").trim() || null,
       onboarding_completed: true,
-      role: "owner",
       receive_signed_report_email: true,
+      role: "owner",
     };
 
     if (isPro) {
-      profileRow.account_type = "pro";
-      profileRow.individual_role = null;
-      profileRow.company_email = companyEmailTrimmed;
-      profileRow.whatsapp_number = phoneTrimmed;
-      profileRow.company_address = buildFullAddress(
-        line1Trimmed,
-        cityTrimmed,
-        countryTrimmed
-      );
-      profileRow.company_trade_license = tradeTrimmed || null;
-      profileRow.company_website = websiteTrimmed || null;
-      profileRow.company_primary_color = (primaryColor?.trim() ||
-        "#9A88FD") as string;
-    } else {
-      profileRow.account_type = "individual";
-      profileRow.individual_role = individualRoleTrimmed;
-    }
-
-    if (reraTrimmed) {
-      profileRow.rera_number = reraTrimmed;
+      profilePayload.company_email = (companyEmail ?? "").trim() || null;
+      profilePayload.whatsapp_number = (phone ?? "").trim() || null;
+      profilePayload.company_address = buildFullAddress(line1, cityT, countryT);
+      profilePayload.company_trade_license = (tradeLicense ?? "").trim() || null;
+      profilePayload.company_website = websiteT || null;
+      profilePayload.company_primary_color =
+        (primaryColor ?? "").trim() || "#9A88FD";
     }
 
     const { error: profileError } = await admin
       .from("profiles")
-      .upsert(profileRow, { onConflict: "id" });
+      .upsert(profilePayload, { onConflict: "id" });
 
     if (profileError) {
-      console.error("[onboarding/complete] profile:", profileError);
-      if (isPro && createdCompanyId) {
-        await admin.from("companies").delete().eq("id", createdCompanyId);
-      }
-      await admin.auth.admin.deleteUser(userId);
+      console.error("Profile error:", profileError);
       return NextResponse.json(
-        { error: `Profile creation failed: ${profileError.message}` },
+        { error: `Profile update failed: ${profileError.message}` },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true, companyId: companyId });
+    return NextResponse.json({ success: true, companyId });
   } catch (err: unknown) {
-    console.error("[onboarding/complete]", err);
-    if (createdCompanyId) {
-      await admin.from("companies").delete().eq("id", createdCompanyId);
-    }
-    const message = err instanceof Error ? err.message : "Onboarding failed";
+    console.error("Onboarding complete error:", err);
+    const message = err instanceof Error ? err.message : "Server error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
