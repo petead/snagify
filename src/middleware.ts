@@ -44,8 +44,11 @@ export async function middleware(request: NextRequest) {
   const isAppRoute =
     path.startsWith("/dashboard") ||
     path.startsWith("/inspection") ||
-    path === "/dashboard" ||
-    path === "/inspection";
+    path.startsWith("/profile") ||
+    path.startsWith("/property") ||
+    path.startsWith("/properties") ||
+    path.startsWith("/reports") ||
+    path.startsWith("/install-guide");
 
   if (isAuthenticated && isAuthRoute) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
@@ -64,6 +67,16 @@ export const config = {
     "/dashboard/:path*",
     "/inspection",
     "/inspection/:path*",
+    "/profile",
+    "/profile/:path*",
+    "/property",
+    "/property/:path*",
+    "/properties",
+    "/properties/:path*",
+    "/reports",
+    "/reports/:path*",
+    "/install-guide",
+    "/install-guide/:path*",
     "/invite",
     "/login",
     "/register",

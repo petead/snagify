@@ -12,12 +12,15 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     // 1. Listen to auth state changes — catches session invalidation in real time
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // SIGNED_OUT / USER_DELETED (runtime) / missing session
-      if (event === "SIGNED_OUT" || session === null || (event as string) === "USER_DELETED") {
-        await supabase.auth.signOut();
-        router.replace("/login");
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || (event as string) === "USER_DELETED") {
+        router.push("/login");
+        router.refresh();
         return;
+      }
+      if (!session && event !== "INITIAL_SESSION") {
+        router.push("/login");
+        router.refresh();
       }
     });
 
@@ -33,7 +36,8 @@ export function AuthGuard({ children }: { children: ReactNode }) {
       // it returns an error even if a local JWT still exists
       if (error || !user) {
         await supabase.auth.signOut();
-        router.replace("/login");
+        router.push("/login");
+        router.refresh();
         return;
       }
 
@@ -47,7 +51,8 @@ export function AuthGuard({ children }: { children: ReactNode }) {
       if (profileError || !profile) {
         // Profile deleted (account deletion) — force sign out
         await supabase.auth.signOut();
-        router.replace("/login");
+        router.push("/login");
+        router.refresh();
       }
     };
 

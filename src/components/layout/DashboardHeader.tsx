@@ -49,6 +49,7 @@ export function DashboardHeader({ fullName, userEmail }: DashboardHeaderProps) {
       /* sign-out best-effort */
     }
     router.push("/login");
+    router.refresh();
   };
 
   const initials = getInitials(fullName, userEmail);

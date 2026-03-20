@@ -124,6 +124,7 @@ export function ProfileClient({
       /* sign-out best-effort */
     }
     router.push("/login");
+    router.refresh();
   };
 
   const handleToggleSignedReportEmail = async () => {
