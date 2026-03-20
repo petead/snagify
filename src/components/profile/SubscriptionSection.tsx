@@ -1,48 +1,54 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, Check, Zap, Building2, Crown } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Loader2, Check } from 'lucide-react'
 
 const PLANS = [
   {
-    slug: 'pro_solo',
+    slug: 'starter',
     name: 'Starter',
     price: 149,
     credits: 10,
-    users: 'Up to 2 users',
-    highlight: '5 complete cycles/month',
-    extraCredits: 'Extra credits: AED 18/cr',
+    users: '1 user',
+    usersDetail: 'Solo inspector',
+    pricePerCredit: 18,
+    extraCredit: 18,
+    popular: false,
+    gradient: 'from-gray-50 to-white',
+    accentColor: '#9A88FD',
+    savingsVsMax: null,
     priceId: 'price_1TC1CrKIsjOh5d33lCuUGmcd',
-    icon: Zap,
-    color: '#9A88FD',
-    features: ['10 credits/month', 'White-label PDF', '1 inspector'],
   },
   {
-    slug: 'pro_agency',
+    slug: 'growth',
     name: 'Growth',
     price: 249,
     credits: 20,
     users: 'Up to 5 users',
-    highlight: '10 complete cycles/month',
-    extraCredits: 'Extra credits: AED 15/cr',
-    priceId: 'price_1TC1D3KIsjOh5d33oEd1E3T1',
-    icon: Building2,
-    color: '#9A88FD',
+    usersDetail: 'Small team',
+    pricePerCredit: 12.45,
+    extraCredit: 15,
     popular: true,
-    features: ['20 credits/month', 'White-label PDF', 'Up to 3 inspectors'],
+    gradient: 'from-[#9A88FD]/8 to-white',
+    accentColor: '#9A88FD',
+    savingsVsMax: '17% cheaper per credit',
+    priceId: 'price_1TC1D3KIsjOh5d33oEd1E3T1',
   },
   {
-    slug: 'pro_max',
+    slug: 'agency',
     name: 'Agency',
     price: 349,
     credits: 30,
-    users: 'Up to 15 users',
-    highlight: '15 complete cycles/month',
-    extraCredits: 'Extra credits: AED 13/cr',
+    users: 'Unlimited users',
+    usersDetail: 'Full agency',
+    pricePerCredit: 11.63,
+    extraCredit: 13,
+    popular: false,
+    gradient: 'from-gray-50 to-white',
+    accentColor: '#7C3AED',
+    savingsVsMax: '28% cheaper per credit',
     priceId: 'price_1TC1DPKIsjOh5d33hlQhhUTf',
-    icon: Crown,
-    color: '#9A88FD',
-    features: ['30 credits/month', 'White-label PDF', 'Unlimited inspectors'],
   },
 ]
 
@@ -57,7 +63,16 @@ interface Props {
 
 export function SubscriptionSection({ company }: Props) {
   const [loading, setLoading] = useState<string | null>(null)
-  const currentPlan = PLANS.find(p => p.slug === company.plan)
+  const normalizedCurrentPlan = (
+    company.plan === 'pro_solo'
+      ? 'starter'
+      : company.plan === 'pro_agency'
+        ? 'growth'
+        : company.plan === 'pro_max'
+          ? 'agency'
+          : company.plan
+  )
+  const currentPlan = PLANS.find(p => p.slug === normalizedCurrentPlan)
   const isOnPaidPlan = company.plan !== 'free' && company.plan !== null
 
   async function handleSubscribe(plan: typeof PLANS[0]) {
@@ -98,6 +113,12 @@ export function SubscriptionSection({ company }: Props) {
     } finally {
       setLoading(null)
     }
+  }
+
+  function handleSelectPlan(slug: string) {
+    const plan = PLANS.find((p) => p.slug === slug)
+    if (!plan) return
+    void handleSubscribe(plan)
   }
 
   return (
@@ -160,161 +181,220 @@ export function SubscriptionSection({ company }: Props) {
         </div>
       )}
 
+      <motion.div
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="mx-4 mb-6 rounded-2xl border border-[#9A88FD]/20 bg-[#9A88FD]/8 p-4"
+      >
+        <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-[#9A88FD]">
+          ✦ Everything included in every plan
+        </p>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+          {[
+            'White-label PDF reports',
+            'AI photo analysis',
+            'E-signature for all parties',
+            'Unlimited properties',
+            'Check-in & check-out',
+            'SHA-256 document integrity',
+          ].map((feat) => (
+            <div key={feat} className="flex items-center gap-1.5">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#9A88FD"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span className="text-[11px] text-gray-500">{feat}</span>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+
       {/* Plan cards */}
       <div style={{ padding: 20 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: '#9CA3AF', marginBottom: 12 }}>
           {isOnPaidPlan ? 'Change plan' : 'Choose a plan'}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {PLANS.map(plan => {
-            const isCurrent = plan.slug === company.plan
-            const Icon = plan.icon
-
+        <div className="flex flex-col gap-3">
+          {PLANS.map((plan, idx) => {
+            const isCurrent = plan.slug === normalizedCurrentPlan
             return (
-              <div
+              <motion.div
                 key={plan.slug}
-                style={{
-                  position: 'relative',
-                  borderRadius: 16,
-                  border: isCurrent ? '2px solid #9A88FD' : '2px solid #F3F4F6',
-                  padding: 16,
-                  background: isCurrent ? 'rgba(237, 233, 255, 0.3)' : '#fff',
-                  transition: 'all 0.2s ease',
-                }}
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 + idx * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                className={`relative mx-4 mb-4 overflow-hidden rounded-3xl border bg-gradient-to-b ${plan.gradient} ${
+                  plan.popular
+                    ? 'z-10 scale-[1.02] border-[#9A88FD] shadow-[0_8px_40px_rgba(154,136,253,0.25)]'
+                    : 'border-gray-200 shadow-sm'
+                }`}
               >
-                {/* Popular badge */}
-                {plan.popular && !isCurrent && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: -10,
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      background: '#9A88FD',
-                      color: '#fff',
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: '4px 12px',
-                      borderRadius: 999,
-                    }}
-                  >
-                    Most popular
-                  </div>
+                {plan.popular && (
+                  <motion.div
+                    animate={{ opacity: [0.4, 0.7, 0.4] }}
+                    transition={{ duration: 3, repeat: Infinity }}
+                    className="pointer-events-none absolute inset-0 rounded-3xl"
+                    style={{ boxShadow: 'inset 0 0 40px rgba(154,136,253,0.08)' }}
+                  />
                 )}
 
-                {/* Current badge */}
-                {isCurrent && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: -10,
-                      left: 16,
-                      background: '#16A34A',
-                      color: '#fff',
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: '4px 12px',
-                      borderRadius: 999,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                  >
-                    <Check size={10} />
-                    Current plan
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        background: '#EDE9FF',
-                        borderRadius: 10,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
+                {plan.popular && (
+                  <div className="absolute -top-px left-1/2 -translate-x-1/2">
+                    <motion.div
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: 0.3, type: 'spring', stiffness: 500 }}
+                      className="rounded-b-xl bg-[#9A88FD] px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white"
                     >
-                      <Icon size={18} color="#9A88FD" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E' }}>
-                        {plan.name}
-                      </div>
-                      <div
-                        style={{
-                          marginTop: 4,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          borderRadius: 999,
-                          background: '#EDE9FF',
-                          color: '#6D5BD0',
-                          padding: '2px 8px',
-                          fontSize: 10,
-                          fontWeight: 700,
-                        }}
-                      >
-                        {plan.highlight}
-                      </div>
-                      <div style={{ fontSize: 11, color: '#9CA3AF' }}>
-                        {plan.users}
-                      </div>
-                      <div style={{ fontSize: 10, color: '#6B7280', marginTop: 4 }}>
-                        {plan.extraCredits}
-                      </div>
-                    </div>
+                      ⭐ Most popular
+                    </motion.div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: '#1A1A2E' }}>
-                      AED {plan.price}
-                    </div>
-                    <div style={{ fontSize: 10, color: '#9CA3AF' }}>/month</div>
-                  </div>
-                </div>
-
-                {/* Features */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-                  {plan.features.map(f => (
-                    <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Check size={12} color="#16A34A" />
-                      <span style={{ fontSize: 12, color: '#6B7280' }}>{f}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* CTA */}
-                {!isCurrent && (
-                  <button
-                    type="button"
-                    onClick={() => handleSubscribe(plan)}
-                    disabled={loading === plan.slug}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: 12,
-                      border: 'none',
-                      background: '#9A88FD',
-                      color: '#fff',
-                      fontSize: 13,
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 8,
-                      cursor: loading === plan.slug ? 'not-allowed' : 'pointer',
-                      opacity: loading === plan.slug ? 0.5 : 1,
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    {loading === plan.slug && <Loader2 size={14} className="animate-spin" />}
-                    {isOnPaidPlan ? 'Switch to this plan' : 'Get started'}
-                  </button>
                 )}
-              </div>
+
+                <div className="p-5 pt-6">
+                  {isCurrent && (
+                    <div className="mb-3 inline-flex items-center gap-1 rounded-full bg-green-600 px-2.5 py-1 text-[10px] font-bold text-white">
+                      <Check size={10} />
+                      Current plan
+                    </div>
+                  )}
+
+                  <div className="mb-4 flex items-start justify-between">
+                    <div>
+                      <h3 className="text-xl font-black text-gray-900">{plan.name}</h3>
+                      <p className="mt-0.5 text-xs text-gray-400">{plan.usersDetail}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-baseline gap-0.5">
+                        <span className="text-xs text-gray-400">AED</span>
+                        <motion.span
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: 0.15 + idx * 0.08, type: 'spring' }}
+                          className="text-3xl font-black text-gray-900"
+                        >
+                          {plan.price}
+                        </motion.span>
+                      </div>
+                      <span className="text-[10px] text-gray-400">/month</span>
+                    </div>
+                  </div>
+
+                  <div className="mb-4 rounded-2xl bg-gray-50 p-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-gray-600">Monthly credits</span>
+                      <motion.span
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.2 + idx * 0.08 }}
+                        className="text-lg font-black"
+                        style={{ color: plan.accentColor }}
+                      >
+                        {plan.credits}
+                      </motion.span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-gray-200">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(plan.credits / 30) * 100}%` }}
+                        transition={{ delay: 0.3 + idx * 0.08, duration: 0.8, ease: 'easeOut' }}
+                        className="h-full rounded-full"
+                        style={{
+                          background: `linear-gradient(90deg, ${plan.accentColor}90, ${plan.accentColor})`,
+                        }}
+                      />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[11px] text-gray-400">
+                        AED {plan.pricePerCredit.toFixed(2)}/credit included
+                      </span>
+                      {plan.savingsVsMax && (
+                        <motion.span
+                          initial={{ opacity: 0, x: 8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.4 + idx * 0.08 }}
+                          className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-500"
+                        >
+                          ↓ {plan.savingsVsMax}
+                        </motion.span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mb-5 flex flex-col gap-2">
+                    <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-white px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <svg
+                          width="15"
+                          height="15"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke={plan.accentColor}
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        >
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                          <circle cx="9" cy="7" r="4" />
+                          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        </svg>
+                        <span className="text-xs text-gray-600">Team size</span>
+                      </div>
+                      <span className="text-xs font-bold text-gray-800">{plan.users}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-white px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <svg
+                          width="15"
+                          height="15"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke={plan.accentColor}
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="8" x2="12" y2="16" />
+                          <line x1="8" y1="12" x2="16" y2="12" />
+                        </svg>
+                        <span className="text-xs text-gray-600">Extra credit</span>
+                      </div>
+                      <span className="text-xs font-bold text-gray-800">AED {plan.extraCredit}/cr</span>
+                    </div>
+                  </div>
+
+                  <motion.button
+                    whileHover={{ scale: 1.02, boxShadow: `0 8px 24px ${plan.accentColor}40` }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={() => handleSelectPlan(plan.slug)}
+                    disabled={isCurrent || loading === plan.slug}
+                    className="relative w-full overflow-hidden rounded-2xl py-3.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-70"
+                    style={{ backgroundColor: plan.accentColor }}
+                  >
+                    <motion.div
+                      className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      initial={{ x: '-100%' }}
+                      whileHover={{ x: '200%' }}
+                      transition={{ duration: 0.55 }}
+                    />
+                    <span className="relative z-10 flex items-center justify-center gap-2">
+                      {loading === plan.slug && <Loader2 size={14} className="animate-spin" />}
+                      {isCurrent ? '✓ Current plan' : 'Get started'}
+                    </span>
+                  </motion.button>
+                </div>
+              </motion.div>
             )
           })}
         </div>
