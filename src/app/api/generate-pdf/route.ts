@@ -5,6 +5,7 @@ import {
   generateInspectionPDFBuffer,
   type ReportData,
   type InspectionMeta,
+  type SignatureEntry,
 } from "@/lib/generatePDF";
 import {
   renderCheckoutPDFToBuffer,
@@ -18,7 +19,7 @@ import {
 } from "@/lib/compressImageForPdf";
 import {
   buildPdfSignatureEmbeds,
-  normalizeSignatureToDataUrl,
+  fetchUrlAsBase64DataUrl,
   resolveCreatorPdfRole,
   type CreatorPdfRole,
   type PdfSignatureEmbeds,
@@ -231,6 +232,7 @@ const INSPECTION_SELECT = `
   signatures (
     id,
     signer_type,
+    signer_name,
     otp_verified,
     signed_at,
     signature_data
@@ -436,7 +438,7 @@ export async function buildPdfAndUpload(
     if (supabaseAdmin) {
       const { data: sigData, error: sigFetchErr } = await supabaseAdmin
         .from("signatures")
-        .select("signer_type, signed_at, signature_data, otp_verified")
+        .select("signer_type, signer_name, signed_at, signature_data, otp_verified")
         .eq("inspection_id", inspectionId);
       if (sigFetchErr) {
         console.error("[generate-pdf] Signatures fetch error:", sigFetchErr);
@@ -452,37 +454,23 @@ export async function buildPdfAndUpload(
       creatorPdfRole,
     });
 
-    if (creatorPdfRole === "inspector" && supabaseAdmin && agentId) {
-      const { data: profileSig, error: profileSigErr } = await supabaseAdmin
-        .from("signatures")
-        .select("signature_url, signature_data, created_at")
-        .eq("user_id", agentId)
-        .is("inspection_id", null)
-        .maybeSingle();
-
-      if (profileSigErr) {
-        console.warn("[generate-pdf] Profile signature row fetch:", profileSigErr.message);
+    // Inspector (Pro): signatures table has only landlord/tenant — use profile image URL → data URL
+    if (
+      creatorPdfRole === "inspector" &&
+      agentData?.account_type === "pro" &&
+      agentId
+    ) {
+      let inspectorSigData: string | null = null;
+      if (agentData.signature_image_url) {
+        inspectorSigData = await fetchUrlAsBase64DataUrl(agentData.signature_image_url);
       }
-
-      const ps = profileSig as {
-        signature_url?: string | null;
-        signature_data?: string | null;
-      } | null;
-      const raw = ps?.signature_url ?? ps?.signature_data ?? null;
-
-      let inspectorBase64 = raw ? await normalizeSignatureToDataUrl(raw) : null;
-      if (!inspectorBase64 && agentData?.signature_image_url) {
-        inspectorBase64 = await normalizeSignatureToDataUrl(
-          agentData.signature_image_url
-        );
-      }
-
-      const inspectorSignedAt = inspectorBase64 ? new Date().toISOString() : null;
+      const inspectorSignedAt = inspectorSigData ? new Date().toISOString() : null;
 
       signatureEmbeds = {
         ...signatureEmbeds,
         inspector: {
-          base64: inspectorBase64,
+          data: inspectorSigData,
+          name: agentData.full_name ?? null,
           signedAt: inspectorSignedAt,
         },
       };
@@ -555,6 +543,7 @@ export async function buildPdfAndUpload(
       checkinRooms: undefined,
       signatures: freshSignatureRows.map((s) => ({
         signer_type: s.signer_type ?? "",
+        signer_name: s.signer_name ?? null,
         signed_at: s.signed_at ?? null,
         signature_data: s.signature_data ?? null,
         otp_verified: s.otp_verified ?? false,
@@ -653,9 +642,9 @@ export async function buildPdfAndUpload(
           landlord_email: tenancy?.landlord_email ?? undefined,
         },
         rooms: roomsWithDelta,
-        signatures: (meta.signatures ?? []).map((s) => ({
+        signatures: (meta.signatures ?? []).map((s: SignatureEntry) => ({
           signer_type: s.signer_type,
-          signer_name: undefined,
+          signer_name: s.signer_name ?? undefined,
           signature_data: s.signature_data ?? undefined,
           signed_at: s.signed_at ?? null,
         })),

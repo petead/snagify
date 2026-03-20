@@ -1014,8 +1014,9 @@ interface ReportData {
   recommendations: string[];
 }
 
-interface SignatureEntry {
+export interface SignatureEntry {
   signer_type: string;
+  signer_name?: string | null;
   signed_at?: string | null;
   signature_data?: string | null;
   otp_verified?: boolean;
@@ -1890,8 +1891,9 @@ function InspectionReport({
             {(() => {
               const landlordSig = (meta.signatures ?? []).find((s) => s.signer_type === "landlord");
               const tenantSig = (meta.signatures ?? []).find((s) => s.signer_type === "tenant");
-              const landlordImg = sigE?.landlord.base64 ?? landlordSig?.signature_data ?? null;
-              const tenantImg = sigE?.tenant.base64 ?? tenantSig?.signature_data ?? null;
+              const landlordImg =
+                sigE?.landlord.data ?? landlordSig?.signature_data ?? null;
+              const tenantImg = sigE?.tenant.data ?? tenantSig?.signature_data ?? null;
               const landlordSignedAt = sigE?.landlord.signedAt ?? landlordSig?.signed_at ?? null;
               const tenantSignedAt = sigE?.tenant.signedAt ?? tenantSig?.signed_at ?? null;
               const sigBoxStyle = {
@@ -2041,18 +2043,11 @@ function InspectionReport({
 
           {creatorPdfRole === "inspector" &&
             (() => {
-            const inspectorSig = (meta.signatures ?? []).find(
-              (s) => s.signer_type === "agent" || s.signer_type === "inspector"
-            );
             const profile = meta.agent;
-            const inspectorName = profile?.full_name ?? "—";
-            const isIndividual = (profile?.account_type ?? "individual") === "individual";
+            const inspectorName =
+              sigE?.inspector.name ?? profile?.full_name ?? "—";
 
-            const inspectorImg =
-              sigE?.inspector.base64 ??
-              inspectorSig?.signature_data ??
-              (!isIndividual ? profile?.signature_image_url : null) ??
-              null;
+            const inspectorImg = sigE?.inspector.data ?? null;
 
             const inspectorSignedAtEmbed = sigE?.inspector.signedAt ?? null;
             const inspectorSignedAtLegacy = meta.inspection.created_at ?? null;

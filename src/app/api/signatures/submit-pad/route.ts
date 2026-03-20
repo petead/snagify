@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { buildPdfAndUpload } from '@/app/api/generate-pdf/route'
 import { sendSignedPdfEmail } from '@/lib/sendSignedPdfEmail'
 import {
   notifySignatureSigned,
@@ -111,13 +112,13 @@ export async function POST(req: NextRequest) {
       .eq('id', inspectionId)
       .single()
 
-    // Only send if not already sent + report exists
-    if (
-      fullInspection &&
-      fullInspection.report_url &&
-      !fullInspection.pdf_sent_at
-    ) {
+    // Regenerate PDF so landlord/tenant/inspector signatures are embedded, then email once
+    if (fullInspection && !fullInspection.pdf_sent_at) {
       try {
+        const { report_url: freshReportUrl } = await buildPdfAndUpload(inspectionId)
+        if (!freshReportUrl) {
+          console.error('[submit-pad] buildPdfAndUpload returned no report_url; skipping signed email')
+        } else {
         const company = (fullInspection.agent as any)?.company
         const tenancy = fullInspection.tenancy as any
         const property = fullInspection.property as { location?: string; building_name?: string; unit_number?: string }
@@ -156,18 +157,16 @@ export async function POST(req: NextRequest) {
           propertyAddress,
           inspectionType: fullInspection.type,
           inspectionDate,
-          pdfUrl: fullInspection.report_url.split('?')[0],
+          pdfUrl: freshReportUrl.split('?')[0],
         })
 
-        // Mark as sent
         await supabaseAdmin
           .from('inspections')
           .update({ pdf_sent_at: now })
           .eq('id', inspectionId)
-
+        }
       } catch (emailErr) {
-        // Log but don't fail the signature submission
-        console.error('Failed to send signed PDF email:', emailErr)
+        console.error('Failed to regenerate PDF or send signed PDF email:', emailErr)
       }
     }
   }

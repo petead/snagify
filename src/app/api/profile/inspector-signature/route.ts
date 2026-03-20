@@ -60,11 +60,12 @@ export async function POST(request: NextRequest) {
     .eq("user_id", user.id)
     .is("inspection_id", null);
 
+  const signatureDataUrl = `data:image/png;base64,${buffer.toString("base64")}`;
   const { error: insErr } = await supabaseAdmin.from("signatures").insert({
     user_id: user.id,
     inspection_id: null,
     signer_type: "profile_inspector",
-    signature_url: publicUrl,
+    signature_data: signatureDataUrl,
     signed_at: new Date().toISOString(),
   });
 

@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 
 export type SignatureRow = {
   signer_type?: string | null;
+  signer_name?: string | null;
   signed_at?: string | null;
   signature_data?: string | null;
   otp_verified?: boolean | null;
@@ -20,7 +21,9 @@ export function resolveCreatorPdfRole(
 }
 
 export type PdfPartySignature = {
-  base64: string | null;
+  /** Data URL (e.g. data:image/png;base64,...) for @react-pdf/renderer Image src */
+  data: string | null;
+  name?: string | null;
   signedAt?: string | null;
 };
 
@@ -58,71 +61,57 @@ export async function normalizeSignatureToDataUrl(
   return null;
 }
 
+/** Use DB value directly when already a data URL; otherwise normalize (e.g. rare https). */
+async function embedSignatureData(raw: string | null | undefined): Promise<string | null> {
+  if (!raw?.trim()) return null;
+  const s = raw.trim();
+  if (s.startsWith("data:")) return s;
+  return normalizeSignatureToDataUrl(s);
+}
+
 export function isFullySigned(
   embeds: PdfSignatureEmbeds,
   creatorPdfRole: CreatorPdfRole = "inspector"
 ): boolean {
-  const landlordOk = !!embeds.landlord.base64;
-  const tenantOk = !!embeds.tenant.base64;
+  const landlordOk = !!embeds.landlord.data;
+  const tenantOk = !!embeds.tenant.data;
   if (creatorPdfRole === "inspector") {
-    return landlordOk && tenantOk && !!embeds.inspector.base64;
+    return landlordOk && tenantOk && !!embeds.inspector.data;
   }
   return landlordOk && tenantOk;
 }
 
 /**
- * Build landlord / tenant / (optional) inspector image data URLs for PDF embedding.
- * Owner → landlord column, tenant → tenant column. Pro inspector slot is filled in generate-pdf (profile signatures row / profile URL), not from inspection rows.
+ * Landlord / tenant from `signatures` rows (signer_type only — no inspector row).
+ * Pro inspector slot is filled in generate-pdf from profiles.signature_image_url.
  */
 export async function buildPdfSignatureEmbeds(options: {
   rows: SignatureRow[];
+  /** Kept for API compatibility; landlord & tenant embeds use signer_type rows only. */
   creatorPdfRole: CreatorPdfRole;
 }): Promise<PdfSignatureEmbeds> {
-  const { rows, creatorPdfRole } = options;
+  const { rows } = options;
 
-  const rawLandlord = rows.find((r) => r.signer_type === "landlord");
+  const landlordRow = rows.find((r) => r.signer_type === "landlord");
   const rawTenant = rows.find((r) => r.signer_type === "tenant");
-  const rawAgentInspector = rows.find(
-    (r) => r.signer_type === "agent" || r.signer_type === "inspector"
-  );
 
-  // Pro inspector: never take creator signature from inspection-level agent/inspector rows
-  const creatorSig =
-    creatorPdfRole === "inspector"
-      ? null
-      : rawAgentInspector ??
-        (creatorPdfRole === "landlord"
-          ? rawLandlord
-          : creatorPdfRole === "tenant"
-            ? rawTenant
-            : null) ??
-        null;
-
-  const landlordRow =
-    creatorPdfRole === "landlord" ? creatorSig ?? rawLandlord : rawLandlord;
-  const tenantRow =
-    creatorPdfRole === "tenant" ? creatorSig ?? rawTenant : rawTenant;
-
-  const landlordBase64 = await normalizeSignatureToDataUrl(
-    landlordRow?.signature_data ?? null
-  );
-  const tenantBase64 = await normalizeSignatureToDataUrl(
-    tenantRow?.signature_data ?? null
-  );
-  const landlordSignedAt: string | null = landlordRow?.signed_at ?? null;
-  const tenantSignedAt: string | null = tenantRow?.signed_at ?? null;
+  const landlordData = await embedSignatureData(landlordRow?.signature_data ?? null);
+  const tenantData = await embedSignatureData(rawTenant?.signature_data ?? null);
 
   return {
     landlord: {
-      base64: landlordBase64,
-      signedAt: landlordSignedAt,
+      data: landlordData,
+      name: landlordRow?.signer_name ?? null,
+      signedAt: landlordRow?.signed_at ?? null,
     },
     tenant: {
-      base64: tenantBase64,
-      signedAt: tenantSignedAt,
+      data: tenantData,
+      name: rawTenant?.signer_name ?? null,
+      signedAt: rawTenant?.signed_at ?? null,
     },
     inspector: {
-      base64: null,
+      data: null,
+      name: null,
       signedAt: null,
     },
   };

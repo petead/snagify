@@ -2318,8 +2318,9 @@ export function CheckoutPDFDocument({
             {(() => {
               const landlordSig = (signatures ?? []).find((s) => s.signer_type === "landlord");
               const tenantSig = (signatures ?? []).find((s) => s.signer_type === "tenant");
-              const landlordImg = sigE?.landlord.base64 ?? landlordSig?.signature_data ?? null;
-              const tenantImg = sigE?.tenant.base64 ?? tenantSig?.signature_data ?? null;
+              const landlordImg =
+                sigE?.landlord.data ?? landlordSig?.signature_data ?? null;
+              const tenantImg = sigE?.tenant.data ?? tenantSig?.signature_data ?? null;
               const landlordSignedAt = sigE?.landlord.signedAt ?? landlordSig?.signed_at ?? null;
               const tenantSignedAt = sigE?.tenant.signedAt ?? tenantSig?.signed_at ?? null;
               const sigBoxStyle = {
@@ -2469,17 +2470,10 @@ export function CheckoutPDFDocument({
 
           {creatorPdfRole === "inspector" &&
             (() => {
-            const inspectorSig = (signatures ?? []).find(
-              (s) => s.signer_type === "agent" || s.signer_type === "inspector"
-            );
-            const inspectorName = profile?.full_name ?? "—";
-            const isIndividual = ((profile as { account_type?: string } | undefined)?.account_type ?? "individual") === "individual";
+            const inspectorName =
+              sigE?.inspector.name ?? profile?.full_name ?? "—";
 
-            const inspectorImg =
-              sigE?.inspector.base64 ??
-              inspectorSig?.signature_data ??
-              (!isIndividual ? profile?.signature_image_url : null) ??
-              null;
+            const inspectorImg = sigE?.inspector.data ?? null;
 
             const inspectorSignedAtEmbed = sigE?.inspector.signedAt ?? null;
             const inspectorSignedAtLegacy = inspection.created_at ?? null;
