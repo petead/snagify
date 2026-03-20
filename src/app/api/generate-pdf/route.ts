@@ -24,6 +24,11 @@ import {
   type PdfSignatureEmbeds,
   type SignatureRow,
 } from "@/lib/pdf/inspectionSignatureEmbeds";
+import {
+  assertCanDebitCheckoutReport,
+  debitCheckoutReportAfterPdfSuccess,
+  InsufficientCreditsError,
+} from "@/lib/credits/checkoutReportDebit";
 
 export const maxDuration = 60;
 
@@ -415,6 +420,18 @@ export async function buildPdfAndUpload(
     const supabaseAdmin =
       supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
 
+    if (isCheckout) {
+      if (!supabaseAdmin) {
+        throw new Error(
+          "Check-out report billing requires server configuration (SUPABASE_SERVICE_ROLE_KEY)"
+        );
+      }
+      if (!agentId) {
+        throw new Error("Inspection has no agent_id; cannot verify credits for check-out");
+      }
+      await assertCanDebitCheckoutReport(supabaseAdmin, inspectionId, agentId);
+    }
+
     let freshSignatureRows: SignatureRow[] = [];
     if (supabaseAdmin) {
       const { data: sigData, error: sigFetchErr } = await supabaseAdmin
@@ -704,11 +721,19 @@ export async function buildPdfAndUpload(
         console.error("[generate-pdf] Failed to save report_url:", updateErr.message);
       } else {
         reportUrl = bustUrl;
+        if (isCheckout && supabaseAdmin && agentId) {
+          await debitCheckoutReportAfterPdfSuccess(
+            supabaseAdmin,
+            inspectionId,
+            agentId
+          );
+        }
       }
     }
 
     return { report_url: reportUrl, buffer: new Uint8Array(pdfBuffer) };
   } catch (err: unknown) {
+    if (err instanceof InsufficientCreditsError) throw err;
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[buildPdfAndUpload] CRASH:", msg);
     throw new Error(`buildPdfAndUpload — ${msg}`);
@@ -737,6 +762,16 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (err) {
+    if (err instanceof InsufficientCreditsError) {
+      return NextResponse.json(
+        {
+          error: err.message,
+          balance: err.balance,
+          credits_needed: err.credits_needed,
+        },
+        { status: 402 }
+      );
+    }
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : "";
     console.error(`[generate-pdf] CRASH at step="${step}":`, msg);

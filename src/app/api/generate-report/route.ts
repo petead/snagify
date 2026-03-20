@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { buildPdfAndUpload } from "@/app/api/generate-pdf/route";
+import { InsufficientCreditsError } from "@/lib/credits/checkoutReportDebit";
 
 export const maxDuration = 60;
 
@@ -243,6 +244,16 @@ export async function POST(request: Request) {
       executive_summary: aiSummary,
     });
   } catch (err: unknown) {
+    if (err instanceof InsufficientCreditsError) {
+      return NextResponse.json(
+        {
+          error: err.message,
+          balance: err.balance,
+          credits_needed: err.credits_needed,
+        },
+        { status: 402 }
+      );
+    }
     const message = err instanceof Error ? err.message : "Unknown error";
     const stack = err instanceof Error ? err.stack : "";
     console.error(`[generate-report] CRASH at step="${step}":`, message);

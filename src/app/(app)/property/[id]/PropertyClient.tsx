@@ -150,24 +150,32 @@ function InspectionRow({
     if (inspectionType === "check-out" && sourceCheckInId) {
       setPreparingCheckOut(true);
       try {
-        const debitRes = await fetch("/api/credits/debit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ inspection_id: null }),
-        });
-        const debitData = (await debitRes.json()) as { error?: string };
-        if (debitRes.status === 402) {
+        const supabase = createClient();
+        const [balanceRes, costRow] = await Promise.all([
+          fetch("/api/credits/balance"),
+          supabase
+            .from("credit_costs")
+            .select("credits")
+            .eq("action", "checkout_standard")
+            .maybeSingle(),
+        ]);
+        const balanceJson = (await balanceRes.json()) as {
+          balance?: number;
+          error?: string;
+        };
+        if (!balanceRes.ok) {
+          alert(balanceJson.error || "Could not verify credits");
+          setPreparingCheckOut(false);
+          return;
+        }
+        const balance = Number(balanceJson.balance ?? 0);
+        const cost = Number(costRow.data?.credits ?? 2) || 2;
+        if (balance < cost) {
           setShowBuyCredits(true);
           setPreparingCheckOut(false);
           return;
         }
-        if (!debitRes.ok) {
-          alert(debitData.error || "Something went wrong");
-          setPreparingCheckOut(false);
-          return;
-        }
 
-        const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           setPreparingCheckOut(false);

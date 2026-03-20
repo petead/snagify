@@ -435,6 +435,7 @@ export function InspectionClient({
   const [showCreditConfirm, setShowCreditConfirm] = useState(false);
   const [liveCredits, setLiveCredits] = useState<number | null>(null);
   const [creditCost, setCreditCost] = useState(2);
+  const [openingCreditModal, setOpeningCreditModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const notesTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -471,26 +472,43 @@ export function InspectionClient({
     window.scrollTo(0, 0);
   }, [screen]);
 
-  // Fetch current company credits each time the checkout modal opens.
-  useEffect(() => {
-    if (!showCreditConfirm) return;
-
-    const fetchCredits = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+  /** Fresh balance + cost from DB, then open the confirm sheet (avoids stale 0 balance flash). */
+  async function openCheckoutCreditConfirmModal() {
+    setOpeningCreditModal(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data } = await supabase
-        .from("profiles")
-        .select("company:companies(credits_balance)")
-        .eq("id", user.id)
-        .single();
+      const [profileRes, costRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("company:companies(credits_balance)")
+          .eq("id", user.id)
+          .single(),
+        supabase
+          .from("credit_costs")
+          .select("credits")
+          .eq("action", "checkout_standard")
+          .maybeSingle(),
+      ]);
 
-      const balance = (data?.company as { credits_balance?: number } | null)?.credits_balance ?? 0;
+      if (profileRes.error) {
+        setToast("Could not load credit balance");
+        return;
+      }
+
+      const balance =
+        (profileRes.data?.company as { credits_balance?: number } | null)
+          ?.credits_balance ?? 0;
       setLiveCredits(balance);
-    };
-
-    void fetchCredits();
-  }, [showCreditConfirm, supabase]);
+      if (costRes.data?.credits) setCreditCost(costRes.data.credits);
+      setShowCreditConfirm(true);
+    } finally {
+      setOpeningCreditModal(false);
+    }
+  }
 
   // Pre-select existing room names on mount + detect matching template
   useEffect(() => {
@@ -1086,7 +1104,17 @@ export function InspectionClient({
         body: JSON.stringify({ inspectionId }),
       });
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({})) as { error?: string };
+        const errBody = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          balance?: number;
+          credits_needed?: number;
+        };
+        if (res.status === 402) {
+          throw new Error(
+            errBody.error ??
+              `Insufficient credits (need ${errBody.credits_needed ?? creditCost})`
+          );
+        }
         throw new Error(errBody.error ?? "Generation failed");
       }
 
@@ -2262,7 +2290,7 @@ export function InspectionClient({
                       onClick={() => {
                         setShowCompletenessWarning(false);
                         if (isCheckout) {
-                          setShowCreditConfirm(true);
+                          void openCheckoutCreditConfirmModal();
                         } else {
                           handleGenerateReport();
                         }
@@ -2307,26 +2335,35 @@ export function InspectionClient({
                   if (completenessIssues.length > 0) {
                     setShowCompletenessWarning(true);
                   } else {
-                    setShowCreditConfirm(true);
+                    void openCheckoutCreditConfirmModal();
                   }
                 } else {
                   handleGenerateReport();
                 }
               }}
-              disabled={generating || navigating}
+              disabled={generating || navigating || openingCreditModal}
               style={{
                 width: "100%", height: 52, borderRadius: 14, border: "none",
-                background: (generating || navigating)
+                background: (generating || navigating || openingCreditModal)
                   ? "#e5e7eb"
                   : "linear-gradient(135deg, #9A88FD, #7B65FC)",
-                color: (generating || navigating) ? "#9ca3af" : "white",
+                color: (generating || navigating || openingCreditModal) ? "#9ca3af" : "white",
                 fontFamily: "Poppins, sans-serif",
                 fontWeight: 800, fontSize: 15,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                cursor: (generating || navigating) ? "default" : "pointer",
+                cursor: (generating || navigating || openingCreditModal) ? "default" : "pointer",
               }}
             >
-              {navigating ? (
+              {openingCreditModal ? (
+                <>
+                  <div style={{
+                    width: 16, height: 16, borderRadius: "50%",
+                    border: "2px solid #9ca3af", borderTopColor: "transparent",
+                    animation: "spin 0.8s linear infinite",
+                  }} />
+                  Loading…
+                </>
+              ) : navigating ? (
                 <>
                   <div style={{
                     width: 16, height: 16, borderRadius: "50%",
