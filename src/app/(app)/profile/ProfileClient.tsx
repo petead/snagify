@@ -6,12 +6,13 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import PushNotificationToggle from "@/components/PushNotificationToggle";
-import { SubscriptionSection } from "@/components/profile/SubscriptionSection";
 import { TeamSection } from "@/components/profile/TeamSection";
 import { ReportBugModal } from "@/components/settings/ReportBugModal";
+import { SubscriptionSheet } from "@/components/SubscriptionSheet";
 import { Check } from "lucide-react";
 import { trackAction } from "@/lib/breadcrumb";
 import type { ProfileRole } from "@/lib/profileLabels";
+import { motion } from "framer-motion";
 
 export type ProfileData = {
   full_name: string | null;
@@ -39,6 +40,7 @@ export type CompanyData = {
   max_users: number;
   name: string;
   stripe_subscription_id?: string | null;
+  billing_cycle_reset_at?: string | null;
 } | null;
 
 interface ProfileClientProps {
@@ -67,6 +69,29 @@ function formatMemberSince(iso: string | null): string {
   return d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 }
 
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "soon";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "soon";
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function getMaxCredits(plan: string | null | undefined): number {
+  switch (plan) {
+    case "starter":
+    case "pro_solo":
+      return 10;
+    case "growth":
+    case "pro_agency":
+      return 20;
+    case "agency":
+    case "pro_max":
+      return 30;
+    default:
+      return 0;
+  }
+}
+
 export function ProfileClient({
   userId: _userId,
   userEmail,
@@ -85,6 +110,7 @@ export function ProfileClient({
   const [showBugReport, setShowBugReport] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [showSubscription, setShowSubscription] = useState(false);
   const justSubscribed = searchParams.get("subscribed") === "true";
   const isPro = accountType === "pro";
   const isOwner = role === "owner";
@@ -115,6 +141,18 @@ export function ProfileClient({
   const displayName = profile.full_name?.trim() || (userEmail ? userEmail.split("@")[0] : "User");
   const displayEmail = userEmail ?? "";
   const memberSince = profile.memberSince ?? null;
+  const planColors: Record<string, string> = {
+    free: "#9CA3AF",
+    starter: "#9A88FD",
+    growth: "#7C3AED",
+    agency: "#1E1B4B",
+    pro_solo: "#9A88FD",
+    pro_agency: "#7C3AED",
+    pro_max: "#1E1B4B",
+  };
+  const planColor = planColors[company?.plan ?? "free"] ?? "#9CA3AF";
+  const isSubscribed = Boolean(company?.plan && company.plan !== "free");
+  const maxCredits = getMaxCredits(company?.plan);
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -389,7 +427,66 @@ export function ProfileClient({
             <p style={{ fontSize: 13, color: "#BBB", margin: "0 0 12px", fontWeight: 500, letterSpacing: 2, textTransform: "uppercase" }}>
               Subscription
             </p>
-            <SubscriptionSection company={company} />
+            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowSubscription(true)} className="w-full text-left" type="button">
+              <div className="w-full overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <div className="h-1 w-full" style={{ backgroundColor: planColor }} />
+                <div className="flex items-center justify-between px-4 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: `${planColor}15` }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={planColor} strokeWidth="2" strokeLinecap="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" />
+                        <path d="M8 21h8M12 17v4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Subscription</p>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <p className="text-base font-black text-gray-900 capitalize">{company?.plan ?? "Free"}</p>
+                        {isSubscribed ? (
+                          <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white" style={{ backgroundColor: planColor }}>
+                            Active
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold text-gray-500">No plan</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-[10px] text-gray-400">Credits</p>
+                      <p className="text-lg font-black" style={{ color: planColor }}>
+                        {company?.credits_balance ?? 0}
+                      </p>
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </div>
+                </div>
+                {isSubscribed ? (
+                  <div className="flex items-center justify-between border-t border-gray-50 px-4 pb-3">
+                    <p className="text-[11px] text-gray-400">Renews {formatDate(company?.billing_cycle_reset_at)}</p>
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-gray-100">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            backgroundColor: planColor,
+                            width: `${Math.min(100, maxCredits > 0 ? ((company?.credits_balance ?? 0) / maxCredits) * 100 : 0)}%`,
+                          }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-gray-400">{company?.credits_balance ?? 0}/{maxCredits} cr</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-t border-gray-50 px-4 pb-3">
+                    <p className="text-[11px] font-semibold text-[#9A88FD]">Upgrade to Pro to start inspecting →</p>
+                  </div>
+                )}
+              </div>
+            </motion.button>
           </div>
         )}
 
@@ -627,6 +724,16 @@ export function ProfileClient({
       {/* Bug report modal */}
       {showBugReport && (
         <ReportBugModal onClose={() => setShowBugReport(false)} />
+      )}
+
+      {canManageBilling && company && (
+        <SubscriptionSheet
+          isOpen={showSubscription}
+          onClose={() => setShowSubscription(false)}
+          currentPlan={company?.plan ?? "free"}
+          creditsBalance={company?.credits_balance ?? 0}
+          companyId={company.id}
+        />
       )}
 
       {showDeleteConfirm && (
