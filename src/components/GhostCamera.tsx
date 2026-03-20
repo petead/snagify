@@ -359,52 +359,43 @@ export default function GhostCamera({
   };
 
   return (
-    <div className="fixed inset-0 z-[999] overflow-hidden bg-black">
-      {/* Video viewport — full sensor, no forced aspect ratio */}
-      <div className="absolute inset-0 flex items-start justify-center bg-black">
-        <div
+    <div className="fixed inset-0 z-[999] bg-black">
+      {/* Full-bleed video layer — behind all overlays (header z-30) */}
+      <div className="absolute inset-0">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="block"
           style={{
-            position: "relative",
             width: "100%",
             height: "100%",
+            objectFit: "contain",
           }}
-        >
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "contain",
-              zIndex: 0,
-            }}
-          />
+        />
 
-          {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={activeGhost.url}
-                alt=""
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "contain",
-                  opacity: ghostOpacity,
-                  pointerEvents: "none",
-                  zIndex: 1,
-                }}
-              />
-            </>
-          )}
+        {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={activeGhost.url}
+              alt=""
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                opacity: ghostOpacity,
+                pointerEvents: "none",
+                zIndex: 1,
+              }}
+            />
+          </>
+        )}
 
-              {activeGhost && !isAdditionalMode && (
+        {activeGhost && !isAdditionalMode && (
                 <div
                   style={{
                     position: "absolute",
@@ -534,16 +525,15 @@ export default function GhostCamera({
                   </span>
                 </div>
               )}
-            </div>
-          </div>
+      </div>
 
-      {/* ── LAYER 2: TOP BAR overlay — floats over full-bleed video (same stacking context as root) */}
+      {/* ── TOP BAR — transparent overlay on video */}
       <div
-        className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-4"
+        className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4"
         style={{
           paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
           paddingBottom: 8,
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)",
+          background: "transparent",
         }}
       >
         <button
