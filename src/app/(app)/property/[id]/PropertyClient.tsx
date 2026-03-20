@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 import { useCredits } from "@/hooks/useCredits";
 import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
+import { ProGateSheet } from "@/components/ProGateSheet";
+import { checkProAccess, type ProAccessState } from "@/lib/checkProAccess";
 
 type InspectionSignature = {
   signer_type: string;
@@ -143,6 +145,12 @@ function InspectionRow({
   const router = useRouter();
   const [preparingCheckOut, setPreparingCheckOut] = useState(false);
   const [showBuyCredits, setShowBuyCredits] = useState(false);
+  const [showGate, setShowGate] = useState(false);
+  const [gateState, setGateState] = useState<ProAccessState>("ok");
+  const [gateBalance, setGateBalance] = useState(0);
+  const [gateCost, setGateCost] = useState(0);
+  const [gatePlan, setGatePlan] = useState("free");
+  const [gateActionLabel, setGateActionLabel] = useState("Start Check-in");
 
   const state = inspection ? getInspectionState(inspection) : null;
 
@@ -247,9 +255,45 @@ function InspectionRow({
       return;
     }
 
-    const params = new URLSearchParams({ propertyId, type: "check-in" });
-    if (tenancyId) params.set("tenancyId", tenancyId);
-    router.push(`/inspection/new?${params.toString()}`);
+    const startCheckIn = () => {
+      const params = new URLSearchParams({ propertyId, type: "check-in" });
+      if (tenancyId) params.set("tenancyId", tenancyId);
+      router.push(`/inspection/new?${params.toString()}`);
+    };
+
+    if (inspectionType === "check-in" && creditsAccountType === "pro") {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("company_id")
+        .eq("id", user.id)
+        .single();
+      if (!profile?.company_id) return;
+
+      const { data: costData } = await supabase
+        .from("credit_costs")
+        .select("credits")
+        .eq("action", "pro_checkin")
+        .eq("is_active", true)
+        .single();
+      const cost = Number(costData?.credits ?? 1) || 1;
+
+      const access = await checkProAccess(profile.company_id, cost, supabase);
+      setGateState(access.state);
+      setGateBalance(access.balance);
+      setGateCost(cost);
+      setGatePlan(access.plan);
+      setGateActionLabel("Start Check-in");
+      setShowGate(true);
+      return;
+    }
+
+    startCheckIn();
   };
 
   const handleOpen = () => {
@@ -406,6 +450,23 @@ function InspectionRow({
           setShowBuyCredits(false);
         }}
       />
+
+      {showGate && (
+        <ProGateSheet
+          state={gateState}
+          balance={gateBalance}
+          cost={gateCost}
+          plan={gatePlan}
+          actionLabel={gateActionLabel}
+          onClose={() => setShowGate(false)}
+          onConfirm={() => {
+            setShowGate(false);
+            const params = new URLSearchParams({ propertyId, type: "check-in" });
+            if (tenancyId) params.set("tenancyId", tenancyId);
+            router.push(`/inspection/new?${params.toString()}`);
+          }}
+        />
+      )}
     </div>
   );
 }

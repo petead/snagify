@@ -14,6 +14,8 @@ import GhostCamera from "@/components/GhostCamera";
 import { assertValidDimensions } from "@/lib/getImageDimensions";
 import { compressPhoto, compressPhotoDataUrl } from "@/lib/compressPhoto";
 import { CheckoutCreditConfirmModal } from "@/components/inspection/CheckoutCreditConfirmModal";
+import { ProGateSheet } from "@/components/ProGateSheet";
+import { checkProAccess, type ProAccessState } from "@/lib/checkProAccess";
 import { trackAction } from "@/lib/breadcrumb";
 
 // ─── Types ───────────────────────────────────────
@@ -449,6 +451,12 @@ export function InspectionClient({
   const [liveCredits, setLiveCredits] = useState<number | null>(null);
   const [creditCost, setCreditCost] = useState(1);
   const [openingCreditModal, setOpeningCreditModal] = useState(false);
+  const [showProGate, setShowProGate] = useState(false);
+  const [gateState, setGateState] = useState<ProAccessState>("ok");
+  const [gateBalance, setGateBalance] = useState(0);
+  const [gatePlan, setGatePlan] = useState("free");
+  const [gateCost, setGateCost] = useState(0);
+  const [gateActionLabel, setGateActionLabel] = useState("Generate Report");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const notesTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -525,6 +533,67 @@ export function InspectionClient({
       setLiveCredits(balance);
       setCreditCost(Number(costRes.data?.credits ?? 1) || 1);
       setShowCreditConfirm(true);
+    } finally {
+      setOpeningCreditModal(false);
+    }
+  }
+
+  async function openProGateForReport() {
+    setOpeningCreditModal(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("account_type, company_id")
+        .eq("id", user.id)
+        .single();
+
+      const accountType = profile?.account_type === "individual" ? "individual" : "pro";
+      const inspType = inspectionType === "check-in" ? "check-in" : "check-out";
+      const action =
+        accountType === "pro"
+          ? inspType === "check-in"
+            ? "pro_checkin"
+            : "pro_checkout"
+          : inspType === "check-in"
+            ? "individual_checkin"
+            : "individual_checkout";
+
+      const { data: costData } = await supabase
+        .from("credit_costs")
+        .select("credits")
+        .eq("action", action)
+        .eq("is_active", true)
+        .single();
+      const cost = Number(costData?.credits ?? 1) || 1;
+
+      if (accountType !== "pro") {
+        if (inspType === "check-in") {
+          await handleGenerateReport();
+          return;
+        }
+        setCreditCost(cost);
+        await openCheckoutCreditConfirmModal();
+        return;
+      }
+
+      if (!profile?.company_id) {
+        setToast("Could not verify company access");
+        return;
+      }
+      const access = await checkProAccess(profile.company_id, cost, supabase);
+      setGateState(access.state);
+      setGateBalance(access.balance);
+      setGateCost(cost);
+      setGatePlan(access.plan);
+      setGateActionLabel(
+        `Generate ${inspType === "check-in" ? "Check-in" : "Check-out"} Report`
+      );
+      setShowProGate(true);
     } finally {
       setOpeningCreditModal(false);
     }
@@ -2325,11 +2394,7 @@ export function InspectionClient({
                       type="button"
                       onClick={() => {
                         setShowCompletenessWarning(false);
-                        if (isCheckout) {
-                          void openCheckoutCreditConfirmModal();
-                        } else {
-                          handleGenerateReport();
-                        }
+                        void openProGateForReport();
                       }}
                       style={{
                         flex: 1,
@@ -2367,14 +2432,10 @@ export function InspectionClient({
             <button
               type="button"
               onClick={() => {
-                if (isCheckout) {
-                  if (completenessIssues.length > 0) {
-                    setShowCompletenessWarning(true);
-                  } else {
-                    void openCheckoutCreditConfirmModal();
-                  }
+                if (isCheckout && completenessIssues.length > 0) {
+                  setShowCompletenessWarning(true);
                 } else {
-                  handleGenerateReport();
+                  void openProGateForReport();
                 }
               }}
               disabled={generating || navigating || openingCreditModal}
@@ -2436,6 +2497,21 @@ export function InspectionClient({
             await handleGenerateReport();
           }}
           onCancel={() => setShowCreditConfirm(false)}
+        />
+      )}
+
+      {showProGate && (
+        <ProGateSheet
+          state={gateState}
+          balance={gateBalance}
+          plan={gatePlan}
+          cost={gateCost}
+          actionLabel={gateActionLabel}
+          onClose={() => setShowProGate(false)}
+          onConfirm={async () => {
+            setShowProGate(false);
+            await handleGenerateReport();
+          }}
         />
       )}
     </>
