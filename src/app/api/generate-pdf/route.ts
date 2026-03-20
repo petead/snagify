@@ -421,42 +421,40 @@ export async function buildPdfAndUpload(
     const supabaseAdmin =
       supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
 
-    if (isCheckout) {
-      if (!supabaseAdmin) {
-        throw new Error(
-          "Check-out report billing requires server configuration (SUPABASE_SERVICE_ROLE_KEY)"
+    if (!supabaseAdmin) {
+      throw new Error(
+        "Report billing requires server configuration (SUPABASE_SERVICE_ROLE_KEY)"
+      );
+    }
+    if (!agentId) {
+      throw new Error("Inspection has no agent_id; cannot verify credits");
+    }
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("account_type, company_id")
+      .eq("id", inspection.agent_id)
+      .single();
+
+    const accountType =
+      profile?.account_type === "individual" ? "individual" : "pro";
+    const companyId = profile?.company_id as string | null;
+    const inspType = inspection.type === "check-in" ? "check-in" : "check-out";
+
+    if (companyId) {
+      const result = await deductCredits({
+        supabaseAdmin,
+        companyId,
+        inspectionId,
+        inspectionType: inspType,
+        accountType,
+      });
+
+      if (!result.success) {
+        throw new InsufficientCreditsError(
+          "Insufficient credits",
+          result.newBalance,
+          result.cost
         );
-      }
-      if (!agentId) {
-        throw new Error("Inspection has no agent_id; cannot verify credits for check-out");
-      }
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("account_type, company_id")
-        .eq("id", inspection.agent_id)
-        .single();
-
-      const accountType =
-        profile?.account_type === "individual" ? "individual" : "pro";
-      const companyId = profile?.company_id as string | null;
-      const inspType = inspection.type === "check-in" ? "check-in" : "check-out";
-
-      if (companyId) {
-        const result = await deductCredits({
-          supabaseAdmin,
-          companyId,
-          inspectionId,
-          inspectionType: inspType,
-          accountType,
-        });
-
-        if (!result.success) {
-          throw new InsufficientCreditsError(
-            "Insufficient credits",
-            result.newBalance,
-            result.cost
-          );
-        }
       }
     }
 
