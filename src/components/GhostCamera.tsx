@@ -173,12 +173,16 @@ export default function GhostCamera({
     let mounted = true;
     const startCamera = async () => {
       try {
+        const activePhoto = checkinPhotos[activeGhostIndex] ?? checkinPhotos[0];
+        const streamPhotoW = activePhoto?.width ?? 1440;
+        const streamPhotoH = activePhoto?.height ?? 1920;
+
         const mediaConstraints: MediaStreamConstraints = {
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: photoW },
-            height: { ideal: photoH },
-            aspectRatio: { ideal: photoH / photoW },
+            width: { ideal: streamPhotoW, exact: streamPhotoW },
+            height: { ideal: streamPhotoH, exact: streamPhotoH },
+            aspectRatio: { ideal: streamPhotoH / streamPhotoW },
           },
           audio: false,
         };
@@ -187,10 +191,22 @@ export default function GhostCamera({
         try {
           mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
         } catch {
-          mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: "environment" } },
-            audio: false,
-          });
+          try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode: { ideal: "environment" },
+                aspectRatio: { ideal: streamPhotoH / streamPhotoW },
+                width: { ideal: streamPhotoW },
+                height: { ideal: streamPhotoH },
+              },
+              audio: false,
+            });
+          } catch {
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: "environment" } },
+              audio: false,
+            });
+          }
         }
         if (!mounted) {
           mediaStream.getTracks().forEach((t) => t.stop());
