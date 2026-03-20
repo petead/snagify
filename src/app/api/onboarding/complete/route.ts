@@ -15,6 +15,11 @@ function buildFullAddress(
   return [line1.trim(), city.trim(), country.trim()].filter(Boolean).join(", ");
 }
 
+function getMissingColumnFromError(message: string): string | null {
+  const m = message.match(/Could not find the '([^']+)' column/i);
+  return m?.[1] ?? null;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -127,18 +132,38 @@ export async function POST(req: Request) {
         websiteT = `https://${websiteT}`;
       }
 
-      const { data: company, error: companyError } = await admin
-        .from("companies")
-        .insert({
-          name,
-          address: buildFullAddress(line1, cityT, countryT) || null,
-          trade_license: (tradeLicense ?? "").trim() || null,
-          primary_color: (primaryColor ?? "").trim() || "#9A88FD",
-          website: websiteT || null,
-          logo_url: "https://app.snagify.net/icon-512x512.png",
-        })
-        .select("id")
-        .single();
+      let company:
+        | {
+            id: string;
+          }
+        | null = null;
+      let companyError: { message?: string; code?: string } | null = null;
+      let companyInsertPayload: Record<string, unknown> = {
+        name,
+        company_email: companyEmailTrimmed || null,
+        address: buildFullAddress(line1, cityT, countryT) || null,
+        trade_license: (tradeLicense ?? "").trim() || null,
+        primary_color: (primaryColor ?? "").trim() || "#9A88FD",
+        website: websiteT || null,
+        logo_url: "https://app.snagify.net/icon-512x512.png",
+      };
+
+      for (let i = 0; i < 4; i++) {
+        const { data, error } = await admin
+          .from("companies")
+          .insert(companyInsertPayload)
+          .select("id")
+          .single();
+        if (!error) {
+          company = data;
+          companyError = null;
+          break;
+        }
+        companyError = error;
+        const missingColumn = getMissingColumnFromError(error.message ?? "");
+        if (!missingColumn || !(missingColumn in companyInsertPayload)) break;
+        delete companyInsertPayload[missingColumn];
+      }
 
       // #region agent log
       fetch("http://127.0.0.1:7620/ingest/2d2a86d0-4e2c-4ff3-bf45-64aa83a51471", {
@@ -198,7 +223,6 @@ export async function POST(req: Request) {
     };
 
     if (isPro) {
-      profilePayload.company_email = (companyEmail ?? "").trim() || null;
       profilePayload.whatsapp_number = (phone ?? "").trim() || null;
       profilePayload.company_trade_license = (tradeLicense ?? "").trim() || null;
       profilePayload.company_website = websiteT || null;
@@ -206,9 +230,26 @@ export async function POST(req: Request) {
         (primaryColor ?? "").trim() || "#9A88FD";
     }
 
-    const { error: profileError } = await admin
-      .from("profiles")
-      .upsert(profilePayload, { onConflict: "id" });
+    let profileError: { message?: string; code?: string } | null = null;
+    let profileUpsertDroppedColumn: string | null = null;
+    let workingPayload: Record<string, unknown> = { ...profilePayload };
+
+    for (let i = 0; i < 6; i++) {
+      const { error } = await admin
+        .from("profiles")
+        .upsert(workingPayload, { onConflict: "id" });
+      if (!error) {
+        profileError = null;
+        break;
+      }
+      profileError = error;
+      const missingColumn = getMissingColumnFromError(error.message ?? "");
+      if (!missingColumn) break;
+      if (["id", "email", "full_name", "account_type"].includes(missingColumn)) break;
+      if (!(missingColumn in workingPayload)) break;
+      delete workingPayload[missingColumn];
+      profileUpsertDroppedColumn = missingColumn;
+    }
 
     // #region agent log
     fetch("http://127.0.0.1:7620/ingest/2d2a86d0-4e2c-4ff3-bf45-64aa83a51471", {
@@ -233,6 +274,7 @@ export async function POST(req: Request) {
             profilePayload,
             "whatsapp_number"
           ),
+          droppedColumn: profileUpsertDroppedColumn,
           profileErrorCode: profileError?.code ?? null,
           profileErrorMessage: profileError?.message ?? null,
         },
