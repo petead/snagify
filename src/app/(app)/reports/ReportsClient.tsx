@@ -170,10 +170,6 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
 
         .report-card {
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          cursor: pointer;
-        }
-        .report-card:active {
-          transform: scale(0.98);
         }
         .report-card-deleting {
           opacity: 0;
@@ -373,6 +369,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
               const prop = first(report.properties) as { building_name?: string | null; unit_number?: string | null } | null;
               const ten = first(report.tenancies) as { tenant_name?: string | null } | null;
               const signed = isSigned(report);
+              const isDraft = report.status === "in_progress";
               const pending = report.status === "completed" && !signed;
               const typeLabel = report.type === "check-in" ? "Check-in" : "Check-out";
               const propertyName = prop?.building_name ?? "Property";
@@ -403,7 +400,6 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                     animationDelay: `${0.2 + i * 0.07}s`,
                     position: "relative",
                   }}
-                  onClick={() => router.push(`/inspection/${report.id}/report`)}
                 >
                   {/* Top row */}
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -467,18 +463,24 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                         >
                           {propertyName}
                         </h3>
-                        <span
-                          style={{
-                            fontSize: 11, fontWeight: 600,
-                            color: statusColor,
-                            background: statusBg,
-                            padding: "4px 12px", borderRadius: 100,
-                            textTransform: "uppercase", letterSpacing: 0.5,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {statusLabel}
-                        </span>
+                        {isDraft ? (
+                          <span className="flex-shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-gray-500">
+                            Draft
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: 11, fontWeight: 600,
+                              color: statusColor,
+                              background: statusBg,
+                              padding: "4px 12px", borderRadius: 100,
+                              textTransform: "uppercase", letterSpacing: 0.5,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {statusLabel}
+                          </span>
+                        )}
                       </div>
                       <p style={{ fontSize: 13, color: "#999", margin: "3px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {[unit, typeLabel, formatDate(report.created_at)].filter(Boolean).join(" · ")}
@@ -507,10 +509,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                   )}
 
                   {/* Stats + Actions */}
-                  <div
-                    style={{ marginTop: 14, display: "flex", gap: 8, alignItems: "center" }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <div style={{ marginTop: 14, display: "flex", gap: 8, alignItems: "center" }}>
                     <div
                       style={{
                         flex: 1, background: "#F8F7F4", borderRadius: 12,
@@ -537,52 +536,67 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                     </div>
 
                     {/* Action button */}
-                    {pending ? (
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        className="cta-btn"
-                        onClick={() => router.push(`/inspection/${report.id}/report`)}
-                        onKeyDown={(e) => e.key === "Enter" && router.push(`/inspection/${report.id}/report`)}
-                        style={{
-                          background: "#9A88FD", borderRadius: 12,
-                          padding: "10px 16px",
-                          display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                        }}
+                    {isDraft ? (
+                      <button
+                        type="button"
+                        className="cta-btn flex shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-sm font-bold text-white"
+                        onClick={() => router.push(`/inspection/${report.id}`)}
                       >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
-                          <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          aria-hidden
+                        >
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>
-                        <span style={{ fontSize: 12, color: "#fff", fontWeight: 600 }}>Sign</span>
-                      </div>
-                    ) : (
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        className="cta-btn"
+                        Draft
+                      </button>
+                    ) : signed ? (
+                      <button
+                        type="button"
+                        className="cta-btn flex shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+                        disabled={pdfLoadingId === report.id}
                         onClick={() => void handleReportPdfDownload(report.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") void handleReportPdfDownload(report.id);
-                        }}
-                        style={{
-                          background: "#1A1A1A", borderRadius: 12,
-                          padding: "10px 14px",
-                          display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                        }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
                           <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
                           <polyline points="7 10 12 15 17 10" />
                           <line x1="12" y1="15" x2="12" y2="3" />
                         </svg>
-                        <span style={{ fontSize: 12, color: "#fff", fontWeight: 600 }}>PDF</span>
-                      </div>
+                        <span style={{ fontSize: 12, color: "#fff", fontWeight: 600 }}>
+                          {pdfLoadingId === report.id ? "…" : "PDF"}
+                        </span>
+                      </button>
+                    ) : pending ? (
+                      <button
+                        type="button"
+                        className="cta-btn flex shrink-0 items-center gap-1.5 rounded-xl bg-[#9A88FD] px-4 py-2 text-sm font-bold text-white"
+                        onClick={() => router.push(`/inspection/${report.id}/report`)}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
+                          <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                        </svg>
+                        <span style={{ fontSize: 12, color: "#fff", fontWeight: 600 }}>Sign</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="cta-btn flex shrink-0 items-center gap-1.5 rounded-xl bg-[#9A88FD] px-4 py-2 text-sm font-bold text-white"
+                        onClick={() => router.push(`/inspection/${report.id}/report`)}
+                      >
+                        Open
+                      </button>
                     )}
 
                     {/* Delete button */}
                     <div
                       className="trash-btn"
-                      onClick={(e) => e.stopPropagation()}
                       style={{
                         width: 40, height: 40, borderRadius: 12,
                         background: "#F8F7F4",

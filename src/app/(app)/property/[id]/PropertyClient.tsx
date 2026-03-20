@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 import { useCredits } from "@/hooks/useCredits";
 import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
+import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 
 type InspectionSignature = {
   signer_type: string;
@@ -87,6 +88,15 @@ function getInspectionState(inspection: {
   return "draft";
 }
 
+/** Same rules as dashboard / reports — fully signed inspection */
+function inspectionFullySignedGroup(inspection: InspectionInGroup): boolean {
+  if (inspection.status === "signed" || inspection.signed_at) return true;
+  const sigs = inspection.signatures ?? [];
+  const landlordSig = sigs.find((s) => s.signer_type === "landlord");
+  const tenantSig = sigs.find((s) => s.signer_type === "tenant");
+  return !!landlordSig?.signed_at && !!tenantSig?.signed_at;
+}
+
 type CheckInWithRooms = {
   id: string;
   property_id: string;
@@ -143,8 +153,11 @@ function InspectionRow({
   const router = useRouter();
   const [preparingCheckOut, setPreparingCheckOut] = useState(false);
   const [showBuyCredits, setShowBuyCredits] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const state = inspection ? getInspectionState(inspection) : null;
+  const isDraft = inspection?.status === "in_progress";
+  const isSigned = inspection ? inspectionFullySignedGroup(inspection) : false;
 
   const handleStart = async () => {
     if (inspectionType === "check-out" && sourceCheckInId) {
@@ -265,6 +278,19 @@ function InspectionRow({
     }
   };
 
+  const handleDownloadPdf = async () => {
+    if (!inspection) return;
+    setPdfLoading(true);
+    try {
+      await regenerateAndDownloadInspectionPdf(inspection.id);
+    } catch (e) {
+      console.error("[DownloadPDF]", e);
+      alert(e instanceof Error ? e.message : "Download failed");
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   // Inspection exists
   if (inspection && state) {
     return (
@@ -287,31 +313,80 @@ function InspectionRow({
           </span>
 
           {/* Signed badge */}
-          {state === "signed" && (
+          {isSigned && (
             <span className="text-[10px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5 flex-shrink-0">
               ✓ Signed
             </span>
           )}
 
-          {/* Sign button */}
-          {state === "to_sign" && (
+          {/* Draft → resume */}
+          {isDraft ? (
             <button
+              type="button"
+              onClick={() => router.push(`/inspection/${inspection.id}`)}
+              className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-[13px] font-bold text-white"
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                aria-hidden
+              >
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+              Draft
+            </button>
+          ) : isSigned ? (
+            <button
+              type="button"
+              disabled={pdfLoading}
+              onClick={() => void handleDownloadPdf()}
+              className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-[13px] font-bold text-white disabled:opacity-60"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              {pdfLoading ? "…" : "PDF"}
+            </button>
+          ) : state === "to_sign" ? (
+            <button
+              type="button"
               onClick={() => router.push(`/inspection/${inspection.id}/report`)}
-              className="flex items-center gap-1.5 bg-[#9A88FD] text-white rounded-xl px-4 py-2 text-[13px] font-bold flex-shrink-0"
+              className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-[#9A88FD] px-4 py-2 text-[13px] font-bold text-white"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                <path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"
-                  stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                <path
+                  d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"
+                  stroke="white"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
               Sign
             </button>
-          )}
-
-          {/* Open button */}
-          {(state === "draft" || state === "signed") && (
+          ) : (
             <button
+              type="button"
               onClick={handleOpen}
-              className="flex items-center gap-1.5 bg-[#F3F3F8] text-[#1A1A2E] rounded-xl px-4 py-2 text-[13px] font-bold flex-shrink-0"
+              className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-[#F3F3F8] px-4 py-2 text-[13px] font-bold text-[#1A1A2E]"
             >
               Open
             </button>

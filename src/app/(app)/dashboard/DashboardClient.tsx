@@ -242,10 +242,6 @@ export function DashboardClient({
 
         .dash-card {
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          cursor: pointer;
-        }
-        .dash-card:active {
-          transform: scale(0.98);
         }
         .dash-card-deleting {
           opacity: 0;
@@ -835,6 +831,8 @@ export function DashboardClient({
             const unit = prop?.unit_number ? `Unit ${prop.unit_number}` : "";
             const tenant = ten?.tenant_name?.split(" ")[0] ?? "—";
             const typeLabel = insp.type === "check-in" ? "Check-in" : "Check-out";
+            const isDraft = insp.status === "in_progress";
+            const isSigned = inspectionFullySigned(insp);
             const dateStr = insp.completed_at ?? insp.created_at;
             const rooms = insp.rooms ?? [];
             const roomCount = rooms.length;
@@ -852,15 +850,7 @@ export function DashboardClient({
                   boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
                 }}
               >
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => router.push(`/inspection/${insp.id}/report`)}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" && router.push(`/inspection/${insp.id}/report`)
-                  }
-                  style={{ display: "flex", alignItems: "center", gap: 14 }}
-                >
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                   <div
                     style={{
                       width: 48,
@@ -924,21 +914,27 @@ export function DashboardClient({
                       >
                         {propertyName}
                       </h3>
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 600,
-                          color: "#9A88FD",
-                          background: "rgba(154,136,253,0.1)",
-                          padding: "3px 10px",
-                          borderRadius: 100,
-                          textTransform: "uppercase",
-                          letterSpacing: 0.5,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {typeLabel}
-                      </span>
+                      {isDraft ? (
+                        <span className="flex-shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-gray-500">
+                          Draft
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 600,
+                            color: "#9A88FD",
+                            background: "rgba(154,136,253,0.1)",
+                            padding: "3px 10px",
+                            borderRadius: 100,
+                            textTransform: "uppercase",
+                            letterSpacing: 0.5,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {typeLabel}
+                        </span>
+                      )}
                     </div>
                     <p
                       style={{
@@ -1007,7 +1003,31 @@ export function DashboardClient({
                       {photoCount}
                     </span>
                   </div>
-                  {inspectionFullySigned(insp) ? (
+                  {isDraft ? (
+                    <button
+                      type="button"
+                      className="cta-btn flex shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-sm font-bold text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/inspection/${insp.id}`);
+                      }}
+                    >
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        aria-hidden
+                      >
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                      Draft
+                    </button>
+                  ) : isSigned ? (
                     <button
                       type="button"
                       className="cta-btn flex shrink-0 items-center gap-1.5 rounded-2xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
@@ -1034,7 +1054,7 @@ export function DashboardClient({
                       </svg>
                       {pdfLoadingId === insp.id ? "…" : "PDF"}
                     </button>
-                  ) : insp.status === "completed" && !inspectionFullySigned(insp) ? (
+                  ) : insp.status === "completed" && !isSigned ? (
                     <button
                       type="button"
                       className="cta-btn flex shrink-0 items-center gap-1.5 rounded-2xl bg-[#9A88FD] px-4 py-2 text-sm font-semibold text-white"
