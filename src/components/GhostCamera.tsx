@@ -380,27 +380,159 @@ export default function GhostCamera({
 
   return (
     <div className="fixed inset-0 z-[999] overflow-hidden bg-black">
-      {/* ── LAYER 0–1: VIDEO + ghost — same box, same object-fit: cover → aligned overlay ── */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="absolute inset-0 z-0 h-full w-full"
-        style={{ objectFit: "cover" }}
-      />
+      {/* Ratio-locked viewport — video + ghost share identical pixels */}
+      {(() => {
+        const ph = isAdditionalMode
+          ? null
+          : (checkinPhotos[activeGhostIndex] ?? checkinPhotos[0] ?? null);
+        const pW = ph?.width ?? 1440;
+        const pH = ph?.height ?? 1920;
+        const cssRatio = `${pW} / ${pH}`;
 
-      {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={activeGhost.url}
-            alt=""
-            className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
-            style={{ objectFit: "cover", opacity: ghostOpacity }}
-          />
-        </>
-      )}
+        return (
+          <div className="absolute inset-0 flex items-center justify-center bg-black">
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                aspectRatio: cssRatio,
+                maxWidth: "100%",
+                maxHeight: "100%",
+                overflow: "hidden",
+              }}
+            >
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  zIndex: 0,
+                }}
+              />
+
+              {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={activeGhost.url}
+                    alt=""
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      opacity: ghostOpacity,
+                      pointerEvents: "none",
+                      zIndex: 1,
+                    }}
+                  />
+                </>
+              )}
+
+              {activeGhost && !isAdditionalMode && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 12,
+                    left: 12,
+                    zIndex: 5,
+                    background: "rgba(0,0,0,0.55)",
+                    borderRadius: 8,
+                    padding: "4px 10px",
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "rgba(255,255,255,0.7)",
+                    }}
+                  >
+                    👻 Entry photo
+                  </p>
+                </div>
+              )}
+              {isAdditionalMode && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 12,
+                    left: 12,
+                    zIndex: 5,
+                    background: "rgba(255,138,101,0.7)",
+                    borderRadius: 8,
+                    padding: "4px 10px",
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "white" }}>📸 New finding</p>
+                </div>
+              )}
+              {checkinPhotos.length === 0 && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 12,
+                    left: 12,
+                    zIndex: 5,
+                    background: "rgba(0,0,0,0.45)",
+                    borderRadius: 8,
+                    padding: "4px 10px",
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "rgba(255,255,255,0.5)",
+                    }}
+                  >
+                    No entry photos for this room
+                  </p>
+                </div>
+              )}
+
+              <AnimatePresence>
+                {autoZoomApplied &&
+                  activeGhost?.zoom_level != null &&
+                  Math.abs(Number(activeGhost.zoom_level) - 1) > 0.05 && (
+                    <motion.div
+                      key="auto-zoom-badge"
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      style={{
+                        position: "absolute",
+                        top: 12,
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        zIndex: 6,
+                        borderRadius: 9999,
+                        background: "rgba(0,0,0,0.6)",
+                        padding: "6px 12px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "white",
+                        backdropFilter: "blur(8px)",
+                      }}
+                    >
+                      Zoom matched: {Number(activeGhost.zoom_level).toFixed(1)}×
+                    </motion.div>
+                  )}
+              </AnimatePresence>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── LAYER 2: TOP BAR overlay ── */}
       <div
@@ -426,50 +558,6 @@ export default function GhostCamera({
         </div>
         <div className="w-9" />
       </div>
-
-      {/* ── LAYER 3: Entry photo / additional mode / empty badge ── */}
-      {activeGhost && !isAdditionalMode && (
-        <div
-          className="absolute left-3 top-24 z-20 rounded-lg px-2.5 py-1"
-          style={{ background: "rgba(0,0,0,0.55)" }}
-        >
-          <p className="m-0 text-[11px] font-semibold text-white/70">👻 Entry photo</p>
-        </div>
-      )}
-      {isAdditionalMode && (
-        <div
-          className="absolute left-3 top-24 z-20 rounded-lg px-2.5 py-1"
-          style={{ background: "rgba(255,138,101,0.7)" }}
-        >
-          <p className="m-0 text-[11px] font-semibold text-white">📸 New finding</p>
-        </div>
-      )}
-      {checkinPhotos.length === 0 && (
-        <div
-          className="absolute left-3 top-24 z-20 rounded-lg px-2.5 py-1"
-          style={{ background: "rgba(0,0,0,0.45)" }}
-        >
-          <p className="m-0 text-[11px] font-semibold text-white/50">No entry photos for this room</p>
-        </div>
-      )}
-
-      {/* ── LAYER 4: Auto zoom badge ── */}
-      <AnimatePresence>
-        {autoZoomApplied &&
-          activeGhost?.zoom_level != null &&
-          Math.abs(Number(activeGhost.zoom_level) - 1) > 0.05 && (
-            <motion.div
-              key="auto-zoom-badge"
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="absolute left-1/2 top-24 z-30 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm"
-            >
-              Zoom matched: {Number(activeGhost.zoom_level).toFixed(1)}×
-            </motion.div>
-          )}
-      </AnimatePresence>
 
       {/* ── LAYER 5: ZOOM + TORCH controls ── */}
       {(showZoomBar || showTorchBtn) && (
