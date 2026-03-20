@@ -4,11 +4,8 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
-import {
-  ChevronLeft,
-  Check,
-  Camera,
-} from "lucide-react";
+import { Check, Camera } from "lucide-react";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import GhostCamera from "@/components/GhostCamera";
 import { assertValidDimensions } from "@/lib/getImageDimensions";
@@ -464,6 +461,8 @@ export function InspectionClient({
   const [gatePlan, setGatePlan] = useState("free");
   const [gateCost, setGateCost] = useState(0);
   const [gateActionLabel, setGateActionLabel] = useState("Generate Report");
+  const [showAbandonConfirm, setShowAbandonConfirm] = useState(false);
+  const [abandonPortalMounted, setAbandonPortalMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const notesTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -476,6 +475,10 @@ export function InspectionClient({
     trackAction(`Viewed Inspection ${inspectionId.slice(0, 8)}`);
     return () => { document.body.style.overflow = ""; };
   }, [inspectionId]);
+
+  useEffect(() => {
+    setAbandonPortalMounted(true);
+  }, []);
 
   // Hide bottom nav on inspect screen
   useEffect(() => {
@@ -642,6 +645,19 @@ export function InspectionClient({
   const currentRoomId = currentRoom?.id;
   const roomCurrentPhotos = photos.filter((p) => p.room_id === currentRoomId);
   const totalPhotos = photos.length;
+
+  const navigateToProperty = () => {
+    router.push(`/property/${propertyId}`);
+  };
+
+  const handleAbandonHeaderClick = () => {
+    if (totalPhotos > 0) {
+      setShowAbandonConfirm(true);
+    } else {
+      navigateToProperty();
+    }
+  };
+
   const damagedPhotos = photos.filter((p) => p.damage_tags?.length > 0).length;
   const roomsWithPhotos = liveRooms.filter((room) =>
     photos.some((p) => p.room_id === room.id)
@@ -1290,12 +1306,16 @@ export function InspectionClient({
             padding: "14px 16px 12px",
           }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <button type="button" onClick={() => router.back()} style={{
-                width: 34, height: 34, borderRadius: "50%", border: "none",
-                background: "#f5f5f5", cursor: "pointer", display: "flex",
-                alignItems: "center", justifyContent: "center",
-              }}>
-                <ChevronLeft size={18} color="#555" />
+              <button
+                type="button"
+                onClick={handleAbandonHeaderClick}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100"
+                aria-label="Close inspection"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
               </button>
               <div style={{ textAlign: "center" }}>
                 <p style={{
@@ -1483,8 +1503,16 @@ export function InspectionClient({
           {/* Top bar */}
           <div style={{ background: "#0e0e14", padding: "16px 16px 8px", flexShrink: 0 }}>
             <div className="flex items-center justify-between mb-3">
-              <button type="button" onClick={() => setScreen("rooms")} className="text-white/60">
-                <ChevronLeft size={22} />
+              <button
+                type="button"
+                onClick={handleAbandonHeaderClick}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10"
+                aria-label="Close inspection"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
               </button>
               <div className="text-center">
                 <p className="text-white font-semibold text-sm">
@@ -1671,14 +1699,14 @@ export function InspectionClient({
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <button
                 type="button"
-                onClick={() => setScreen("inspect")}
-                style={{
-                  width: 34, height: 34, borderRadius: "50%", border: "none",
-                  background: "#f5f5f5", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}
+                onClick={handleAbandonHeaderClick}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100"
+                aria-label="Close inspection"
               >
-                <ChevronLeft size={18} color="#555" />
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
               </button>
               <div style={{ textAlign: "center" }}>
                 <p style={{
@@ -2525,6 +2553,51 @@ export function InspectionClient({
           }}
         />
       )}
+
+      {abandonPortalMounted &&
+        showAbandonConfirm &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center px-5">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowAbandonConfirm(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              className="relative z-10 w-full max-w-sm rounded-3xl bg-white p-6"
+            >
+              <h3 className="mb-2 text-lg font-black text-gray-900">
+                {isCheckout ? "Abandon check-out?" : "Abandon check-in?"}
+              </h3>
+              <p className="mb-6 text-sm leading-relaxed text-gray-500">
+                Your progress will be saved as a draft. You can resume this{" "}
+                {isCheckout ? "check-out" : "check-in"} from the property page.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAbandonConfirm(false);
+                  navigateToProperty();
+                }}
+                className="mb-3 w-full rounded-2xl bg-gray-900 py-3.5 text-sm font-bold text-white"
+              >
+                Yes, leave
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAbandonConfirm(false)}
+                className="w-full py-2 text-sm text-gray-400"
+              >
+                Continue {isCheckout ? "check-out" : "check-in"}
+              </button>
+            </motion.div>
+          </div>,
+          document.body
+        )}
     </>
   );
 }
