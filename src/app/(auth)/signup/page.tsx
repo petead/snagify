@@ -369,6 +369,21 @@ export default function SignupPage() {
     if (accountType === 'individual' && individualRole === null) return
     setLoading(true)
     setError(null)
+    // #region agent log
+    fetch('http://127.0.0.1:7620/ingest/2d2a86d0-4e2c-4ff3-bf45-64aa83a51471', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '116434' },
+      body: JSON.stringify({
+        sessionId: '116434',
+        runId: 'signup-onboarding-pre-fix',
+        hypothesisId: 'H2',
+        location: 'src/app/(auth)/signup/page.tsx:394',
+        message: 'handleSubmit start',
+        data: { accountType, hasIndividualRole: Boolean(individualRole) },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -384,6 +399,21 @@ export default function SignupPage() {
       if (authError) throw new Error(authError.message)
       const user = authData?.user
       if (!user) throw new Error('Signup failed — no user returned')
+      // #region agent log
+      fetch('http://127.0.0.1:7620/ingest/2d2a86d0-4e2c-4ff3-bf45-64aa83a51471', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '116434' },
+        body: JSON.stringify({
+          sessionId: '116434',
+          runId: 'signup-onboarding-pre-fix',
+          hypothesisId: 'H2',
+          location: 'src/app/(auth)/signup/page.tsx:417',
+          message: 'signUp result',
+          data: { hasUser: Boolean(user), hasSession: Boolean(authData?.session) },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
 
       if (!authData.session) {
         const { error: signInErr } = await supabase.auth.signInWithPassword({
@@ -423,6 +453,21 @@ export default function SignupPage() {
           reraNumber: accountType === 'pro' ? reraNumber.trim() || undefined : undefined,
         }),
       })
+      // #region agent log
+      fetch('http://127.0.0.1:7620/ingest/2d2a86d0-4e2c-4ff3-bf45-64aa83a51471', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '116434' },
+        body: JSON.stringify({
+          sessionId: '116434',
+          runId: 'signup-onboarding-pre-fix',
+          hypothesisId: 'H2',
+          location: 'src/app/(auth)/signup/page.tsx:494',
+          message: 'onboarding API response status',
+          data: { status: res.status, ok: res.ok },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
 
       const result = (await res.json()) as {
         error?: string
@@ -493,6 +538,21 @@ export default function SignupPage() {
       if (process.env.NODE_ENV === 'development') {
         console.error('Signup error:', err)
       }
+      // #region agent log
+      fetch('http://127.0.0.1:7620/ingest/2d2a86d0-4e2c-4ff3-bf45-64aa83a51471', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '116434' },
+        body: JSON.stringify({
+          sessionId: '116434',
+          runId: 'signup-onboarding-pre-fix',
+          hypothesisId: 'H4',
+          location: 'src/app/(auth)/signup/page.tsx:568',
+          message: 'handleSubmit catch',
+          data: { errorMessage: msg },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
       setError(getErrorMessage(msg))
     } finally {
       setLoading(false)

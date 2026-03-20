@@ -36,6 +36,30 @@ export async function POST(req: Request) {
       reraNumber,
     } = body as Record<string, string | undefined | null>;
 
+    // #region agent log
+    fetch("http://127.0.0.1:7620/ingest/2d2a86d0-4e2c-4ff3-bf45-64aa83a51471", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "116434",
+      },
+      body: JSON.stringify({
+        sessionId: "116434",
+        runId: "signup-onboarding-pre-fix",
+        hypothesisId: "H1",
+        location: "src/app/api/onboarding/complete/route.ts:39",
+        message: "onboarding payload summary",
+        data: {
+          hasUserId: Boolean(userId),
+          accountType,
+          hasCompanyName: Boolean(companyName),
+          hasAddress: Boolean(address),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
@@ -116,6 +140,29 @@ export async function POST(req: Request) {
         .select("id")
         .single();
 
+      // #region agent log
+      fetch("http://127.0.0.1:7620/ingest/2d2a86d0-4e2c-4ff3-bf45-64aa83a51471", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "116434",
+        },
+        body: JSON.stringify({
+          sessionId: "116434",
+          runId: "signup-onboarding-pre-fix",
+          hypothesisId: "H3",
+          location: "src/app/api/onboarding/complete/route.ts:125",
+          message: "company insert result",
+          data: {
+            ok: !companyError,
+            companyIdReturned: company?.id ?? null,
+            companyErrorCode: companyError?.code ?? null,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+
       if (companyError) {
         console.error("Company error:", companyError);
         return NextResponse.json(
@@ -164,6 +211,37 @@ export async function POST(req: Request) {
       .from("profiles")
       .upsert(profilePayload, { onConflict: "id" });
 
+    // #region agent log
+    fetch("http://127.0.0.1:7620/ingest/2d2a86d0-4e2c-4ff3-bf45-64aa83a51471", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "116434",
+      },
+      body: JSON.stringify({
+        sessionId: "116434",
+        runId: "signup-onboarding-pre-fix",
+        hypothesisId: "H1",
+        location: "src/app/api/onboarding/complete/route.ts:194",
+        message: "profile upsert fields/result",
+        data: {
+          keys: Object.keys(profilePayload),
+          hasCompanyAddress: Object.prototype.hasOwnProperty.call(
+            profilePayload,
+            "company_address"
+          ),
+          hasWhatsappNumber: Object.prototype.hasOwnProperty.call(
+            profilePayload,
+            "whatsapp_number"
+          ),
+          profileErrorCode: profileError?.code ?? null,
+          profileErrorMessage: profileError?.message ?? null,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
     if (profileError) {
       console.error("Profile error:", profileError);
       return NextResponse.json(
@@ -174,6 +252,26 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, companyId });
   } catch (err: unknown) {
+    // #region agent log
+    fetch("http://127.0.0.1:7620/ingest/2d2a86d0-4e2c-4ff3-bf45-64aa83a51471", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "116434",
+      },
+      body: JSON.stringify({
+        sessionId: "116434",
+        runId: "signup-onboarding-pre-fix",
+        hypothesisId: "H4",
+        location: "src/app/api/onboarding/complete/route.ts:213",
+        message: "route catch",
+        data: {
+          errorMessage: err instanceof Error ? err.message : String(err),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     console.error("Onboarding complete error:", err);
     const message = err instanceof Error ? err.message : "Server error";
     return NextResponse.json({ error: message }, { status: 500 });
