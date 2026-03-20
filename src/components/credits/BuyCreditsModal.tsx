@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 
 interface BuyCreditsModalProps {
   isOpen: boolean;
@@ -131,27 +132,20 @@ export function BuyCreditsModal({
     <>
       <style>{modalStyles}</style>
 
-      <div
-        style={{
-          position: "fixed", inset: 0, zIndex: 50,
-          background: "rgba(10,8,25,0.65)",
-          backdropFilter: "blur(8px)",
-          display: "flex", alignItems: "flex-end", justifyContent: "center",
-        }}
-        onClick={onClose}
-      >
+      <div className="fixed inset-0 z-50 flex min-h-[100dvh] items-end justify-center">
         <div
-          className="buy-sheet"
-          style={{
-            width: "100%", maxWidth: 480,
-            background: "linear-gradient(170deg, #1A1A2E 0%, #12102a 100%)",
-            borderRadius: "28px 28px 0 0",
-            paddingBottom: "max(88px, calc(64px + env(safe-area-inset-bottom) + 16px))",
-            boxShadow: "0 -20px 60px rgba(154,136,253,0.25)",
-            overflowY: "auto",
-            maxHeight: "calc(100vh - 80px)",
-            position: "relative",
-          }}
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={onClose}
+          aria-hidden
+        />
+        <div
+          className={cn(
+            "buy-sheet relative z-10 w-full max-w-[480px]",
+            "rounded-t-3xl bg-[#12102A] px-5 pt-6",
+            "min-h-[60vh] max-h-[90vh] overflow-y-auto",
+            "pb-[max(6rem,calc(4rem+env(safe-area-inset-bottom)))]",
+            "shadow-[0_-20px_60px_rgba(154,136,253,0.25)]"
+          )}
           onClick={(e) => e.stopPropagation()}
         >
           <div
@@ -168,7 +162,7 @@ export function BuyCreditsModal({
             <div style={{ width: 36, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.12)" }} />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 16px 0" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 0 0" }}>
             <button
               onClick={onClose}
               style={{
@@ -186,7 +180,7 @@ export function BuyCreditsModal({
             </button>
           </div>
 
-          <div style={{ textAlign: "center", padding: "4px 24px 20px", position: "relative" }}>
+          <div style={{ textAlign: "center", padding: "4px 0 20px", position: "relative" }}>
             <div
               className="coin-icon"
               style={{
@@ -217,7 +211,7 @@ export function BuyCreditsModal({
             </p>
           </div>
 
-          <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ padding: "0 0", display: "flex", flexDirection: "column", gap: 10 }}>
             {loadingCatalog ? (
               <p style={{ margin: "8px 0", textAlign: "center", fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
                 Loading offers...
@@ -323,24 +317,20 @@ export function BuyCreditsModal({
             )}
           </div>
 
-          <div style={{ padding: "16px 16px 0" }}>
+          <div style={{ padding: "16px 0 0" }}>
             <button
               type="button"
               onClick={handlePurchase}
               disabled={!selectedPack || loading}
-              className={selectedPack && !loading ? "shimmer-cta" : ""}
-              style={{
-                width: "100%", border: "none", borderRadius: 18,
-                padding: "16px 0", fontSize: 15, fontWeight: 800,
-                color: "white", cursor: selectedPack ? "pointer" : "default",
-                fontFamily: "Poppins, sans-serif",
-                background: selectedPack && !loading
-                  ? undefined
-                  : "rgba(154,136,253,0.2)",
-                opacity: !selectedPack || loading ? 0.5 : 1,
-                boxShadow: selectedPack ? "0 8px 28px rgba(154,136,253,0.4)" : "none",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              }}
+              className={cn(
+                "w-full rounded-2xl border-none py-4 text-base font-extrabold transition-all",
+                "flex items-center justify-center gap-2",
+                loading && selectedPack
+                  ? "cursor-wait bg-[#9A88FD] text-white opacity-90"
+                  : selectedPack
+                    ? "shimmer-cta cursor-pointer text-white shadow-[0_8px_28px_rgba(154,136,253,0.4)]"
+                    : "cursor-not-allowed bg-white/10 text-white/30"
+              )}
             >
               {loading ? (
                 <>
