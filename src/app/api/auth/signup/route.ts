@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
       password,
       fullName,
       accountType,
+      individualRole,
       primaryColor,
       companyName,
       reraNumber,
@@ -70,6 +71,8 @@ export async function POST(req: NextRequest) {
       password?: string;
       fullName?: string;
       accountType?: string;
+      /** Required when accountType is individual */
+      individualRole?: string;
       primaryColor?: string;
       companyName?: string;
       reraNumber?: string;
@@ -90,6 +93,15 @@ export async function POST(req: NextRequest) {
     }
 
     const isPro = accountType === "pro";
+    const individualRoleTrimmed = (individualRole ?? "").trim();
+    if (!isPro) {
+      if (individualRoleTrimmed !== "owner" && individualRoleTrimmed !== "tenant") {
+        return NextResponse.json(
+          { error: "Please choose whether you are an owner or a tenant" },
+          { status: 400 }
+        );
+      }
+    }
     const companyNameTrimmed = (companyName ?? "").trim();
     const reraTrimmed = (reraNumber ?? "").trim();
     const companyEmailTrimmed = (companyEmail ?? "").trim();
@@ -200,6 +212,7 @@ export async function POST(req: NextRequest) {
     };
     if (isPro) {
       profileRow.account_type = "pro";
+      profileRow.individual_role = null;
       profileRow.company_email = companyEmailTrimmed;
       profileRow.whatsapp_number = phoneTrimmed;
       profileRow.company_address = buildFullAddress(
@@ -210,6 +223,9 @@ export async function POST(req: NextRequest) {
       profileRow.company_trade_license = tradeTrimmed || null;
       profileRow.company_website = websiteTrimmed || null;
       profileRow.company_primary_color = (primaryColor?.trim() || "#9A88FD") as string;
+    } else {
+      profileRow.account_type = "individual";
+      profileRow.individual_role = individualRoleTrimmed;
     }
     if (reraTrimmed) {
       profileRow.rera_number = reraTrimmed;

@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import { getCroppedImg } from '@/utils/cropImage'
 
 type AccountType = 'individual' | 'pro'
+type IndividualRole = 'owner' | 'tenant'
 type Step = 1 | 2 | 3
 type ProSubStep = 1 | 2 | 3
 
@@ -201,6 +202,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [accountType, setAccountType] = useState<AccountType | null>(null)
+  const [individualRole, setIndividualRole] = useState<IndividualRole | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [emailTouched, setEmailTouched] = useState(false)
@@ -273,12 +275,17 @@ export default function SignupPage() {
     setError(null)
     if (accountType === null) return
     if (accountType === 'individual') {
+      if (individualRole === null) return
       await handleSubmit()
     } else {
       setProSubStep(1)
       setCurrentStep(3)
     }
   }
+
+  const canContinueStep2 =
+    (accountType === 'individual' && individualRole !== null) ||
+    accountType === 'pro'
 
   const uploadLogoAfterSignup = async (userId: string) => {
     if (!croppedLogoBlob) return
@@ -307,6 +314,7 @@ export default function SignupPage() {
 
   const handleSubmit = async () => {
     if (!accountType) return
+    if (accountType === 'individual' && individualRole === null) return
     setLoading(true)
     setError(null)
     try {
@@ -316,6 +324,8 @@ export default function SignupPage() {
         password,
         fullName: fullName.trim(),
         accountType,
+        individualRole:
+          accountType === 'individual' && individualRole ? individualRole : undefined,
       }
       if (isPro) {
         body.reraNumber = reraNumber.trim() || undefined
@@ -733,24 +743,33 @@ export default function SignupPage() {
                 </AnimatePresence>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <motion.button
-                    type="button"
+                  <motion.div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setAccountType('individual')}
-                    animate={{ scale: accountType === 'individual' ? 1.02 : 1 }}
-                    transition={cardSpring}
-                    className={cn(
-                      'relative rounded-2xl border-2 p-5 text-left transition-colors duration-200',
-                      accountType === 'individual'
-                        ? 'border-[#9A88FD] bg-[#9A88FD]/[0.08] shadow-lg shadow-[#9A88FD]/20'
-                        : 'border-gray-200 bg-white'
-                    )}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        setAccountType('individual')
+                      }
+                    }}
+                    animate={{
+                      borderColor: accountType === 'individual' ? '#9A88FD' : '#E5E7EB',
+                      scale: accountType === 'individual' ? 1.01 : 1,
+                    }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                    className="relative cursor-pointer rounded-2xl border-2 bg-white p-5 text-left shadow-sm"
                   >
-                    <div className="mb-3 text-4xl" aria-hidden>
-                      🏠
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl" aria-hidden>
+                        🏠
+                      </span>
+                      <div>
+                        <p className="font-bold text-gray-900">Individual</p>
+                        <p className="text-xs text-gray-400">Landlord or tenant</p>
+                      </div>
                     </div>
-                    <p className="text-lg font-bold text-[#1A1A2E]">Individual</p>
-                    <p className="mb-3 text-sm text-gray-500">Landlord or tenant</p>
-                    <ul className="space-y-2 text-sm text-gray-600">
+                    <ul className="mt-3 space-y-2 text-sm text-gray-600">
                       <li className="flex gap-2">
                         <span className="text-[#9A88FD]">✓</span> Up to 3 properties
                       </li>
@@ -761,11 +780,95 @@ export default function SignupPage() {
                         <span className="text-[#9A88FD]">✓</span> E-signature included
                       </li>
                     </ul>
-                  </motion.button>
+
+                    <AnimatePresence initial={false}>
+                      {accountType === 'individual' && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                          animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
+                          exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mb-4 border-t border-gray-100" />
+                          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            I am a...
+                          </p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <motion.button
+                              type="button"
+                              whileTap={{ scale: 0.97 }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setIndividualRole('owner')
+                              }}
+                              className={cn(
+                                'flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-colors',
+                                individualRole === 'owner'
+                                  ? 'border-[#9A88FD] bg-[#9A88FD]/[0.08]'
+                                  : 'border-gray-200 bg-gray-50'
+                              )}
+                            >
+                              <span className="text-xl" aria-hidden>
+                                🔑
+                              </span>
+                              <span className="text-sm font-semibold text-gray-800">Owner</span>
+                              <span className="text-center text-[11px] leading-tight text-gray-400">
+                                I own or manage a property
+                              </span>
+                              {individualRole === 'owner' && (
+                                <motion.div
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  className="flex h-4 w-4 items-center justify-center rounded-full bg-[#9A88FD]"
+                                >
+                                  <span className="text-[9px] text-white">✓</span>
+                                </motion.div>
+                              )}
+                            </motion.button>
+                            <motion.button
+                              type="button"
+                              whileTap={{ scale: 0.97 }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setIndividualRole('tenant')
+                              }}
+                              className={cn(
+                                'flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-colors',
+                                individualRole === 'tenant'
+                                  ? 'border-[#9A88FD] bg-[#9A88FD]/[0.08]'
+                                  : 'border-gray-200 bg-gray-50'
+                              )}
+                            >
+                              <span className="text-xl" aria-hidden>
+                                🪪
+                              </span>
+                              <span className="text-sm font-semibold text-gray-800">Tenant</span>
+                              <span className="text-center text-[11px] leading-tight text-gray-400">
+                                I rent a property
+                              </span>
+                              {individualRole === 'tenant' && (
+                                <motion.div
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  className="flex h-4 w-4 items-center justify-center rounded-full bg-[#9A88FD]"
+                                >
+                                  <span className="text-[9px] text-white">✓</span>
+                                </motion.div>
+                              )}
+                            </motion.button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
 
                   <motion.button
                     type="button"
-                    onClick={() => setAccountType('pro')}
+                    onClick={() => {
+                      setAccountType('pro')
+                      setIndividualRole(null)
+                    }}
                     animate={{ scale: accountType === 'pro' ? 1.02 : 1 }}
                     transition={cardSpring}
                     className={cn(
@@ -800,11 +903,15 @@ export default function SignupPage() {
                 <motion.button
                   type="button"
                   onClick={() => void handleStep2Continue()}
-                  disabled={accountType === null || loading}
-                  whileHover={accountType !== null && !loading ? { scale: 1.02 } : {}}
-                  whileTap={accountType !== null && !loading ? { scale: 0.98 } : {}}
+                  disabled={!canContinueStep2 || loading}
+                  whileHover={canContinueStep2 && !loading ? { scale: 1.02 } : {}}
+                  whileTap={canContinueStep2 && !loading ? { scale: 0.98 } : {}}
                   transition={{ type: 'spring', stiffness: 400, damping: 22 }}
-                  className="mt-8 w-full rounded-2xl bg-[#9A88FD] py-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className={cn(
+                    'mt-8 w-full rounded-2xl bg-[#9A88FD] py-4 text-base font-semibold text-white transition-opacity duration-200',
+                    !canContinueStep2 && !loading ? 'cursor-not-allowed opacity-40' : 'opacity-100',
+                    loading && 'cursor-wait'
+                  )}
                 >
                   <span className="flex items-center justify-center gap-2">
                     {loading && accountType === 'individual' ? (
