@@ -390,7 +390,7 @@ export default function GhostCamera({
         const cssRatio = `${pW} / ${pH}`;
 
         return (
-          <div className="absolute inset-0 flex items-center justify-center bg-black">
+          <div className="absolute inset-0 flex items-start justify-center bg-black">
             <div
               style={{
                 position: "relative",
@@ -536,27 +536,26 @@ export default function GhostCamera({
 
       {/* ── LAYER 2: TOP BAR overlay ── */}
       <div
-        className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-4 pb-3 pt-12"
+        className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-4"
         style={{
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%)",
+          paddingTop: "env(safe-area-inset-top, 12px)",
+          paddingBottom: 8,
+          background: "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)",
         }}
       >
         <button
           type="button"
           onClick={handleClose}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-lg text-white backdrop-blur-sm"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-base text-white backdrop-blur-sm"
         >
           ✕
         </button>
-        <div className="text-center">
-          <p className="m-0 text-sm font-bold text-white" style={{ fontFamily: "Poppins, sans-serif" }}>
-            {roomName}
-          </p>
-          <p className="mb-0 mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#FF8A65]">
-            Check-out
-          </p>
-        </div>
-        <div className="w-9" />
+
+        <p className="text-sm font-bold text-white" style={{ fontFamily: "Poppins, sans-serif" }}>
+          {roomName}
+        </p>
+
+        <div className="w-8" aria-hidden />
       </div>
 
       {/* ── LAYER 5: ZOOM + TORCH controls ── */}
@@ -649,25 +648,6 @@ export default function GhostCamera({
             </span>
           </div>
         )}
-
-        {checkinPhotos.length > 0 &&
-          (() => {
-            const covered = coveredCheckinIds.size;
-            const total = checkinPhotos.length;
-            const all = covered >= total;
-            return (
-              <div
-                className="self-center rounded-full px-3 py-1"
-                style={{
-                  background: all ? "rgba(34,197,94,0.2)" : "rgba(255,138,101,0.2)",
-                }}
-              >
-                <p className="m-0 text-xs font-bold" style={{ color: all ? "#22c55e" : "#FF8A65" }}>
-                  {all ? `✓ All ${total} entry photos covered` : `${covered}/${total} covered`}
-                </p>
-              </div>
-            );
-          })()}
 
         {checkinPhotos.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -768,8 +748,8 @@ export default function GhostCamera({
           </div>
         )}
 
-        <div className="relative flex items-center justify-center">
-          {isCheckout && (
+        <div className="flex items-center justify-between">
+          {isCheckout ? (
             <button
               type="button"
               onClick={() => {
@@ -778,7 +758,6 @@ export default function GhostCamera({
                 setSelectedTags([]);
                 setPrepopulatedHintVisible(false);
               }}
-              className="absolute left-0"
               style={{
                 padding: "6px 14px",
                 borderRadius: 20,
@@ -788,11 +767,15 @@ export default function GhostCamera({
                 fontSize: 12,
                 fontWeight: 700,
                 cursor: "pointer",
+                whiteSpace: "nowrap",
               }}
             >
               ＋ New
             </button>
+          ) : (
+            <div style={{ width: 72 }} aria-hidden />
           )}
+
           <button
             type="button"
             onClick={handleShutter}
@@ -807,6 +790,7 @@ export default function GhostCamera({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              flexShrink: 0,
               transition: "all 0.15s",
             }}
           >
@@ -820,6 +804,37 @@ export default function GhostCamera({
               }}
             />
           </button>
+
+          {checkinPhotos.length > 0
+            ? (() => {
+                const covered = coveredCheckinIds.size;
+                const total = checkinPhotos.length;
+                const all = covered >= total;
+                return (
+                  <div
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: 20,
+                      background: all ? "rgba(34,197,94,0.2)" : "rgba(255,138,101,0.2)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: all ? "#22c55e" : "#FF8A65",
+                      }}
+                    >
+                      {all ? `✓ ${total}/${total}` : `${covered}/${total}`}
+                    </p>
+                  </div>
+                );
+              })()
+            : (
+                <div style={{ width: 72 }} aria-hidden />
+              )}
         </div>
 
         {cameraError && (
