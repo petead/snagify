@@ -816,16 +816,6 @@ export default function SignupPage() {
                   ← Back
                 </motion.button>
 
-                <h1
-                  className="mb-1 text-2xl font-extrabold text-[#1A1A2E]"
-                  style={{ fontFamily: 'var(--font-heading), Poppins, sans-serif' }}
-                >
-                  How will you use Snagify?
-                </h1>
-                <p className="mb-6 text-sm text-gray-500">
-                  We&apos;ll tailor your experience accordingly.
-                </p>
-
                 <AnimatePresence>
                   {error && (
                     <motion.div
@@ -839,191 +829,385 @@ export default function SignupPage() {
                   )}
                 </AnimatePresence>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <motion.div
+                  key="step-2"
+                  initial={{ opacity: 0, x: 40 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -40 }}
+                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex flex-col gap-6"
+                >
                   <motion.div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setAccountType('individual')}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        setAccountType('individual')
-                      }
-                    }}
-                    animate={{
-                      borderColor: accountType === 'individual' ? '#9A88FD' : '#E5E7EB',
-                      scale: accountType === 'individual' ? 1.01 : 1,
-                    }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                    className="relative cursor-pointer rounded-2xl border-2 bg-white p-5 text-left shadow-sm"
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 }}
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl" aria-hidden>
-                        🏠
-                      </span>
-                      <div>
-                        <p className="font-bold text-gray-900">Individual</p>
-                        <p className="text-xs text-gray-400">Landlord or tenant</p>
-                      </div>
-                    </div>
-                    <ul className="mt-3 space-y-2 text-sm text-gray-600">
-                      <li className="flex gap-2">
-                        <span className="text-[#9A88FD]">✓</span> Up to 3 properties
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="text-[#9A88FD]">✓</span> Digital inspection reports
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="text-[#9A88FD]">✓</span> E-signature included
-                      </li>
-                    </ul>
-
-                    <AnimatePresence initial={false}>
-                      {accountType === 'individual' && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                          animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
-                          exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                          className="overflow-hidden"
-                        >
-                          <div className="mb-4 border-t border-gray-100" />
-                          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            I am a...
-                          </p>
-                          <div className="grid grid-cols-2 gap-3">
-                            <motion.button
-                              type="button"
-                              whileTap={{ scale: 0.97 }}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setIndividualRole('owner')
-                              }}
-                              className={cn(
-                                'flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-colors',
-                                individualRole === 'owner'
-                                  ? 'border-[#9A88FD] bg-[#9A88FD]/[0.08]'
-                                  : 'border-gray-200 bg-gray-50'
-                              )}
-                            >
-                              <span className="text-xl" aria-hidden>
-                                🔑
-                              </span>
-                              <span className="text-sm font-semibold text-gray-800">Owner</span>
-                              <span className="text-center text-[11px] leading-tight text-gray-400">
-                                I own or manage a property
-                              </span>
-                              {individualRole === 'owner' && (
-                                <motion.div
-                                  initial={{ scale: 0 }}
-                                  animate={{ scale: 1 }}
-                                  className="flex h-4 w-4 items-center justify-center rounded-full bg-[#9A88FD]"
-                                >
-                                  <span className="text-[9px] text-white">✓</span>
-                                </motion.div>
-                              )}
-                            </motion.button>
-                            <motion.button
-                              type="button"
-                              whileTap={{ scale: 0.97 }}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setIndividualRole('tenant')
-                              }}
-                              className={cn(
-                                'flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-colors',
-                                individualRole === 'tenant'
-                                  ? 'border-[#9A88FD] bg-[#9A88FD]/[0.08]'
-                                  : 'border-gray-200 bg-gray-50'
-                              )}
-                            >
-                              <span className="text-xl" aria-hidden>
-                                🪪
-                              </span>
-                              <span className="text-sm font-semibold text-gray-800">Tenant</span>
-                              <span className="text-center text-[11px] leading-tight text-gray-400">
-                                I rent a property
-                              </span>
-                              {individualRole === 'tenant' && (
-                                <motion.div
-                                  initial={{ scale: 0 }}
-                                  animate={{ scale: 1 }}
-                                  className="flex h-4 w-4 items-center justify-center rounded-full bg-[#9A88FD]"
-                                >
-                                  <span className="text-[9px] text-white">✓</span>
-                                </motion.div>
-                              )}
-                            </motion.button>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    <h2 className="text-2xl font-bold leading-tight text-gray-900">
+                      How will you use Snagify?
+                    </h2>
+                    <p className="mt-1 text-sm text-gray-400">
+                      We&apos;ll tailor your experience accordingly.
+                    </p>
                   </motion.div>
+
+                  <div className="flex flex-col gap-3">
+                    <motion.div
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                      onClick={() => setAccountType('individual')}
+                      className="cursor-pointer"
+                    >
+                      <motion.div
+                        animate={{
+                          borderColor: accountType === 'individual' ? '#9A88FD' : '#E5E7EB',
+                          backgroundColor:
+                            accountType === 'individual'
+                              ? 'rgba(154,136,253,0.05)'
+                              : '#FFFFFF',
+                        }}
+                        transition={{ duration: 0.2 }}
+                        className="relative overflow-hidden rounded-2xl border-2 p-5"
+                      >
+                        {accountType === 'individual' && (
+                          <motion.div
+                            layoutId="cardGlow"
+                            className="absolute inset-0 rounded-2xl"
+                            style={{
+                              boxShadow:
+                                '0 0 0 2px #9A88FD, 0 4px 20px rgba(154,136,253,0.15)',
+                            }}
+                          />
+                        )}
+
+                        <div className="flex items-start gap-4">
+                          <motion.div
+                            animate={{
+                              backgroundColor:
+                                accountType === 'individual' ? '#9A88FD' : '#F3F4F6',
+                            }}
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                          >
+                            <svg
+                              width="22"
+                              height="22"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke={accountType === 'individual' ? '#fff' : '#9CA3AF'}
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                              <polyline points="9 22 9 12 15 12 15 22" />
+                            </svg>
+                          </motion.div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between">
+                              <p className="text-base font-bold text-gray-900">Individual</p>
+                              <motion.div
+                                animate={{
+                                  borderColor:
+                                    accountType === 'individual' ? '#9A88FD' : '#D1D5DB',
+                                  backgroundColor:
+                                    accountType === 'individual' ? '#9A88FD' : 'transparent',
+                                }}
+                                className="flex h-5 w-5 items-center justify-center rounded-full border-2"
+                              >
+                                {accountType === 'individual' && (
+                                  <motion.div
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    className="h-2 w-2 rounded-full bg-white"
+                                  />
+                                )}
+                              </motion.div>
+                            </div>
+                            <p className="mt-0.5 text-xs text-gray-400">Landlord or tenant</p>
+
+                            <div className="mt-3 flex flex-col gap-1.5">
+                              {[
+                                'Up to 3 properties',
+                                'Digital inspection reports',
+                                'E-signature included',
+                              ].map((feat, i) => (
+                                <motion.div
+                                  key={feat}
+                                  initial={{ opacity: 0, x: -8 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: 0.12 + i * 0.05 }}
+                                  className="flex items-center gap-2"
+                                >
+                                  <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="#9A88FD"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                  >
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                  <span className="text-xs text-gray-500">{feat}</span>
+                                </motion.div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <AnimatePresence>
+                          {accountType === 'individual' && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                              animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
+                              exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                              className="overflow-hidden"
+                            >
+                              <div className="border-t border-gray-100 pt-4">
+                                <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                  I am a...
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {(
+                                    [
+                                      {
+                                        value: 'owner' as const,
+                                        label: 'Owner',
+                                        sub: 'I own a property',
+                                        icon: (
+                                          <svg
+                                            width="18"
+                                            height="18"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="1.8"
+                                            strokeLinecap="round"
+                                          >
+                                            <circle cx="12" cy="8" r="4" />
+                                            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                                          </svg>
+                                        ),
+                                      },
+                                      {
+                                        value: 'tenant' as const,
+                                        label: 'Tenant',
+                                        sub: 'I rent a property',
+                                        icon: (
+                                          <svg
+                                            width="18"
+                                            height="18"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="1.8"
+                                            strokeLinecap="round"
+                                          >
+                                            <rect x="2" y="7" width="20" height="14" rx="2" />
+                                            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+                                          </svg>
+                                        ),
+                                      },
+                                    ] as const
+                                  ).map((opt) => (
+                                    <motion.button
+                                      key={opt.value}
+                                      type="button"
+                                      whileTap={{ scale: 0.97 }}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setIndividualRole(opt.value)
+                                      }}
+                                      animate={{
+                                        borderColor:
+                                          individualRole === opt.value ? '#9A88FD' : '#E5E7EB',
+                                        backgroundColor:
+                                          individualRole === opt.value
+                                            ? 'rgba(154,136,253,0.08)'
+                                            : '#F9FAFB',
+                                        color:
+                                          individualRole === opt.value ? '#9A88FD' : '#6B7280',
+                                      }}
+                                      className="flex flex-col items-center gap-1.5 rounded-xl border-2 px-2 py-3.5 text-center transition-none"
+                                    >
+                                      {opt.icon}
+                                      <span className="text-sm font-semibold">{opt.label}</span>
+                                      <span className="text-[10px] opacity-70">{opt.sub}</span>
+                                    </motion.button>
+                                  ))}
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15 }}
+                      onClick={() => {
+                        setAccountType('pro')
+                        setIndividualRole(null)
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <motion.div
+                        animate={{
+                          borderColor: accountType === 'pro' ? '#9A88FD' : '#E5E7EB',
+                          backgroundColor:
+                            accountType === 'pro' ? 'rgba(154,136,253,0.05)' : '#FFFFFF',
+                        }}
+                        transition={{ duration: 0.2 }}
+                        className="relative overflow-hidden rounded-2xl border-2 p-5"
+                      >
+                        {accountType === 'pro' && (
+                          <motion.div
+                            layoutId="cardGlow"
+                            className="absolute inset-0 rounded-2xl"
+                            style={{
+                              boxShadow:
+                                '0 0 0 2px #9A88FD, 0 4px 20px rgba(154,136,253,0.15)',
+                            }}
+                          />
+                        )}
+
+                        <div className="absolute right-4 top-4">
+                          <motion.div
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ delay: 0.2, type: 'spring', stiffness: 400 }}
+                            className="rounded-full bg-[#9A88FD] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white"
+                          >
+                            Most Popular
+                          </motion.div>
+                        </div>
+
+                        <div className="flex items-start gap-4">
+                          <motion.div
+                            animate={{
+                              backgroundColor: accountType === 'pro' ? '#9A88FD' : '#F3F4F6',
+                            }}
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                          >
+                            <svg
+                              width="22"
+                              height="22"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke={accountType === 'pro' ? '#fff' : '#9CA3AF'}
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <rect x="2" y="3" width="20" height="14" rx="2" />
+                              <path d="M8 21h8M12 17v4" />
+                            </svg>
+                          </motion.div>
+
+                          <div className="min-w-0 flex-1 pr-20">
+                            <div className="flex items-center justify-between">
+                              <p className="text-base font-bold text-gray-900">Pro</p>
+                              <motion.div
+                                animate={{
+                                  borderColor: accountType === 'pro' ? '#9A88FD' : '#D1D5DB',
+                                  backgroundColor:
+                                    accountType === 'pro' ? '#9A88FD' : 'transparent',
+                                }}
+                                className="flex h-5 w-5 items-center justify-center rounded-full border-2"
+                              >
+                                {accountType === 'pro' && (
+                                  <motion.div
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    className="h-2 w-2 rounded-full bg-white"
+                                  />
+                                )}
+                              </motion.div>
+                            </div>
+                            <p className="mt-0.5 text-xs text-gray-400">
+                              Agent or property manager
+                            </p>
+
+                            <div className="mt-3 flex flex-col gap-1.5">
+                              {[
+                                'Unlimited properties',
+                                'White-label reports',
+                                'Team collaboration',
+                              ].map((feat, i) => (
+                                <motion.div
+                                  key={feat}
+                                  initial={{ opacity: 0, x: -8 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: 0.17 + i * 0.05 }}
+                                  className="flex items-center gap-2"
+                                >
+                                  <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="#9A88FD"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                  >
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                  <span className="text-xs text-gray-500">{feat}</span>
+                                </motion.div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  </div>
 
                   <motion.button
                     type="button"
-                    onClick={() => {
-                      setAccountType('pro')
-                      setIndividualRole(null)
-                    }}
-                    animate={{ scale: accountType === 'pro' ? 1.02 : 1 }}
-                    transition={cardSpring}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.25 }}
+                    whileHover={
+                      canContinueStep2 && !loading
+                        ? { scale: 1.02, boxShadow: '0 8px 30px rgba(154,136,253,0.4)' }
+                        : {}
+                    }
+                    whileTap={canContinueStep2 && !loading ? { scale: 0.98 } : {}}
+                    disabled={!canContinueStep2 || loading}
+                    onClick={() => void handleStep2Continue()}
                     className={cn(
-                      'relative rounded-2xl border-2 p-5 text-left transition-colors duration-200',
-                      accountType === 'pro'
-                        ? 'border-[#9A88FD] bg-[#9A88FD]/[0.08] shadow-lg shadow-[#9A88FD]/20'
-                        : 'border-gray-200 bg-white'
+                      'relative w-full overflow-hidden rounded-2xl py-4 text-base font-semibold text-white transition-opacity',
+                      canContinueStep2 && !loading ? 'bg-[#9A88FD]' : 'bg-[#9A88FD]/40',
+                      !canContinueStep2 && !loading && 'cursor-not-allowed',
+                      loading && 'cursor-wait'
                     )}
                   >
-                    <span className="absolute right-3 top-3 rounded-full bg-[#9A88FD] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                      Most Popular
+                    <motion.div
+                      className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      initial={{ x: '-100%' }}
+                      whileHover={{ x: '200%' }}
+                      transition={{ duration: 0.55 }}
+                    />
+                    <span className="relative z-10 flex items-center justify-center gap-2">
+                      {loading && accountType === 'individual' ? (
+                        <>
+                          <Loader2 size={18} className="animate-spin" />
+                          Creating account...
+                        </>
+                      ) : (
+                        <>
+                          Continue
+                          <ArrowRight size={18} />
+                        </>
+                      )}
                     </span>
-                    <div className="mb-3 text-4xl" aria-hidden>
-                      🏢
-                    </div>
-                    <p className="text-lg font-bold text-[#1A1A2E]">Pro</p>
-                    <p className="mb-3 text-sm text-gray-500">Agent or property manager</p>
-                    <ul className="space-y-2 text-sm text-gray-600">
-                      <li className="flex gap-2">
-                        <span className="text-[#9A88FD]">✓</span> Unlimited properties
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="text-[#9A88FD]">✓</span> White-label reports
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="text-[#9A88FD]">✓</span> Team collaboration
-                      </li>
-                    </ul>
                   </motion.button>
-                </div>
-
-                <motion.button
-                  type="button"
-                  onClick={() => void handleStep2Continue()}
-                  disabled={!canContinueStep2 || loading}
-                  whileHover={canContinueStep2 && !loading ? { scale: 1.02 } : {}}
-                  whileTap={canContinueStep2 && !loading ? { scale: 0.98 } : {}}
-                  transition={{ type: 'spring', stiffness: 400, damping: 22 }}
-                  className={cn(
-                    'mt-8 w-full rounded-2xl bg-[#9A88FD] py-4 text-base font-semibold text-white transition-opacity duration-200',
-                    !canContinueStep2 && !loading ? 'cursor-not-allowed opacity-40' : 'opacity-100',
-                    loading && 'cursor-wait'
-                  )}
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    {loading && accountType === 'individual' ? (
-                      <>
-                        <Loader2 size={18} className="animate-spin" />
-                        Creating account...
-                      </>
-                    ) : (
-                      <>
-                        Continue
-                        <ArrowRight size={18} />
-                      </>
-                    )}
-                  </span>
-                </motion.button>
+                </motion.div>
               </motion.div>
             )}
 
