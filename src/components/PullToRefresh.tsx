@@ -16,35 +16,50 @@ export function PullToRefreshIndicator({
   threshold = 72,
 }: PullToRefreshIndicatorProps) {
   const progress = Math.min(pullDistance / threshold, 1);
-  const show = pullDistance > 8 || isRefreshing;
+  const show = pullDistance > 12 || isRefreshing;
+
+  const topOffset = Math.max(pullDistance * 0.6 - 4, 0);
 
   return (
     <AnimatePresence>
       {show && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="pointer-events-none absolute left-0 right-0 top-0 z-50 flex justify-center"
-          style={{ paddingTop: Math.max(pullDistance - 8, 0) }}
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.2 }}
+          style={{
+            position: isRefreshing ? "fixed" : "absolute",
+            top: isRefreshing ? 56 : topOffset,
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            display: "flex",
+            justifyContent: "center",
+            pointerEvents: "none",
+          }}
         >
           <motion.div
             animate={{
-              scale: isTriggered || isRefreshing ? 1 : 0.8 + progress * 0.2,
+              scale: isTriggered || isRefreshing ? 1 : 0.75 + progress * 0.25,
               backgroundColor:
                 isTriggered || isRefreshing
                   ? "#9A88FD"
-                  : `rgba(154, 136, 253, ${0.1 + progress * 0.15})`,
+                  : `rgba(154, 136, 253, ${0.15 + progress * 0.2})`,
+              boxShadow:
+                isTriggered || isRefreshing
+                  ? "0 4px 16px rgba(154,136,253,0.4)"
+                  : "none",
             }}
             transition={{ duration: 0.15 }}
-            className="flex h-9 w-9 items-center justify-center rounded-full shadow-sm"
+            className="flex h-10 w-10 items-center justify-center rounded-full"
           >
             {isRefreshing ? (
               <motion.svg
                 animate={{ rotate: 360 }}
-                transition={{ duration: 0.7, repeat: Infinity, ease: "linear" }}
-                width="18"
-                height="18"
+                transition={{ duration: 0.65, repeat: Infinity, ease: "linear" }}
+                width="20"
+                height="20"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="white"
@@ -56,7 +71,7 @@ export function PullToRefreshIndicator({
             ) : (
               <motion.svg
                 animate={{ rotate: progress * 180 }}
-                transition={{ duration: 0.1 }}
+                transition={{ duration: 0.08 }}
                 width="16"
                 height="16"
                 viewBox="0 0 24 24"
