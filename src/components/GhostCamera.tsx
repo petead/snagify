@@ -389,7 +389,7 @@ export default function GhostCamera({
       </div>
 
       {/* CAMERA AREA — fills space between top bar and bottom controls */}
-      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div className="relative overflow-hidden" style={{ height: "52vh", minHeight: 240 }}>
         <AnimatePresence>
           {autoZoomApplied &&
             activeGhost &&
@@ -524,12 +524,15 @@ export default function GhostCamera({
 
       {/* BOTTOM CONTROLS */}
       <div
-        className="flex shrink-0 flex-col gap-3 px-6 pb-10 pt-4"
-        style={{ background: "rgba(0,0,0,0.85)" }}
+        className="flex flex-col gap-3 px-6 pb-10 pt-4 overflow-y-auto"
+        style={{ background: "rgba(0,0,0,0.85)", maxHeight: "48vh" }}
       >
         {checkinPhotos.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 16 }}>👻</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 0 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
+              <path d="M12 8v4M12 16h.01" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" />
+            </svg>
             <input
               type="range"
               min={0}
@@ -537,13 +540,13 @@ export default function GhostCamera({
               step={0.05}
               value={ghostOpacity}
               onChange={(e) => setGhostOpacity(parseFloat(e.target.value))}
-              style={{ flex: 1, accentColor: "#9A88FD" }}
+              style={{ flex: 1, accentColor: "#9A88FD", height: 2 }}
             />
             <span
               style={{
-                color: "rgba(255,255,255,0.6)",
-                fontSize: 12,
-                minWidth: 36,
+                color: "rgba(255,255,255,0.45)",
+                fontSize: 11,
+                minWidth: 30,
                 textAlign: "right",
               }}
             >
@@ -662,7 +665,7 @@ export default function GhostCamera({
               style={{
                 display: "flex",
                 flexWrap: "wrap",
-                gap: 6,
+                gap: 4,
               }}
             >
               {DAMAGE_TAGS.map((tag) => {
@@ -673,7 +676,7 @@ export default function GhostCamera({
                     type="button"
                     onClick={() => toggleTag(tag)}
                     style={{
-                      padding: "6px 10px",
+                      padding: "4px 9px",
                       borderRadius: 20,
                       border: on ? "1.5px solid #9A88FD" : "1.5px solid rgba(255,255,255,0.2)",
                       background: on ? "rgba(154,136,253,0.25)" : "rgba(255,255,255,0.06)",
@@ -714,6 +717,8 @@ export default function GhostCamera({
             alignItems: "center",
             justifyContent: "center",
             position: "relative",
+            paddingTop: 4,
+            paddingBottom: 4,
           }}
         >
           <button
