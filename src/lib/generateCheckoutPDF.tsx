@@ -19,6 +19,8 @@ import QRCode from "qrcode";
 import { getBrandTokens, type BrandTokens } from "@/lib/pdf/brandTokens";
 import {
   isFullySigned,
+  resolveCreatorPdfRole,
+  type CreatorPdfRole,
   type PdfSignatureEmbeds,
 } from "@/lib/pdf/inspectionSignatureEmbeds";
 
@@ -184,7 +186,9 @@ export interface CheckoutPDFProps {
     rera_number?: string;
     signature_image_url?: string;
     account_type?: string;
+    individual_role?: string | null;
   };
+  creatorPdfRole?: CreatorPdfRole;
   agencyName: string;
   agencyWebsite: string;
   agencyLogoUrl?: string | null;
@@ -1166,6 +1170,7 @@ export function CheckoutPDFDocument({
   checkinRooms,
   signatures,
   signatureEmbeds: sigE,
+  creatorPdfRole: creatorPdfRoleProp,
   profile,
   agencyName,
   agencyWebsite,
@@ -1175,6 +1180,9 @@ export function CheckoutPDFDocument({
 }: CheckoutPDFProps) {
   /** Same derivation as check-in PDF — agency primary + shades */
   const tokens = getBrandTokens(tokensProp.primary);
+  const creatorPdfRole =
+    creatorPdfRoleProp ??
+    resolveCreatorPdfRole(profile?.account_type, profile?.individual_role);
   const documentHash = inspection.document_hash || "";
   const shortHash = `${documentHash.slice(0, 8)}…${documentHash.slice(-8)}`;
 
@@ -2246,7 +2254,10 @@ export function CheckoutPDFDocument({
               style={[
                 s.sigVerifiedBadge,
                 {
-                  backgroundColor: sigE && isFullySigned(sigE) ? tokens.primaryLight : "#F3F4F6",
+                  backgroundColor:
+                    sigE && isFullySigned(sigE, creatorPdfRole)
+                      ? tokens.primaryLight
+                      : "#F3F4F6",
                 },
               ]}
             >
@@ -2255,17 +2266,27 @@ export function CheckoutPDFDocument({
                   s.sigVerifiedDot,
                   {
                     marginRight: 5,
-                    backgroundColor: sigE && isFullySigned(sigE) ? tokens.primary : "#9CA3AF",
+                    backgroundColor:
+                      sigE && isFullySigned(sigE, creatorPdfRole)
+                        ? tokens.primary
+                        : "#9CA3AF",
                   },
                 ]}
               />
               <Text
                 style={[
                   s.sigVerifiedText,
-                  { color: sigE && isFullySigned(sigE) ? undefined : "#6B7280" },
+                  {
+                    color:
+                      sigE && isFullySigned(sigE, creatorPdfRole)
+                        ? undefined
+                        : "#6B7280",
+                  },
                 ]}
               >
-                {sigE && isFullySigned(sigE) ? "Verified Document" : "Pending Signatures"}
+                {sigE && isFullySigned(sigE, creatorPdfRole)
+                  ? "Verified Document"
+                  : "Pending Signatures"}
               </Text>
             </View>
           </View>
@@ -2446,28 +2467,22 @@ export function CheckoutPDFDocument({
             })()}
           </View>
 
-          {(() => {
+          {creatorPdfRole === "inspector" &&
+            (() => {
             const inspectorSig = (signatures ?? []).find(
               (s) => s.signer_type === "agent" || s.signer_type === "inspector"
             );
             const inspectorName = profile?.full_name ?? "—";
             const isIndividual = ((profile as { account_type?: string } | undefined)?.account_type ?? "individual") === "individual";
 
-            const landlordSigForInspector = isIndividual
-              ? (signatures ?? []).find((s) => s.signer_type === "landlord")
-              : null;
-
             const inspectorImg =
               sigE?.inspector.base64 ??
               inspectorSig?.signature_data ??
-              landlordSigForInspector?.signature_data ??
               (!isIndividual ? profile?.signature_image_url : null) ??
               null;
 
             const inspectorSignedAtEmbed = sigE?.inspector.signedAt ?? null;
-            const inspectorSignedAtLegacy = isIndividual
-              ? (landlordSigForInspector?.signed_at ?? null)
-              : (inspection.created_at ?? null);
+            const inspectorSignedAtLegacy = inspection.created_at ?? null;
             const inspectorSignedAt = inspectorSignedAtEmbed ?? inspectorSignedAtLegacy;
             return (
               <View
@@ -2520,9 +2535,7 @@ export function CheckoutPDFDocument({
                       <Text style={{ fontSize: 7, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
                         {inspectorImg
                           ? `● Signed on ${formatDate(inspectorSignedAt ?? inspection.created_at, true)}`
-                          : isIndividual
-                            ? "Pending signature"
-                            : `Report generated on ${formatDate(inspection.created_at, true)}`}
+                          : `Report generated on ${formatDate(inspection.created_at, true)}`}
                       </Text>
                     </View>
                   </View>

@@ -20,6 +20,8 @@ import { getBrandTokens } from "@/lib/pdf/brandTokens";
 import { getPdfImageHeight } from "@/lib/photos/getImageDimensions";
 import {
   isFullySigned,
+  resolveCreatorPdfRole,
+  type CreatorPdfRole,
   type PdfSignatureEmbeds,
 } from "@/lib/pdf/inspectionSignatureEmbeds";
 
@@ -1057,6 +1059,7 @@ interface InspectionMeta {
     rera_number?: string;
     signature_image_url?: string;
     account_type?: string;
+    individual_role?: string | null;
   } | null;
   rooms: {
     name: string;
@@ -1078,6 +1081,8 @@ interface InspectionMeta {
   checkinRooms?: { name: string; photos: { id: string; url?: string; damage_tags?: string[]; ai_analysis?: string | null }[] }[];
   /** Data URLs + dates for PDF Image embedding (from service-role signature fetch). */
   signatureEmbeds?: PdfSignatureEmbeds;
+  /** Maps the inspection agent to landlord / tenant / inspector column in the PDF */
+  creatorPdfRole?: CreatorPdfRole;
 }
 
 function isValidHex(s: string | undefined): boolean {
@@ -1108,6 +1113,9 @@ function InspectionReport({
   const property = meta.property ?? {};
   const inspection = meta.inspection;
   const sigE = meta.signatureEmbeds;
+  const creatorPdfRole =
+    meta.creatorPdfRole ??
+    resolveCreatorPdfRole(meta.agent?.account_type, meta.agent?.individual_role);
 
   const tenancy = {
     landlord_name: meta.inspection.landlord_name,
@@ -1818,7 +1826,10 @@ function InspectionReport({
               style={[
                 s.sigVerifiedBadge,
                 {
-                  backgroundColor: sigE && isFullySigned(sigE) ? tokens.primaryLight : "#F3F4F6",
+                  backgroundColor:
+                    sigE && isFullySigned(sigE, creatorPdfRole)
+                      ? tokens.primaryLight
+                      : "#F3F4F6",
                 },
               ]}
             >
@@ -1827,17 +1838,27 @@ function InspectionReport({
                   s.sigVerifiedDot,
                   {
                     marginRight: 5,
-                    backgroundColor: sigE && isFullySigned(sigE) ? tokens.primary : "#9CA3AF",
+                    backgroundColor:
+                      sigE && isFullySigned(sigE, creatorPdfRole)
+                        ? tokens.primary
+                        : "#9CA3AF",
                   },
                 ]}
               />
               <Text
                 style={[
                   s.sigVerifiedText,
-                  { color: sigE && isFullySigned(sigE) ? undefined : "#6B7280" },
+                  {
+                    color:
+                      sigE && isFullySigned(sigE, creatorPdfRole)
+                        ? undefined
+                        : "#6B7280",
+                  },
                 ]}
               >
-                {sigE && isFullySigned(sigE) ? "Verified Document" : "Pending Signatures"}
+                {sigE && isFullySigned(sigE, creatorPdfRole)
+                  ? "Verified Document"
+                  : "Pending Signatures"}
               </Text>
             </View>
           </View>
@@ -2018,7 +2039,8 @@ function InspectionReport({
             })()}
           </View>
 
-          {(() => {
+          {creatorPdfRole === "inspector" &&
+            (() => {
             const inspectorSig = (meta.signatures ?? []).find(
               (s) => s.signer_type === "agent" || s.signer_type === "inspector"
             );
@@ -2026,22 +2048,14 @@ function InspectionReport({
             const inspectorName = profile?.full_name ?? "—";
             const isIndividual = (profile?.account_type ?? "individual") === "individual";
 
-            // For individual accounts: the owner is also the landlord.
-            const landlordSigForInspector = isIndividual
-              ? (meta.signatures ?? []).find((s) => s.signer_type === "landlord")
-              : null;
-
             const inspectorImg =
               sigE?.inspector.base64 ??
               inspectorSig?.signature_data ??
-              landlordSigForInspector?.signature_data ??
               (!isIndividual ? profile?.signature_image_url : null) ??
               null;
 
             const inspectorSignedAtEmbed = sigE?.inspector.signedAt ?? null;
-            const inspectorSignedAtLegacy = isIndividual
-              ? (landlordSigForInspector?.signed_at ?? null)
-              : (meta.inspection.created_at ?? null);
+            const inspectorSignedAtLegacy = meta.inspection.created_at ?? null;
             const inspectorSignedAt = inspectorSignedAtEmbed ?? inspectorSignedAtLegacy;
             return (
               <View
@@ -2094,9 +2108,7 @@ function InspectionReport({
                       <Text style={{ fontSize: 7, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
                         {inspectorImg
                           ? `● Signed on ${formatDate(inspectorSignedAt ?? meta.inspection.created_at, true)}`
-                          : isIndividual
-                            ? "Pending signature"
-                            : `Report generated on ${formatDate(meta.inspection.created_at, true)}`}
+                          : `Report generated on ${formatDate(meta.inspection.created_at, true)}`}
                       </Text>
                     </View>
                   </View>

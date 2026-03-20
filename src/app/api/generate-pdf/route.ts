@@ -18,6 +18,8 @@ import {
 } from "@/lib/compressImageForPdf";
 import {
   buildPdfSignatureEmbeds,
+  resolveCreatorPdfRole,
+  type CreatorPdfRole,
   type SignatureRow,
 } from "@/lib/pdf/inspectionSignatureEmbeds";
 
@@ -377,7 +379,9 @@ export async function buildPdfAndUpload(
     const { data: agentRow } = agentId
       ? await supabase
           .from("profiles")
-          .select("full_name, rera_number, signature_image_url, account_type, company:companies(*)")
+          .select(
+            "full_name, rera_number, signature_image_url, account_type, individual_role, company:companies(*)"
+          )
           .eq("id", agentId)
           .maybeSingle()
       : { data: null };
@@ -395,8 +399,14 @@ export async function buildPdfAndUpload(
           rera_number: agentRow.rera_number,
           signature_image_url: agentRow.signature_image_url,
           account_type: agentRow.account_type ?? "individual",
+          individual_role: (agentRow as { individual_role?: string | null }).individual_role ?? null,
         }
       : null;
+
+    const creatorPdfRole: CreatorPdfRole = resolveCreatorPdfRole(
+      agentData?.account_type,
+      agentData?.individual_role
+    );
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -421,8 +431,8 @@ export async function buildPdfAndUpload(
     const signatureEmbeds = await buildPdfSignatureEmbeds({
       rows: freshSignatureRows,
       profileSignatureUrl: agentData?.signature_image_url ?? null,
-      accountType: agentData?.account_type ?? "individual",
       inspectionCreatedAt: row.created_at != null ? String(row.created_at) : null,
+      creatorPdfRole,
     });
 
     const meta: InspectionMeta = {
@@ -465,6 +475,7 @@ export async function buildPdfAndUpload(
             rera_number: (agentData as { rera_number?: string }).rera_number ?? undefined,
             signature_image_url: (agentData as { signature_image_url?: string }).signature_image_url ?? undefined,
             account_type: (agentData as { account_type?: string }).account_type ?? "individual",
+            individual_role: (agentData as { individual_role?: string | null }).individual_role ?? undefined,
           }
         : null,
       rooms: (row.rooms ?? [])
@@ -496,6 +507,7 @@ export async function buildPdfAndUpload(
         otp_verified: s.otp_verified ?? false,
       })),
       signatureEmbeds,
+      creatorPdfRole,
     };
 
     /** Smaller JPEG data URLs for PDF embedding only — document_hash uses original meta above */
@@ -595,12 +607,14 @@ export async function buildPdfAndUpload(
           signed_at: s.signed_at ?? null,
         })),
         signatureEmbeds: meta.signatureEmbeds,
+        creatorPdfRole: meta.creatorPdfRole,
         profile: agentData
           ? {
               full_name: agentData.full_name,
               rera_number: (agentData as { rera_number?: string }).rera_number,
               signature_image_url: (agentData as { signature_image_url?: string }).signature_image_url,
               account_type: (agentData as { account_type?: string }).account_type ?? "individual",
+              individual_role: (agentData as { individual_role?: string | null }).individual_role ?? null,
             }
           : undefined,
         agencyName: agentData?.agency_name ?? "Agency",

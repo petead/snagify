@@ -7,6 +7,18 @@ export type SignatureRow = {
   otp_verified?: boolean | null;
 };
 
+/** Which PDF signature column the logged-in agent (inspection creator) maps to */
+export type CreatorPdfRole = "landlord" | "tenant" | "inspector";
+
+export function resolveCreatorPdfRole(
+  accountType?: string | null,
+  individualRole?: string | null
+): CreatorPdfRole {
+  if (accountType === "pro") return "inspector";
+  if (individualRole === "tenant") return "tenant";
+  return "landlord";
+}
+
 export type PdfPartySignature = {
   base64: string | null;
   signedAt?: string | null;
@@ -46,32 +58,58 @@ export async function normalizeSignatureToDataUrl(
   return null;
 }
 
-export function isFullySigned(embeds: PdfSignatureEmbeds): boolean {
-  return !!(
-    embeds.landlord.base64 &&
-    embeds.tenant.base64 &&
-    embeds.inspector.base64
-  );
+export function isFullySigned(
+  embeds: PdfSignatureEmbeds,
+  creatorPdfRole: CreatorPdfRole = "inspector"
+): boolean {
+  const landlordOk = !!embeds.landlord.base64;
+  const tenantOk = !!embeds.tenant.base64;
+  if (creatorPdfRole === "inspector") {
+    return landlordOk && tenantOk && !!embeds.inspector.base64;
+  }
+  return landlordOk && tenantOk;
 }
 
 /**
  * Build landlord / tenant / inspector image data URLs for PDF embedding.
- * Mirrors generatePDF.tsx inspector fallbacks (individual vs pro).
+ * Assigns the creator's pad signature to the correct column (owner → landlord, tenant → tenant, pro → inspector).
  */
 export async function buildPdfSignatureEmbeds(options: {
   rows: SignatureRow[];
   profileSignatureUrl?: string | null;
-  accountType: string;
   inspectionCreatedAt?: string | null;
+  creatorPdfRole: CreatorPdfRole;
 }): Promise<PdfSignatureEmbeds> {
-  const { rows, profileSignatureUrl, accountType, inspectionCreatedAt } = options;
-  const isIndividual = (accountType || "individual") === "individual";
+  const {
+    rows,
+    profileSignatureUrl,
+    inspectionCreatedAt,
+    creatorPdfRole,
+  } = options;
 
-  const landlordRow = rows.find((r) => r.signer_type === "landlord");
-  const tenantRow = rows.find((r) => r.signer_type === "tenant");
-  const inspectorRow = rows.find(
+  const rawLandlord = rows.find((r) => r.signer_type === "landlord");
+  const rawTenant = rows.find((r) => r.signer_type === "tenant");
+  const rawAgentInspector = rows.find(
     (r) => r.signer_type === "agent" || r.signer_type === "inspector"
   );
+
+  const creatorSig =
+    rawAgentInspector ??
+    (creatorPdfRole === "landlord"
+      ? rawLandlord
+      : creatorPdfRole === "tenant"
+        ? rawTenant
+        : null) ??
+    null;
+
+  const landlordRow =
+    creatorPdfRole === "landlord" ? creatorSig ?? rawLandlord : rawLandlord;
+  const tenantRow =
+    creatorPdfRole === "tenant" ? creatorSig ?? rawTenant : rawTenant;
+  const inspectorRow: SignatureRow | null =
+    creatorPdfRole === "inspector"
+      ? creatorSig ?? rawAgentInspector ?? null
+      : null;
 
   const landlordBase64 = await normalizeSignatureToDataUrl(
     landlordRow?.signature_data ?? null
@@ -79,18 +117,19 @@ export async function buildPdfSignatureEmbeds(options: {
   const tenantBase64 = await normalizeSignatureToDataUrl(
     tenantRow?.signature_data ?? null
   );
+  const landlordSignedAt: string | null = landlordRow?.signed_at ?? null;
+  const tenantSignedAt: string | null = tenantRow?.signed_at ?? null;
 
-  let inspectorBase64 = await normalizeSignatureToDataUrl(
+  let inspectorBase64: string | null = await normalizeSignatureToDataUrl(
     inspectorRow?.signature_data ?? null
   );
   let inspectorSignedAt: string | null = inspectorRow?.signed_at ?? null;
 
-  if (!inspectorBase64 && isIndividual) {
-    inspectorBase64 = landlordBase64;
-    inspectorSignedAt = landlordRow?.signed_at ?? null;
-  }
-
-  if (!inspectorBase64 && !isIndividual && profileSignatureUrl) {
+  if (
+    creatorPdfRole === "inspector" &&
+    !inspectorBase64 &&
+    profileSignatureUrl
+  ) {
     inspectorBase64 = await normalizeSignatureToDataUrl(profileSignatureUrl);
     inspectorSignedAt = inspectionCreatedAt ?? null;
   }
@@ -98,15 +137,15 @@ export async function buildPdfSignatureEmbeds(options: {
   return {
     landlord: {
       base64: landlordBase64,
-      signedAt: landlordRow?.signed_at ?? null,
+      signedAt: landlordSignedAt,
     },
     tenant: {
       base64: tenantBase64,
-      signedAt: tenantRow?.signed_at ?? null,
+      signedAt: tenantSignedAt,
     },
     inspector: {
-      base64: inspectorBase64,
-      signedAt: inspectorSignedAt,
+      base64: creatorPdfRole === "inspector" ? inspectorBase64 : null,
+      signedAt: creatorPdfRole === "inspector" ? inspectorSignedAt : null,
     },
   };
 }
