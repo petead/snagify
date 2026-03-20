@@ -151,12 +151,15 @@ function InspectionRow({
       setPreparingCheckOut(true);
       try {
         const supabase = createClient();
+        const action =
+          creditsAccountType === "individual" ? "individual_checkout" : "pro_checkout";
         const [balanceRes, costRow] = await Promise.all([
           fetch("/api/credits/balance"),
           supabase
             .from("credit_costs")
             .select("credits")
-            .eq("action", "checkout_standard")
+            .eq("action", action)
+            .eq("is_active", true)
             .maybeSingle(),
         ]);
         const balanceJson = (await balanceRes.json()) as {
@@ -169,7 +172,7 @@ function InspectionRow({
           return;
         }
         const balance = Number(balanceJson.balance ?? 0);
-        const cost = Number(costRow.data?.credits ?? 2) || 2;
+        const cost = Number(costRow.data?.credits ?? 1) || 1;
         if (balance < cost) {
           setShowBuyCredits(true);
           setPreparingCheckOut(false);

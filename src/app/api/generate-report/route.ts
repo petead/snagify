@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { buildPdfAndUpload } from "@/app/api/generate-pdf/route";
-import { InsufficientCreditsError } from "@/lib/credits/checkoutReportDebit";
+import { InsufficientCreditsError } from "@/lib/credits";
 
 export const maxDuration = 60;
 
@@ -250,6 +250,7 @@ export async function POST(request: Request) {
           error: err.message,
           balance: err.balance,
           credits_needed: err.credits_needed,
+          required: err.credits_needed,
         },
         { status: 402 }
       );

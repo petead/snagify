@@ -26,10 +26,9 @@ import {
   type SignatureRow,
 } from "@/lib/pdf/inspectionSignatureEmbeds";
 import {
-  assertCanDebitCheckoutReport,
-  debitCheckoutReportAfterPdfSuccess,
+  deductCredits,
   InsufficientCreditsError,
-} from "@/lib/credits/checkoutReportDebit";
+} from "@/lib/credits";
 
 export const maxDuration = 60;
 
@@ -431,7 +430,34 @@ export async function buildPdfAndUpload(
       if (!agentId) {
         throw new Error("Inspection has no agent_id; cannot verify credits for check-out");
       }
-      await assertCanDebitCheckoutReport(supabaseAdmin, inspectionId, agentId);
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("account_type, company_id")
+        .eq("id", inspection.agent_id)
+        .single();
+
+      const accountType =
+        profile?.account_type === "individual" ? "individual" : "pro";
+      const companyId = profile?.company_id as string | null;
+      const inspType = inspection.type === "check-in" ? "check-in" : "check-out";
+
+      if (companyId) {
+        const result = await deductCredits({
+          supabaseAdmin,
+          companyId,
+          inspectionId,
+          inspectionType: inspType,
+          accountType,
+        });
+
+        if (!result.success) {
+          throw new InsufficientCreditsError(
+            "Insufficient credits",
+            result.newBalance,
+            result.cost
+          );
+        }
+      }
     }
 
     let freshSignatureRows: SignatureRow[] = [];
@@ -710,13 +736,6 @@ export async function buildPdfAndUpload(
         console.error("[generate-pdf] Failed to save report_url:", updateErr.message);
       } else {
         reportUrl = bustUrl;
-        if (isCheckout && supabaseAdmin && agentId) {
-          await debitCheckoutReportAfterPdfSuccess(
-            supabaseAdmin,
-            inspectionId,
-            agentId
-          );
-        }
       }
     }
 
@@ -757,6 +776,7 @@ export async function POST(request: NextRequest) {
           error: err.message,
           balance: err.balance,
           credits_needed: err.credits_needed,
+          required: err.credits_needed,
         },
         { status: 402 }
       );

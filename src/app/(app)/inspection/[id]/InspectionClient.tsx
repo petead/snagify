@@ -101,6 +101,19 @@ const DAMAGE_TAGS = [
   "scratch", "stain", "crack", "damp", "missing", "broken", "hole", "leak",
 ];
 
+function creditActionFor(
+  inspectionType: "check-in" | "check-out",
+  accountType: "pro" | "individual"
+) {
+  return accountType === "pro"
+    ? inspectionType === "check-in"
+      ? "pro_checkin"
+      : "pro_checkout"
+    : inspectionType === "check-in"
+      ? "individual_checkin"
+      : "individual_checkout";
+}
+
 // ─── Helpers ─────────────────────────────────────
 // ─── PhotoCard ───────────────────────────────────
 function PhotoCard({
@@ -434,7 +447,7 @@ export function InspectionClient({
   const [showCompletenessWarning, setShowCompletenessWarning] = useState(false);
   const [showCreditConfirm, setShowCreditConfirm] = useState(false);
   const [liveCredits, setLiveCredits] = useState<number | null>(null);
-  const [creditCost, setCreditCost] = useState(2);
+  const [creditCost, setCreditCost] = useState(1);
   const [openingCreditModal, setOpeningCreditModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -481,18 +494,25 @@ export function InspectionClient({
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [profileRes, costRes] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("company:companies(credits_balance)")
-          .eq("id", user.id)
-          .single(),
-        supabase
-          .from("credit_costs")
-          .select("credits")
-          .eq("action", "checkout_standard")
-          .maybeSingle(),
-      ]);
+      const profileRes = await supabase
+        .from("profiles")
+        .select("account_type, company:companies(credits_balance)")
+        .eq("id", user.id)
+        .single();
+
+      const profileAccountType =
+        profileRes.data?.account_type === "individual" ? "individual" : "pro";
+      const action = creditActionFor(
+        inspectionType === "check-in" ? "check-in" : "check-out",
+        profileAccountType
+      );
+
+      const costRes = await supabase
+        .from("credit_costs")
+        .select("credits")
+        .eq("action", action)
+        .eq("is_active", true)
+        .single();
 
       if (profileRes.error) {
         setToast("Could not load credit balance");
@@ -503,12 +523,54 @@ export function InspectionClient({
         (profileRes.data?.company as { credits_balance?: number } | null)
           ?.credits_balance ?? 0;
       setLiveCredits(balance);
-      if (costRes.data?.credits) setCreditCost(costRes.data.credits);
+      setCreditCost(Number(costRes.data?.credits ?? 1) || 1);
       setShowCreditConfirm(true);
     } finally {
       setOpeningCreditModal(false);
     }
   }
+
+  // Fetch credit cost from DB with account-type specific action.
+  useEffect(() => {
+    if (!isCheckout) return;
+    const fetchCost = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("account_type")
+        .eq("id", user.id)
+        .single();
+
+      const accountType = profile?.account_type === "individual" ? "individual" : "pro";
+      const action = creditActionFor("check-out", accountType);
+      const { data } = await supabase
+        .from("credit_costs")
+        .select("credits")
+        .eq("action", action)
+        .eq("is_active", true)
+        .single();
+
+      setCreditCost(Number(data?.credits ?? 1) || 1);
+    };
+    void fetchCost();
+  }, [isCheckout, supabase]);
+
+  const showToast = (msg: string) => setToast(msg);
+
+  // ── Derived (currentRoom = selected room for dock and handlers)
+  const currentRoom = liveRooms[activeRoom] ?? null;
+  const currentRoomId = currentRoom?.id;
+  const roomCurrentPhotos = photos.filter((p) => p.room_id === currentRoomId);
+  const totalPhotos = photos.length;
+  const damagedPhotos = photos.filter((p) => p.damage_tags?.length > 0).length;
+  const roomsWithPhotos = liveRooms.filter((room) =>
+    photos.some((p) => p.room_id === room.id)
+  ).length;
+  const progressPct = liveRooms.length > 0 ? (roomsWithPhotos / liveRooms.length) * 100 : 0;
 
   // Pre-select existing room names on mount + detect matching template
   useEffect(() => {
@@ -623,32 +685,6 @@ export function InspectionClient({
       return () => clearTimeout(t);
     }
   }, [toast]);
-
-  // Fetch credit cost from DB (for checkout)
-  useEffect(() => {
-    if (!isCheckout) return;
-    supabase
-      .from("credit_costs")
-      .select("credits")
-      .eq("action", "checkout_standard")
-      .single()
-      .then(({ data }) => {
-        if (data?.credits) setCreditCost(data.credits);
-      });
-  }, [isCheckout, supabase]);
-
-  const showToast = (msg: string) => setToast(msg);
-
-  // ── Derived (currentRoom = selected room for dock and handlers)
-  const currentRoom = liveRooms[activeRoom] ?? null;
-  const currentRoomId = currentRoom?.id;
-  const roomCurrentPhotos = photos.filter((p) => p.room_id === currentRoomId);
-  const totalPhotos = photos.length;
-  const damagedPhotos = photos.filter((p) => p.damage_tags?.length > 0).length;
-  const roomsWithPhotos = liveRooms.filter((room) =>
-    photos.some((p) => p.room_id === room.id)
-  ).length;
-  const progressPct = liveRooms.length > 0 ? (roomsWithPhotos / liveRooms.length) * 100 : 0;
 
   // ── Setup handlers
   const handleTypeSelect = (type: string) => {
@@ -2394,6 +2430,7 @@ export function InspectionClient({
         <CheckoutCreditConfirmModal
           creditsBalance={liveCredits ?? 0}
           creditCost={creditCost}
+          inspectionType={inspectionType === "check-in" ? "check-in" : "check-out"}
           onConfirm={async () => {
             setShowCreditConfirm(false);
             await handleGenerateReport();

@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react'
 interface Props {
   creditsBalance: number
   creditCost?: number
+  inspectionType?: "check-in" | "check-out"
   onConfirm: () => Promise<void>
   onCancel: () => void
 }
@@ -13,6 +14,7 @@ interface Props {
 export function CheckoutCreditConfirmModal({
   creditsBalance,
   creditCost = 2,
+  inspectionType = "check-out",
   onConfirm,
   onCancel,
 }: Props) {
@@ -116,9 +118,17 @@ export function CheckoutCreditConfirmModal({
             className="relative z-10"
             style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.5 }}
           >
-            This will use {creditCost} credits from your balance
-            <br />
-            to generate the full report.
+            {creditCost === 0 ? (
+              <>
+                This {inspectionType} is <strong>free</strong> ✓
+              </>
+            ) : (
+              <>
+                This will use <strong>{creditCost} credit{creditCost > 1 ? "s" : ""}</strong>
+                <br />
+                to generate the full report.
+              </>
+            )}
           </p>
         </div>
 
@@ -291,7 +301,7 @@ export function CheckoutCreditConfirmModal({
                     strokeLinecap="round"
                   />
                 </svg>
-                Generate Report · {creditCost} credits
+                {creditCost === 0 ? "Generate Report · Free" : `Generate Report · ${creditCost} credits`}
               </>
             )}
           </button>
