@@ -529,6 +529,32 @@ export default function GhostCamera({
                     </motion.div>
                   )}
               </AnimatePresence>
+
+              {/* Ghost opacity slider — overlaid on bottom of video */}
+              {checkinPhotos.length > 0 && (
+                <div className="absolute bottom-3 left-4 right-4 z-20 flex items-center gap-2">
+                  <span style={{ fontSize: 13 }}>👻</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={0.7}
+                    step={0.05}
+                    value={ghostOpacity}
+                    onChange={(e) => setGhostOpacity(parseFloat(e.target.value))}
+                    style={{ flex: 1, accentColor: "#9A88FD", height: 2 }}
+                  />
+                  <span
+                    style={{
+                      color: "rgba(255,255,255,0.5)",
+                      fontSize: 11,
+                      minWidth: 30,
+                      textAlign: "right",
+                    }}
+                  >
+                    {Math.round(ghostOpacity * 100)}%
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -558,59 +584,26 @@ export default function GhostCamera({
         <div className="w-8" aria-hidden />
       </div>
 
-      {/* ── LAYER 5: ZOOM + TORCH controls ── */}
+      {/* ── LEFT COLUMN OVERLAY: Flash on top, zoom presets vertical ── */}
       {(showZoomBar || showTorchBtn) && (
         <div
-          className={`pointer-events-auto absolute bottom-48 left-0 right-0 z-20 flex items-center px-4 ${
-            showZoomBar && showTorchBtn
-              ? "justify-between"
-              : showTorchBtn
-                ? "justify-end"
-                : "justify-start"
-          }`}
+          className="pointer-events-auto absolute left-3 z-20 flex flex-col items-center gap-2"
+          style={{ top: "50%", transform: "translateY(-50%)" }}
         >
-          {showZoomBar && (
-            <div className="flex items-center gap-1.5 rounded-full bg-black/40 px-2 py-1.5 backdrop-blur-sm">
-              {zoomPresets.map((preset) => (
-                <motion.button
-                  key={preset.label}
-                  type="button"
-                  onClick={() => void applyZoom(preset.value)}
-                  animate={{
-                    backgroundColor:
-                      Math.abs(currentZoom - preset.value) < 0.1
-                        ? "rgba(255,255,255,0.25)"
-                        : "transparent",
-                    scale: Math.abs(currentZoom - preset.value) < 0.1 ? 1.1 : 1,
-                  }}
-                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                  className="rounded-full px-2.5 py-1"
-                >
-                  <span
-                    className={`text-xs font-bold ${
-                      Math.abs(currentZoom - preset.value) < 0.1 ? "text-yellow-300" : "text-white/70"
-                    }`}
-                  >
-                    {preset.label}
-                  </span>
-                </motion.button>
-              ))}
-            </div>
-          )}
           {showTorchBtn && (
             <motion.button
               type="button"
               onClick={() => void toggleTorch()}
               animate={{
-                backgroundColor: torchOn ? "rgba(254,222,128,0.3)" : "rgba(0,0,0,0.4)",
+                backgroundColor: torchOn ? "rgba(254,222,128,0.35)" : "rgba(0,0,0,0.45)",
               }}
-              className="flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-sm"
+              className="mb-1 flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-sm"
               whileTap={{ scale: 0.9 }}
               aria-label={torchOn ? "Turn flash off" : "Turn flash on"}
             >
               <svg
-                width="18"
-                height="18"
+                width="16"
+                height="16"
                 viewBox="0 0 24 24"
                 fill={torchOn ? "#FEDE80" : "none"}
                 stroke={torchOn ? "#FEDE80" : "white"}
@@ -620,6 +613,41 @@ export default function GhostCamera({
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
               </svg>
             </motion.button>
+          )}
+
+          {showZoomBar && (
+            <div
+              className="flex flex-col items-center gap-1 rounded-2xl px-1.5 py-2"
+              style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)" }}
+            >
+              {[...zoomPresets].reverse().map((preset) => {
+                const active = Math.abs(currentZoom - preset.value) < 0.1;
+                return (
+                  <motion.button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => void applyZoom(preset.value)}
+                    animate={{
+                      backgroundColor: active ? "rgba(255,255,255,0.2)" : "transparent",
+                      scale: active ? 1.1 : 1,
+                    }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                    className="flex h-8 w-8 items-center justify-center rounded-full"
+                  >
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: active ? "#FEDE80" : "rgba(255,255,255,0.7)",
+                        writingMode: "horizontal-tb",
+                      }}
+                    >
+                      {preset.label}
+                    </span>
+                  </motion.button>
+                );
+              })}
+            </div>
           )}
         </div>
       )}
@@ -631,24 +659,6 @@ export default function GhostCamera({
           background: "linear-gradient(to top, rgba(0,0,0,0.88) 70%, transparent 100%)",
         }}
       >
-        {checkinPhotos.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-white/50">👻</span>
-            <input
-              type="range"
-              min={0}
-              max={0.7}
-              step={0.05}
-              value={ghostOpacity}
-              onChange={(e) => setGhostOpacity(parseFloat(e.target.value))}
-              style={{ flex: 1, accentColor: "#9A88FD", height: 2 }}
-            />
-            <span className="min-w-[30px] text-right text-[11px] text-white/40">
-              {Math.round(ghostOpacity * 100)}%
-            </span>
-          </div>
-        )}
-
         {checkinPhotos.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
             {checkinPhotos.map((photo, idx) => (
