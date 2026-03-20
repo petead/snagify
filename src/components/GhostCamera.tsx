@@ -281,41 +281,12 @@ export default function GhostCamera({
     let mounted = true;
     const startCamera = async () => {
       try {
-        const activePhoto = checkinPhotos[activeGhostIndex] ?? checkinPhotos[0];
-        const streamPhotoW = activePhoto?.width ?? 1440;
-        const streamPhotoH = activePhoto?.height ?? 1920;
-
-        const mediaConstraints: MediaStreamConstraints = {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: streamPhotoW, exact: streamPhotoW },
-            height: { ideal: streamPhotoH, exact: streamPhotoH },
-            aspectRatio: { ideal: streamPhotoH / streamPhotoW },
           },
           audio: false,
-        };
-
-        let mediaStream: MediaStream;
-        try {
-          mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-        } catch {
-          try {
-            mediaStream = await navigator.mediaDevices.getUserMedia({
-              video: {
-                facingMode: { ideal: "environment" },
-                aspectRatio: { ideal: streamPhotoH / streamPhotoW },
-                width: { ideal: streamPhotoW },
-                height: { ideal: streamPhotoH },
-              },
-              audio: false,
-            });
-          } catch {
-            mediaStream = await navigator.mediaDevices.getUserMedia({
-              video: { facingMode: { ideal: "environment" } },
-              audio: false,
-            });
-          }
-        }
+        });
         if (!mounted) {
           mediaStream.getTracks().forEach((t) => t.stop());
           return;
@@ -362,7 +333,7 @@ export default function GhostCamera({
       trackRef.current = null;
       setStream(null);
     };
-  }, [photoW, photoH, syncCapabilitiesFromTrack]);
+  }, [syncCapabilitiesFromTrack]);
 
   /** Match live camera zoom to check-in photo when ghost is selected. */
   useEffect(() => {
@@ -498,61 +469,49 @@ export default function GhostCamera({
 
   return (
     <div className="fixed inset-0 z-[999] overflow-hidden bg-black">
-      {/* Ratio-locked viewport — video + ghost share identical pixels */}
-      {(() => {
-        const ph = isAdditionalMode
-          ? null
-          : (checkinPhotos[activeGhostIndex] ?? checkinPhotos[0] ?? null);
-        const pW = ph?.width ?? 1440;
-        const pH = ph?.height ?? 1920;
-        const cssRatio = `${pW} / ${pH}`;
+      {/* Video viewport — full sensor, no forced aspect ratio */}
+      <div className="absolute inset-0 bg-black">
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            height: "100%",
+          }}
+        >
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              zIndex: 0,
+            }}
+          />
 
-        return (
-          <div className="absolute inset-0 flex items-start justify-center bg-black">
-            <div
-              style={{
-                position: "relative",
-                width: "100%",
-                aspectRatio: cssRatio,
-                maxWidth: "100%",
-                maxHeight: "100%",
-                overflow: "hidden",
-              }}
-            >
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
+          {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={activeGhost.url}
+                alt=""
                 style={{
                   position: "absolute",
                   inset: 0,
                   width: "100%",
                   height: "100%",
-                  objectFit: "cover",
-                  zIndex: 0,
+                  objectFit: "contain",
+                  opacity: ghostOpacity,
+                  pointerEvents: "none",
+                  zIndex: 1,
                 }}
               />
-
-              {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
-                <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={activeGhost.url}
-                    alt=""
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      opacity: ghostOpacity,
-                      pointerEvents: "none",
-                      zIndex: 1,
-                    }}
-                  />
-                </>
-              )}
+            </>
+          )}
 
               {activeGhost && !isAdditionalMode && (
                 <div
@@ -675,8 +634,6 @@ export default function GhostCamera({
               )}
             </div>
           </div>
-        );
-      })()}
 
       {/* ── LAYER 2: TOP BAR overlay ── */}
       <div
