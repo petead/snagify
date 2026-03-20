@@ -27,7 +27,6 @@ interface TeamMember {
   created_at?: string | null;
   propertiesCount: number;
   inspectionsCount: number;
-  reportsCount: number;
   isCurrentUser: boolean;
   displayRole: "Owner" | "Inspector";
 }
@@ -66,7 +65,19 @@ export function TeamSection({ company, currentUserId }: Props) {
     const [membersRes, invitesRes] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name, email, avatar_url, job_title, role, created_at")
+        .select(
+          `
+          id,
+          full_name,
+          email,
+          avatar_url,
+          job_title,
+          role,
+          created_at,
+          properties (id),
+          inspections (id)
+        `
+        )
         .eq("company_id", companyId)
         .order("created_at", { ascending: true }),
       supabase
@@ -84,39 +95,38 @@ export function TeamSection({ company, currentUserId }: Props) {
       console.error("Team invitations fetch error:", invitesRes.error);
     }
 
-    const members = membersRes.data;
+    type ProfileWithRelations = {
+      id: string;
+      full_name: string | null;
+      email: string | null;
+      avatar_url: string | null;
+      job_title: string | null;
+      role: string | null;
+      created_at: string | null;
+      properties: { id: string }[] | null;
+      inspections: { id: string }[] | null;
+    };
+
+    const rawMembers = membersRes.data as ProfileWithRelations[] | null;
     const inviteRows = invitesRes.data;
 
-    if (!members?.length) {
+    if (!rawMembers?.length) {
       setTeamMembers([]);
       setInvitations((inviteRows as Invitation[]) ?? []);
       setLoading(false);
       return;
     }
 
-    const membersWithStats: TeamMember[] = await Promise.all(
-      members.map(async (member) => {
-        const [{ count: propertiesCount }, { count: inspectionsCount }, { count: reportsCount }] =
-          await Promise.all([
-            supabase.from("properties").select("id", { count: "exact", head: true }).eq("agent_id", member.id),
-            supabase.from("inspections").select("id", { count: "exact", head: true }).eq("agent_id", member.id),
-            supabase
-              .from("inspections")
-              .select("id", { count: "exact", head: true })
-              .eq("agent_id", member.id)
-              .not("report_url", "is", null),
-          ]);
-
-        return {
-          ...member,
-          propertiesCount: propertiesCount ?? 0,
-          inspectionsCount: inspectionsCount ?? 0,
-          reportsCount: reportsCount ?? 0,
-          isCurrentUser: member.id === currentUserId,
-          displayRole: teamDisplayRole(member.role),
-        };
-      })
-    );
+    const membersWithStats: TeamMember[] = rawMembers.map((member) => {
+      const { properties: _p, inspections: _i, ...rest } = member;
+      return {
+        ...rest,
+        propertiesCount: Array.isArray(member.properties) ? member.properties.length : 0,
+        inspectionsCount: Array.isArray(member.inspections) ? member.inspections.length : 0,
+        isCurrentUser: member.id === currentUserId,
+        displayRole: teamDisplayRole(member.role),
+      };
+    });
 
     setTeamMembers(membersWithStats);
     setInvitations((inviteRows as Invitation[]) ?? []);
@@ -255,21 +265,18 @@ export function TeamSection({ company, currentUserId }: Props) {
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round">
                       <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                     </svg>
-                    <span className="text-[10px] text-gray-400">{m.propertiesCount}</span>
+                    <span className="text-[10px] text-gray-400">
+                      {m.propertiesCount} prop.
+                    </span>
                   </div>
                   <div className="flex items-center gap-1">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round">
                       <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
                       <rect x="9" y="3" width="6" height="4" rx="1" />
                     </svg>
-                    <span className="text-[10px] text-gray-400">{m.inspectionsCount}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                    </svg>
-                    <span className="text-[10px] text-gray-400">{m.reportsCount}</span>
+                    <span className="text-[10px] text-gray-400">
+                      {m.inspectionsCount} inspect.
+                    </span>
                   </div>
                 </div>
               </div>
@@ -446,7 +453,6 @@ export function TeamSection({ company, currentUserId }: Props) {
                     {[
                       `${deletingMember.propertiesCount} propert${deletingMember.propertiesCount !== 1 ? "ies" : "y"}`,
                       `${deletingMember.inspectionsCount} inspection${deletingMember.inspectionsCount !== 1 ? "s" : ""}`,
-                      `${deletingMember.reportsCount} report${deletingMember.reportsCount !== 1 ? "s" : ""}`,
                       "All photos & signatures",
                       "Account access",
                     ].map((item) => (
