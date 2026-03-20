@@ -110,7 +110,7 @@ export function ProGateSheet({
             </p>
             <button
               type="button"
-              onClick={() => closeAndGo("/profile?tab=subscription")}
+              onClick={() => closeAndGo("/profile?tab=subscription#topup")}
               className="mb-2 w-full rounded-2xl bg-[#9A88FD] py-3 font-bold"
             >
               Buy credits →

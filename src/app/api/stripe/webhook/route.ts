@@ -46,37 +46,56 @@ export async function POST(req: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.mode !== "payment") break;
 
-        const companyId = session.metadata?.company_id;
-        const packId = session.metadata?.pack_id;
-        if (!companyId || !packId) break;
+        const companyId = session.metadata?.company_id || "";
+        const packId = session.metadata?.pack_id || "";
+        const userId = session.metadata?.supabase_user_id || "";
+        const creditsFromMeta = Number(session.metadata?.credits ?? 0);
 
-        const { data: pack } = await supabaseAdmin
-          .from("credit_packs")
-          .select("credits, name")
-          .eq("id", packId)
-          .single();
-        if (!pack) break;
+        let creditsToAdd = creditsFromMeta;
+        let packName = "credits";
+        if (packId) {
+          const { data: pack } = await supabaseAdmin
+            .from("credit_packs")
+            .select("credits, name")
+            .eq("id", packId)
+            .single();
+          if (pack?.credits) creditsToAdd = Number(pack.credits);
+          if (pack?.name) packName = pack.name;
+        }
+        if (!creditsToAdd || Number.isNaN(creditsToAdd)) break;
+
+        let targetCompanyId = companyId;
+        if (!targetCompanyId && userId) {
+          const { data: profile } = await supabaseAdmin
+            .from("profiles")
+            .select("company_id")
+            .eq("id", userId)
+            .single();
+          targetCompanyId = profile?.company_id ?? "";
+        }
+        if (!targetCompanyId) break;
 
         const { data: company } = await supabaseAdmin
           .from("companies")
           .select("credits_balance")
-          .eq("id", companyId)
+          .eq("id", targetCompanyId)
           .single();
-        const newBalance = Number(company?.credits_balance ?? 0) + Number(pack.credits ?? 0);
+        const newBalance = Number(company?.credits_balance ?? 0) + creditsToAdd;
 
         await supabaseAdmin
           .from("companies")
           .update({ credits_balance: newBalance })
-          .eq("id", companyId);
+          .eq("id", targetCompanyId);
 
         await supabaseAdmin.from("credit_transactions").insert({
-          company_id: companyId,
+          company_id: targetCompanyId,
           type: "purchase",
-          credits: pack.credits,
+          credits: creditsToAdd,
           balance_after: newBalance,
-          pack_id: packId,
+          ...(packId ? { pack_id: packId } : {}),
           stripe_payment_intent_id: session.payment_intent as string,
-          note: `Purchased ${pack.name} - ${pack.credits} credits`,
+          action: "pack_purchase",
+          note: `Purchased ${packName} - ${creditsToAdd} credits`,
         });
         break;
       }

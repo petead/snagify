@@ -54,7 +54,8 @@ export function BuyCreditsModal({
     const fetchPacks = async () => {
       setLoadingCatalog(true);
       try {
-        const res = await fetch(`/api/credits/packs?target=individual`);
+        const target = accountType === "pro" ? "pro" : "individual";
+        const res = await fetch(`/api/credits/packs?target=${target}`);
         const data = (await res.json()) as {
           packs?: Pack[];
         };
@@ -66,18 +67,19 @@ export function BuyCreditsModal({
       }
     };
     void fetchPacks();
-  }, [isOpen]);
+  }, [isOpen, accountType]);
 
-  async function handleBuy(priceId: string, packId: string) {
-    setLoadingPriceId(priceId);
+  async function handleBuy(pack: Pack) {
+    setLoadingPriceId(pack.id);
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "one_time",
-          price_id: priceId,
-          pack_id: packId,
+          packId: pack.id,
+          successUrl: `${window.location.origin}/dashboard?credits=success`,
+          cancelUrl: window.location.href,
         }),
       });
       const data = (await res.json()) as { url?: string; error?: string };
@@ -94,10 +96,6 @@ export function BuyCreditsModal({
         void onPurchaseSuccess();
       }
     }
-  }
-
-  if (accountType !== "individual") {
-    return null;
   }
 
   const modalStyles = `
@@ -126,12 +124,10 @@ export function BuyCreditsModal({
 `;
 
   const currentCredits = currentBalance;
-  const loading =
-    !!selectedPack?.stripe_price_id &&
-    loadingPriceId === selectedPack.stripe_price_id;
+  const loading = !!selectedPack && loadingPriceId === selectedPack.id;
   const handlePurchase = () => {
-    if (!selectedPack?.stripe_price_id) return;
-    void handleBuy(selectedPack.stripe_price_id, selectedPack.id);
+    if (!selectedPack) return;
+    void handleBuy(selectedPack);
   };
 
   const portal = mounted

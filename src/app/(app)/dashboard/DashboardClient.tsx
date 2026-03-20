@@ -165,8 +165,8 @@ export function DashboardClient({
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("payment") === "success") {
-      alert("Payment successful! Your credits have been added.");
+    if (params.get("credits") === "success" || params.get("payment") === "success") {
+      alert("Credits added to your account!");
       void refreshCredits();
       window.history.replaceState({}, "", "/dashboard");
     } else if (params.get("payment") === "cancelled") {

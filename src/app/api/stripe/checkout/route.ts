@@ -22,14 +22,16 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       type?: "one_time" | "subscription";
       price_id?: string;
+      packId?: string;
       pack_id?: string;
       plan_slug?: string;
+      companyId?: string;
+      userId?: string;
+      successUrl?: string;
+      cancelUrl?: string;
     };
-    const { type, price_id, pack_id, plan_slug } = body;
-
-    if (!price_id) {
-      return NextResponse.json({ error: "Missing price_id" }, { status: 400 });
-    }
+    const { type, price_id, plan_slug } = body;
+    const packId = body.packId ?? body.pack_id;
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
@@ -63,31 +65,69 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.snagify.net";
 
     const isSubscription = type === "subscription";
+    const checkoutCompanyId = body.companyId ?? profile.company_id;
     const successUrl = isSubscription
-      ? `${appUrl}/profile?subscribed=true`
-      : `${appUrl}/dashboard?payment=success`;
+      ? (body.successUrl ?? `${appUrl}/profile?subscribed=true`)
+      : (body.successUrl ?? `${appUrl}/dashboard?credits=success`);
     const cancelUrl = isSubscription
-      ? `${appUrl}/profile`
-      : `${appUrl}/dashboard?payment=cancelled`;
+      ? (body.cancelUrl ?? `${appUrl}/profile`)
+      : (body.cancelUrl ?? `${appUrl}/dashboard?payment=cancelled`);
+
+    let lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
+    let checkoutCredits = 0;
+    if (isSubscription) {
+      if (!price_id) {
+        return NextResponse.json({ error: "Missing price_id" }, { status: 400 });
+      }
+      lineItems = [{ price: price_id, quantity: 1 }];
+    } else {
+      if (!packId) {
+        return NextResponse.json({ error: "Missing packId" }, { status: 400 });
+      }
+      const { data: pack } = await supabaseAdmin
+        .from("credit_packs")
+        .select("id, name, credits, price_aed, is_active")
+        .eq("id", packId)
+        .eq("is_active", true)
+        .single();
+      if (!pack) {
+        return NextResponse.json({ error: "Pack not found" }, { status: 404 });
+      }
+      checkoutCredits = Number(pack.credits ?? 0);
+      lineItems = [
+        {
+          price_data: {
+            currency: "aed",
+            unit_amount: Math.round(Number(pack.price_aed) * 100),
+            product_data: {
+              name: `Snagify Credits — ${pack.name}`,
+              description: `${pack.credits} credit${Number(pack.credits) > 1 ? "s" : ""} for Snagify inspections`,
+            },
+          },
+          quantity: 1,
+        },
+      ];
+    }
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
       mode: isSubscription ? "subscription" : "payment",
-      line_items: [{ price: price_id, quantity: 1 }],
+      line_items: lineItems,
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: {
-        supabase_user_id: user.id,
-        company_id: profile.company_id,
+        supabase_user_id: body.userId ?? user.id,
+        company_id: checkoutCompanyId ?? "",
         type: type ?? "one_time",
-        ...(pack_id ? { pack_id } : {}),
+        ...(packId ? { pack_id: packId } : {}),
+        ...(checkoutCredits ? { credits: String(checkoutCredits) } : {}),
         ...(plan_slug ? { plan_slug } : {}),
       },
       ...(type === "subscription"
         ? {
             subscription_data: {
               metadata: {
-                company_id: profile.company_id,
+                company_id: checkoutCompanyId ?? "",
                 plan_slug: plan_slug || "",
               },
             },
