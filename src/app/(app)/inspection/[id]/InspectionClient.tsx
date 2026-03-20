@@ -64,7 +64,14 @@ function getGeoCoords(): Promise<GeoCoords | null> {
   });
 }
 
-type GhostPhoto = { id: string; url: string; damage_tags?: string[]; ai_analysis?: string | null };
+type GhostPhoto = {
+  id: string;
+  url: string;
+  width?: number | null;
+  height?: number | null;
+  damage_tags?: string[];
+  ai_analysis?: string | null;
+};
 
 interface Props {
   inspectionId: string;
@@ -722,6 +729,8 @@ export function InspectionClient({
           photos (
             id,
             url,
+            width,
+            height,
             damage_tags,
             ai_analysis
           )
@@ -736,6 +745,8 @@ export function InspectionClient({
           ghostMap[key] = room.photos.map((p) => ({
             id: p.id,
             url: p.url,
+            width: (p as { width?: number | null }).width ?? null,
+            height: (p as { height?: number | null }).height ?? null,
             damage_tags: p.damage_tags,
             ai_analysis: p.ai_analysis,
           }));

@@ -20,10 +20,20 @@ const DAMAGE_TAGS = [
 export type GhostPhoto = {
   id: string;
   url: string;
+  width?: number | null;
+  height?: number | null;
   storage_path?: string | null;
   damage_tags?: string[];
   ai_analysis?: string | null;
 };
+
+/** height / width; fallback 4:3 when DB has no dimensions (legacy photos). */
+function aspectRatioFromPhoto(ph: GhostPhoto | null | undefined): number {
+  const w = ph?.width;
+  const h = ph?.height;
+  if (w && h && w > 0 && h > 0) return h / w;
+  return 4 / 3;
+}
 
 export interface GhostCameraProps {
   checkinPhotos: GhostPhoto[];
@@ -70,6 +80,21 @@ export default function GhostCamera({
   const [isAdditionalMode, setIsAdditionalMode] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [prepopulatedHintVisible, setPrepopulatedHintVisible] = useState(false);
+
+  /** Display + capture: match active entry photo (or 4:3 in “New finding”). */
+  const targetAspectRatio = useMemo(() => {
+    if (isAdditionalMode) return 4 / 3;
+    const ph = checkinPhotos[activeGhostIndex];
+    return aspectRatioFromPhoto(ph ?? null);
+  }, [isAdditionalMode, activeGhostIndex, checkinPhotos]);
+
+  /** Hint for getUserMedia — first entry photo that has dimensions, else 4:3. */
+  const aspectForStream = useMemo(() => {
+    const withDims = checkinPhotos.find(
+      (p) => p.width && p.height && p.width > 0 && p.height > 0
+    );
+    return aspectRatioFromPhoto(withDims ?? null);
+  }, [checkinPhotos]);
 
   /** Sync tags from the active check-in ghost photo (entry photo strip / index). */
   useEffect(() => {
@@ -137,16 +162,28 @@ export default function GhostCamera({
     let mounted = true;
     const startCamera = async () => {
       try {
-        // No width/height constraints — let the device use its native
-        // camera resolution (e.g. iPhone 1440x1920 portrait).
-        // Constraining to 1920x1080 forces landscape ratio and causes
-        // inconsistent dimensions across check-in/check-out flows.
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
+        const ar = Math.max(0.25, Math.min(4, aspectForStream));
+        const widthIdeal = 1920;
+        const heightIdeal = Math.round(widthIdeal * ar);
+        const mediaConstraints: MediaStreamConstraints = {
           video: {
             facingMode: "environment",
+            width: { ideal: widthIdeal },
+            height: { ideal: heightIdeal },
+            aspectRatio: { ideal: 1 / ar },
           },
           audio: false,
-        });
+        };
+
+        let mediaStream: MediaStream;
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+        } catch {
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" },
+            audio: false,
+          });
+        }
         if (!mounted) {
           mediaStream.getTracks().forEach((t) => t.stop());
           return;
@@ -187,7 +224,7 @@ export default function GhostCamera({
         if (mounted) setCameraError("Camera access denied. Please allow camera permissions.");
       }
     };
-    startCamera();
+    void startCamera();
     return () => {
       mounted = false;
       const t = trackRef.current;
@@ -199,7 +236,7 @@ export default function GhostCamera({
       trackRef.current = null;
       setStream(null);
     };
-  }, []);
+  }, [aspectForStream]);
 
   const handleShutter = async () => {
     if (!videoRef.current || !canvasRef.current || capturing) return;
@@ -207,17 +244,34 @@ export default function GhostCamera({
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const { width: frameW, height: frameH } = getVideoCaptureDimensions(video);
-    if (!frameW || !frameH) {
+    const { width: nativeW, height: nativeH } = getVideoCaptureDimensions(video);
+    if (!nativeW || !nativeH) {
       console.error("[GhostCamera] Video frame dimensions unavailable — cannot capture");
       setCapturing(false);
       return;
     }
-    canvas.width = frameW;
-    canvas.height = frameH;
+
+    const nativeRatio = nativeH / nativeW;
+    const aspect = targetAspectRatio;
+
+    let cropW = nativeW;
+    let cropH = nativeH;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    if (nativeRatio > aspect) {
+      cropH = Math.round(nativeW * aspect);
+      offsetY = Math.round((nativeH - cropH) / 2);
+    } else if (nativeRatio < aspect) {
+      cropW = Math.round(nativeH / aspect);
+      offsetX = Math.round((nativeW - cropW) / 2);
+    }
+
+    canvas.width = cropW;
+    canvas.height = cropH;
 
     const ctx = canvas.getContext("2d");
-    ctx?.drawImage(video, 0, 0, frameW, frameH);
+    ctx?.drawImage(video, offsetX, offsetY, cropW, cropH, 0, 0, cropW, cropH);
 
     const tagsSnapshot = [...selectedTags];
 
@@ -337,41 +391,45 @@ export default function GhostCamera({
         <div style={{ width: 32 }} />
       </div>
 
-      {/* CAMERA + GHOST LAYER */}
-      <div style={{ position: "relative", flex: 1, overflow: "hidden" }}>
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-          }}
-        />
-
-        {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-            src={activeGhost.url}
-            alt="Check-in ghost"
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              opacity: ghostOpacity,
-              pointerEvents: "none",
-              mixBlendMode: "normal",
-            }}
+      {/* CAMERA + GHOST LAYER — ratio-locked to active check-in photo (H/W) */}
+      <div
+        style={{
+          position: "relative",
+          flex: 1,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          minHeight: 0,
+        }}
+      >
+        <div
+          className="relative w-full overflow-hidden bg-black"
+          style={{ paddingBottom: `${targetAspectRatio * 100}%` }}
+        >
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute inset-0 z-0 h-full w-full object-cover"
+            style={{ transform: "scaleX(1)" }}
           />
-          </>
-        )}
+
+          {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={activeGhost.url}
+                alt="Check-in ghost"
+                className="pointer-events-none absolute inset-0 z-[1] h-full w-full object-cover"
+                style={{
+                  opacity: ghostOpacity,
+                  mixBlendMode: "normal",
+                }}
+              />
+            </>
+          )}
 
         {activeGhost && !isAdditionalMode && (
           <div
@@ -487,6 +545,8 @@ export default function GhostCamera({
             )}
           </div>
         )}
+
+        </div>
 
         <canvas ref={canvasRef} style={{ display: "none" }} />
       </div>
