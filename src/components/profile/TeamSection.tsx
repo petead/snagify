@@ -6,7 +6,16 @@ import Image from "next/image";
 import { Loader2, UserPlus, X, Mail, Clock } from "lucide-react";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import { normalizeProfileRole } from "@/lib/profileLabels";
+
+/** Team UI: owner only if `profiles.role` is owner/agent (case-insensitive). Anything else → inspector. */
+function isProfileOwnerRole(role: string | null | undefined): boolean {
+  const r = (role ?? "").trim().toLowerCase();
+  return r === "owner" || r === "agent";
+}
+
+function teamDisplayRole(role: string | null | undefined): "Owner" | "Inspector" {
+  return isProfileOwnerRole(role) ? "Owner" : "Inspector";
+}
 
 interface TeamMember {
   id: string;
@@ -15,7 +24,6 @@ interface TeamMember {
   role: string | null;
   avatar_url?: string | null;
   job_title?: string | null;
-  account_type?: "pro" | "individual" | null;
   created_at?: string | null;
   propertiesCount: number;
   inspectionsCount: number;
@@ -51,24 +59,35 @@ export function TeamSection({ company, currentUserId }: Props) {
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const fetchTeamMembers = useCallback(async () => {
-    if (!company.id) return;
+    const companyId = company.id;
+    if (!companyId) return;
     setLoading(true);
 
-    const [{ data: members }, { data: inviteRows }] = await Promise.all([
+    const [membersRes, invitesRes] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name, email, role, avatar_url, job_title, account_type, created_at")
-        .eq("company_id", company.id)
+        .select("id, full_name, email, avatar_url, job_title, role, created_at")
+        .eq("company_id", companyId)
         .order("created_at", { ascending: true }),
       supabase
         .from("company_invitations")
         .select("id, email, created_at, expires_at")
-        .eq("company_id", company.id)
+        .eq("company_id", companyId)
         .is("accepted_at", null)
         .gt("expires_at", new Date().toISOString()),
     ]);
 
-    if (!members) {
+    if (membersRes.error) {
+      console.error("Team fetch error:", membersRes.error);
+    }
+    if (invitesRes.error) {
+      console.error("Team invitations fetch error:", invitesRes.error);
+    }
+
+    const members = membersRes.data;
+    const inviteRows = invitesRes.data;
+
+    if (!members?.length) {
       setTeamMembers([]);
       setInvitations((inviteRows as Invitation[]) ?? []);
       setLoading(false);
@@ -88,14 +107,13 @@ export function TeamSection({ company, currentUserId }: Props) {
               .not("report_url", "is", null),
           ]);
 
-        const normalizedRole = normalizeProfileRole(member.role);
         return {
           ...member,
           propertiesCount: propertiesCount ?? 0,
           inspectionsCount: inspectionsCount ?? 0,
           reportsCount: reportsCount ?? 0,
           isCurrentUser: member.id === currentUserId,
-          displayRole: normalizedRole === "owner" ? "Owner" : "Inspector",
+          displayRole: teamDisplayRole(member.role),
         };
       })
     );
@@ -180,7 +198,7 @@ export function TeamSection({ company, currentUserId }: Props) {
 
   const currentUserMember = teamMembers.find((m) => m.id === currentUserId);
   const isCurrentUserOwner =
-    !!currentUserMember && normalizeProfileRole(currentUserMember.role) === "owner";
+    !!currentUserMember && isProfileOwnerRole(currentUserMember.role);
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden border border-gray-100">
@@ -264,7 +282,7 @@ export function TeamSection({ company, currentUserId }: Props) {
               </span>
               {isCurrentUserOwner &&
                 !m.isCurrentUser &&
-                normalizeProfileRole(m.role) !== "owner" && (
+                !isProfileOwnerRole(m.role) && (
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.9 }}
