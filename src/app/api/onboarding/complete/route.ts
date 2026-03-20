@@ -195,6 +195,12 @@ export async function POST(req: Request) {
           { status: 500 }
         );
       }
+      if (!company?.id) {
+        return NextResponse.json(
+          { error: "Company creation failed: missing company id" },
+          { status: 500 }
+        );
+      }
       companyId = company.id;
     } else {
       companyId = await getDefaultSnagifyCompanyId(admin);
