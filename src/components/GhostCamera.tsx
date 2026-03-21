@@ -371,8 +371,8 @@ export default function GhostCamera({
   if (isLandscape) {
     return (
       <div className="fixed inset-0 z-[999] flex flex-row bg-black">
-        {/* VIDEO — left side, fills available space */}
-        <div className="relative flex-1" style={{ minWidth: 0 }}>
+        {/* ── LEFT: VIDEO fills all remaining space ── */}
+        <div className="relative min-h-0 flex-1" style={{ minWidth: 0 }}>
           <video
             ref={videoRef}
             autoPlay
@@ -380,7 +380,14 @@ export default function GhostCamera({
             muted
             className="block h-full w-full"
             style={{ objectFit: "cover" }}
+            onLoadedMetadata={() => {
+              const v = videoRef.current;
+              if (v && v.videoWidth && v.videoHeight) {
+                setVideoAspectRatio(`${v.videoWidth} / ${v.videoHeight}`);
+              }
+            }}
           />
+
           {/* Ghost overlay */}
           {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
             <>
@@ -396,35 +403,34 @@ export default function GhostCamera({
                   objectFit: "cover",
                   opacity: ghostOpacity,
                   pointerEvents: "none",
+                  zIndex: 1,
                 }}
               />
             </>
           )}
-          {/* TOP BAR overlaid on video */}
+
+          {/* TOP BAR — transparent, overlaid */}
           <div
             className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-4"
             style={{
-              paddingTop: "calc(env(safe-area-inset-top,0px)+8px)",
-              paddingBottom: 8,
-              background: "transparent",
+              paddingTop: "calc(env(safe-area-inset-top,0px) + 6px)",
+              paddingBottom: 6,
             }}
           >
             <button
               type="button"
               onClick={handleClose}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-base text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-base text-white backdrop-blur-sm"
             >
               ✕
             </button>
-            <p
-              className="text-sm font-bold text-white"
-              style={{ fontFamily: "Poppins, sans-serif" }}
-            >
+            <p className="m-0 text-sm font-bold text-white" style={{ fontFamily: "Poppins,sans-serif" }}>
               {roomName}
             </p>
             <div className="w-8" />
           </div>
-          {/* Entry photo badge */}
+
+          {/* Entry photo / new finding badge — top right */}
           {activeGhost && !isAdditionalMode && (
             <div
               style={{
@@ -442,7 +448,7 @@ export default function GhostCamera({
                   margin: 0,
                   fontSize: 11,
                   fontWeight: 600,
-                  color: "rgba(255,255,255,0.7)",
+                  color: "rgba(255,255,255,0.75)",
                 }}
               >
                 👻 Entry photo
@@ -461,16 +467,15 @@ export default function GhostCamera({
                 padding: "4px 10px",
               }}
             >
-              <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "white" }}>
-                📸 New finding
-              </p>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "white" }}>📸 New finding</p>
             </div>
           )}
-          {/* Zoom + flash — left overlay */}
+
+          {/* ZOOM + FLASH — left overlay column */}
           {(showZoomBar || showTorchBtn) && (
             <div
               className="absolute left-3 z-20 flex flex-col items-center gap-2"
-              style={{ top: "30%" }}
+              style={{ top: "28%" }}
             >
               {showTorchBtn && (
                 <motion.button
@@ -481,12 +486,12 @@ export default function GhostCamera({
                       ? "rgba(254,222,128,0.35)"
                       : "rgba(0,0,0,0.45)",
                   }}
-                  className="mb-1 flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-sm"
+                  className="mb-1 flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-sm"
                   whileTap={{ scale: 0.9 }}
                 >
                   <svg
-                    width="14"
-                    height="14"
+                    width="16"
+                    height="16"
                     viewBox="0 0 24 24"
                     fill={torchOn ? "#FEDE80" : "none"}
                     stroke={torchOn ? "#FEDE80" : "white"}
@@ -513,12 +518,13 @@ export default function GhostCamera({
                           backgroundColor: active
                             ? "rgba(255,255,255,0.2)"
                             : "transparent",
+                          scale: active ? 1.1 : 1,
                         }}
-                        className="flex h-7 w-7 items-center justify-center rounded-full"
+                        className="flex h-8 w-8 items-center justify-center rounded-full"
                       >
                         <span
                           style={{
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: 700,
                             color: active ? "#FEDE80" : "rgba(255,255,255,0.7)",
                           }}
@@ -532,7 +538,8 @@ export default function GhostCamera({
               )}
             </div>
           )}
-          {/* Ghost slider bottom of video */}
+
+          {/* Ghost slider — bottom of video */}
           {checkinPhotos.length > 0 && !isAdditionalMode && (
             <div
               style={{
@@ -546,7 +553,7 @@ export default function GhostCamera({
                 gap: 8,
               }}
             >
-              <span style={{ fontSize: 12 }}>👻</span>
+              <span style={{ fontSize: 13 }}>👻</span>
               <input
                 type="range"
                 min={0}
@@ -559,7 +566,7 @@ export default function GhostCamera({
               <span
                 style={{
                   color: "rgba(255,255,255,0.5)",
-                  fontSize: 10,
+                  fontSize: 11,
                   minWidth: 28,
                   textAlign: "right",
                 }}
@@ -570,91 +577,124 @@ export default function GhostCamera({
           )}
         </div>
 
-        {/* RIGHT PANEL — controls */}
+        {/* ── RIGHT PANEL: controls ── */}
         <div
-          className="flex flex-shrink-0 flex-col gap-2 overflow-y-auto px-3 py-4"
-          style={{ width: 180, background: "rgba(0,0,0,0.88)" }}
+          className="flex h-full min-h-0 flex-shrink-0 flex-col gap-3 overflow-y-auto"
+          style={{
+            width: 190,
+            background: "rgba(0,0,0,0.9)",
+            padding: "16px 12px 24px",
+          }}
         >
-          {/* Photo strip */}
+          {/* Photo strip — horizontal wrap */}
           {checkinPhotos.length > 1 && (
-            <div
-              className="flex flex-col gap-1.5 overflow-y-auto"
-              style={{ maxHeight: 120 }}
-            >
-              {checkinPhotos.map((photo, idx) => (
-                <button
-                  key={photo.id}
-                  type="button"
-                  onClick={() => setActiveGhostIndex(idx)}
-                  style={{
-                    flexShrink: 0,
-                    position: "relative",
-                    width: 40,
-                    height: 40,
-                    borderRadius: 6,
-                    overflow: "hidden",
-                    padding: 0,
-                    border:
-                      idx === activeGhostIndex
-                        ? "2px solid #9A88FD"
-                        : "2px solid transparent",
-                    opacity: idx === activeGhostIndex ? 1 : 0.5,
-                    cursor: "pointer",
-                  }}
-                >
-                  <Image src={photo.url} alt="" fill sizes="40px" style={{ objectFit: "cover" }} />
-                  {coveredCheckinIds.has(photo.id) && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        background: "rgba(34,197,94,0.45)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <span style={{ color: "white", fontSize: 14, fontWeight: 800 }}>✓</span>
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-          {/* Damage tags */}
-          {isCheckout && (
-            <div className="flex flex-wrap gap-1">
-              {DAMAGE_TAGS.map((tag) => {
-                const on = selectedTags.includes(tag);
-                return (
+            <div>
+              <p
+                style={{
+                  color: "rgba(255,255,255,0.4)",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  margin: "0 0 6px",
+                }}
+              >
+                Photos
+              </p>
+              <div className="flex flex-row flex-wrap gap-1.5">
+                {checkinPhotos.map((photo, idx) => (
                   <button
-                    key={tag}
+                    key={photo.id}
                     type="button"
-                    onClick={() => toggleTag(tag)}
+                    onClick={() => setActiveGhostIndex(idx)}
                     style={{
-                      padding: "3px 7px",
-                      borderRadius: 20,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      border: on
-                        ? "1.5px solid #9A88FD"
-                        : "1.5px solid rgba(255,255,255,0.2)",
-                      background: on
-                        ? "rgba(154,136,253,0.25)"
-                        : "rgba(255,255,255,0.06)",
-                      color: on ? "#e9e4ff" : "rgba(255,255,255,0.65)",
-                      textTransform: "capitalize",
+                      position: "relative",
+                      width: 44,
+                      height: 44,
+                      borderRadius: 6,
+                      overflow: "hidden",
+                      padding: 0,
                       cursor: "pointer",
+                      border:
+                        idx === activeGhostIndex
+                          ? "2px solid #9A88FD"
+                          : "2px solid transparent",
+                      opacity: idx === activeGhostIndex ? 1 : 0.5,
                     }}
                   >
-                    {tag}
+                    <Image src={photo.url} alt="" fill sizes="44px" style={{ objectFit: "cover" }} />
+                    {coveredCheckinIds.has(photo.id) && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          background: "rgba(34,197,94,0.45)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <span style={{ color: "white", fontSize: 16, fontWeight: 800 }}>✓</span>
+                      </div>
+                    )}
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
           )}
+
+          {/* Damage tags */}
+          {isCheckout && (
+            <div>
+              <p
+                style={{
+                  color: "rgba(255,255,255,0.4)",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  margin: "0 0 6px",
+                }}
+              >
+                Damage tags
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {DAMAGE_TAGS.map((tag) => {
+                  const on = selectedTags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTag(tag)}
+                      style={{
+                        padding: "3px 8px",
+                        borderRadius: 20,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        border: on
+                          ? "1.5px solid #9A88FD"
+                          : "1.5px solid rgba(255,255,255,0.2)",
+                        background: on
+                          ? "rgba(154,136,253,0.25)"
+                          : "rgba(255,255,255,0.06)",
+                        color: on ? "#e9e4ff" : "rgba(255,255,255,0.65)",
+                        textTransform: "capitalize",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Spacer */}
+          <div style={{ flex: 1 }} />
+
           {/* Shutter row */}
-          <div className="mt-auto flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between">
             {isCheckout ? (
               <button
                 type="button"
@@ -673,6 +713,7 @@ export default function GhostCamera({
                   background: "transparent",
                   color: "#FF8A65",
                   cursor: "pointer",
+                  whiteSpace: "nowrap",
                 }}
               >
                 ＋ New
@@ -680,16 +721,17 @@ export default function GhostCamera({
             ) : (
               <div style={{ width: 40 }} />
             )}
+
             <button
               type="button"
               onClick={handleShutter}
               disabled={capturing}
               style={{
-                width: 56,
-                height: 56,
+                width: 60,
+                height: 60,
                 borderRadius: "50%",
                 border: isAdditionalMode ? "3px solid #FF8A65" : "3px solid white",
-                background: capturing ? "#9A88FD" : "rgba(255,255,255,0.15)",
+                background: capturing ? "#9A88FD" : "rgba(255,255,255,0.12)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -698,13 +740,14 @@ export default function GhostCamera({
             >
               <div
                 style={{
-                  width: 44,
-                  height: 44,
+                  width: 46,
+                  height: 46,
                   borderRadius: "50%",
                   background: capturing ? "#9A88FD" : "white",
                 }}
               />
             </button>
+
             {checkinPhotos.length > 0
               ? (() => {
                   const covered = coveredCheckinIds.size;
@@ -713,7 +756,7 @@ export default function GhostCamera({
                   return (
                     <div
                       style={{
-                        padding: "4px 8px",
+                        padding: "5px 10px",
                         borderRadius: 20,
                         background: all
                           ? "rgba(34,197,94,0.2)"
@@ -723,7 +766,7 @@ export default function GhostCamera({
                       <p
                         style={{
                           margin: 0,
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: 700,
                           color: all ? "#22c55e" : "#FF8A65",
                         }}
@@ -737,13 +780,20 @@ export default function GhostCamera({
                 <div style={{ width: 40 }} />
               )}
           </div>
+
+          {cameraError && (
+            <p className="m-0 text-center text-[11px]" style={{ color: "#FF8A65" }}>
+              {cameraError}
+            </p>
+          )}
         </div>
+
         <canvas ref={canvasRef} className="hidden" />
       </div>
     );
   }
 
-  // ── PORTRAIT: unchanged ──
+  // ── PORTRAIT: return statement below is UNTOUCHED ──
   return (
     <div className="fixed inset-0 z-[999] bg-black flex flex-col">
       {/* Video container — ratio-locked to stream natural dimensions */}
