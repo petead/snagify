@@ -86,21 +86,6 @@ export default function GhostCamera({
   const [prepopulatedHintVisible, setPrepopulatedHintVisible] = useState(false);
   const [autoZoomApplied, setAutoZoomApplied] = useState(false);
   const [videoAspectRatio, setVideoAspectRatio] = useState<string | undefined>(undefined);
-  const [isLandscape, setIsLandscape] = useState(false);
-
-  useEffect(() => {
-    const update = () => {
-      setIsLandscape(window.innerWidth > window.innerHeight);
-    };
-    update();
-    window.addEventListener("resize", update);
-    screen.orientation?.addEventListener?.("change", update);
-    return () => {
-      window.removeEventListener("resize", update);
-      screen.orientation?.removeEventListener?.("change", update);
-    };
-  }, []);
-
   /** Display + capture: match active entry photo (or 4:3 in “New finding”). */
   const targetAspectRatio = useMemo(() => {
     if (isAdditionalMode) return 4 / 3;
@@ -375,19 +360,11 @@ export default function GhostCamera({
   };
 
   return (
-    <div
-      className={`fixed inset-0 z-[999] flex bg-black ${isLandscape ? "min-h-0 flex-row" : "flex-col"}`}
-    >
-      {/* Video container — ratio-locked (portrait) or fills left column (landscape) */}
+    <div className="fixed inset-0 z-[999] bg-black flex flex-col">
+      {/* Video container — ratio-locked to stream natural dimensions */}
       <div
-        className="relative flex-1"
-        style={{
-          minHeight: 0,
-          minWidth: 0,
-          ...(!isLandscape
-            ? { aspectRatio: videoAspectRatio ?? "3 / 4", width: "100%" }
-            : { height: "100%" }),
-        }}
+        className="relative w-full"
+        style={{ aspectRatio: videoAspectRatio ?? "3 / 4" }}
       >
         <video
           ref={videoRef}
@@ -518,8 +495,8 @@ export default function GhostCamera({
                   )}
               </AnimatePresence>
 
-              {/* Ghost slider — portrait: bottom of video */}
-              {checkinPhotos.length > 0 && !isAdditionalMode && !isLandscape && (
+              {/* Ghost slider — overlaid on bottom of video */}
+              {checkinPhotos.length > 0 && !isAdditionalMode && (
                 <div
                   style={{
                     position: "absolute",
@@ -580,8 +557,8 @@ export default function GhostCamera({
         <div className="w-8" aria-hidden />
       </div>
 
-      {/* ── LEFT COLUMN OVERLAY: Flash + zoom — portrait only ── */}
-      {(showZoomBar || showTorchBtn) && !isLandscape && (
+      {/* ── LEFT COLUMN OVERLAY: Flash on top, zoom presets vertical ── */}
+      {(showZoomBar || showTorchBtn) && (
         <div
           className="pointer-events-auto absolute left-3 z-20 flex flex-col items-center gap-2"
           style={{ top: "25%" }}
@@ -648,103 +625,13 @@ export default function GhostCamera({
         </div>
       )}
 
-      {/* ── BOTTOM / RIGHT CONTROLS — portrait: bottom strip; landscape: right column ── */}
+      {/* ── LAYER 6: BOTTOM CONTROLS overlay ── */}
       <div
-        className={
-          isLandscape
-            ? "z-20 flex h-full min-h-0 flex-shrink-0 flex-col gap-2 justify-between overflow-y-auto px-3 py-4"
-            : "absolute bottom-0 left-0 right-0 z-20 flex flex-col gap-2 px-4 pb-8 pt-3"
-        }
+        className="absolute bottom-0 left-0 right-0 z-20 flex flex-col gap-2 px-4 pb-8 pt-3"
         style={{
           background: "rgba(0,0,0,0.88)",
-          ...(isLandscape
-            ? {
-                width: 200,
-                height: "100%",
-              }
-            : {}),
         }}
       >
-        {(showZoomBar || showTorchBtn) && isLandscape && (
-          <div className="mb-2 flex flex-col items-center gap-1.5">
-            {showTorchBtn && (
-              <motion.button
-                type="button"
-                onClick={() => void toggleTorch()}
-                animate={{
-                  backgroundColor: torchOn ? "rgba(254,222,128,0.35)" : "rgba(255,255,255,0.1)",
-                }}
-                className="flex h-8 w-8 items-center justify-center rounded-full"
-                whileTap={{ scale: 0.9 }}
-                aria-label={torchOn ? "Turn flash off" : "Turn flash on"}
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill={torchOn ? "#FEDE80" : "none"}
-                  stroke={torchOn ? "#FEDE80" : "white"}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                >
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                </svg>
-              </motion.button>
-            )}
-            {showZoomBar && (
-              <div className="flex flex-row flex-wrap justify-center gap-1">
-                {zoomPresets.map((preset) => {
-                  const active = Math.abs(currentZoom - preset.value) < 0.1;
-                  return (
-                    <motion.button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => void applyZoom(preset.value)}
-                      animate={{
-                        backgroundColor: active ? "rgba(255,255,255,0.2)" : "transparent",
-                      }}
-                      className="flex h-7 w-7 items-center justify-center rounded-full"
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: active ? "#FEDE80" : "rgba(255,255,255,0.7)",
-                        }}
-                      >
-                        {preset.label}
-                      </span>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {checkinPhotos.length > 0 && !isAdditionalMode && isLandscape && (
-          <div className="flex flex-col items-center gap-1 px-1">
-            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>👻</span>
-            <input
-              type="range"
-              min={0}
-              max={0.7}
-              step={0.05}
-              value={ghostOpacity}
-              onChange={(e) => setGhostOpacity(parseFloat(e.target.value))}
-              style={{
-                writingMode: "vertical-lr",
-                direction: "rtl",
-                height: 60,
-                accentColor: "#9A88FD",
-              }}
-            />
-            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)" }}>
-              {Math.round(ghostOpacity * 100)}%
-            </span>
-          </div>
-        )}
         {checkinPhotos.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
             {checkinPhotos.map((photo, idx) => (
