@@ -85,6 +85,15 @@ export default function GhostCamera({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [prepopulatedHintVisible, setPrepopulatedHintVisible] = useState(false);
   const [autoZoomApplied, setAutoZoomApplied] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(false);
+
+  useEffect(() => {
+    const update = () => setIsLandscape(window.innerWidth > window.innerHeight);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
   const [videoAspectRatio, setVideoAspectRatio] = useState<string | undefined>(undefined);
   /** Display + capture: match active entry photo (or 4:3 in “New finding”). */
   const targetAspectRatio = useMemo(() => {
@@ -359,6 +368,382 @@ export default function GhostCamera({
     );
   };
 
+  if (isLandscape) {
+    return (
+      <div className="fixed inset-0 z-[999] flex flex-row bg-black">
+        {/* VIDEO — left side, fills available space */}
+        <div className="relative flex-1" style={{ minWidth: 0 }}>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="block h-full w-full"
+            style={{ objectFit: "cover" }}
+          />
+          {/* Ghost overlay */}
+          {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={activeGhost.url}
+                alt=""
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  opacity: ghostOpacity,
+                  pointerEvents: "none",
+                }}
+              />
+            </>
+          )}
+          {/* TOP BAR overlaid on video */}
+          <div
+            className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-4"
+            style={{
+              paddingTop: "calc(env(safe-area-inset-top,0px)+8px)",
+              paddingBottom: 8,
+              background: "transparent",
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleClose}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-base text-white"
+            >
+              ✕
+            </button>
+            <p
+              className="text-sm font-bold text-white"
+              style={{ fontFamily: "Poppins, sans-serif" }}
+            >
+              {roomName}
+            </p>
+            <div className="w-8" />
+          </div>
+          {/* Entry photo badge */}
+          {activeGhost && !isAdditionalMode && (
+            <div
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                zIndex: 5,
+                background: "rgba(0,0,0,0.55)",
+                borderRadius: 8,
+                padding: "4px 10px",
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.7)",
+                }}
+              >
+                👻 Entry photo
+              </p>
+            </div>
+          )}
+          {isAdditionalMode && (
+            <div
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                zIndex: 5,
+                background: "rgba(255,138,101,0.7)",
+                borderRadius: 8,
+                padding: "4px 10px",
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "white" }}>
+                📸 New finding
+              </p>
+            </div>
+          )}
+          {/* Zoom + flash — left overlay */}
+          {(showZoomBar || showTorchBtn) && (
+            <div
+              className="absolute left-3 z-20 flex flex-col items-center gap-2"
+              style={{ top: "30%" }}
+            >
+              {showTorchBtn && (
+                <motion.button
+                  type="button"
+                  onClick={() => void toggleTorch()}
+                  animate={{
+                    backgroundColor: torchOn
+                      ? "rgba(254,222,128,0.35)"
+                      : "rgba(0,0,0,0.45)",
+                  }}
+                  className="mb-1 flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-sm"
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill={torchOn ? "#FEDE80" : "none"}
+                    stroke={torchOn ? "#FEDE80" : "white"}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                  </svg>
+                </motion.button>
+              )}
+              {showZoomBar && (
+                <div
+                  className="flex flex-col items-center gap-1 rounded-2xl px-1.5 py-2"
+                  style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)" }}
+                >
+                  {[...zoomPresets].reverse().map((preset) => {
+                    const active = Math.abs(currentZoom - preset.value) < 0.1;
+                    return (
+                      <motion.button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => void applyZoom(preset.value)}
+                        animate={{
+                          backgroundColor: active
+                            ? "rgba(255,255,255,0.2)"
+                            : "transparent",
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-full"
+                      >
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: active ? "#FEDE80" : "rgba(255,255,255,0.7)",
+                          }}
+                        >
+                          {preset.label}
+                        </span>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+          {/* Ghost slider bottom of video */}
+          {checkinPhotos.length > 0 && !isAdditionalMode && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: 8,
+                left: 16,
+                right: 16,
+                zIndex: 20,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 12 }}>👻</span>
+              <input
+                type="range"
+                min={0}
+                max={0.7}
+                step={0.05}
+                value={ghostOpacity}
+                onChange={(e) => setGhostOpacity(parseFloat(e.target.value))}
+                style={{ flex: 1, accentColor: "#9A88FD", height: 2 }}
+              />
+              <span
+                style={{
+                  color: "rgba(255,255,255,0.5)",
+                  fontSize: 10,
+                  minWidth: 28,
+                  textAlign: "right",
+                }}
+              >
+                {Math.round(ghostOpacity * 100)}%
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT PANEL — controls */}
+        <div
+          className="flex flex-shrink-0 flex-col gap-2 overflow-y-auto px-3 py-4"
+          style={{ width: 180, background: "rgba(0,0,0,0.88)" }}
+        >
+          {/* Photo strip */}
+          {checkinPhotos.length > 1 && (
+            <div
+              className="flex flex-col gap-1.5 overflow-y-auto"
+              style={{ maxHeight: 120 }}
+            >
+              {checkinPhotos.map((photo, idx) => (
+                <button
+                  key={photo.id}
+                  type="button"
+                  onClick={() => setActiveGhostIndex(idx)}
+                  style={{
+                    flexShrink: 0,
+                    position: "relative",
+                    width: 40,
+                    height: 40,
+                    borderRadius: 6,
+                    overflow: "hidden",
+                    padding: 0,
+                    border:
+                      idx === activeGhostIndex
+                        ? "2px solid #9A88FD"
+                        : "2px solid transparent",
+                    opacity: idx === activeGhostIndex ? 1 : 0.5,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Image src={photo.url} alt="" fill sizes="40px" style={{ objectFit: "cover" }} />
+                  {coveredCheckinIds.has(photo.id) && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background: "rgba(34,197,94,0.45)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <span style={{ color: "white", fontSize: 14, fontWeight: 800 }}>✓</span>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+          {/* Damage tags */}
+          {isCheckout && (
+            <div className="flex flex-wrap gap-1">
+              {DAMAGE_TAGS.map((tag) => {
+                const on = selectedTags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleTag(tag)}
+                    style={{
+                      padding: "3px 7px",
+                      borderRadius: 20,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      border: on
+                        ? "1.5px solid #9A88FD"
+                        : "1.5px solid rgba(255,255,255,0.2)",
+                      background: on
+                        ? "rgba(154,136,253,0.25)"
+                        : "rgba(255,255,255,0.06)",
+                      color: on ? "#e9e4ff" : "rgba(255,255,255,0.65)",
+                      textTransform: "capitalize",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {/* Shutter row */}
+          <div className="mt-auto flex items-center justify-between pt-2">
+            {isCheckout ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setGhostOpacity(0);
+                  setIsAdditionalMode(true);
+                  setSelectedTags([]);
+                  setPrepopulatedHintVisible(false);
+                }}
+                style={{
+                  padding: "5px 10px",
+                  borderRadius: 20,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  border: "1.5px solid rgba(255,138,101,0.6)",
+                  background: "transparent",
+                  color: "#FF8A65",
+                  cursor: "pointer",
+                }}
+              >
+                ＋ New
+              </button>
+            ) : (
+              <div style={{ width: 40 }} />
+            )}
+            <button
+              type="button"
+              onClick={handleShutter}
+              disabled={capturing}
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                border: isAdditionalMode ? "3px solid #FF8A65" : "3px solid white",
+                background: capturing ? "#9A88FD" : "rgba(255,255,255,0.15)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: capturing ? "default" : "pointer",
+              }}
+            >
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: "50%",
+                  background: capturing ? "#9A88FD" : "white",
+                }}
+              />
+            </button>
+            {checkinPhotos.length > 0
+              ? (() => {
+                  const covered = coveredCheckinIds.size;
+                  const total = checkinPhotos.length;
+                  const all = covered >= total;
+                  return (
+                    <div
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: 20,
+                        background: all
+                          ? "rgba(34,197,94,0.2)"
+                          : "rgba(255,138,101,0.2)",
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: all ? "#22c55e" : "#FF8A65",
+                        }}
+                      >
+                        {all ? `✓${total}` : `${covered}/${total}`}
+                      </p>
+                    </div>
+                  );
+                })()
+              : (
+                <div style={{ width: 40 }} />
+              )}
+          </div>
+        </div>
+        <canvas ref={canvasRef} className="hidden" />
+      </div>
+    );
+  }
+
+  // ── PORTRAIT: unchanged ──
   return (
     <div className="fixed inset-0 z-[999] bg-black flex flex-col">
       {/* Video container — ratio-locked to stream natural dimensions */}
