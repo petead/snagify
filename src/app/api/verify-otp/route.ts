@@ -1,4 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
+import { sendSignedPdfEmail } from "@/lib/sendSignedPdfEmail";
+import { formatPropertyBuildingUnit } from "@/lib/formatPropertyAddress";
 
 export async function POST(request: Request) {
   const { email, otp, signatureData, inspectionId, signerType } = await request.json();
@@ -66,6 +68,76 @@ export async function POST(request: Request) {
         signed_at: new Date().toISOString(),
       })
       .eq("id", inspectionId);
+
+    // ── Fetch everything needed to send the signed PDF email ──
+    try {
+      const { data: insp } = await supabase
+        .from("inspections")
+        .select(
+          `
+          type, created_at, report_url,
+          property:properties(building_name, unit_number, location),
+          agent:profiles(
+            full_name, email,
+            receive_signed_report_email,
+            company:companies(name, logo_url, primary_color)
+          )
+        `
+        )
+        .eq("id", inspectionId)
+        .single();
+
+      const { data: sigs } = await supabase
+        .from("signatures")
+        .select("signer_type, signer_name, email")
+        .eq("inspection_id", inspectionId);
+
+      const landlordSig = sigs?.find((s) => s.signer_type === "landlord");
+      const tenantSig = sigs?.find((s) => s.signer_type === "tenant");
+
+      const agent = insp?.agent as {
+        full_name?: string | null;
+        email?: string | null;
+        receive_signed_report_email?: boolean | null;
+        company?: { name?: string | null; logo_url?: string | null; primary_color?: string | null } | null;
+      } | undefined;
+      const company = agent?.company;
+      const propertyRow = insp?.property as {
+        building_name?: string | null;
+        unit_number?: string | null;
+        location?: string | null;
+      } | null;
+      const propertyAddress = formatPropertyBuildingUnit(propertyRow) || "Property";
+
+      const pdfUrl = insp?.report_url;
+      if (!pdfUrl) throw new Error("No report_url on inspection");
+
+      await sendSignedPdfEmail({
+        landlordName: landlordSig?.signer_name || "Landlord",
+        landlordEmail: landlordSig?.email || "",
+        tenantName: tenantSig?.signer_name || "Tenant",
+        tenantEmail: tenantSig?.email || "",
+        inspectorName: agent?.full_name || "Inspector",
+        inspectorEmail: agent?.email || "",
+        includeInspectorRecipient: agent?.receive_signed_report_email !== false,
+        agencyName: company?.name || "Snagify",
+        agencyLogo: company?.logo_url ?? null,
+        primaryColor: company?.primary_color || "#9A88FD",
+        propertyAddress,
+        inspectionType: insp?.type || "check-in",
+        inspectionDate: insp?.created_at
+          ? new Date(insp.created_at).toLocaleDateString("en-AE", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })
+          : "—",
+        pdfUrl,
+      });
+    } catch (emailErr) {
+      // Log but don't fail the response — signing succeeded even if email fails
+      console.error("[verify-otp] Failed to send signed PDF email:", emailErr);
+    }
   }
 
   return Response.json({ success: true, bothSigned });
