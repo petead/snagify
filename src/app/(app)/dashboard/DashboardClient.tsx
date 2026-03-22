@@ -242,7 +242,12 @@ export function DashboardClient({
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
         .dash-card {
+          cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .dash-card:active {
+          transform: scale(0.98);
+          opacity: 0.92;
         }
         .dash-card-deleting {
           opacity: 0;
