@@ -1319,8 +1319,8 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
       </div>
 
       <div
-        className="scroll-hide overscroll-behavior-y-none bg-[#F8F7F4]"
-        style={{ overflowY: "auto", maxHeight: "calc(100vh - 120px)", paddingBottom: 24 }}
+        className="bg-[#F8F7F4]"
+        style={{ paddingBottom: 24 }}
       >
         {/* Report Header */}
         <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: "0.06s" }}>
