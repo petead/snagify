@@ -379,18 +379,22 @@ export default function GhostCamera({
       <style>{`
         @media screen and (orientation: landscape) {
           .ghost-camera-root {
-            transform: rotate(-90deg);
-            transform-origin: left top;
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100vh;
             height: 100vw;
-            position: fixed;
-            top: 100%;
-            left: 0;
+            transform: rotate(-90deg);
+            transform-origin: top left;
+            translate: 0 -100vw;
             overflow: hidden;
           }
         }
         @media screen and (orientation: portrait) {
           .ghost-camera-root {
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
           }
