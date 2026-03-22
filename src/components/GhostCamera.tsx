@@ -258,18 +258,20 @@ export default function GhostCamera({
 
   /** Lock UI to portrait (no CSS counter-rotation); fallback for older APIs. */
   useEffect(() => {
-    const orientation = screen.orientation;
-    if (!orientation?.lock) return;
+    const orientation = screen.orientation as ScreenOrientation & {
+      lock?: (o: OrientationLockType | string) => Promise<void>
+      unlock?: () => void
+    }
+    if (!orientation?.lock) return
 
-    void (orientation.lock("portrait") as Promise<void>).catch(() => {
-      // Fallback: try portrait-primary if portrait fails
-      void (orientation.lock("portrait-primary") as Promise<void>).catch(() => {});
-    });
+    void orientation.lock("portrait").catch(() => {
+      void orientation.lock?.("portrait-primary").catch(() => {})
+    })
 
     return () => {
-      orientation.unlock?.();
-    };
-  }, []);
+      orientation.unlock?.()
+    }
+  }, [])
 
   /** Match live camera zoom to check-in photo when ghost is selected. */
   useEffect(() => {
