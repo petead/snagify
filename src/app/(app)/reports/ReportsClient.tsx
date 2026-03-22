@@ -281,12 +281,17 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
           minHeight: 0,
           overflowY: "auto",
           overscrollBehaviorY: "none",
-          transform: `translateY(${pullDistance}px)`,
-          transition: isRefreshing ? "transform 0.2s ease" : "none",
-          paddingBottom: 24,
           position: "relative",
         }}
       >
+        <div
+          style={{
+            transform: `translateY(${pullDistance}px)`,
+            transition: isRefreshing ? "transform 0.2s ease" : "none",
+            paddingBottom: 24,
+            minHeight: "100%",
+          }}
+        >
         <PullToRefreshIndicator
           pullDistance={pullDistance}
           isRefreshing={isRefreshing}
@@ -659,6 +664,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
           )}
         </div>
       </div>
+        </div>
       </div>
     </div>
   );
