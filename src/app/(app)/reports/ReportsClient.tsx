@@ -395,7 +395,26 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
               return (
                 <div
                   key={report.id}
+                  role="button"
+                  tabIndex={0}
                   className={`${loaded ? "fade-up" : ""} ${deletingId === report.id ? "report-card-deleting" : "report-card"}`}
+                  onClick={() => {
+                    if (report.status === "in_progress") {
+                      router.push(`/inspection/${report.id}`);
+                    } else {
+                      router.push(`/inspection/${report.id}/report`);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      if (report.status === "in_progress") {
+                        router.push(`/inspection/${report.id}`);
+                      } else {
+                        router.push(`/inspection/${report.id}/report`);
+                      }
+                    }
+                  }}
                   style={{
                     background: "#fff",
                     borderRadius: 22,
@@ -404,6 +423,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                     boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
                     animationDelay: `${0.2 + i * 0.07}s`,
                     position: "relative",
+                    cursor: "pointer",
                   }}
                 >
                   {/* Top row */}
@@ -534,7 +554,10 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                       <button
                         type="button"
                         className="cta-btn flex shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-sm font-bold text-white"
-                        onClick={() => router.push(`/inspection/${report.id}`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/inspection/${report.id}`);
+                        }}
                       >
                         <svg
                           width="13"
@@ -556,7 +579,10 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                         type="button"
                         className="cta-btn flex shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
                         disabled={pdfLoadingId === report.id}
-                        onClick={() => void handleReportPdfDownload(report.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleReportPdfDownload(report.id);
+                        }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
                           <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
@@ -571,7 +597,10 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                       <button
                         type="button"
                         className="cta-btn flex shrink-0 items-center gap-1.5 rounded-xl bg-[#9A88FD] px-4 py-2 text-sm font-bold text-white"
-                        onClick={() => router.push(`/inspection/${report.id}/report`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/inspection/${report.id}/report`);
+                        }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
                           <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
@@ -582,7 +611,10 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                       <button
                         type="button"
                         className="cta-btn flex shrink-0 items-center gap-1.5 rounded-xl bg-[#9A88FD] px-4 py-2 text-sm font-bold text-white"
-                        onClick={() => router.push(`/inspection/${report.id}/report`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/inspection/${report.id}/report`);
+                        }}
                       >
                         Open
                       </button>
@@ -591,6 +623,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                     {/* Delete button */}
                     <div
                       className="trash-btn"
+                      onClick={(e) => e.stopPropagation()}
                       style={{
                         width: 40, height: 40, borderRadius: 12,
                         background: "#F8F7F4",

@@ -842,13 +842,33 @@ export function DashboardClient({
             return (
               <div
                 key={insp.id}
+                role="button"
+                tabIndex={0}
                 className={deletingId === insp.id ? "dash-card-deleting" : "dash-card"}
+                onClick={() => {
+                  if (insp.status === "in_progress") {
+                    router.push(`/inspection/${insp.id}`);
+                  } else {
+                    router.push(`/inspection/${insp.id}/report`);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    if (insp.status === "in_progress") {
+                      router.push(`/inspection/${insp.id}`);
+                    } else {
+                      router.push(`/inspection/${insp.id}/report`);
+                    }
+                  }
+                }}
                 style={{
                   background: "#fff",
                   borderRadius: 20,
                   padding: 18,
                   marginBottom: 12,
                   boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                  cursor: "pointer",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
