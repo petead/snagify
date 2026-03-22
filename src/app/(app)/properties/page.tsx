@@ -42,7 +42,14 @@ export default async function PropertiesPage() {
   const list = error ? [] : (properties ?? []);
 
   return (
-    <main className="min-h-screen" style={{ background: "#F8F7F4" }}>
+    <main
+      style={{
+        height: "calc(100dvh - 4rem)",
+        maxHeight: "calc(100dvh - 4rem)",
+        overflow: "hidden",
+        background: "#F8F7F4",
+      }}
+    >
       <PropertiesClient
         properties={list}
         fullName={fullName}

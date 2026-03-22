@@ -35,7 +35,14 @@ export default async function ReportsPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <main className="min-h-screen" style={{ background: "#F8F7F4" }}>
+    <main
+      style={{
+        height: "calc(100dvh - 4rem)",
+        maxHeight: "calc(100dvh - 4rem)",
+        overflow: "hidden",
+        background: "#F8F7F4",
+      }}
+    >
       <ReportsClient
         initialReports={(reportsData ?? []) as Parameters<typeof ReportsClient>[0]["initialReports"]}
         fullName={fullName}
