@@ -139,17 +139,14 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
         maxWidth: 480,
         margin: "0 auto",
         height: "calc(100dvh - 4rem)",
-        maxHeight: "calc(100dvh - 4rem)",
         display: "flex",
         flexDirection: "column",
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
-        position: "relative",
-        overflow: "hidden",
       }}
     >
-      {/* Fixed header — logo, title, tabs, search */}
-      <div style={{ flexShrink: 0, padding: "16px 20px 12px" }}>
+      {/* Header — NE BOUGE JAMAIS */}
+      <div style={{ flexShrink: 0, padding: "16px 20px 12px", background: "#F8F7F4" }}>
         <div className={loaded ? "fade-up" : ""} style={{ animationDelay: "0s" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -258,6 +255,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
         </div>
       </div>
 
+      {/* Scroll area */}
       <div
         className="scroll-hide"
         style={{
