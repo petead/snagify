@@ -1276,7 +1276,7 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
-        paddingBottom: 260,
+        paddingBottom: "calc(180px + env(safe-area-inset-bottom))",
       }}
     >
       <style>{`
@@ -1939,12 +1939,12 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
         </div>
       </div>
 
-      {/* Action Buttons — fixed above bottom navbar */}
+      {/* Action Buttons — flush bottom; padding clears app navbar + safe area */}
       <div
         className={loaded ? "fade-up" : ""}
         style={{
           position: "fixed",
-          bottom: 72,
+          bottom: 0,
           left: 0,
           right: 0,
           maxWidth: 480,
@@ -1954,7 +1954,7 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
           WebkitBackdropFilter: "blur(12px)",
           borderTop: "1px solid #F0EFEC",
           padding: "12px 24px",
-          paddingBottom: "max(12px, env(safe-area-inset-bottom))",
+          paddingBottom: "calc(72px + max(12px, env(safe-area-inset-bottom)))",
           animationDelay: "0.54s",
           zIndex: 40,
           borderRadius: "16px 16px 0 0",
