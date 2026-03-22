@@ -160,7 +160,6 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
-        overflow: "hidden",
       }}
     >
       {/* Fixed header — logo, title, tabs, search */}
@@ -276,11 +275,12 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
       <div
         ref={containerRef}
         data-pull-scroll
-        className="scroll-hide relative"
+        className="scroll-hide"
         style={{
           flex: 1,
           minHeight: 0,
           overflowY: "auto",
+          overscrollBehaviorY: "none",
           transform: `translateY(${pullDistance}px)`,
           transition: isRefreshing ? "transform 0.2s ease" : "none",
           paddingBottom: 24,

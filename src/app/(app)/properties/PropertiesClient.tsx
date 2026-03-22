@@ -147,7 +147,6 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
-        overflow: "hidden",
       }}
     >
       {/* Fixed header — logo, title, search */}
@@ -275,11 +274,12 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
       <div
         ref={containerRef}
         data-pull-scroll
-        className="scroll-hide relative"
+        className="scroll-hide"
         style={{
           flex: 1,
           minHeight: 0,
           overflowY: "auto",
+          overscrollBehaviorY: "none",
           transform: `translateY(${pullDistance}px)`,
           transition: isRefreshing ? "transform 0.2s ease" : "none",
           paddingBottom: 24,
