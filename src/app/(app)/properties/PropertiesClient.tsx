@@ -157,12 +157,6 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
         isRefreshing={isRefreshing}
         isTriggered={isTriggered}
       />
-      <div
-        style={{
-          transform: `translateY(${pullDistance}px)`,
-          transition: isRefreshing ? "transform 0.2s ease" : "none",
-        }}
-      >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -474,7 +468,6 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
             </div>
           )}
         </div>
-      </div>
       </div>
     </div>
   );
