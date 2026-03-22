@@ -132,6 +132,7 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
+        overflow: "hidden",
       }}
     >
       {/* Fixed header — logo, title, search */}
