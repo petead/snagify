@@ -98,6 +98,13 @@ export default function GhostCamera({
   const activeGhostId = checkinPhotos[activeGhostIndex]?.id;
   const activeGhostZoomLevel = checkinPhotos[activeGhostIndex]?.zoom_level;
 
+  const isCheckinLandscape = useMemo(() => {
+    if (isAdditionalMode) return false;
+    const ph = checkinPhotos[activeGhostIndex];
+    if (!ph?.width || !ph?.height) return false;
+    return ph.width > ph.height;
+  }, [isAdditionalMode, activeGhostIndex, checkinPhotos]);
+
   /** Sync tags from the active check-in ghost photo (entry photo strip / index). */
   useEffect(() => {
     if (!isCheckout) return;
@@ -417,13 +424,25 @@ export default function GhostCamera({
               alt=""
               style={{
                 position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
+                ...(isCheckinLandscape
+                  ? {
+                      top: "50%",
+                      left: "50%",
+                      width: "100vh",
+                      height: "100vw",
+                      transform: "translate(-50%, -50%) rotate(90deg)",
+                      objectFit: "cover",
+                    }
+                  : {
+                      inset: 0,
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }),
                 opacity: ghostOpacity,
                 pointerEvents: "none",
                 zIndex: 1,
+                transition: "opacity 0.2s",
               }}
             />
           </>
