@@ -1276,10 +1276,11 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
+        overscrollBehaviorY: "none",
         // 72px = navbar
-        // 116px = hauteur exacte de la barre fixe (PDF 52px + gap 10px + ligne 2 44px + padding top 10px)
+        // 104px = hauteur barre fixe (actions PDF + Sign/Share)
         // 0 marge supplémentaire → plus d'espace en trop
-        paddingBottom: "calc(72px + 116px + env(safe-area-inset-bottom))",
+        paddingBottom: "calc(72px + 104px + env(safe-area-inset-bottom))",
       }}
     >
       <style>{`
