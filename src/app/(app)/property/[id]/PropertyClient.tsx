@@ -555,11 +555,13 @@ export function PropertyClient({
       style={{
         maxWidth: 480,
         margin: "0 auto",
-        minHeight: "100vh",
+        height: "calc(100dvh - 4rem)",
+        maxHeight: "calc(100dvh - 4rem)",
+        display: "flex",
+        flexDirection: "column",
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
-        paddingBottom: 24,
       }}
     >
       <style>{`
@@ -579,29 +581,30 @@ export function PropertyClient({
         }
       `}</style>
 
-      {/* Back button */}
-      <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: "0s" }}>
-        <Link
-          href="/properties"
-          className="back-btn"
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 12,
-            background: "#EEEDE9",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            textDecoration: "none",
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="2.5" strokeLinecap="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </Link>
-      </div>
+      {/* ── FIXED HEADER ── */}
+      <div style={{ flexShrink: 0, background: "#F8F7F4" }}>
+        {/* Back button */}
+        <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: "0s" }}>
+          <Link
+            href="/properties"
+            className="back-btn"
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 12,
+              background: "#EEEDE9",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              textDecoration: "none",
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="2.5" strokeLinecap="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </Link>
+        </div>
 
-      <div className="scroll-hide" style={{ overflowY: "auto", maxHeight: 700, paddingBottom: 100 }}>
         {/* Property Info Card */}
         <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: "0.06s" }}>
           <div
@@ -658,13 +661,24 @@ export function PropertyClient({
           </div>
         </div>
 
-        {/* Tenancy History Title */}
-        <div className={loaded ? "fade-up" : ""} style={{ padding: "24px 24px 0", animationDelay: "0.12s" }}>
+        {/* Tenancy History title */}
+        <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 8px", animationDelay: "0.12s" }}>
           <h2 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 20, fontWeight: 800, color: "#1A1A1A", margin: 0 }}>
             Tenancy History
           </h2>
         </div>
+      </div>
 
+      {/* ── SCROLL AREA — tenancy groups only ── */}
+      <div
+        className="scroll-hide"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          paddingBottom: 100,
+        }}
+      >
         {/* Tenancy Cards */}
         {tenancyGroups.length === 0 ? (
           <div className={loaded ? "fade-up" : ""} style={{ padding: "14px 24px 0", animationDelay: "0.18s" }}>
