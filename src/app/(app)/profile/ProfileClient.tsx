@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -113,6 +114,8 @@ export function ProfileClient({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [signOutLoading, setSignOutLoading] = useState(false);
   const justSubscribed = searchParams.get("subscribed") === "true";
   const isPro = accountType === "pro";
   const isOwner = role === "owner";
@@ -155,17 +158,6 @@ export function ProfileClient({
   const planColor = planColors[company?.plan ?? "free"] ?? "#9CA3AF";
   const isSubscribed = Boolean(company?.plan && company.plan !== "free");
   const maxCredits = getMaxCredits(company?.plan);
-
-  const handleSignOut = async () => {
-    const supabase = createClient();
-    try {
-      await supabase.auth.signOut();
-    } catch {
-      /* sign-out best-effort */
-    }
-    router.push("/login");
-    router.refresh();
-  };
 
   const handleToggleSignedReportEmail = async () => {
     const newValue = !receiveSignedReportEmail;
@@ -317,29 +309,28 @@ export function ProfileClient({
             </div>
           </div>
 
-          {/* RIGHT — Logout */}
+          {/* RIGHT — Sign out (opens confirmation) */}
           <button
             type="button"
-            aria-label="Sign out"
-            onClick={() => void handleSignOut()}
+            onClick={() => setShowSignOutConfirm(true)}
             style={{
-              width: 38,
-              height: 38,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 14px",
               borderRadius: 12,
               background: "#FEE2E2",
               border: "none",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
               cursor: "pointer",
               flexShrink: 0,
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#EF4444" }}>Sign out</span>
           </button>
         </div>
       </div>
@@ -831,6 +822,143 @@ export function ProfileClient({
           </div>
         </div>
       )}
+
+      {showSignOutConfirm &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            role="presentation"
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 9999,
+              background: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 20px",
+            }}
+            onClick={() => !signOutLoading && setShowSignOutConfirm(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="sign-out-title"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "#fff",
+                borderRadius: 24,
+                padding: 24,
+                width: "100%",
+                maxWidth: 360,
+              }}
+            >
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 16,
+                  background: "#FEE2E2",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
+                }}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </div>
+
+              <h3
+                id="sign-out-title"
+                style={{
+                  fontFamily: "Poppins, sans-serif",
+                  fontSize: 17,
+                  fontWeight: 800,
+                  color: "#1A1A1A",
+                  textAlign: "center",
+                  margin: "0 0 8px",
+                }}
+              >
+                Sign out?
+              </h3>
+
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "#6B7280",
+                  textAlign: "center",
+                  lineHeight: 1.5,
+                  margin: "0 0 20px",
+                }}
+              >
+                {profile.full_name?.trim() && (
+                  <strong style={{ color: "#1A1A1A" }}>{profile.full_name.trim()}</strong>
+                )}
+                {profile.full_name?.trim() && <br />}
+                {displayEmail}
+              </p>
+
+              <button
+                type="button"
+                disabled={signOutLoading}
+                onClick={async () => {
+                  setSignOutLoading(true);
+                  try {
+                    const supabase = createClient();
+                    try {
+                      await supabase.auth.signOut();
+                    } catch {
+                      /* sign-out best-effort */
+                    }
+                    router.push("/login");
+                    router.refresh();
+                  } finally {
+                    setSignOutLoading(false);
+                    setShowSignOutConfirm(false);
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  background: "#EF4444",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 14,
+                  padding: "14px 0",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: signOutLoading ? "wait" : "pointer",
+                  marginBottom: 10,
+                  opacity: signOutLoading ? 0.6 : 1,
+                  fontFamily: "Poppins, sans-serif",
+                }}
+              >
+                {signOutLoading ? "Signing out..." : "Yes, sign out"}
+              </button>
+
+              <button
+                type="button"
+                disabled={signOutLoading}
+                onClick={() => setShowSignOutConfirm(false)}
+                style={{
+                  width: "100%",
+                  background: "none",
+                  border: "none",
+                  color: "#9CA3AF",
+                  fontSize: 13,
+                  cursor: signOutLoading ? "not-allowed" : "pointer",
+                  padding: "8px 0",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
