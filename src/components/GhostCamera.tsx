@@ -1,13 +1,6 @@
 "use client";
 
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useMemo,
-  useCallback,
-  useSyncExternalStore,
-} from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { getVideoCaptureDimensions } from "@/lib/getImageDimensions";
@@ -42,18 +35,6 @@ function aspectRatioFromPhoto(ph: GhostPhoto | null | undefined): number {
   const h = ph?.height;
   if (w && h && w > 0 && h > 0) return h / w;
   return 4 / 3;
-}
-
-function useMatchesMedia(query: string) {
-  return useSyncExternalStore(
-    (onStoreChange) => {
-      const mq = window.matchMedia(query);
-      mq.addEventListener("change", onStoreChange);
-      return () => mq.removeEventListener("change", onStoreChange);
-    },
-    () => window.matchMedia(query).matches,
-    () => false
-  );
 }
 
 export interface GhostCameraProps {
@@ -123,9 +104,6 @@ export default function GhostCamera({
     if (!ph?.width || !ph?.height) return false;
     return ph.width > ph.height;
   }, [isAdditionalMode, activeGhostIndex, checkinPhotos]);
-
-  /** Device orientation: when true, landscape <style> rules own video/overlay transforms. */
-  const isDeviceLandscape = useMatchesMedia("(orientation: landscape)");
 
   /** Sync tags from the active check-in ghost photo (entry photo strip / index). */
   useEffect(() => {
@@ -454,6 +432,30 @@ export default function GhostCamera({
             width: 100%;
             height: 100%;
           }
+
+          .ghost-camera-root img.ghost-overlay {
+            position: absolute;
+          }
+          .ghost-camera-root img.ghost-overlay--fill {
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+          .ghost-camera-root img.ghost-overlay--checkin-landscape {
+            top: 50%;
+            left: 50%;
+            width: 100vh;
+            height: 100vw;
+            transform: translate(-50%, -50%) rotate(90deg);
+            object-fit: cover;
+          }
+        }
+
+        .ghost-camera-root img.ghost-overlay {
+          pointer-events: none;
+          z-index: 1;
+          transition: opacity 0.2s;
         }
       `}</style>
       {/* Video container — ratio-locked to stream natural dimensions */}
@@ -482,31 +484,12 @@ export default function GhostCamera({
             <img
               src={activeGhost.url}
               alt=""
-              className="ghost-overlay"
-              style={{
-                position: "absolute",
-                ...(isDeviceLandscape
-                  ? {}
-                  : isCheckinLandscape
-                    ? {
-                        top: "50%",
-                        left: "50%",
-                        width: "100vh",
-                        height: "100vw",
-                        transform: "translate(-50%, -50%) rotate(90deg)",
-                        objectFit: "cover",
-                      }
-                    : {
-                        inset: 0,
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                      }),
-                opacity: ghostOpacity,
-                pointerEvents: "none",
-                zIndex: 1,
-                transition: "opacity 0.2s",
-              }}
+              className={`ghost-overlay ${
+                isCheckinLandscape
+                  ? "ghost-overlay--checkin-landscape"
+                  : "ghost-overlay--fill"
+              }`}
+              style={{ opacity: ghostOpacity }}
             />
           </>
         )}
