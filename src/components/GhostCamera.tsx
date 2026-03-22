@@ -91,14 +91,14 @@ export default function GhostCamera({
   useEffect(() => {
     try {
       const orientation = screen.orientation as ScreenOrientation & {
-        lock?: (orientation: string) => Promise<void>;
+        lock?: (o: string) => Promise<void>;
         unlock?: () => void;
       };
       if (orientation?.lock) {
-        void orientation.lock("portrait").catch(() => {});
+        void orientation.lock("portrait-primary").catch(() => {});
       }
     } catch {
-      /* ignore — not supported on all browsers */
+      /* ignore */
     }
 
     return () => {
