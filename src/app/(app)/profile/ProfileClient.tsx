@@ -11,7 +11,7 @@ import { ReportBugModal } from "@/components/settings/ReportBugModal";
 import { SubscriptionSheet } from "@/components/SubscriptionSheet";
 import { Check } from "lucide-react";
 import { trackAction } from "@/lib/breadcrumb";
-import type { ProfileRole } from "@/lib/profileLabels";
+import { formatAccountTierLabel, formatProfileRoleLabel, type ProfileRole } from "@/lib/profileLabels";
 import { motion } from "framer-motion";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefresh";
@@ -243,48 +243,104 @@ export function ProfileClient({
         position: "relative",
       }}
     >
-      {/* Fixed header — avatar, name, job title */}
-      <div style={{ flexShrink: 0, padding: "16px 20px 12px" }}>
+      {/* Header — NE BOUGE JAMAIS */}
+      <div style={{ flexShrink: 0, padding: "16px 20px 12px", background: "#F8F7F4" }}>
         <div
           className={loaded ? "fade-up" : ""}
-          style={{ display: "flex", alignItems: "center", gap: 14, animationDelay: "0s" }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            animationDelay: "0s",
+          }}
         >
-          <div
+          {/* LEFT — Avatar + nom + role + badge */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: 1 }}>
+            <div
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                overflow: "hidden",
+                flexShrink: 0,
+                border: "2px solid #EEEDE9",
+                background: profile.avatar_url ? "transparent" : "#9A88FD",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {profile.avatar_url ? (
+                <Image
+                  src={profile.avatar_url}
+                  alt=""
+                  width={64}
+                  height={64}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <span style={{ color: "#fff", fontSize: 20, fontWeight: 700, fontFamily: "'Poppins', sans-serif" }}>{initials}</span>
+              )}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <p
+                style={{
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: "#1A1A1A",
+                  margin: 0,
+                  fontFamily: "'Poppins', sans-serif",
+              }}
+              >
+                {displayName}
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#666" }}>
+                  {formatProfileRoleLabel(role)}
+                </span>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                    padding: "2px 8px",
+                    borderRadius: 20,
+                    background: accountType === "pro" ? "rgba(154,136,253,0.12)" : "rgba(0,0,0,0.06)",
+                    color: accountType === "pro" ? "#9A88FD" : "#888",
+                  }}
+                >
+                  {formatAccountTierLabel(accountType)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT — Logout */}
+          <button
+            type="button"
+            aria-label="Sign out"
+            onClick={() => void handleSignOut()}
             style={{
-              width: 64,
-              height: 64,
-              borderRadius: "50%",
-              overflow: "hidden",
-              flexShrink: 0,
-              border: "2px solid #EEEDE9",
-              background: profile.avatar_url ? "transparent" : "#9A88FD",
+              width: 38,
+              height: 38,
+              borderRadius: 12,
+              background: "#FEE2E2",
+              border: "none",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              cursor: "pointer",
+              flexShrink: 0,
             }}
           >
-            {profile.avatar_url ? (
-              <Image
-                src={profile.avatar_url}
-                alt=""
-                width={64}
-                height={64}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            ) : (
-              <span style={{ color: "#fff", fontSize: 22, fontWeight: 800, fontFamily: "'Poppins', sans-serif" }}>{initials}</span>
-            )}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A", margin: 0, fontFamily: "'Poppins', sans-serif" }}>{displayName}</p>
-            {profile.job_title?.trim() ? (
-              <p style={{ fontSize: 13, color: "#666", margin: "4px 0 0" }}>{profile.job_title}</p>
-            ) : (
-              <p style={{ fontSize: 12, color: "#BBB", margin: "4px 0 0", fontWeight: 500, letterSpacing: 1, textTransform: "uppercase" }}>
-                Profile
-              </p>
-            )}
-          </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -327,11 +383,6 @@ export function ProfileClient({
           opacity: 0;
         }
         .nav-item { transition: all 0.2s ease; cursor: pointer; }
-        .signout-btn { transition: all 0.2s ease; cursor: pointer; }
-        .signout-btn:active {
-          transform: scale(0.97);
-          background: rgba(239,68,68,0.08) !important;
-        }
       `}</style>
 
       <div style={{ paddingBottom: 24 }}>
@@ -695,36 +746,6 @@ export function ProfileClient({
               Delete my account
             </button>
           </div>
-        </div>
-
-        {/* Sign Out */}
-        <div className={loaded ? "fade-up" : ""} style={{ padding: "16px 24px 0", animationDelay: canManageBilling ? "0.38s" : "0.28s" }}>
-          <button
-            type="button"
-            className="signout-btn"
-            onClick={handleSignOut}
-            style={{
-              width: "100%",
-              background: "#fff",
-              borderRadius: 16,
-              padding: "16px 0",
-              textAlign: "center",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              border: "1.5px solid rgba(239,68,68,0.15)",
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round">
-              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#EF4444" }}>Sign Out</span>
-          </button>
         </div>
 
         {/* Member since */}
