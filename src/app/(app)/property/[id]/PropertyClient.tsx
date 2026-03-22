@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -9,6 +9,8 @@ import { useCredits } from "@/hooks/useCredits";
 import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 import { InspectionStatusBadge } from "@/components/inspection/InspectionStatusBadge";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 import { motion } from "framer-motion";
 
 type InspectionSignature = {
@@ -520,6 +522,7 @@ export function PropertyClient({
   tenancyGroups: initialTenancyGroups,
   totalInspections,
 }: PropertyClientProps) {
+  const router = useRouter();
   const { balance, plan, accountType, refresh: refreshCredits } = useCredits();
   const [loaded, setLoaded] = useState(false);
   const [tenancyGroups, setTenancyGroups] = useState(initialTenancyGroups);
@@ -549,6 +552,15 @@ export function PropertyClient({
   const propertyName = property.building_name ?? property.location ?? "Property";
   const unit = property.unit_number ? `Unit ${property.unit_number}` : "";
   const propertyType = property.property_type ?? "";
+
+  const handleRefresh = useCallback(async () => {
+    router.refresh();
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  }, [router]);
+
+  const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  });
 
   return (
     <div
@@ -671,14 +683,45 @@ export function PropertyClient({
 
       {/* ── SCROLL AREA — tenancy groups only ── */}
       <div
+        ref={containerRef}
+        data-pull-scroll
         className="scroll-hide"
         style={{
           flex: 1,
           minHeight: 0,
           overflowY: "auto",
-          paddingBottom: 100,
+          position: "relative",
+          paddingBottom: 24,
         }}
       >
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: pullDistance,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            pointerEvents: "none",
+            zIndex: 10,
+          }}
+        >
+          <PullToRefreshIndicator
+            pullDistance={pullDistance}
+            isRefreshing={isRefreshing}
+            isTriggered={isTriggered}
+          />
+        </div>
+
+        <div
+          style={{
+            transform: `translateY(${pullDistance}px)`,
+            transition: isRefreshing ? "transform 0.25s ease" : "none",
+          }}
+        >
         {/* Tenancy Cards */}
         {tenancyGroups.length === 0 ? (
           <div className={loaded ? "fade-up" : ""} style={{ padding: "14px 24px 0", animationDelay: "0.18s" }}>
@@ -864,6 +907,7 @@ export function PropertyClient({
             );
           })
         )}
+        </div>
       </div>
     </div>
   );
