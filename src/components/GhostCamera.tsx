@@ -258,6 +258,26 @@ export default function GhostCamera({
     };
   }, [syncCapabilitiesFromTrack]);
 
+  /** Re-attach stream after orientation / resize (some browsers clear srcObject). */
+  useEffect(() => {
+    const reattach = () => {
+      if (videoRef.current && streamRef.current) {
+        if (videoRef.current.srcObject !== streamRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+          videoRef.current.play().catch(() => {});
+        }
+      }
+    };
+
+    window.addEventListener("resize", reattach);
+    screen.orientation?.addEventListener?.("change", reattach);
+
+    return () => {
+      window.removeEventListener("resize", reattach);
+      screen.orientation?.removeEventListener?.("change", reattach);
+    };
+  }, []);
+
   /** Match live camera zoom to check-in photo when ghost is selected. */
   useEffect(() => {
     if (!stream || isAdditionalMode || !activeGhostId) return;
@@ -380,8 +400,8 @@ export default function GhostCamera({
 
   const activeGhost = checkinPhotos[activeGhostIndex] ?? null;
 
-  const showZoomBar = isCheckout && stream && zoomPresets.length > 1;
-  const showTorchBtn = isCheckout && stream && hasTorch;
+  const showZoomBar = isCheckout && zoomPresets.length > 1;
+  const showTorchBtn = isCheckout && hasTorch;
 
   const toggleTag = (tag: string) => {
     setPrepopulatedHintVisible(false);
