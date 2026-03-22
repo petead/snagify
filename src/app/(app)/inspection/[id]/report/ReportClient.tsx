@@ -1277,10 +1277,8 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
         overscrollBehaviorY: "none",
-        // 72px = navbar
-        // 104px = hauteur barre fixe (actions PDF + Sign/Share)
-        // 0 marge supplémentaire → plus d'espace en trop
-        paddingBottom: "calc(72px + 104px + env(safe-area-inset-bottom))",
+        // 72px = navbar, 140px = hauteur barre sticky checkout (alignée ~sticky bottom bar)
+        paddingBottom: "calc(72px + 140px + env(safe-area-inset-bottom))",
       }}
     >
       <style>{`

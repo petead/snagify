@@ -82,5 +82,5 @@ canvas {
 
 html, body {
   background-color: #F8F7F4;
-  overscroll-behavior: none;
+  overscroll-behavior-y: none;
 }
