@@ -18,6 +18,12 @@ interface SendSignedPdfEmailParams {
   inspectionType: 'check-in' | 'check-out' | string
   inspectionDate: string
   pdfUrl: string
+  /** When set, email explains a party refused to sign (disputed flow). */
+  refusalInfo?: {
+    refusedParty: 'landlord' | 'tenant'
+    refusedReason: string | null
+    refusedAt: string
+  }
 }
 
 export async function sendSignedPdfEmail(params: SendSignedPdfEmailParams) {
@@ -29,6 +35,7 @@ export async function sendSignedPdfEmail(params: SendSignedPdfEmailParams) {
     agencyName, agencyLogo, primaryColor,
     propertyAddress, inspectionType, inspectionDate,
     pdfUrl,
+    refusalInfo,
   } = params
 
   const pdfRes = await fetch(pdfUrl)
@@ -45,6 +52,9 @@ export async function sendSignedPdfEmail(params: SendSignedPdfEmailParams) {
         style="height:44px;border-radius:10px;object-fit:contain;" />`
     : `<span style="font-size:18px;font-weight:800;color:white;">${agencyName}</span>`
 
+  const refusalPartyLabel =
+    refusalInfo?.refusedParty === 'landlord' ? 'Landlord' : 'Tenant'
+
   const buildHtml = (recipientName: string, recipientRole: string) => `
     <div style="font-family:-apple-system,sans-serif;max-width:480px;
       margin:0 auto;padding:32px 24px;">
@@ -57,12 +67,19 @@ export async function sendSignedPdfEmail(params: SendSignedPdfEmailParams) {
 
       <!-- Title -->
       <h2 style="font-size:20px;font-weight:800;color:#1A1A2E;margin:0 0 8px;">
-        Inspection report signed
+        ${refusalInfo ? 'Refusal to sign recorded' : 'Inspection report signed'}
       </h2>
       <p style="font-size:14px;color:#6B7280;margin:0 0 24px;line-height:1.6;">
-        Hi ${recipientName}, the inspection report for
+        ${refusalInfo
+          ? `Hi ${recipientName}, the <strong style="color:#1A1A2E;">${refusalPartyLabel}</strong> has refused to sign the inspection report for
+        <strong style="color:#1A1A2E;">${propertyAddress}</strong>.
+        The inspection is marked as disputed. ${refusalInfo.refusedReason
+            ? `<br/><br/><span style="color:#1A1A2E;font-weight:600;">Reason given:</span> ${refusalInfo.refusedReason}`
+            : ''}
+        Please find the report PDF attached for your records.`
+          : `Hi ${recipientName}, the inspection report for
         <strong style="color:#1A1A2E;">${propertyAddress}</strong>
-        has been signed by all parties. Please find the signed report attached.
+        has been signed by all parties. Please find the signed report attached.`}
       </p>
 
       <!-- Details -->
@@ -138,12 +155,16 @@ export async function sendSignedPdfEmail(params: SendSignedPdfEmailParams) {
       : []),
   ].filter((r) => r.email)
 
+  const emailSubject = refusalInfo
+    ? `Report update — refusal recorded — ${propertyAddress}`
+    : `Signed inspection report — ${propertyAddress}`
+
   const results = await Promise.allSettled(
     recipients.map(r =>
       resend.emails.send({
         from: `${agencyName} <noreply@snagify.net>`,
         to: r.email,
-        subject: `Signed inspection report — ${propertyAddress}`,
+        subject: emailSubject,
         html: buildHtml(r.name, r.role),
         attachments: [
           {

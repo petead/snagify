@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
@@ -73,6 +74,20 @@ export async function POST(request: NextRequest) {
         })
       : "—";
 
+    const signingWindowMs = 7 * 24 * 60 * 60 * 1000;
+    const { data: existingSig } = await supabaseAdmin
+      .from("signatures")
+      .select("refuse_token, refuse_token_expires_at")
+      .eq("inspection_id", inspectionId)
+      .eq("signer_type", signerType)
+      .maybeSingle();
+
+    const refuseToken =
+      existingSig?.refuse_token ?? randomUUID();
+    const refuseTokenExpiresAt =
+      existingSig?.refuse_token_expires_at ??
+      new Date(Date.now() + signingWindowMs).toISOString();
+
     // Upsert signature record with remote mode
     const { error: dbError } = await supabaseAdmin.from("signatures").upsert(
       {
@@ -84,6 +99,8 @@ export async function POST(request: NextRequest) {
         signing_mode: "remote",
         expires_at: expiresAt,
         ip_address: ip,
+        refuse_token: refuseToken,
+        refuse_token_expires_at: refuseTokenExpiresAt,
         // Reset in_person fields in case it was attempted before
         otp_code: null,
         otp_verified: false,
@@ -97,6 +114,14 @@ export async function POST(request: NextRequest) {
       console.error("Supabase error:", dbError);
       return Response.json({ error: dbError.message }, { status: 500 });
     }
+
+    const refuseUrl = `${appUrl}/sign/refuse?token=${encodeURIComponent(
+      refuseToken
+    )}&inspectionId=${encodeURIComponent(
+      inspectionId
+    )}&signerType=${encodeURIComponent(
+      signerType
+    )}&email=${encodeURIComponent(email)}`;
 
     // Build agency header HTML
     const agencyHeader = agencyLogo
@@ -170,6 +195,17 @@ export async function POST(request: NextRequest) {
             This link expires in 30 minutes. By signing, you agree to the findings of this report.
             If you didn't expect this email, please ignore it.
           </p>
+
+          <!-- Refuse option -->
+          <div style="margin-top:24px;padding-top:16px;border-top:1px solid #F0EFEC;text-align:center;">
+            <p style="font-size:12px;color:#9B9BA8;margin:0 0 8px;line-height:1.5;">
+              Do you contest the findings of this report?
+            </p>
+            <a href="${refuseUrl}"
+              style="font-size:12px;color:#EF4444;font-weight:600;text-decoration:none;">
+              Refuse to sign this report →
+            </a>
+          </div>
 
           <!-- Footer -->
           <div style="margin-top:32px;padding-top:16px;border-top:1px solid #F3F3F8;

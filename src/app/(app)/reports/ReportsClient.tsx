@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
+import { InspectionStatusBadge } from "@/components/inspection/InspectionStatusBadge";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 
@@ -380,13 +381,6 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
               const roomCount = rooms.length;
               const photoCount = rooms.reduce((n, r) => n + (r.photos?.length ?? 0), 0);
 
-              const statusLabel = signed ? "Signed" : pending ? "Pending" : "In Progress";
-              const statusColor = signed ? "#9A88FD" : pending ? "#9A88FD" : "#FEDE80";
-              const statusBg = signed
-                ? "rgba(154,136,253,0.1)"
-                : pending
-                  ? "#EEEDE9"
-                  : "rgba(254,222,128,0.3)";
               return (
                 <div
                   key={report.id}
@@ -468,18 +462,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                             Draft
                           </span>
                         ) : (
-                          <span
-                            style={{
-                              fontSize: 11, fontWeight: 600,
-                              color: statusColor,
-                              background: statusBg,
-                              padding: "4px 12px", borderRadius: 100,
-                              textTransform: "uppercase", letterSpacing: 0.5,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {statusLabel}
-                          </span>
+                          <InspectionStatusBadge status={report.status} fullySigned={signed} />
                         )}
                       </div>
                       <p style={{ fontSize: 13, color: "#999", margin: "3px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

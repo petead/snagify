@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   // Security gate: verify this email is a valid signer for this inspection
   const { data: sig } = await supabaseAdmin
     .from('signatures')
-    .select('id, signed_at, otp_verified, signing_mode, opened_at')
+    .select('id, signed_at, otp_verified, signing_mode, opened_at, refuse_token')
     .eq('inspection_id', inspectionId)
     .eq('signer_type', signerType)
     .eq('email', decodeURIComponent(email))
@@ -68,5 +68,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     inspection,
     mySig: sig,
+    refuseToken: sig?.refuse_token ?? null,
   })
 }

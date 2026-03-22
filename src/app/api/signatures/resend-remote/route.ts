@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
   // Fetch existing signature + inspection data
   const { data: sig } = await supabaseAdmin
     .from('signatures')
-    .select('id, email, signer_name, sign_url, signed_at')
+    .select('id, email, signer_name, sign_url, signed_at, refuse_token')
     .eq('inspection_id', inspectionId)
     .eq('signer_type', signerType)
     .single()
@@ -43,14 +44,36 @@ export async function POST(req: NextRequest) {
   const propertyLabel = formatPropertyBuildingUnit(property)
   const propertyAddress = propertyLabel !== '—' ? propertyLabel : 'the property'
 
-  // Reset opened_at so tracking is fresh
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL || 'https://app.snagify.net'
+
+  let refuseToken = sig.refuse_token
+  if (!refuseToken) {
+    refuseToken = randomUUID()
+  }
+  const refuseExpires =
+    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  // Reset opened_at so tracking is fresh; ensure refuse token exists for legacy rows
   await supabaseAdmin
     .from('signatures')
     .update({
       opened_at: null,
       expires_at: new Date(Date.now() + REMOTE_OTP_MS).toISOString(),
+      ...(sig.refuse_token
+        ? {}
+        : {
+            refuse_token: refuseToken,
+            refuse_token_expires_at: refuseExpires,
+          }),
     })
     .eq('id', sig.id)
+
+  const refuseUrl = `${appUrl}/sign/refuse?token=${encodeURIComponent(
+    refuseToken
+  )}&inspectionId=${encodeURIComponent(inspectionId)}&signerType=${encodeURIComponent(
+    signerType
+  )}&email=${encodeURIComponent(sig.email ?? '')}`
 
   // Resend the email (same template as original send)
   await resend.emails.send({
@@ -92,6 +115,16 @@ export async function POST(req: NextRequest) {
           This link expires in 30 minutes. If you didn't expect this,
           please ignore it.
         </p>
+
+        <div style="margin-top:24px;padding-top:16px;border-top:1px solid #F0EFEC;text-align:center;">
+          <p style="font-size:12px;color:#9B9BA8;margin:0 0 8px;line-height:1.5;">
+            Do you contest the findings of this report?
+          </p>
+          <a href="${refuseUrl}"
+            style="font-size:12px;color:#EF4444;font-weight:600;text-decoration:none;">
+            Refuse to sign this report →
+          </a>
+        </div>
 
         <div style="margin-top:32px;padding-top:16px;
           border-top:1px solid #F3F3F8;text-align:center;

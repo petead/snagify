@@ -17,6 +17,7 @@ import { CheckoutReportView } from "@/components/inspection/CheckoutReportView";
 import { formatPropertyBuildingUnit } from "@/lib/formatPropertyAddress";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 import { createClient } from "@/lib/supabase/client";
+import { InspectionStatusBadge } from "@/components/inspection/InspectionStatusBadge";
 
 interface ReportClientProps {
   inspection: InspectionWithRelations;
@@ -848,6 +849,35 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
     );
   }, [inspection.report_url, inspection.executive_summary, inspection.report_data?.executive_summary]);
 
+  useEffect(() => {
+    const isCheckout = (inspection.type ?? "").toLowerCase().includes("check-out");
+    if (!isCheckout) return;
+    if (inspection.status !== "completed") return;
+    const deadline = inspection.signing_deadline;
+    if (!deadline || new Date(deadline) >= new Date()) return;
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/signatures/expire", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ inspectionId }),
+        });
+        const data = (await res.json()) as { expired?: boolean };
+        if (data.expired) router.refresh();
+      } catch (e) {
+        console.error("[expire check]", e);
+      }
+    })();
+  }, [
+    inspection.id,
+    inspection.type,
+    inspection.status,
+    inspection.signing_deadline,
+    inspectionId,
+    router,
+  ]);
+
   const prop = normalizeOne(inspection.properties) as PropertyRelation | null;
   const tenancy = normalizeOne(inspection.tenancies) as TenancyRelation | null;
   const buildingName = prop?.building_name ?? prop?.location ?? "Property";
@@ -864,13 +894,6 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
   const bothSigned = landlordSigned && tenantSigned;
   const isCheckIn = (inspection.type ?? "").toLowerCase().includes("check-in") || (inspection.type ?? "").toLowerCase() === "check_in";
   const typeLabel = isCheckIn ? "Check-in" : "Check-out";
-  const status = bothSigned ? "signed" : (inspection.status ?? "draft");
-  const statusDisplay =
-    status === "signed"
-      ? "Fully Signed"
-      : status === "completed"
-        ? "Awaiting Signatures"
-        : "In Progress";
   const contractFrom = tenancy?.contract_from;
   const contractTo = tenancy?.contract_to;
   const durationMonths =
@@ -1360,18 +1383,7 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
               <p style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", margin: 0 }}>{unitLabel}</p>
             )}
             <div style={{ marginTop: 16 }}>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: status === "signed" ? "#22C55E" : "#FBBF24",
-                  background: status === "signed" ? "rgba(34,197,94,0.15)" : "rgba(251,191,36,0.15)",
-                  padding: "5px 14px",
-                  borderRadius: 100,
-                }}
-              >
-                {statusDisplay}
-              </span>
+              <InspectionStatusBadge status={inspection.status} fullySigned={bothSigned} />
             </div>
           </div>
         </div>

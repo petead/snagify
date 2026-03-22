@@ -127,6 +127,7 @@ export type InspectionWithRelations = {
   id: string;
   type: string | null;
   status: string | null;
+  signing_deadline?: string | null;
   report_url: string | null;
   completed_at: string | null;
   signed_at?: string | null;

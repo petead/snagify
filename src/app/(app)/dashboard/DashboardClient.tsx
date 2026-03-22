@@ -14,6 +14,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 import { createClient } from "@/lib/supabase/client";
+import { InspectionStatusBadge } from "@/components/inspection/InspectionStatusBadge";
 
 type InspectionRow = {
   id: string;
@@ -919,21 +920,7 @@ export function DashboardClient({
                           Draft
                         </span>
                       ) : (
-                        <span
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 600,
-                            color: "#9A88FD",
-                            background: "rgba(154,136,253,0.1)",
-                            padding: "3px 10px",
-                            borderRadius: 100,
-                            textTransform: "uppercase",
-                            letterSpacing: 0.5,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {typeLabel}
-                        </span>
+                        <InspectionStatusBadge status={insp.status} fullySigned={isSigned} />
                       )}
                     </div>
                     <p
@@ -946,7 +933,7 @@ export function DashboardClient({
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {[unit, tenant, formatCardDate(dateStr)].filter(Boolean).join(" · ")}
+                      {[unit, tenant, typeLabel, formatCardDate(dateStr)].filter(Boolean).join(" · ")}
                     </p>
                   </div>
                 </div>

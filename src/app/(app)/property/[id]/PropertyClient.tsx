@@ -8,6 +8,7 @@ import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButt
 import { useCredits } from "@/hooks/useCredits";
 import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
+import { InspectionStatusBadge } from "@/components/inspection/InspectionStatusBadge";
 
 type InspectionSignature = {
   signer_type: string;
@@ -312,12 +313,10 @@ function InspectionRow({
             {formatDateShort(inspection.completed_at ?? inspection.created_at)}
           </span>
 
-          {/* Signed badge */}
-          {isSigned && (
-            <span className="text-[10px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5 flex-shrink-0">
-              ✓ Signed
-            </span>
-          )}
+          <InspectionStatusBadge
+            status={inspection.status}
+            fullySigned={inspectionFullySignedGroup(inspection)}
+          />
 
           {/* Draft → resume */}
           {isDraft ? (

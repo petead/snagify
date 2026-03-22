@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { Loader2, FileText, Check, RotateCcw, ShieldCheck } from 'lucide-react'
 import { formatPropertyBuildingUnit } from '@/lib/formatPropertyAddress'
+import { RefuseButton } from '@/app/sign/RefuseButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,6 +53,7 @@ function SignPageContent() {
   const [otpLoading, setOtpLoading] = useState(false)
   const [hasDrawn, setHasDrawn] = useState(false)
   const [submitLoading, setSubmitLoading] = useState(false)
+  const [refuseToken, setRefuseToken] = useState<string | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const isDrawing = useRef(false)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
@@ -72,7 +74,13 @@ function SignPageContent() {
       return
     }
 
-    const { inspection, mySig } = await res.json()
+    const { inspection, mySig, refuseToken: rt } = await res.json() as {
+      inspection: SignInspectionData
+      mySig?: { signed_at?: string | null }
+      refuseToken?: string | null
+    }
+
+    setRefuseToken(rt ?? null)
 
     if (mySig?.signed_at) {
       setData(inspection)
@@ -571,6 +579,12 @@ function SignPageContent() {
                 }
               </button>
             </div>
+            <RefuseButton
+              refuseToken={refuseToken}
+              inspectionId={inspectionId}
+              signerType={signerType}
+              email={email}
+            />
           </div>
         )}
 
@@ -600,6 +614,12 @@ function SignPageContent() {
                 </>
             }
           </button>
+          <RefuseButton
+            refuseToken={refuseToken}
+            inspectionId={inspectionId}
+            signerType={signerType}
+            email={email}
+          />
           <p className="text-center text-[11px] text-gray-400 mt-2 flex
             items-center justify-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full inline-block"
