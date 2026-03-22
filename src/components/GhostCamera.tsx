@@ -259,7 +259,7 @@ export default function GhostCamera({
   /** Lock UI to portrait (no CSS counter-rotation); fallback for older APIs. */
   useEffect(() => {
     const orientation = screen.orientation as ScreenOrientation & {
-      lock?: (o: OrientationLockType | string) => Promise<void>
+      lock?: (o: string) => Promise<void>
       unlock?: () => void
     }
     if (!orientation?.lock) return
