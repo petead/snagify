@@ -396,29 +396,78 @@ export default function GhostCamera({
         touchAction: "none",
       }}
     >
+      {/* Landscape blocker — CSS only, zero JS */}
+      <style>{`
+        @media screen and (orientation: landscape) {
+          .landscape-blocker { display: flex !important; }
+          .portrait-content  { display: none  !important; }
+        }
+        @media screen and (orientation: portrait) {
+          .landscape-blocker { display: none  !important; }
+          .portrait-content  { display: flex  !important; }
+        }
+      `}</style>
+
+      <div
+        className="landscape-blocker"
+        style={{
+          display: "none",
+          position: "fixed",
+          inset: 0,
+          zIndex: 10,
+          background: "black",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 16,
+        }}
+      >
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="white"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        >
+          <rect x="2" y="7" width="10" height="14" rx="2" />
+          <path d="M14 9l3-3 3 3M17 6v8" />
+        </svg>
+        <p
+          style={{
+            color: "white",
+            fontSize: 16,
+            fontWeight: 600,
+            fontFamily: "Poppins, sans-serif",
+            textAlign: "center",
+            margin: 0,
+            padding: "0 32px",
+          }}
+        >
+          Please rotate your phone
+          <br />
+          to portrait mode
+        </p>
+      </div>
+
+      <div
+        className="portrait-content"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          width: "100%",
+        }}
+      >
       <style>{`
         .ghost-camera-root {
           position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
+          inset: 0;
           z-index: 999;
           background: black;
           display: flex;
           flex-direction: column;
-        }
-
-        @media screen and (orientation: landscape) {
-          .ghost-camera-root {
-            width: 100svh;
-            height: 100svw;
-            transform: rotate(-90deg);
-            transform-origin: top left;
-            position: fixed;
-            top: 100svw;
-            left: 0;
-          }
         }
 
         .ghost-camera-root img.ghost-overlay {
@@ -905,6 +954,7 @@ export default function GhostCamera({
       </div>
 
       <canvas ref={canvasRef} className="hidden" />
+      </div>
     </div>
   );
 }
