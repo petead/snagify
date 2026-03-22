@@ -88,30 +88,6 @@ export default function GhostCamera({
 
   const [videoAspectRatio, setVideoAspectRatio] = useState<string | undefined>(undefined);
 
-  useEffect(() => {
-    try {
-      const orientation = screen.orientation as ScreenOrientation & {
-        lock?: (o: string) => Promise<void>;
-        unlock?: () => void;
-      };
-      if (orientation?.lock) {
-        void orientation.lock("portrait-primary").catch(() => {});
-      }
-    } catch {
-      /* ignore */
-    }
-
-    return () => {
-      try {
-        const orientation = screen.orientation as ScreenOrientation & {
-          unlock?: () => void;
-        };
-        orientation?.unlock?.();
-      } catch {
-        /* ignore */
-      }
-    };
-  }, []);
   /** Display + capture: match active entry photo (or 4:3 in “New finding”). */
   const targetAspectRatio = useMemo(() => {
     if (isAdditionalMode) return 4 / 3;
@@ -387,12 +363,32 @@ export default function GhostCamera({
 
   return (
     <div
-      className="fixed inset-0 z-[999] bg-black flex flex-col"
+      className="ghost-camera-root fixed inset-0 z-[999] bg-black flex flex-col"
       style={{
         // Force portrait UI: stream may rotate but layout stays portrait; block scroll/zoom gestures
         touchAction: "none",
       }}
     >
+      <style>{`
+        @media screen and (orientation: landscape) {
+          .ghost-camera-root {
+            transform: rotate(-90deg);
+            transform-origin: left top;
+            width: 100vh;
+            height: 100vw;
+            position: fixed;
+            top: 100%;
+            left: 0;
+            overflow: hidden;
+          }
+        }
+        @media screen and (orientation: portrait) {
+          .ghost-camera-root {
+            width: 100%;
+            height: 100%;
+          }
+        }
+      `}</style>
       {/* Video container — ratio-locked to stream natural dimensions */}
       <div
         className="relative w-full"
