@@ -47,8 +47,18 @@ export function usePullToRefresh({
     const el = scrollEl;
     if (!el) return;
 
+    const getScrollTop = (container: HTMLElement) => {
+      const byData = container.querySelector("[data-pull-scroll]") as HTMLElement | null;
+      if (byData) return byData.scrollTop;
+      const byStyle = container.querySelector(
+        '[style*="overflow-y"]'
+      ) as HTMLElement | null;
+      const scrollTop = byStyle ? byStyle.scrollTop : container.scrollTop;
+      return scrollTop;
+    };
+
     const onTouchStart = (e: TouchEvent) => {
-      if (el.scrollTop > 0) return;
+      if (getScrollTop(el) > 2) return;
       startYRef.current = e.touches[0].clientY;
       isPullingRef.current = true;
     };

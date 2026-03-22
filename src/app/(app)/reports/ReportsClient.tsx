@@ -118,9 +118,14 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
     return signedCount;
   };
 
-  const handleRefresh = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     router.refresh();
+    await new Promise((resolve) => setTimeout(resolve, 800));
   }, [router]);
+
+  const handleRefresh = useCallback(async () => {
+    await fetchData();
+  }, [fetchData]);
 
   const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
     onRefresh: handleRefresh,
@@ -146,17 +151,13 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
   return (
     <div
       ref={containerRef}
-      className="scroll-hide relative"
+      className="relative"
       style={{
         maxWidth: 480,
         margin: "0 auto",
         height: "calc(100dvh - 4rem)",
-        maxHeight: "calc(100dvh - 4rem)",
-        overflowY: "auto",
-        background: "#F8F7F4",
-        fontFamily: "'DM Sans', sans-serif",
         position: "relative",
-        paddingBottom: 24,
+        background: "#F8F7F4",
         transform: `translateY(${pullDistance}px)`,
         transition: isRefreshing ? "transform 0.2s ease" : "none",
       }}
@@ -166,6 +167,16 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
         isRefreshing={isRefreshing}
         isTriggered={isTriggered}
       />
+      <div
+        data-pull-scroll
+        className="scroll-hide"
+        style={{
+          height: "100%",
+          overflowY: "auto",
+          paddingBottom: 24,
+          fontFamily: "'DM Sans', sans-serif",
+        }}
+      >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -614,6 +625,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
             })
           )}
         </div>
+      </div>
       </div>
     </div>
   );
