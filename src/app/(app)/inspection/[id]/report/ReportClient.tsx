@@ -1276,7 +1276,8 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
-        paddingBottom: "calc(180px + env(safe-area-inset-bottom))",
+        // 72px = navbar, 130px = boutons fixes (PDF + Sign/Share), pas de marge supplémentaire
+        paddingBottom: "calc(72px + 130px + env(safe-area-inset-bottom))",
       }}
     >
       <style>{`

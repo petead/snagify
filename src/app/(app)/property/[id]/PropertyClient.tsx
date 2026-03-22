@@ -304,6 +304,8 @@ function InspectionRow({
           style={{
             cursor: inspection.id ? "pointer" : "default",
             borderRadius: 12,
+            width: "100%",
+            display: "block",
           }}
         >
           <div className="flex items-center gap-2">
