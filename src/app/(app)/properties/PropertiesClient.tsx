@@ -138,15 +138,18 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
   return (
     <div
       ref={containerRef}
-      className="relative"
+      data-pull-scroll
+      className="scroll-hide relative"
       style={{
         maxWidth: 480,
         margin: "0 auto",
         height: "calc(100dvh - 4rem)",
-        position: "relative",
+        maxHeight: "calc(100dvh - 4rem)",
+        overflowY: "auto",
         background: "#F8F7F4",
-        transform: `translateY(${pullDistance}px)`,
-        transition: isRefreshing ? "transform 0.2s ease" : "none",
+        fontFamily: "'DM Sans', sans-serif",
+        position: "relative",
+        paddingBottom: 24,
       }}
     >
       <PullToRefreshIndicator
@@ -155,13 +158,9 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
         isTriggered={isTriggered}
       />
       <div
-        data-pull-scroll
-        className="scroll-hide"
         style={{
-          height: "100%",
-          overflowY: "auto",
-          paddingBottom: 24,
-          fontFamily: "'DM Sans', sans-serif",
+          transform: `translateY(${pullDistance}px)`,
+          transition: isRefreshing ? "transform 0.2s ease" : "none",
         }}
       >
       <style>{`
