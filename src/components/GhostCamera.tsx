@@ -256,6 +256,21 @@ export default function GhostCamera({
     };
   }, []);
 
+  /** Lock UI to portrait (no CSS counter-rotation); fallback for older APIs. */
+  useEffect(() => {
+    const orientation = screen.orientation;
+    if (!orientation?.lock) return;
+
+    void (orientation.lock("portrait") as Promise<void>).catch(() => {
+      // Fallback: try portrait-primary if portrait fails
+      void (orientation.lock("portrait-primary") as Promise<void>).catch(() => {});
+    });
+
+    return () => {
+      orientation.unlock?.();
+    };
+  }, []);
+
   /** Match live camera zoom to check-in photo when ghost is selected. */
   useEffect(() => {
     if (!stream || isAdditionalMode || !activeGhostId) return;
@@ -397,65 +412,34 @@ export default function GhostCamera({
       }}
     >
       <style>{`
-        @media screen and (orientation: landscape) {
-          .ghost-camera-root {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vh;
-            height: 100vw;
-            transform: rotate(-90deg);
-            transform-origin: top left;
-            translate: 0 -100vw;
-            overflow: hidden;
-          }
-
-          /* Video cancels parent rotation → stream appears natural */
-          .ghost-camera-root video,
-          .ghost-camera-root img.ghost-overlay {
-            transform: rotate(90deg);
-            transform-origin: center center;
-            width: 100vw;
-            height: 100vh;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            translate: -50% -50%;
-            object-fit: cover;
-          }
-        }
-        @media screen and (orientation: portrait) {
-          .ghost-camera-root {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-          }
-
-          .ghost-camera-root img.ghost-overlay {
-            position: absolute;
-          }
-          .ghost-camera-root img.ghost-overlay--fill {
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .ghost-camera-root img.ghost-overlay--checkin-landscape {
-            top: 50%;
-            left: 50%;
-            width: 100vh;
-            height: 100vw;
-            transform: translate(-50%, -50%) rotate(90deg);
-            object-fit: cover;
-          }
+        .ghost-camera-root {
+          position: fixed;
+          inset: 0;
+          z-index: 999;
+          background: black;
+          display: flex;
+          flex-direction: column;
         }
 
         .ghost-camera-root img.ghost-overlay {
           pointer-events: none;
           z-index: 1;
           transition: opacity 0.2s;
+          position: absolute;
+        }
+        .ghost-camera-root img.ghost-overlay--fill {
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .ghost-camera-root img.ghost-overlay--checkin-landscape {
+          top: 50%;
+          left: 50%;
+          width: 100vh;
+          height: 100vw;
+          transform: translate(-50%, -50%) rotate(90deg);
+          object-fit: cover;
         }
       `}</style>
       {/* Video container — ratio-locked to stream natural dimensions */}
