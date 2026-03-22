@@ -48,6 +48,7 @@ export function usePullToRefresh({
     if (!el) return;
 
     const getScrollTop = (container: HTMLElement) => {
+      if (container.hasAttribute("data-pull-scroll")) return container.scrollTop;
       const byData = container.querySelector("[data-pull-scroll]") as HTMLElement | null;
       if (byData) return byData.scrollTop;
       const byStyle = container.querySelector(

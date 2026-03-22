@@ -218,11 +218,11 @@ export function ProfileClient({
 
   const fetchData = useCallback(async () => {
     router.refresh();
-    await new Promise((resolve) => setTimeout(resolve, 800));
   }, [router]);
 
   const handleRefresh = useCallback(async () => {
     await fetchData();
+    await new Promise((r) => setTimeout(r, 400));
   }, [fetchData]);
 
   const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
@@ -231,26 +231,83 @@ export function ProfileClient({
 
   return (
     <div
-      ref={containerRef}
-      data-pull-scroll
-      className="scroll-hide relative"
       style={{
         maxWidth: 480,
         margin: "0 auto",
         height: "calc(100dvh - 4rem)",
         maxHeight: "calc(100dvh - 4rem)",
-        overflowY: "auto",
+        display: "flex",
+        flexDirection: "column",
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
-        paddingBottom: 24,
+        overflow: "hidden",
       }}
     >
-      <PullToRefreshIndicator
-        pullDistance={pullDistance}
-        isRefreshing={isRefreshing}
-        isTriggered={isTriggered}
-      />
+      {/* Fixed header — avatar, name, job title */}
+      <div style={{ flexShrink: 0, padding: "16px 20px 12px" }}>
+        <div
+          className={loaded ? "fade-up" : ""}
+          style={{ display: "flex", alignItems: "center", gap: 14, animationDelay: "0s" }}
+        >
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: "50%",
+              overflow: "hidden",
+              flexShrink: 0,
+              border: "2px solid #EEEDE9",
+              background: profile.avatar_url ? "transparent" : "#9A88FD",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {profile.avatar_url ? (
+              <Image
+                src={profile.avatar_url}
+                alt=""
+                width={64}
+                height={64}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <span style={{ color: "#fff", fontSize: 22, fontWeight: 800, fontFamily: "'Poppins', sans-serif" }}>{initials}</span>
+            )}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A", margin: 0, fontFamily: "'Poppins', sans-serif" }}>{displayName}</p>
+            {profile.job_title?.trim() ? (
+              <p style={{ fontSize: 13, color: "#666", margin: "4px 0 0" }}>{profile.job_title}</p>
+            ) : (
+              <p style={{ fontSize: 12, color: "#BBB", margin: "4px 0 0", fontWeight: 500, letterSpacing: 1, textTransform: "uppercase" }}>
+                Profile
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        ref={containerRef}
+        data-pull-scroll
+        className="scroll-hide relative"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          transform: `translateY(${pullDistance}px)`,
+          transition: isRefreshing ? "transform 0.2s ease" : "none",
+          paddingBottom: 24,
+          position: "relative",
+        }}
+      >
+        <PullToRefreshIndicator
+          pullDistance={pullDistance}
+          isRefreshing={isRefreshing}
+          isTriggered={isTriggered}
+        />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -276,38 +333,6 @@ export function ProfileClient({
           background: rgba(239,68,68,0.08) !important;
         }
       `}</style>
-
-      {/* Header */}
-      <div
-        className={loaded ? "fade-up" : ""}
-        style={{ padding: "18px 24px 0", animationDelay: "0s" }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Image
-              src="/icon-512x512.png"
-              alt="Snagify"
-              width={32}
-              height={32}
-              style={{ width: 32, height: 32, borderRadius: 10, objectFit: "contain" }}
-              priority
-            />
-            <span style={{ fontSize: 16, fontWeight: 700, color: "#1A1A1A", letterSpacing: -0.3, fontFamily: "'Poppins', sans-serif" }}>
-              Snagify
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Title */}
-      <div className={loaded ? "fade-up" : ""} style={{ padding: "24px 24px 0", animationDelay: "0.06s" }}>
-        <p style={{ fontSize: 13, color: "#BBB", margin: 0, fontWeight: 500, letterSpacing: 1.2, textTransform: "uppercase" }}>
-          Account
-        </p>
-        <h1 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 30, fontWeight: 800, margin: "4px 0 0", color: "#1A1A1A", letterSpacing: -0.5 }}>
-          Profile
-        </h1>
-      </div>
 
       <div style={{ paddingBottom: 24 }}>
         {/* Success banner for subscription */}
@@ -337,45 +362,11 @@ export function ProfileClient({
           </div>
         )}
 
-        {/* Identity card (read-only) */}
+        {/* Identity card — email & agency (avatar / name in fixed header) */}
         <div className={loaded ? "fade-up" : ""} style={{ padding: "20px 24px 0", animationDelay: "0.1s" }}>
           <div style={{ background: "#fff", borderRadius: 22, padding: "24px", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
-              <div
-                style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: "50%",
-                  overflow: "hidden",
-                  flexShrink: 0,
-                  border: "2px solid #EEEDE9",
-                  background: profile.avatar_url ? "transparent" : "#9A88FD",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {profile.avatar_url ? (
-                  <Image
-                    src={profile.avatar_url}
-                    alt=""
-                    width={72}
-                    height={72}
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                ) : (
-                  <span style={{ color: "#fff", fontSize: 24, fontWeight: 800, fontFamily: "'Poppins', sans-serif" }}>{initials}</span>
-                )}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A", margin: 0, fontFamily: "'Poppins', sans-serif" }}>{displayName}</p>
-                {profile.job_title?.trim() && (
-                  <p style={{ fontSize: 13, color: "#666", margin: "2px 0 0" }}>{profile.job_title}</p>
-                )}
-                <p style={{ fontSize: 13, color: "#999", margin: "4px 0 0" }}>{displayEmail}</p>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <p style={{ fontSize: 13, color: "#999", margin: 0 }}>{displayEmail}</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
               {profile.company_logo_url && (
                 <Image
                   src={profile.company_logo_url}
@@ -744,6 +735,7 @@ export function ProfileClient({
             </p>
           </div>
         )}
+      </div>
       </div>
 
       {/* Bug report modal */}

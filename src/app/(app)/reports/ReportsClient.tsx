@@ -120,11 +120,11 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
 
   const fetchData = useCallback(async () => {
     router.refresh();
-    await new Promise((resolve) => setTimeout(resolve, 800));
   }, [router]);
 
   const handleRefresh = useCallback(async () => {
     await fetchData();
+    await new Promise((r) => setTimeout(r, 400));
   }, [fetchData]);
 
   const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
@@ -150,26 +150,148 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
 
   return (
     <div
-      ref={containerRef}
-      data-pull-scroll
-      className="scroll-hide relative"
       style={{
         maxWidth: 480,
         margin: "0 auto",
         height: "calc(100dvh - 4rem)",
         maxHeight: "calc(100dvh - 4rem)",
-        overflowY: "auto",
+        display: "flex",
+        flexDirection: "column",
         background: "#F8F7F4",
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
-        paddingBottom: 24,
+        overflow: "hidden",
       }}
     >
-      <PullToRefreshIndicator
-        pullDistance={pullDistance}
-        isRefreshing={isRefreshing}
-        isTriggered={isTriggered}
-      />
+      {/* Fixed header — logo, title, tabs, search */}
+      <div style={{ flexShrink: 0, padding: "16px 20px 12px" }}>
+        <div className={loaded ? "fade-up" : ""} style={{ animationDelay: "0s" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Image
+                src="/icon-512x512.png"
+                alt="Snagify"
+                width={32}
+                height={32}
+                style={{ width: 32, height: 32, borderRadius: 10, objectFit: "contain" }}
+                priority
+              />
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#1A1A1A", letterSpacing: -0.3, fontFamily: "'Poppins', sans-serif" }}>
+                Snagify
+              </span>
+            </div>
+            <Link
+              href="/profile"
+              style={{
+                width: 42, height: 42, borderRadius: "50%",
+                background: "#9A88FD",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#fff", fontSize: 14, fontWeight: 600, letterSpacing: 0.5,
+                textDecoration: "none",
+              }}
+            >
+              {initials}
+            </Link>
+          </div>
+        </div>
+
+        <div className={loaded ? "fade-up" : ""} style={{ paddingTop: 12, animationDelay: "0.06s" }}>
+          <p style={{ fontSize: 13, color: "#BBB", margin: 0, fontWeight: 500, letterSpacing: 1.2, textTransform: "uppercase" }}>
+            Documents
+          </p>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
+            <h1 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 30, fontWeight: 800, margin: 0, color: "#1A1A1A", letterSpacing: -0.5 }}>
+              Reports
+            </h1>
+          </div>
+        </div>
+
+        <div
+          className={loaded ? "fade-up" : ""}
+          style={{ paddingTop: 12, display: "flex", gap: 8, animationDelay: "0.1s" }}
+        >
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                type="button"
+                className="tab-btn"
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: 100,
+                  background: isActive ? "#1A1A1A" : "transparent",
+                  border: isActive ? "none" : "1.5px solid #DDDCD8",
+                  color: isActive ? "#fff" : "#999",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: "pointer",
+                }}
+              >
+                {tab}
+                <span style={{ fontSize: 11, fontWeight: 700, color: isActive ? "rgba(255,255,255,0.5)" : "#CCC" }}>
+                  {tabCount(tab)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className={loaded ? "fade-up" : ""} style={{ paddingTop: 12, animationDelay: "0.14s" }}>
+          <div style={{ position: "relative" }}>
+            <svg
+              width="18" height="18" viewBox="0 0 24 24" fill="none"
+              stroke="#BBB" strokeWidth="2.5" strokeLinecap="round"
+              style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+            >
+              <circle cx="11" cy="11" r="7" />
+              <line x1="16.5" y1="16.5" x2="21" y2="21" />
+            </svg>
+            <input
+              className="search-input"
+              type="text"
+              placeholder="Search by property or tenant..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "14px 16px 14px 46px",
+                borderRadius: 14,
+                border: "1.5px solid transparent",
+                background: "#EEEDE9",
+                fontSize: 16,
+                color: "#1A1A1A",
+                fontFamily: "'DM Sans', sans-serif",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div
+        ref={containerRef}
+        data-pull-scroll
+        className="scroll-hide relative"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          transform: `translateY(${pullDistance}px)`,
+          transition: isRefreshing ? "transform 0.2s ease" : "none",
+          paddingBottom: 24,
+          position: "relative",
+        }}
+      >
+        <PullToRefreshIndicator
+          pullDistance={pullDistance}
+          isRefreshing={isRefreshing}
+          isTriggered={isTriggered}
+        />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -223,126 +345,6 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
         .trash-btn { transition: all 0.2s ease; cursor: pointer; }
         .trash-btn:active { transform: scale(0.9); }
       `}</style>
-
-      {/* Header */}
-      <div
-        className={loaded ? "fade-up" : ""}
-        style={{ padding: "18px 24px 0", animationDelay: "0s" }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Image
-              src="/icon-512x512.png"
-              alt="Snagify"
-              width={32}
-              height={32}
-              style={{ width: 32, height: 32, borderRadius: 10, objectFit: "contain" }}
-              priority
-            />
-            <span style={{ fontSize: 16, fontWeight: 700, color: "#1A1A1A", letterSpacing: -0.3, fontFamily: "'Poppins', sans-serif" }}>
-              Snagify
-            </span>
-          </div>
-          <Link
-            href="/profile"
-            style={{
-              width: 42, height: 42, borderRadius: "50%",
-              background: "#9A88FD",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#fff", fontSize: 14, fontWeight: 600, letterSpacing: 0.5,
-              textDecoration: "none",
-            }}
-          >
-            {initials}
-          </Link>
-        </div>
-      </div>
-
-      {/* Title */}
-      <div
-        className={loaded ? "fade-up" : ""}
-        style={{ padding: "24px 24px 0", animationDelay: "0.06s" }}
-      >
-        <p style={{ fontSize: 13, color: "#BBB", margin: 0, fontWeight: 500, letterSpacing: 1.2, textTransform: "uppercase" }}>
-          Documents
-        </p>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
-          <h1 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 30, fontWeight: 800, margin: 0, color: "#1A1A1A", letterSpacing: -0.5 }}>
-            Reports
-          </h1>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div
-        className={loaded ? "fade-up" : ""}
-        style={{ padding: "16px 24px 0", display: "flex", gap: 8, animationDelay: "0.1s" }}
-      >
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab;
-          return (
-            <button
-              key={tab}
-              type="button"
-              className="tab-btn"
-              onClick={() => setActiveTab(tab)}
-              style={{
-                padding: "8px 18px",
-                borderRadius: 100,
-                background: isActive ? "#1A1A1A" : "transparent",
-                border: isActive ? "none" : "1.5px solid #DDDCD8",
-                color: isActive ? "#fff" : "#999",
-                fontSize: 13,
-                fontWeight: 600,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                cursor: "pointer",
-              }}
-            >
-              {tab}
-              <span style={{ fontSize: 11, fontWeight: 700, color: isActive ? "rgba(255,255,255,0.5)" : "#CCC" }}>
-                {tabCount(tab)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Search */}
-      <div
-        className={loaded ? "fade-up" : ""}
-        style={{ padding: "14px 24px 0", animationDelay: "0.14s" }}
-      >
-        <div style={{ position: "relative" }}>
-          <svg
-            width="18" height="18" viewBox="0 0 24 24" fill="none"
-            stroke="#BBB" strokeWidth="2.5" strokeLinecap="round"
-            style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
-          >
-            <circle cx="11" cy="11" r="7" />
-            <line x1="16.5" y1="16.5" x2="21" y2="21" />
-          </svg>
-          <input
-            className="search-input"
-            type="text"
-            placeholder="Search by property or tenant..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "14px 16px 14px 46px",
-              borderRadius: 14,
-              border: "1.5px solid transparent",
-              background: "#EEEDE9",
-              fontSize: 16,
-              color: "#1A1A1A",
-              fontFamily: "'DM Sans', sans-serif",
-              boxSizing: "border-box",
-            }}
-          />
-        </div>
-      </div>
 
       {/* Report Cards */}
       <div style={{ paddingBottom: 24 }}>
@@ -656,6 +658,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
             })
           )}
         </div>
+      </div>
       </div>
     </div>
   );
