@@ -90,17 +90,23 @@ export default function GhostCamera({
 
   useEffect(() => {
     try {
-      if (screen.orientation?.lock) {
-        void screen.orientation.lock("portrait").catch(() => {
-          /* Silently fail — some browsers don't support lock */
-        });
+      const orientation = screen.orientation as ScreenOrientation & {
+        lock?: (orientation: string) => Promise<void>;
+        unlock?: () => void;
+      };
+      if (orientation?.lock) {
+        void orientation.lock("portrait").catch(() => {});
       }
     } catch {
-      /* ignore */
+      /* ignore — not supported on all browsers */
     }
+
     return () => {
       try {
-        screen.orientation?.unlock?.();
+        const orientation = screen.orientation as ScreenOrientation & {
+          unlock?: () => void;
+        };
+        orientation?.unlock?.();
       } catch {
         /* ignore */
       }
