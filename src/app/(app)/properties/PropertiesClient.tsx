@@ -5,6 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getTenancyStatus } from "@/lib/tenancy";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 
 type InspectionRow = {
   id: string;
@@ -119,6 +121,15 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
   const activeCount = properties.filter((p) => getPropertyStatus(p) === "active").length;
   const vacantCount = properties.filter((p) => getPropertyStatus(p) === "vacant").length;
   const initials = getInitials(fullName, userEmail);
+
+  const handleRefresh = useCallback(async () => {
+    router.refresh();
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  }, [router]);
+
+  const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  });
 
   return (
     <div
@@ -256,14 +267,45 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
 
       {/* Scroll area */}
       <div
+        ref={containerRef}
+        data-pull-scroll
         className="scroll-hide"
         style={{
           flex: 1,
           minHeight: 0,
           overflowY: "auto",
           paddingBottom: 24,
+          position: "relative",
         }}
       >
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: pullDistance,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            pointerEvents: "none",
+            zIndex: 10,
+          }}
+        >
+          <PullToRefreshIndicator
+            pullDistance={pullDistance}
+            isRefreshing={isRefreshing}
+            isTriggered={isTriggered}
+          />
+        </div>
+
+        <div
+          style={{
+            transform: `translateY(${pullDistance}px)`,
+            transition: isRefreshing ? "transform 0.25s ease" : "none",
+          }}
+        >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -451,6 +493,7 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
           )}
         </div>
       </div>
+        </div>
       </div>
     </div>
   );

@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 import { InspectionStatusBadge } from "@/components/inspection/InspectionStatusBadge";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 
 type ReportRow = {
   id: string;
@@ -133,6 +135,15 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
     return matchesTab && matchesSearch;
   });
 
+  const handleRefresh = useCallback(async () => {
+    router.refresh();
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  }, [router]);
+
+  const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  });
+
   return (
     <div
       style={{
@@ -257,14 +268,45 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
 
       {/* Scroll area */}
       <div
+        ref={containerRef}
+        data-pull-scroll
         className="scroll-hide"
         style={{
           flex: 1,
           minHeight: 0,
           overflowY: "auto",
           paddingBottom: 24,
+          position: "relative",
         }}
       >
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: pullDistance,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            pointerEvents: "none",
+            zIndex: 10,
+          }}
+        >
+          <PullToRefreshIndicator
+            pullDistance={pullDistance}
+            isRefreshing={isRefreshing}
+            isTriggered={isTriggered}
+          />
+        </div>
+
+        <div
+          style={{
+            transform: `translateY(${pullDistance}px)`,
+            transition: isRefreshing ? "transform 0.25s ease" : "none",
+          }}
+        >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -632,6 +674,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
           )}
         </div>
       </div>
+        </div>
       </div>
     </div>
   );
