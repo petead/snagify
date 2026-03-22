@@ -256,23 +256,6 @@ export default function GhostCamera({
     };
   }, []);
 
-  /** Lock UI to portrait (no CSS counter-rotation); fallback for older APIs. */
-  useEffect(() => {
-    const orientation = screen.orientation as ScreenOrientation & {
-      lock?: (o: string) => Promise<void>
-      unlock?: () => void
-    }
-    if (!orientation?.lock) return
-
-    void orientation.lock("portrait").catch(() => {
-      void orientation.lock?.("portrait-primary").catch(() => {})
-    })
-
-    return () => {
-      orientation.unlock?.()
-    }
-  }, [])
-
   /** Match live camera zoom to check-in photo when ghost is selected. */
   useEffect(() => {
     if (!stream || isAdditionalMode || !activeGhostId) return;
@@ -416,11 +399,26 @@ export default function GhostCamera({
       <style>{`
         .ghost-camera-root {
           position: fixed;
-          inset: 0;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
           z-index: 999;
           background: black;
           display: flex;
           flex-direction: column;
+        }
+
+        @media screen and (orientation: landscape) {
+          .ghost-camera-root {
+            width: 100svh;
+            height: 100svw;
+            transform: rotate(-90deg);
+            transform-origin: top left;
+            position: fixed;
+            top: 100svw;
+            left: 0;
+          }
         }
 
         .ghost-camera-root img.ghost-overlay {
