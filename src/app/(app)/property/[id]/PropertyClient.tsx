@@ -9,6 +9,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 import { InspectionStatusBadge } from "@/components/inspection/InspectionStatusBadge";
+import { motion } from "framer-motion";
 
 type InspectionSignature = {
   signer_type: string;
@@ -270,15 +271,6 @@ function InspectionRow({
     startCheckIn();
   };
 
-  const handleOpen = () => {
-    if (!inspection) return;
-    if (state === "draft") {
-      router.push(`/inspection/${inspection.id}`);
-    } else {
-      router.push(`/inspection/${inspection.id}/report`);
-    }
-  };
-
   const handleDownloadPdf = async () => {
     if (!inspection) return;
     setPdfLoading(true);
@@ -294,9 +286,27 @@ function InspectionRow({
 
   // Inspection exists
   if (inspection && state) {
+    const goToInspection = () => {
+      const id = inspection.id;
+      if (!id) return;
+      if (inspection.status === "in_progress") {
+        router.push(`/inspection/${id}`);
+      } else {
+        router.push(`/inspection/${id}/report`);
+      }
+    };
+
     return (
       <div className="py-3">
-        <div className="flex items-center gap-2">
+        <motion.div
+          whileTap={{ backgroundColor: "rgba(154,136,253,0.05)" }}
+          onClick={goToInspection}
+          style={{
+            cursor: inspection.id ? "pointer" : "default",
+            borderRadius: 12,
+          }}
+        >
+          <div className="flex items-center gap-2">
           {/* Type badge */}
           <span
             className={`text-[10px] font-bold tracking-wide px-2.5 py-1 rounded-lg flex-shrink-0
@@ -322,7 +332,10 @@ function InspectionRow({
           {isDraft ? (
             <button
               type="button"
-              onClick={() => router.push(`/inspection/${inspection.id}`)}
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/inspection/${inspection.id}`);
+              }}
               className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-[13px] font-bold text-white"
             >
               <svg
@@ -344,7 +357,10 @@ function InspectionRow({
             <button
               type="button"
               disabled={pdfLoading}
-              onClick={() => void handleDownloadPdf()}
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleDownloadPdf();
+              }}
               className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-[13px] font-bold text-white disabled:opacity-60"
             >
               <svg
@@ -367,7 +383,10 @@ function InspectionRow({
           ) : state === "to_sign" ? (
             <button
               type="button"
-              onClick={() => router.push(`/inspection/${inspection.id}/report`)}
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/inspection/${inspection.id}/report`);
+              }}
               className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-[#9A88FD] px-4 py-2 text-[13px] font-bold text-white"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
@@ -384,7 +403,10 @@ function InspectionRow({
           ) : (
             <button
               type="button"
-              onClick={handleOpen}
+              onClick={(e) => {
+                e.stopPropagation();
+                goToInspection();
+              }}
               className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-[#F3F3F8] px-4 py-2 text-[13px] font-bold text-[#1A1A2E]"
             >
               Open
@@ -394,6 +416,7 @@ function InspectionRow({
           {/* Trash button — draft only */}
           {state === "draft" && onRemove && onRollback && (
             <div
+              onClick={(e) => e.stopPropagation()}
               style={{
                 width: 40,
                 height: 40,
@@ -418,6 +441,7 @@ function InspectionRow({
             </div>
           )}
         </div>
+        </motion.div>
 
         <BuyCreditsModal
           isOpen={showBuyCredits}
