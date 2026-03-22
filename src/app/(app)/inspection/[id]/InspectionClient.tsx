@@ -1085,7 +1085,8 @@ export function InspectionClient({
     const fileArray = Array.from(files);
 
     for (const file of fileArray) {
-      await handlePhotoCapture(file, currentRoom.id, currentRoom.name, null, false);
+      // Native check-in camera / file picker — no variable zoom (always 1.0); GhostCamera check-out passes live zoom.
+      await handlePhotoCapture(file, currentRoom.id, currentRoom.name, null, false, 1);
     }
 
     const input = document.querySelector('input[type="file"][accept="image/*"]') as HTMLInputElement;
