@@ -5,8 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getTenancyStatus } from "@/lib/tenancy";
-import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 
 type InspectionRow = {
   id: string;
@@ -104,15 +102,6 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
     setProperties(normalizeProperties(initialProperties));
   }, [initialProperties, normalizeProperties]);
 
-  const fetchData = useCallback(async () => {
-    router.refresh();
-  }, [router]);
-
-  const handleRefresh = useCallback(async () => {
-    await fetchData();
-    await new Promise((r) => setTimeout(r, 400));
-  }, [fetchData]);
-
   const filtered =
     search.trim() === ""
       ? properties
@@ -130,10 +119,6 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
   const activeCount = properties.filter((p) => getPropertyStatus(p) === "active").length;
   const vacantCount = properties.filter((p) => getPropertyStatus(p) === "vacant").length;
   const initials = getInitials(fullName, userEmail);
-
-  const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
-    onRefresh: handleRefresh,
-  });
 
   return (
     <div
@@ -272,30 +257,14 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
       </div>
 
       <div
-        ref={containerRef}
-        data-pull-scroll
         className="scroll-hide"
         style={{
           flex: 1,
           minHeight: 0,
           overflowY: "auto",
-          overscrollBehaviorY: "none",
-          position: "relative",
+          paddingBottom: 24,
         }}
       >
-        <div
-          style={{
-            transform: `translateY(${pullDistance}px)`,
-            transition: isRefreshing ? "transform 0.2s ease" : "none",
-            paddingBottom: 24,
-            minHeight: "100%",
-          }}
-        >
-        <PullToRefreshIndicator
-          pullDistance={pullDistance}
-          isRefreshing={isRefreshing}
-          isTriggered={isTriggered}
-        />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -483,7 +452,6 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
           )}
         </div>
       </div>
-        </div>
       </div>
     </div>
   );

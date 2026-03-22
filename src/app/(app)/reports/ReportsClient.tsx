@@ -7,8 +7,6 @@ import { useRouter } from "next/navigation";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 import { InspectionStatusBadge } from "@/components/inspection/InspectionStatusBadge";
-import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 
 type ReportRow = {
   id: string;
@@ -117,19 +115,6 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
     if (tab === "Pending") return pendingCount;
     return signedCount;
   };
-
-  const fetchData = useCallback(async () => {
-    router.refresh();
-  }, [router]);
-
-  const handleRefresh = useCallback(async () => {
-    await fetchData();
-    await new Promise((r) => setTimeout(r, 400));
-  }, [fetchData]);
-
-  const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
-    onRefresh: handleRefresh,
-  });
 
   const filtered = reports.filter((r) => {
     const prop = first(r.properties) as { building_name?: string | null; unit_number?: string | null } | null;
@@ -273,30 +258,14 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
       </div>
 
       <div
-        ref={containerRef}
-        data-pull-scroll
         className="scroll-hide"
         style={{
           flex: 1,
           minHeight: 0,
           overflowY: "auto",
-          overscrollBehaviorY: "none",
-          position: "relative",
+          paddingBottom: 24,
         }}
       >
-        <div
-          style={{
-            transform: `translateY(${pullDistance}px)`,
-            transition: isRefreshing ? "transform 0.2s ease" : "none",
-            paddingBottom: 24,
-            minHeight: "100%",
-          }}
-        >
-        <PullToRefreshIndicator
-          pullDistance={pullDistance}
-          isRefreshing={isRefreshing}
-          isTriggered={isTriggered}
-        />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -664,7 +633,6 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
           )}
         </div>
       </div>
-        </div>
       </div>
     </div>
   );
