@@ -208,14 +208,10 @@ export function ProfileClient({
     }
   };
 
-  const fetchData = useCallback(async () => {
-    router.refresh();
-  }, [router]);
-
   const handleRefresh = useCallback(async () => {
-    await fetchData();
-    await new Promise((r) => setTimeout(r, 400));
-  }, [fetchData]);
+    router.refresh();
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  }, [router]);
 
   const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
     onRefresh: handleRefresh,
@@ -344,17 +340,38 @@ export function ProfileClient({
           minHeight: 0,
           overflowY: "auto",
           overscrollBehaviorY: "none",
-          transform: `translateY(${pullDistance}px)`,
-          transition: isRefreshing ? "transform 0.2s ease" : "none",
-          paddingBottom: 24,
           position: "relative",
+          paddingBottom: 24,
         }}
       >
-        <PullToRefreshIndicator
-          pullDistance={pullDistance}
-          isRefreshing={isRefreshing}
-          isTriggered={isTriggered}
-        />
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: pullDistance,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            pointerEvents: "none",
+            zIndex: 10,
+          }}
+        >
+          <PullToRefreshIndicator
+            pullDistance={pullDistance}
+            isRefreshing={isRefreshing}
+            isTriggered={isTriggered}
+          />
+        </div>
+
+        <div
+          style={{
+            transform: `translateY(${pullDistance}px)`,
+            transition: isRefreshing ? "transform 0.25s ease" : "none",
+          }}
+        >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -748,6 +765,7 @@ export function ProfileClient({
           </div>
         )}
       </div>
+        </div>
       </div>
 
       {/* Bug report modal */}
