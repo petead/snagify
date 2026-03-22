@@ -218,7 +218,8 @@ export function DashboardClient({
   return (
     <div
       ref={containerRef}
-      className="scroll-hide relative"
+      data-pull-scroll
+      className="scroll-hide"
       style={{
         maxWidth: 480,
         margin: "0 auto",
@@ -229,15 +230,36 @@ export function DashboardClient({
         fontFamily: "'DM Sans', sans-serif",
         position: "relative",
         paddingBottom: 24,
-        transform: `translateY(${pullDistance}px)`,
-        transition: isRefreshing ? "transform 0.2s ease" : "none",
       }}
     >
-      <PullToRefreshIndicator
-        pullDistance={pullDistance}
-        isRefreshing={isRefreshing}
-        isTriggered={isTriggered}
-      />
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: pullDistance,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+          pointerEvents: "none",
+          zIndex: 10,
+        }}
+      >
+        <PullToRefreshIndicator
+          pullDistance={pullDistance}
+          isRefreshing={isRefreshing}
+          isTriggered={isTriggered}
+        />
+      </div>
+
+      <div
+        style={{
+          transform: `translateY(${pullDistance}px)`,
+          transition: isRefreshing ? "transform 0.25s ease" : "none",
+        }}
+      >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -1196,6 +1218,7 @@ export function DashboardClient({
             </div>
           )}
         </div>
+      </div>
       </div>
       <BuyCreditsModal
         isOpen={showBuyCredits}
