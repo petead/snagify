@@ -12,8 +12,8 @@ export interface UsePullToRefreshOptions {
 
 export function usePullToRefresh({
   onRefresh,
-  threshold = 72,
-  resistance = 0.4,
+  threshold = 80,
+  resistance = 0.3,
 }: UsePullToRefreshOptions) {
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
