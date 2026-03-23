@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { Resend } from 'resend';
 import { sendPushNotification } from '@/lib/push';
 import {
   notifyOpenedNotSigned,
@@ -14,6 +15,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 async function sendToUser(userId: string, payload: {
   title: string;
@@ -130,6 +132,474 @@ async function notifyInactivity() {
   console.log(`[Cron] Inactivity check done for ${userIds.length} subscribers`);
 }
 
+async function sendReminder24h() {
+  try {
+    const now = new Date();
+    const threshold = new Date(now.getTime() - 20 * 60 * 60 * 1000).toISOString();
+
+    const { data: sigs } = await supabase
+      .from('signatures')
+      .select(`
+        id, email, signer_name, signer_type, sign_url, refuse_token,
+        inspection_id, expires_at,
+        inspections:inspection_id (
+          type, created_at,
+          properties:property_id (building_name, unit_number, location),
+          agent:agent_id (
+            company:companies (name, logo_url, primary_color)
+          )
+        )
+      `)
+      .eq('signing_mode', 'remote')
+      .is('signed_at', null)
+      .is('refused_at', null)
+      .is('reminder_24h_sent_at', null)
+      .lt('created_at', threshold);
+
+    console.log(`[Cron] Reminder 24h: ${sigs?.length ?? 0} signatures`);
+
+    for (const sig of sigs ?? []) {
+      if (!sig.email || !sig.sign_url) continue;
+
+      const insp = Array.isArray(sig.inspections) ? sig.inspections[0] : sig.inspections;
+      const prop = Array.isArray(insp?.properties) ? insp.properties[0] : insp?.properties;
+      const agentRaw = Array.isArray(insp?.agent) ? insp.agent[0] : insp?.agent;
+      const company = Array.isArray(agentRaw?.company) ? agentRaw.company[0] : agentRaw?.company;
+
+      const agencyName = company?.name || 'Snagify';
+      const primaryColor = company?.primary_color || '#9A88FD';
+      const agencyLogo = company?.logo_url;
+      const propLabel = formatPropertyBuildingUnit(prop ?? null);
+      const propertyAddress = propLabel !== '—' ? propLabel : 'the property';
+      const expiresDate = sig.expires_at
+        ? new Date(sig.expires_at).toLocaleDateString('en-AE', {
+            day: 'numeric', month: 'long', year: 'numeric',
+          })
+        : '7 days from now';
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.snagify.net';
+      const refuseUrl = sig.refuse_token
+        ? `${appUrl}/sign/refuse?token=${encodeURIComponent(sig.refuse_token)}&inspectionId=${encodeURIComponent(sig.inspection_id)}&signerType=${encodeURIComponent(sig.signer_type)}&email=${encodeURIComponent(sig.email)}`
+        : null;
+
+      const agencyHeader = agencyLogo
+        ? `<img src="${agencyLogo}" alt="${agencyName}" style="height:44px;border-radius:10px;object-fit:contain;" />`
+        : `<div style="font-size:18px;font-weight:800;color:white;">${agencyName}</div>`;
+
+      await resend.emails.send({
+        from: `${agencyName} <noreply@snagify.net>`,
+        to: sig.email,
+        subject: `Reminder: Your signature is needed — ${propertyAddress}`,
+        html: `
+          <div style="font-family:-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+
+            <div style="background:${primaryColor};border-radius:16px;padding:20px 24px;margin-bottom:24px;">
+              ${agencyHeader}
+            </div>
+
+            <h2 style="font-size:20px;font-weight:800;color:#1A1A2E;margin:0 0 8px;">
+              Your signature is still needed
+            </h2>
+            <p style="font-size:14px;color:#6B7280;margin:0 0 24px;line-height:1.6;">
+              Hi ${sig.signer_name || 'there'}, this is a friendly reminder that the inspection
+              report for <strong style="color:#1A1A2E;">${propertyAddress}</strong> is awaiting
+              your signature.
+            </p>
+
+            <div style="background:#FEF3C7;border-radius:12px;padding:16px 20px;margin-bottom:24px;
+              border-left:4px solid #F59E0B;">
+              <div style="font-size:13px;font-weight:700;color:#92400E;margin-bottom:6px;">
+                ⏳ Signature deadline: ${expiresDate}
+              </div>
+              <p style="font-size:13px;color:#78350F;margin:0;line-height:1.6;">
+                After this date, the link will expire and you will no longer be able to sign
+                or contest this report. The report will be automatically marked as
+                <strong>expired</strong> and filed as-is — without your signature or objection
+                on record.
+              </p>
+            </div>
+
+            <div style="background:#F8F7F4;border-radius:12px;padding:16px 20px;margin-bottom:24px;">
+              <div style="font-size:12px;font-weight:700;color:#374151;
+                text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">
+                What happens if you don't sign?
+              </div>
+              <ul style="margin:0;padding:0 0 0 16px;font-size:13px;color:#6B7280;line-height:1.8;">
+                <li>The inspection report remains legally valid without your signature</li>
+                <li>You lose the ability to formally contest any findings</li>
+                <li>In case of a dispute, the report may be submitted to the RERA Dispute Centre
+                    without your input on record</li>
+                <li>Your landlord or tenant will be notified of your non-response</li>
+              </ul>
+            </div>
+
+            <a href="${sig.sign_url}"
+              style="display:block;background:${primaryColor};color:white;text-align:center;
+              padding:16px 24px;border-radius:14px;font-size:15px;font-weight:800;
+              text-decoration:none;margin-bottom:16px;">
+              Review &amp; Sign Report →
+            </a>
+
+            <p style="font-size:11px;color:#9B9BA8;text-align:center;line-height:1.5;margin:0 0 24px;">
+              By signing, you confirm you have read and agree with the inspection findings.
+            </p>
+
+            ${refuseUrl ? `
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid #F0EFEC;text-align:center;">
+              <p style="font-size:12px;color:#9B9BA8;margin:0 0 6px;">
+                Do you contest the findings of this report?
+              </p>
+              <a href="${refuseUrl}"
+                style="font-size:12px;color:#EF4444;font-weight:600;text-decoration:none;">
+                Refuse to sign this report →
+              </a>
+            </div>` : ''}
+
+            <div style="margin-top:32px;padding-top:16px;border-top:1px solid #F3F3F8;
+              text-align:center;font-size:11px;color:#C4C4C4;">
+              Powered by Snagify · snagify.net
+            </div>
+          </div>
+        `,
+      });
+
+      await supabase
+        .from('signatures')
+        .update({ reminder_24h_sent_at: new Date().toISOString() })
+        .eq('id', sig.id);
+    }
+  } catch (error) {
+    console.error('[Cron] Reminder 24h error:', error);
+  }
+}
+
+async function sendReminder72h() {
+  try {
+    const now = new Date();
+    const threshold = new Date(now.getTime() - 68 * 60 * 60 * 1000).toISOString();
+
+    const { data: sigs } = await supabase
+      .from('signatures')
+      .select(`
+        id, email, signer_name, signer_type, sign_url, refuse_token,
+        inspection_id, expires_at,
+        inspections:inspection_id (
+          type, created_at,
+          properties:property_id (building_name, unit_number, location),
+          agent:agent_id (
+            company:companies (name, logo_url, primary_color)
+          )
+        )
+      `)
+      .eq('signing_mode', 'remote')
+      .is('signed_at', null)
+      .is('refused_at', null)
+      .not('reminder_24h_sent_at', 'is', null)
+      .is('reminder_72h_sent_at', null)
+      .lt('created_at', threshold);
+
+    console.log(`[Cron] Reminder 72h: ${sigs?.length ?? 0} signatures`);
+
+    for (const sig of sigs ?? []) {
+      if (!sig.email || !sig.sign_url) continue;
+
+      const insp = Array.isArray(sig.inspections) ? sig.inspections[0] : sig.inspections;
+      const prop = Array.isArray(insp?.properties) ? insp.properties[0] : insp?.properties;
+      const agentRaw = Array.isArray(insp?.agent) ? insp.agent[0] : insp?.agent;
+      const company = Array.isArray(agentRaw?.company) ? agentRaw.company[0] : agentRaw?.company;
+
+      const agencyName = company?.name || 'Snagify';
+      const primaryColor = company?.primary_color || '#9A88FD';
+      const agencyLogo = company?.logo_url;
+      const propLabel = formatPropertyBuildingUnit(prop ?? null);
+      const propertyAddress = propLabel !== '—' ? propLabel : 'the property';
+      const expiresDate = sig.expires_at
+        ? new Date(sig.expires_at).toLocaleDateString('en-AE', {
+            day: 'numeric', month: 'long', year: 'numeric',
+          })
+        : 'very soon';
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.snagify.net';
+      const refuseUrl = sig.refuse_token
+        ? `${appUrl}/sign/refuse?token=${encodeURIComponent(sig.refuse_token)}&inspectionId=${encodeURIComponent(sig.inspection_id)}&signerType=${encodeURIComponent(sig.signer_type)}&email=${encodeURIComponent(sig.email)}`
+        : null;
+
+      const agencyHeader = agencyLogo
+        ? `<img src="${agencyLogo}" alt="${agencyName}" style="height:44px;border-radius:10px;object-fit:contain;" />`
+        : `<div style="font-size:18px;font-weight:800;color:white;">${agencyName}</div>`;
+
+      await resend.emails.send({
+        from: `${agencyName} <noreply@snagify.net>`,
+        to: sig.email,
+        subject: `⚠️ Final reminder: Sign before ${expiresDate} — ${propertyAddress}`,
+        html: `
+          <div style="font-family:-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+
+            <div style="background:${primaryColor};border-radius:16px;padding:20px 24px;margin-bottom:24px;">
+              ${agencyHeader}
+            </div>
+
+            <div style="background:#FEF2F2;border:2px solid #FECACA;border-radius:12px;
+              padding:14px 18px;margin-bottom:24px;text-align:center;">
+              <div style="font-size:14px;font-weight:800;color:#DC2626;">
+                ⚠️ Action required — 4 days remaining
+              </div>
+              <div style="font-size:12px;color:#EF4444;margin-top:4px;">
+                Deadline: ${expiresDate}
+              </div>
+            </div>
+
+            <h2 style="font-size:20px;font-weight:800;color:#1A1A2E;margin:0 0 8px;">
+              This is your final reminder
+            </h2>
+            <p style="font-size:14px;color:#6B7280;margin:0 0 24px;line-height:1.6;">
+              Hi ${sig.signer_name || 'there'}, the inspection report for
+              <strong style="color:#1A1A2E;">${propertyAddress}</strong> still requires
+              your action. You have <strong style="color:#DC2626;">4 days left</strong>
+              before this link expires permanently.
+            </p>
+
+            <div style="background:#1A1A2E;border-radius:12px;padding:20px 24px;margin-bottom:24px;">
+              <div style="font-size:12px;font-weight:700;color:#9A88FD;
+                text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">
+                What happens if you ignore this
+              </div>
+              <ul style="margin:0;padding:0 0 0 16px;font-size:13px;
+                color:rgba(255,255,255,0.75);line-height:2;">
+                <li>Your signature window closes <strong style="color:white;">permanently</strong>
+                    on ${expiresDate}</li>
+                <li>The report is filed <strong style="color:white;">as-is</strong>,
+                    without your input on record</li>
+                <li>You <strong style="color:white;">cannot contest</strong> any findings
+                    after expiry</li>
+                <li>In a RERA dispute, your non-response may be held against you</li>
+              </ul>
+            </div>
+
+            <a href="${sig.sign_url}"
+              style="display:block;background:${primaryColor};color:white;text-align:center;
+              padding:16px 24px;border-radius:14px;font-size:15px;font-weight:800;
+              text-decoration:none;margin-bottom:16px;">
+              Sign Now — ${expiresDate} deadline →
+            </a>
+
+            ${refuseUrl ? `
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid #F0EFEC;text-align:center;">
+              <p style="font-size:12px;color:#9B9BA8;margin:0 0 6px;">
+                Don't agree with the report findings?
+              </p>
+              <a href="${refuseUrl}"
+                style="font-size:12px;color:#EF4444;font-weight:600;text-decoration:none;">
+                Formally refuse to sign →
+              </a>
+              <p style="font-size:11px;color:#C4C4C4;margin:6px 0 0;">
+                A formal refusal is better than no response — it puts your objection on record.
+              </p>
+            </div>` : ''}
+
+            <div style="margin-top:32px;padding-top:16px;border-top:1px solid #F3F3F8;
+              text-align:center;font-size:11px;color:#C4C4C4;">
+              Powered by Snagify · snagify.net
+            </div>
+          </div>
+        `,
+      });
+
+      await supabase
+        .from('signatures')
+        .update({ reminder_72h_sent_at: new Date().toISOString() })
+        .eq('id', sig.id);
+    }
+  } catch (error) {
+    console.error('[Cron] Reminder 72h error:', error);
+  }
+}
+
+async function processExpiredSignatures() {
+  try {
+    const now = new Date().toISOString();
+
+    const { data: sigs } = await supabase
+      .from('signatures')
+      .select(`
+        id, email, signer_name, signer_type, inspection_id,
+        inspections:inspection_id (
+          id, type, created_at, report_url, status, agent_id,
+          properties:property_id (building_name, unit_number, location),
+          tenancies:tenancy_id (
+            tenant_name, tenant_email,
+            landlord_name, landlord_email
+          ),
+          agent:agent_id (
+            full_name, email, receive_signed_report_email,
+            company:companies (name, logo_url, primary_color)
+          )
+        )
+      `)
+      .eq('signing_mode', 'remote')
+      .is('signed_at', null)
+      .is('refused_at', null)
+      .lt('expires_at', now);
+
+    console.log(`[Cron] Expired signatures: ${sigs?.length ?? 0}`);
+
+    const byInspection = new Map<string, typeof sigs>();
+    for (const sig of sigs ?? []) {
+      const group = byInspection.get(sig.inspection_id) ?? [];
+      group.push(sig);
+      byInspection.set(sig.inspection_id, group);
+    }
+
+    for (const [inspectionId, inspSigs] of byInspection.entries()) {
+      const firstSig = inspSigs[0];
+      const insp = Array.isArray(firstSig.inspections)
+        ? firstSig.inspections[0]
+        : firstSig.inspections;
+
+      if (!insp) continue;
+      if (insp.status === 'expired' || insp.status === 'signed') continue;
+
+      const prop = Array.isArray(insp.properties) ? insp.properties[0] : insp.properties;
+      const tenancy = Array.isArray(insp.tenancies) ? insp.tenancies[0] : insp.tenancies;
+      const agentRaw = Array.isArray(insp.agent) ? insp.agent[0] : insp.agent;
+      const company = Array.isArray(agentRaw?.company)
+        ? agentRaw.company[0]
+        : agentRaw?.company;
+
+      const agencyName = company?.name || 'Snagify';
+      const primaryColor = company?.primary_color || '#9A88FD';
+      const agencyLogo = company?.logo_url;
+      const propLabel = formatPropertyBuildingUnit(prop ?? null);
+      const propertyAddress = propLabel !== '—' ? propLabel : 'the property';
+      const inspectionDate = insp.created_at
+        ? new Date(insp.created_at).toLocaleDateString('en-AE', {
+            day: 'numeric', month: 'long', year: 'numeric',
+          })
+        : '—';
+
+      const agencyHeader = agencyLogo
+        ? `<img src="${agencyLogo}" alt="${agencyName}" style="height:44px;border-radius:10px;object-fit:contain;" />`
+        : `<div style="font-size:18px;font-weight:800;color:white;">${agencyName}</div>`;
+
+      await supabase
+        .from('inspections')
+        .update({ status: 'expired' })
+        .eq('id', inspectionId);
+
+      const recipients: { email: string; name: string; role: string }[] = [];
+      for (const sig of inspSigs) {
+        if (sig.email) {
+          recipients.push({
+            email: sig.email,
+            name: sig.signer_name || sig.signer_type,
+            role: sig.signer_type,
+          });
+        }
+      }
+
+      const includeAgent = agentRaw?.receive_signed_report_email !== false;
+      if (includeAgent && agentRaw?.email) {
+        recipients.push({
+          email: agentRaw.email,
+          name: agentRaw.full_name || 'Inspector',
+          role: 'agent',
+        });
+      }
+
+      const unsignedNames = inspSigs
+        .map((s) => `${s.signer_name || s.signer_type} (${s.signer_type})`)
+        .join(', ');
+
+      for (const recipient of recipients) {
+        const isAgent = recipient.role === 'agent';
+
+        await resend.emails.send({
+          from: `${agencyName} <noreply@snagify.net>`,
+          to: recipient.email,
+          subject: `Inspection report expired — ${propertyAddress}`,
+          html: `
+            <div style="font-family:-apple-system,sans-serif;max-width:480px;
+              margin:0 auto;padding:32px 24px;">
+
+              <div style="background:${primaryColor};border-radius:16px;
+                padding:20px 24px;margin-bottom:24px;">
+                ${agencyHeader}
+              </div>
+
+              <div style="background:#F3F4F6;border:2px solid #D1D5DB;border-radius:12px;
+                padding:14px 18px;margin-bottom:24px;text-align:center;">
+                <div style="font-size:13px;font-weight:800;color:#6B7280;
+                  text-transform:uppercase;letter-spacing:1px;">
+                  🔒 Signature window closed
+                </div>
+              </div>
+
+              <h2 style="font-size:20px;font-weight:800;color:#1A1A2E;margin:0 0 8px;">
+                ${isAgent ? 'Report expired — no signature obtained' : 'Your signature window has closed'}
+              </h2>
+
+              <p style="font-size:14px;color:#6B7280;margin:0 0 24px;line-height:1.6;">
+                ${isAgent
+                  ? `The 7-day signature window for the inspection report at
+                     <strong style="color:#1A1A2E;">${propertyAddress}</strong>
+                     (${inspectionDate}) has expired.<br/><br/>
+                     The following ${inspSigs.length > 1 ? 'parties have' : 'party has'} not responded:
+                     <strong style="color:#1A1A2E;">${unsignedNames}</strong>.`
+                  : `Hi ${recipient.name}, the 7-day window to sign the inspection report
+                     for <strong style="color:#1A1A2E;">${propertyAddress}</strong>
+                     (${inspectionDate}) has now closed. You can no longer sign
+                     or contest this report.`
+                }
+              </p>
+
+              <div style="background:#F8F7F4;border-radius:12px;padding:16px 20px;
+                margin-bottom:24px;">
+                <div style="font-size:12px;font-weight:700;color:#374151;
+                  text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">
+                  What this means
+                </div>
+                <ul style="margin:0;padding:0 0 0 16px;font-size:13px;
+                  color:#6B7280;line-height:1.9;">
+                  ${isAgent ? `
+                  <li>The report is filed as <strong>expired</strong> — legally valid as-is</li>
+                  <li>You may contact the unsigned parties directly if needed</li>
+                  <li>The report can be submitted to the RERA Dispute Centre if required</li>
+                  <li>Consider conducting a new inspection if a fresh baseline is needed</li>
+                  ` : `
+                  <li>The inspection report remains <strong>legally valid</strong>
+                      without your signature</li>
+                  <li>Your ability to formally contest any findings has ended</li>
+                  <li>In any future RERA dispute, this report may be submitted as evidence
+                      without your input on record</li>
+                  <li>All parties and the inspector have been notified of your non-response</li>
+                  `}
+                </ul>
+              </div>
+
+              ${insp.report_url ? `
+              <a href="${insp.report_url}"
+                style="display:block;background:#6B7280;color:white;text-align:center;
+                padding:14px 24px;border-radius:14px;font-size:14px;font-weight:700;
+                text-decoration:none;margin-bottom:16px;">
+                View inspection report (read only)
+              </a>` : ''}
+
+              <div style="margin-top:32px;padding-top:16px;border-top:1px solid #F3F3F8;
+                text-align:center;font-size:11px;color:#C4C4C4;">
+                Powered by Snagify · snagify.net
+              </div>
+            </div>
+          `,
+        });
+      }
+
+      console.log(`[Cron] Expired: inspection ${inspectionId} → status:expired, notified ${recipients.length} parties`);
+    }
+  } catch (error) {
+    console.error('[Cron] Expired signatures error:', error);
+  }
+}
+
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
   if (
@@ -147,6 +617,9 @@ export async function GET(req: Request) {
       notifyInactivity(),
       notifyOpenedNotSigned(),
       notifyExpiringSignatures(),
+      sendReminder24h(),
+      sendReminder72h(),
+      processExpiredSignatures(),
     ]);
 
     console.log('[Cron] Daily notification job completed');
