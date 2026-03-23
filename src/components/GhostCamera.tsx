@@ -78,6 +78,7 @@ export default function GhostCamera({
   const [activeGhostIndex, setActiveGhostIndex] = useState(0);
   const [capturing, setCapturing] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [landscapeError, setLandscapeError] = useState(false);
   const [coveredCheckinIds, setCoveredCheckinIds] = useState<Set<string>>(
     () => new Set(initialCoveredIds)
   );
@@ -343,6 +344,14 @@ export default function GhostCamera({
     canvas.toBlob(
       (blob) => {
         if (blob) {
+          // ── Reject landscape photos ──
+          if (canvas.width > canvas.height) {
+            setLandscapeError(true);
+            setTimeout(() => setLandscapeError(false), 3000);
+            setCapturing(false);
+            return;
+          }
+
           const linkedId = isAdditionalMode
             ? null
             : (checkinPhotos[activeGhostIndex]?.id ?? null);
@@ -510,6 +519,61 @@ export default function GhostCamera({
             }
           }}
         />
+
+        {landscapeError && (
+          <div
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              zIndex: 30,
+              background: "rgba(239,68,68,0.92)",
+              borderRadius: 16,
+              padding: "14px 20px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 8,
+              maxWidth: 260,
+              textAlign: "center",
+            }}
+          >
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <rect x="2" y="7" width="10" height="14" rx="2" />
+              <path d="M14 9l3-3 3 3M17 6v8" />
+            </svg>
+            <p
+              style={{
+                color: "white",
+                fontSize: 13,
+                fontWeight: 700,
+                margin: 0,
+                fontFamily: "Poppins, sans-serif",
+              }}
+            >
+              Portrait mode required
+            </p>
+            <p
+              style={{
+                color: "rgba(255,255,255,0.85)",
+                fontSize: 12,
+                margin: 0,
+                lineHeight: 1.4,
+              }}
+            >
+              Please rotate your phone and retake the photo
+            </p>
+          </div>
+        )}
 
         {activeGhost && ghostOpacity > 0 && !isAdditionalMode && (
           <>

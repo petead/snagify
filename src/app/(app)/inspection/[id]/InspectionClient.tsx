@@ -442,6 +442,7 @@ export function InspectionClient({
   const [checkinInspectionId, setCheckinInspectionId] = useState<string | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
+  const [landscapePhotoError, setLandscapePhotoError] = useState(false);
 
   // Setup state
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -1093,6 +1094,22 @@ export function InspectionClient({
     const fileArray = Array.from(files);
 
     for (const file of fileArray) {
+      const isLandscapePhoto = await new Promise<boolean>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          resolve(img.naturalWidth > img.naturalHeight);
+          URL.revokeObjectURL(img.src);
+        };
+        img.onerror = () => resolve(false);
+        img.src = URL.createObjectURL(file);
+      });
+
+      if (isLandscapePhoto) {
+        setLandscapePhotoError(true);
+        setTimeout(() => setLandscapePhotoError(false), 3500);
+        continue;
+      }
+
       // Native check-in camera / file picker — no variable zoom (always 1.0); GhostCamera check-out passes live zoom.
       await handlePhotoCapture(file, currentRoom.id, currentRoom.name, null, false, [], 1);
     }
@@ -1309,6 +1326,64 @@ export function InspectionClient({
           {toast}
         </div>
       )}
+
+      {typeof document !== "undefined" &&
+        landscapePhotoError &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              bottom: 100,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 9999,
+              background: "rgba(239,68,68,0.95)",
+              borderRadius: 16,
+              padding: "14px 24px",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              maxWidth: 320,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            }}
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <rect x="2" y="7" width="10" height="14" rx="2" />
+              <path d="M14 9l3-3 3 3M17 6v8" />
+            </svg>
+            <div>
+              <p
+                style={{
+                  color: "white",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  margin: 0,
+                  fontFamily: "Poppins, sans-serif",
+                }}
+              >
+                Portrait mode required
+              </p>
+              <p
+                style={{
+                  color: "rgba(255,255,255,0.85)",
+                  fontSize: 12,
+                  margin: "2px 0 0",
+                }}
+              >
+                Please retake in portrait orientation
+              </p>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* ═══ ROOMS SCREEN ═══ */}
       {screen === "rooms" && (
