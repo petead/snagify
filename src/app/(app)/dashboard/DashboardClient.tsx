@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 import { PenLine, AlertTriangle } from "lucide-react";
 import { useCredits } from "@/hooks/useCredits";
@@ -75,6 +76,7 @@ interface DashboardClientProps {
   tourCompleted: boolean;
   profileLoading?: boolean;
   showProUpgradeBanner?: boolean;
+  stripeSubscriptionId?: string | null;
   properties: PropertyRow[];
   alerts?: AlertItem[];
   recentInspections?: RecentInspectionRow[];
@@ -132,6 +134,7 @@ export function DashboardClient({
   tourCompleted,
   profileLoading = false,
   showProUpgradeBanner = false,
+  stripeSubscriptionId = null,
   properties: initialProperties,
   alerts = [],
   recentInspections: initialRecentInspections = [],
@@ -139,6 +142,7 @@ export function DashboardClient({
   const supabase = createClient();
   const { balance, plan, accountType, refresh: refreshCredits } = useCredits();
   const [showBuyCredits, setShowBuyCredits] = useState(false);
+  const [showNoSubscriptionAlert, setShowNoSubscriptionAlert] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [properties, setProperties] = useState(() => normalizeProperties(initialProperties));
@@ -659,7 +663,13 @@ export function DashboardClient({
           role="button"
           tabIndex={0}
           className="stat-card relative"
-          onClick={() => setShowBuyCredits(true)}
+          onClick={() => {
+            if (accountType === "pro" && (!plan || plan === "free" || !stripeSubscriptionId)) {
+              setShowNoSubscriptionAlert(true);
+            } else {
+              setShowBuyCredits(true);
+            }
+          }}
           onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setShowBuyCredits(true)}
           style={{
             background: "#fff",
@@ -1231,6 +1241,122 @@ export function DashboardClient({
         planSlug={planSlugForBuyCredits(plan)}
         pricePerCredit={pricePerCreditForBuy(plan)}
       />
+      {showNoSubscriptionAlert &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 9999,
+              background: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 20px",
+            }}
+            onClick={() => setShowNoSubscriptionAlert(false)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "white",
+                borderRadius: 24,
+                padding: 24,
+                width: "100%",
+                maxWidth: 360,
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 16,
+                  background: "rgba(154,136,253,0.1)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
+                }}
+              >
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#9A88FD"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                  <line x1="2" y1="10" x2="22" y2="10" />
+                </svg>
+              </div>
+
+              <h3
+                style={{
+                  fontFamily: "Poppins, sans-serif",
+                  fontSize: 17,
+                  fontWeight: 800,
+                  color: "#1A1A1A",
+                  margin: "0 0 8px",
+                }}
+              >
+                No active plan
+              </h3>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "#6B7280",
+                  lineHeight: 1.6,
+                  margin: "0 0 20px",
+                }}
+              >
+                You need an active Pro subscription to buy extra credits.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNoSubscriptionAlert(false);
+                  router.push("/profile?section=subscription");
+                }}
+                style={{
+                  width: "100%",
+                  background: "#9A88FD",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 14,
+                  padding: "14px 0",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  marginBottom: 10,
+                  fontFamily: "Poppins, sans-serif",
+                }}
+              >
+                View plans →
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowNoSubscriptionAlert(false)}
+                style={{
+                  width: "100%",
+                  background: "none",
+                  border: "none",
+                  color: "#9CA3AF",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  padding: "8px 0",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
       {showOnboarding && (
         <OnboardingTutorial
           accountType={profileAccountType}

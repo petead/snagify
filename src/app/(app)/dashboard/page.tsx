@@ -16,6 +16,7 @@ export default async function DashboardPage() {
   let profileLoading = false;
   let profileNeedsOnboardingFix = false;
   let showProUpgradeBanner = false;
+  let stripeSubscriptionId: string | null = null;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
@@ -35,10 +36,13 @@ export default async function DashboardPage() {
       if (accountType === "pro" && companyId) {
         const { data: company } = await supabase
           .from("companies")
-          .select("plan")
+          .select("plan, stripe_subscription_id")
           .eq("id", companyId)
           .single();
         const plan = (company as { plan?: string } | null)?.plan;
+        stripeSubscriptionId =
+          (company as { stripe_subscription_id?: string | null } | null)
+            ?.stripe_subscription_id ?? null;
         if (plan === "free" || plan == null) {
           showProUpgradeBanner = true;
         }
@@ -257,6 +261,7 @@ export default async function DashboardPage() {
         tourCompleted={tourCompleted}
         profileLoading={profileLoading}
         showProUpgradeBanner={showProUpgradeBanner}
+        stripeSubscriptionId={stripeSubscriptionId}
         properties={propertiesData}
         alerts={alerts}
         recentInspections={recentInspections}
