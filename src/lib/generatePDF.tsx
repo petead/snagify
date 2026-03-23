@@ -2315,9 +2315,8 @@ export async function generateInspectionPDFBuffer(
 
 async function buildReportQrDataUrl(meta: InspectionMeta): Promise<string | undefined> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.snagify.net";
-  const reportUrl =
-    meta.inspection.report_url ??
-    `${appUrl}/report/${meta.inspection.id}`;
+  // Always link to the in-app report page, not the raw PDF storage URL
+  const reportUrl = `${appUrl}/inspection/${meta.inspection.id}/report`;
   try {
     return await QRCode.toDataURL(reportUrl, {
       width: 200,

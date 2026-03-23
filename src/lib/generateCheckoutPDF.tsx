@@ -2704,7 +2704,7 @@ export async function renderCheckoutPDFToBuffer(props: CheckoutPDFProps): Promis
   let qrCodeDataUrl = props.qrCodeDataUrl;
   if (!qrCodeDataUrl) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.snagify.net";
-    const reportUrl = `${appUrl}/report/${props.inspection.id}`;
+    const reportUrl = `${appUrl}/inspection/${props.inspection.id}/report`;
     try {
       qrCodeDataUrl = await QRCode.toDataURL(reportUrl, {
         width: 200,
