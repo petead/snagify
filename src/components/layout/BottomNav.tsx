@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Building2, Plus, FileText, User } from "lucide-react";
-import { NotificationBadge } from "@/components/notifications/NotificationBadge";
 
 export default function BottomNav() {
   const pathname = usePathname();
@@ -64,7 +63,6 @@ export default function BottomNav() {
             </Link>
           );
         })}
-        <NotificationBadge />
       </div>
 
     </nav>

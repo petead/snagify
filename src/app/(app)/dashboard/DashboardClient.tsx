@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
-import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 import { PenLine, AlertTriangle } from "lucide-react";
 import { useCredits } from "@/hooks/useCredits";
 import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
@@ -13,11 +12,9 @@ import { OnboardingTutorial } from "@/components/onboarding/OnboardingTutorial";
 import { trackAction } from "@/lib/breadcrumb";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefresh";
-import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 import { createClient } from "@/lib/supabase/client";
 import { planSlugForBuyCredits, pricePerCreditForBuy } from "@/lib/buyCreditsPlan";
-import { InspectionStatusBadge } from "@/components/inspection/InspectionStatusBadge";
-import { getStatusLabel } from "@/lib/utils/statusHelpers";
+import { DashboardNotifications } from "@/components/notifications/DashboardNotifications";
 
 type InspectionRow = {
   id: string;
@@ -56,18 +53,6 @@ export type AlertItem = {
   actionLabel: string;
 };
 
-type RecentInspectionRow = {
-  id: string;
-  type: string | null;
-  status: string | null;
-  created_at: string | null;
-  completed_at: string | null;
-  properties?: unknown;
-  tenancies?: unknown;
-  signatures?: { signer_type: string; otp_verified: boolean; signed_at?: string | null }[];
-  rooms?: { id: string; photos?: { id: string }[] }[];
-};
-
 interface DashboardClientProps {
   userId: string | null;
   displayName: string;
@@ -80,7 +65,6 @@ interface DashboardClientProps {
   stripeSubscriptionId?: string | null;
   properties: PropertyRow[];
   alerts?: AlertItem[];
-  recentInspections?: RecentInspectionRow[];
 }
 
 function first<T>(x: T | T[] | null | undefined): T | null {
@@ -110,15 +94,6 @@ function formatCardDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-/** Same rules as ReportsClient `isSigned` — DB uses `completed` (not "pending") for awaiting signatures */
-function inspectionFullySigned(insp: RecentInspectionRow): boolean {
-  if (insp.status === "signed") return true;
-  const sigs = insp.signatures ?? [];
-  const landlordSig = sigs.find((s) => s.signer_type === "landlord");
-  const tenantSig = sigs.find((s) => s.signer_type === "tenant");
-  return !!landlordSig?.signed_at && !!tenantSig?.signed_at;
-}
-
 function normalizeProperties(rows: PropertyRow[]): PropertyRow[] {
   return (rows ?? []).map((p) => ({
     ...p,
@@ -138,34 +113,15 @@ export function DashboardClient({
   stripeSubscriptionId = null,
   properties: initialProperties,
   alerts = [],
-  recentInspections: initialRecentInspections = [],
 }: DashboardClientProps) {
   const supabase = createClient();
   const { balance, plan, accountType, refresh: refreshCredits } = useCredits();
   const [showBuyCredits, setShowBuyCredits] = useState(false);
   const [showNoSubscriptionAlert, setShowNoSubscriptionAlert] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [properties, setProperties] = useState(() => normalizeProperties(initialProperties));
-  const [recentInspections, setRecentInspections] = useState(initialRecentInspections);
-  const recentRollbackRef = useRef<RecentInspectionRow[]>([]);
-  const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const router = useRouter();
-
-  const handleDownloadPDF = useCallback(async (insp: RecentInspectionRow) => {
-    if (pdfLoadingId) return;
-    setPdfLoadingId(insp.id);
-    try {
-      await regenerateAndDownloadInspectionPdf(insp.id);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Download failed";
-      console.error("[DownloadPDF]", msg);
-      alert(msg);
-    } finally {
-      setPdfLoadingId(null);
-    }
-  }, [pdfLoadingId]);
 
   useEffect(() => {
     setLoaded(true);
@@ -183,10 +139,6 @@ export function DashboardClient({
       window.history.replaceState({}, "", "/dashboard");
     }
   }, [refreshCredits]);
-  useEffect(() => {
-    setRecentInspections(initialRecentInspections);
-  }, [initialRecentInspections]);
-
   useEffect(() => {
     setProperties(normalizeProperties(initialProperties));
   }, [initialProperties]);
@@ -823,415 +775,7 @@ export function DashboardClient({
         </Link>
       </div>
 
-      {/* Recent Inspections */}
-      <div style={{ paddingBottom: 24 }}>
-        <div
-          className={loaded ? "fade-up" : ""}
-          style={{ padding: "24px 24px 0", animationDelay: "0.22s" }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 14,
-            }}
-          >
-            <h2
-              style={{
-                fontSize: 13,
-                color: "#BBB",
-                margin: 0,
-                fontWeight: 500,
-                letterSpacing: 2,
-                textTransform: "uppercase",
-              }}
-            >
-              Recent Inspections
-            </h2>
-            <Link
-              href="/reports"
-              style={{
-                fontSize: 12,
-                color: "#9A88FD",
-                fontWeight: 600,
-                textDecoration: "none",
-              }}
-            >
-              View all →
-            </Link>
-          </div>
-
-          {recentInspections.map((insp) => {
-            const prop = first(insp.properties) as {
-              building_name?: string | null;
-              unit_number?: string | null;
-            } | null;
-            const ten = first(insp.tenancies) as { tenant_name?: string | null } | null;
-            const propertyName = prop?.building_name ?? prop?.unit_number ?? "Property";
-            const unit = prop?.unit_number ? `Unit ${prop.unit_number}` : "";
-            const tenant = ten?.tenant_name?.split(" ")[0] ?? "—";
-            const typeLabel = insp.type === "check-in" ? "Check-in" : "Check-out";
-            const isDraft = insp.status === "in_progress";
-            const isSigned = inspectionFullySigned(insp);
-            const dateStr = insp.completed_at ?? insp.created_at;
-            const rooms = insp.rooms ?? [];
-            const roomCount = rooms.length;
-            const photoCount = rooms.reduce((n, r) => n + (r.photos?.length ?? 0), 0);
-
-            return (
-              <div
-                key={insp.id}
-                role="button"
-                tabIndex={0}
-                className={deletingId === insp.id ? "dash-card-deleting" : "dash-card"}
-                onClick={() => {
-                  if (insp.status === "in_progress") {
-                    router.push(`/inspection/${insp.id}`);
-                  } else {
-                    router.push(`/inspection/${insp.id}/report`);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    if (insp.status === "in_progress") {
-                      router.push(`/inspection/${insp.id}`);
-                    } else {
-                      router.push(`/inspection/${insp.id}/report`);
-                    }
-                  }
-                }}
-                style={{
-                  background: "#fff",
-                  borderRadius: 20,
-                  padding: 18,
-                  marginBottom: 12,
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <div
-                    style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 14,
-                      background: "rgba(154,136,253,0.1)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {insp.type === "check-in" ? (
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#9A88FD"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      >
-                        <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" />
-                        <polyline points="10 17 15 12 10 7" />
-                        <line x1="15" y1="12" x2="3" y2="12" />
-                      </svg>
-                    ) : (
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#9A88FD"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      >
-                        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-                        <polyline points="16 17 21 12 16 7" />
-                        <line x1="21" y1="12" x2="9" y2="12" />
-                      </svg>
-                    )}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <h3
-                        style={{
-                          fontSize: 15,
-                          fontWeight: 600,
-                          color: "#1A1A1A",
-                          margin: 0,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {propertyName}
-                      </h3>
-                      {isDraft ? (
-                        <span className="flex-shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-gray-500">
-                          {getStatusLabel("in_progress")}
-                        </span>
-                      ) : (
-                        <InspectionStatusBadge status={insp.status} fullySigned={isSigned} />
-                      )}
-                    </div>
-                    <p
-                      style={{
-                        fontSize: 12,
-                        color: "#999",
-                        margin: "4px 0 0",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {[unit, tenant, typeLabel, formatCardDate(dateStr)].filter(Boolean).join(" · ")}
-                    </p>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    marginTop: 14,
-                    display: "flex",
-                    gap: 8,
-                    alignItems: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      flex: 1,
-                      background: "#F8F7F4",
-                      borderRadius: 12,
-                      padding: "10px 14px",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <span style={{ fontSize: 11, color: "#BBB", fontWeight: 500 }}>Rooms</span>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: "#1A1A1A" }}>
-                      {roomCount}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      flex: 1,
-                      background: "#F8F7F4",
-                      borderRadius: 12,
-                      padding: "10px 14px",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#BBB"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    >
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <path d="M21 15l-5-5L5 21" />
-                    </svg>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: "#9A88FD" }}>
-                      {photoCount}
-                    </span>
-                  </div>
-                  {isDraft ? (
-                    <button
-                      type="button"
-                      className="cta-btn flex shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-sm font-bold text-white"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/inspection/${insp.id}`);
-                      }}
-                    >
-                      <svg
-                        width="13"
-                        height="13"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        aria-hidden
-                      >
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                      </svg>
-                      {getStatusLabel("in_progress")}
-                    </button>
-                  ) : isSigned ? (
-                    <button
-                      type="button"
-                      className="cta-btn flex shrink-0 items-center gap-1.5 rounded-2xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                      disabled={pdfLoadingId === insp.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleDownloadPDF(insp);
-                      }}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden
-                      >
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="7 10 12 15 17 10" />
-                        <line x1="12" y1="15" x2="12" y2="3" />
-                      </svg>
-                      {pdfLoadingId === insp.id ? "…" : "PDF"}
-                    </button>
-                  ) : insp.status === "completed" && !isSigned ? (
-                    <button
-                      type="button"
-                      className="cta-btn flex shrink-0 items-center gap-1.5 rounded-2xl bg-[#9A88FD] px-4 py-2 text-sm font-semibold text-white"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/inspection/${insp.id}/report`);
-                      }}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden
-                      >
-                        <path d="M12 20h9" />
-                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                      </svg>
-                      Sign
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="cta-btn shrink-0 rounded-2xl bg-[#9A88FD] px-4 py-2 text-sm font-semibold text-white"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/inspection/${insp.id}/report`);
-                      }}
-                    >
-                      Open
-                    </button>
-                  )}
-
-                  <div
-                    className="trash-btn"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 12,
-                      background: "#F8F7F4",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <DeleteInspectionButton
-                      inspectionId={insp.id}
-                      inspectionType={(insp.type ?? "check-in") as "check-in" | "check-out"}
-                      status={insp.status}
-                      signatures={insp.signatures ?? []}
-                      redirectTo="/dashboard"
-                      variant="icon"
-                      onOptimisticRemove={() => {
-                        recentRollbackRef.current = [...recentInspections];
-                        setDeletingId(insp.id);
-                        setTimeout(() => {
-                          setRecentInspections((prev) => prev.filter((i) => i.id !== insp.id));
-                          setDeletingId(null);
-                        }, 320);
-                      }}
-                      onRollback={() => {
-                        setRecentInspections(recentRollbackRef.current);
-                        setDeletingId(null);
-                      }}
-                      onSuccess={() => router.refresh()}
-                    />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {recentInspections.length === 0 && (
-            <div style={{ textAlign: "center", padding: "50px 0" }}>
-              <div
-                style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 22,
-                  background: "#EEEDE9",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  margin: "0 auto 16px",
-                }}
-              >
-                <svg
-                  width="32"
-                  height="32"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#CCC"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                >
-                  <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
-                  <rect x="9" y="3" width="6" height="4" rx="1" />
-                </svg>
-              </div>
-              <h3
-                style={{
-                  fontFamily: "'Poppins', sans-serif",
-                  fontSize: 17,
-                  fontWeight: 700,
-                  color: "#1A1A1A",
-                  margin: 0,
-                }}
-              >
-                No inspections yet
-              </h3>
-              <p
-                style={{
-                  fontSize: 13,
-                  color: "#BBB",
-                  margin: "8px 0 0",
-                  lineHeight: 1.5,
-                }}
-              >
-                Tap New Check-in to start your first one
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      <DashboardNotifications />
       </div>
       <BuyCreditsModal
         isOpen={showBuyCredits}
