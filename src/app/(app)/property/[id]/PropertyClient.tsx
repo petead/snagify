@@ -10,7 +10,6 @@ import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 import { InspectionStatusBadge } from "@/components/inspection/InspectionStatusBadge";
 import { planSlugForBuyCredits, pricePerCreditForBuy } from "@/lib/buyCreditsPlan";
-import { getStatusLabel } from "@/lib/utils/statusHelpers";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 import { motion } from "framer-motion";
@@ -131,7 +130,6 @@ type CheckInWithRooms = {
 };
 
 function InspectionRow({
-  label,
   inspection,
   canStart,
   propertyId,
@@ -145,7 +143,6 @@ function InspectionRow({
   creditsAccountType,
   refreshCredits,
 }: {
-  label: string;
   inspection: InspectionInGroup | null;
   canStart: boolean;
   propertyId: string;
@@ -159,6 +156,7 @@ function InspectionRow({
   creditsAccountType: "individual" | "pro";
   refreshCredits: () => Promise<void>;
 }) {
+  const label = inspectionType === "check-in" ? "IN" : "OUT";
   const router = useRouter();
   const [preparingCheckOut, setPreparingCheckOut] = useState(false);
   const [showBuyCredits, setShowBuyCredits] = useState(false);
@@ -318,168 +316,151 @@ function InspectionRow({
             display: "block",
           }}
         >
-          <div className="flex items-center gap-2">
-          {/* Type badge */}
-          <span
-            className={`text-[10px] font-bold tracking-wide px-2.5 py-1 rounded-lg flex-shrink-0
-              ${inspectionType === "check-in"
-                ? "bg-[#EDE9FF] text-[#9A88FD]"
-                : "bg-amber-50 text-amber-600"
-              }`}
-          >
-            {label}
-          </span>
+          <div className="flex items-center gap-3">
+            {/* Type pill — fixed width for alignment */}
+            <span
+              className={`text-[10px] font-extrabold tracking-widest px-2.5 py-1.5 rounded-lg
+                flex-shrink-0 w-10 text-center
+                ${inspectionType === "check-in"
+                  ? "bg-[#EDE9FF] text-[#9A88FD]"
+                  : "bg-amber-50 text-amber-600"
+                }`}
+            >
+              {label}
+            </span>
 
-          {/* Date */}
-          <span className="text-[13px] font-semibold text-[#1A1A2E] flex-1 whitespace-nowrap">
-            {formatDateShort(inspection.completed_at ?? inspection.created_at)}
-          </span>
+            {/* Date — fixed width for alignment */}
+            <span className="text-[13px] font-semibold text-[#1A1A2E] whitespace-nowrap w-24">
+              {formatDateShort(inspection.completed_at ?? inspection.created_at)}
+            </span>
 
-          <InspectionStatusBadge
-            status={inspection.status}
-            fullySigned={inspectionFullySignedGroup(inspection)}
-          />
-
-          {/* Draft → resume */}
-          {isDraft ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                router.push(`/inspection/${inspection.id}`);
-              }}
-              className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-[13px] font-bold text-white"
-            >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                aria-hidden
-              >
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-              {getStatusLabel("in_progress")}
-            </button>
-          ) : state === "disputed" || state === "expired" ? (
-            <button
-              type="button"
-              disabled={pdfLoading}
-              onClick={(e) => {
-                e.stopPropagation();
-                void handleDownloadPdf();
-              }}
-              className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-[13px] font-bold text-white disabled:opacity-60"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              {pdfLoading ? "…" : "PDF"}
-            </button>
-          ) : isSigned ? (
-            <button
-              type="button"
-              disabled={pdfLoading}
-              onClick={(e) => {
-                e.stopPropagation();
-                void handleDownloadPdf();
-              }}
-              className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-[13px] font-bold text-white disabled:opacity-60"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              {pdfLoading ? "…" : "PDF"}
-            </button>
-          ) : state === "to_sign" ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                router.push(`/inspection/${inspection.id}/report`);
-              }}
-              className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-[#9A88FD] px-4 py-2 text-[13px] font-bold text-white"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"
-                  stroke="white"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Sign
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                goToInspection();
-              }}
-              className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-[#F3F3F8] px-4 py-2 text-[13px] font-bold text-[#1A1A2E]"
-            >
-              Open
-            </button>
-          )}
-
-          {/* Trash button — draft only */}
-          {state === "draft" && onRemove && onRollback && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                background: "#FEF2F2",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <DeleteInspectionButton
-                inspectionId={inspection.id}
-                inspectionType={inspectionType}
-                status={inspection.status ?? "in_progress"}
-                signatures={inspection.signatures}
-                redirectTo={`/property/${propertyId}`}
-                variant="icon"
-                onOptimisticRemove={onRemove}
-                onRollback={onRollback}
+            {/* Status badge — fixed width */}
+            <div className="flex-1 flex justify-center min-w-0">
+              <InspectionStatusBadge
+                status={inspection.status}
+                fullySigned={inspectionFullySignedGroup(inspection)}
               />
             </div>
-          )}
-        </div>
+
+            {/* Action button — fixed width */}
+            <div className="flex-shrink-0 w-20 flex justify-end">
+              {isDraft ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/inspection/${inspection.id}`);
+                  }}
+                  className="flex items-center gap-1 rounded-xl bg-gray-900 px-3 py-2
+                    text-[12px] font-bold text-white w-full justify-center"
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    aria-hidden
+                  >
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  Edit
+                </button>
+              ) : isSigned || state === "disputed" || state === "expired" ? (
+                <button
+                  type="button"
+                  disabled={pdfLoading}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleDownloadPdf();
+                  }}
+                  className="flex items-center gap-1 rounded-xl bg-gray-900 px-3 py-2
+                    text-[12px] font-bold text-white disabled:opacity-60 w-full justify-center"
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  {pdfLoading ? "…" : "PDF"}
+                </button>
+              ) : state === "to_sign" ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/inspection/${inspection.id}/report`);
+                  }}
+                  className="flex items-center gap-1 rounded-xl bg-[#9A88FD] px-3 py-2
+                    text-[12px] font-bold text-white w-full justify-center"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"
+                      stroke="white"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Sign
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goToInspection();
+                  }}
+                  className="flex items-center gap-1 rounded-xl bg-[#F3F3F8] px-3 py-2
+                    text-[12px] font-bold text-[#1A1A2E] w-full justify-center"
+                >
+                  View
+                </button>
+              )}
+            </div>
+
+            {/* Trash button — draft only */}
+            {state === "draft" && onRemove && onRollback && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  background: "#FEF2F2",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <DeleteInspectionButton
+                  inspectionId={inspection.id}
+                  inspectionType={inspectionType}
+                  status={inspection.status ?? "in_progress"}
+                  signatures={inspection.signatures}
+                  redirectTo={`/property/${propertyId}`}
+                  variant="icon"
+                  onOptimisticRemove={onRemove}
+                  onRollback={onRollback}
+                />
+              </div>
+            )}
+          </div>
         </motion.div>
 
         <BuyCreditsModal
@@ -911,7 +892,6 @@ export function PropertyClient({
                   {/* Inspections */}
                   <div style={{ borderTop: "1px solid #F0EFEC", padding: "4px 20px" }}>
                     <InspectionRow
-                      label="CHECK-IN"
                       inspection={checkIn ?? null}
                       canStart={group.canStartCheckIn.allowed}
                       propertyId={property.id}
@@ -926,7 +906,6 @@ export function PropertyClient({
                     />
                     <div style={{ height: 1, background: "#F0EFEC" }} />
                     <InspectionRow
-                      label="CHECK-OUT"
                       inspection={checkOut ?? null}
                       canStart={group.canStartCheckOut.allowed}
                       propertyId={property.id}
