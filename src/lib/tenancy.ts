@@ -76,8 +76,6 @@ export function canStartCheckOut(
   );
   if (!checkIn)
     return { allowed: false, reason: "Complete a check-in first" };
-  if (checkIn.status === "draft")
-    return { allowed: false, reason: "Finish the check-in report first" };
   if (checkIn.status === "in_progress")
     return { allowed: false, reason: "Complete the check-in report first" };
 

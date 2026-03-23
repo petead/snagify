@@ -10,6 +10,7 @@ import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 import { InspectionStatusBadge } from "@/components/inspection/InspectionStatusBadge";
 import { planSlugForBuyCredits, pricePerCreditForBuy } from "@/lib/buyCreditsPlan";
+import { getStatusLabel } from "@/lib/utils/statusHelpers";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 import { motion } from "framer-motion";
@@ -359,7 +360,7 @@ function InspectionRow({
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
-              Draft
+              {getStatusLabel("in_progress")}
             </button>
           ) : isSigned ? (
             <button
@@ -439,7 +440,7 @@ function InspectionRow({
               <DeleteInspectionButton
                 inspectionId={inspection.id}
                 inspectionType={inspectionType}
-                status={inspection.status ?? "draft"}
+                status={inspection.status ?? "in_progress"}
                 signatures={inspection.signatures}
                 redirectTo={`/property/${propertyId}`}
                 variant="icon"

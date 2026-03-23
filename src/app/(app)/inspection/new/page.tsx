@@ -636,7 +636,7 @@ function NewInspectionContent() {
           tenancy_id: tenancy.id,
           agent_id: user.id,
           type: "check-in",
-          status: "draft",
+          status: "in_progress",
           key_handover: keyHandover.length > 0 ? keyHandover : [],
         })
         .select()

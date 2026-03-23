@@ -1,4 +1,5 @@
 "use client";
+import { getStatusLabel } from "@/lib/utils/statusHelpers";
 
 /**
  * Unified inspection status pill — use Dashboard, Reports, Property rows, Report header.
@@ -16,17 +17,18 @@ export function InspectionStatusBadge({
   if (raw === "disputed") key = "disputed";
   else if (raw === "expired") key = "expired";
   else if (fullySigned || raw === "signed") key = "signed";
-  else if (raw === "completed") key = "pending_signatures";
+  else if (raw === "pending_signatures") key = "pending_signatures";
+  else if (raw === "completed") key = "completed";
   else if (raw === "in_progress") key = "in_progress";
   else key = "in_progress";
 
   const config: Record<string, { label: string; bg: string; color: string }> = {
-    in_progress: { label: "Draft", bg: "#F3F4F6", color: "#6B7280" },
-    completed: { label: "Ready", bg: "#EDE9FF", color: "#7C3AED" },
-    pending_signatures: { label: "Pending", bg: "#FEF3C7", color: "#92400E" },
-    signed: { label: "Signed", bg: "#D1FAE5", color: "#065F46" },
-    disputed: { label: "Disputed", bg: "#FEF3C7", color: "#92400E" },
-    expired: { label: "Expired", bg: "#F3F4F6", color: "#6B7280" },
+    in_progress: { label: getStatusLabel("in_progress"), bg: "#F3F4F6", color: "#6B7280" },
+    completed: { label: getStatusLabel("completed"), bg: "#EDE9FF", color: "#7C3AED" },
+    pending_signatures: { label: getStatusLabel("pending_signatures"), bg: "#FEF3C7", color: "#92400E" },
+    signed: { label: getStatusLabel("signed"), bg: "#D1FAE5", color: "#065F46" },
+    disputed: { label: getStatusLabel("disputed"), bg: "#FEF3C7", color: "#92400E" },
+    expired: { label: getStatusLabel("expired"), bg: "#F3F4F6", color: "#6B7280" },
   };
 
   const c = config[key] ?? {
