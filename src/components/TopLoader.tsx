@@ -7,76 +7,69 @@ export function TopLoader() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pathname = usePathname();
   const prevPath = useRef(pathname);
-  const startedRef = useRef(false);
 
-  // -- START: on any internal link click --
+  // Demarre au changement de pathname (fonctionne pour Link ET router.push)
+  useEffect(() => {
+    if (pathname === prevPath.current) return;
+    prevPath.current = pathname;
+
+    const bar = barRef.current;
+    if (!bar) return;
+
+    // Reset
+    bar.style.transition = "none";
+    bar.style.width = "0%";
+    bar.style.opacity = "1";
+    void bar.offsetWidth;
+
+    // Avance rapidement a 90%
+    bar.style.transition = "width 0.3s ease";
+    bar.style.width = "90%";
+
+    // Complete apres 300ms
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      bar.style.transition = "width 0.1s ease";
+      bar.style.width = "100%";
+      setTimeout(() => {
+        bar.style.transition = "opacity 0.25s ease";
+        bar.style.opacity = "0";
+        setTimeout(() => {
+          bar.style.transition = "none";
+          bar.style.width = "0%";
+        }, 300);
+      }, 100);
+    }, 300);
+  }, [pathname]);
+
+  // Demarre au clic sur <a> pour reactivite immediate
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      const target = (e.target as HTMLElement).closest("a");
-      if (!target) return;
-      const href = target.getAttribute("href");
-      if (!href) return;
-      // Only internal links, not anchors, not external
+      const a = (e.target as HTMLElement).closest("a");
+      if (!a) return;
+      const href = a.getAttribute("href");
       if (
+        !href ||
         href.startsWith("#") ||
         href.startsWith("http") ||
         href.startsWith("mailto")
       )
         return;
-      // Don't fire if same page
       if (href === window.location.pathname) return;
 
-      startBar();
+      const bar = barRef.current;
+      if (!bar) return;
+      bar.style.transition = "none";
+      bar.style.width = "0%";
+      bar.style.opacity = "1";
+      void bar.offsetWidth;
+      bar.style.transition = "width 2s cubic-bezier(0.1,0.05,0,1)";
+      bar.style.width = "85%";
     };
 
     document.addEventListener("click", handleClick);
     return () => document.removeEventListener("click", handleClick);
   }, []);
-
-  // -- COMPLETE: when pathname actually changes --
-  useEffect(() => {
-    if (pathname === prevPath.current) return;
-    prevPath.current = pathname;
-    completeBar();
-  }, [pathname]);
-
-  function startBar() {
-    const bar = barRef.current;
-    if (!bar || startedRef.current) return;
-    startedRef.current = true;
-
-    if (timerRef.current) clearTimeout(timerRef.current);
-
-    bar.style.transition = "none";
-    bar.style.width = "0%";
-    bar.style.opacity = "1";
-
-    void bar.offsetWidth; // force reflow
-
-    bar.style.transition = "width 0.8s cubic-bezier(0.1, 0.05, 0, 1)";
-    bar.style.width = "85%";
-  }
-
-  function completeBar() {
-    const bar = barRef.current;
-    if (!bar) return;
-    startedRef.current = false;
-
-    if (timerRef.current) clearTimeout(timerRef.current);
-
-    bar.style.transition = "width 0.15s ease";
-    bar.style.width = "100%";
-
-    timerRef.current = setTimeout(() => {
-      if (!bar) return;
-      bar.style.transition = "opacity 0.2s ease";
-      bar.style.opacity = "0";
-      setTimeout(() => {
-        bar.style.transition = "none";
-        bar.style.width = "0%";
-      }, 250);
-    }, 150);
-  }
 
   return (
     <div
