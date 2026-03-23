@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     .update({
       signature_data: signatureData,
       signed_at: new Date().toISOString(),
-      ip_address: ip,
+      signed_ip_address: ip,
     })
     .eq('id', sig.id)
 

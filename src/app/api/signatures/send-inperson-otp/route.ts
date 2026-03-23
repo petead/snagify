@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       otp_verified: false,
       expires_at: expiresAt.toISOString(),
       signing_mode: 'in_person',
-      ip_address: ip,
+      sent_ip_address: ip,
       sign_url: null,
       signature_data: null,
       signed_at: null,
