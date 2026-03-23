@@ -134,6 +134,9 @@ export async function POST(req: NextRequest) {
         const rollMax = creditsPerMonth * Number(plan.roll_max_multiplier ?? 1);
         const newBalance = Math.min(currentBalance + creditsPerMonth, rollMax);
 
+        const billingPeriod =
+          subscription.metadata?.billing_period ?? "monthly";
+
         await supabaseAdmin
           .from("companies")
           .update({
@@ -141,6 +144,7 @@ export async function POST(req: NextRequest) {
             plan: planSlug,
             stripe_subscription_id: subscriptionId as string,
             billing_cycle_reset_at: new Date().toISOString(),
+            billing_period: billingPeriod,
           })
           .eq("id", companyId);
 
@@ -179,21 +183,29 @@ export async function POST(req: NextRequest) {
 
         if (!planSlug) {
           const priceId = subscription.items.data[0]?.price?.id;
-          const priceIdToPlanMap: Record<string, string> = {
-            'price_1TC1CrKIsjOh5d33lCuUGmcd': 'pro_solo',
-            'price_1TC1D3KIsjOh5d33oEd1E3T1': 'pro_agency',
-            'price_1TC1DPKIsjOh5d33hlQhhUTf': 'pro_max',
-          };
-          planSlug = priceId ? priceIdToPlanMap[priceId] ?? undefined : undefined;
+          if (priceId) {
+            const { data: planRow } = await supabaseAdmin
+              .from("subscription_plans")
+              .select("slug")
+              .or(
+                `stripe_price_id.eq.${priceId},stripe_price_id_annual.eq.${priceId}`
+              )
+              .maybeSingle();
+            planSlug = planRow?.slug;
+          }
         }
 
         if (!planSlug) break;
+
+        const billingPeriod =
+          subscription.metadata?.billing_period ?? "monthly";
 
         await supabaseAdmin
           .from("companies")
           .update({
             plan: planSlug,
             stripe_subscription_id: subscription.id,
+            billing_period: billingPeriod,
           })
           .eq("id", companyId);
         break;

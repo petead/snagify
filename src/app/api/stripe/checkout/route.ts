@@ -25,12 +25,13 @@ export async function POST(req: NextRequest) {
       packId?: string;
       pack_id?: string;
       plan_slug?: string;
+      billing_period?: "monthly" | "annual";
       companyId?: string;
       userId?: string;
       successUrl?: string;
       cancelUrl?: string;
     };
-    const { type, price_id, plan_slug } = body;
+    const { type, price_id, plan_slug, billing_period = "monthly" } = body;
     const packId = body.packId ?? body.pack_id;
 
     const { data: profile, error: profileError } = await supabaseAdmin
@@ -76,10 +77,26 @@ export async function POST(req: NextRequest) {
     let lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
     let checkoutCredits = 0;
     if (isSubscription) {
-      if (!price_id) {
+      let finalPriceId = price_id;
+
+      if (!finalPriceId && plan_slug) {
+        const { data: plan } = await supabaseAdmin
+          .from("subscription_plans")
+          .select("stripe_price_id, stripe_price_id_annual")
+          .eq("slug", plan_slug)
+          .single();
+
+        finalPriceId =
+          billing_period === "annual"
+            ? plan?.stripe_price_id_annual ?? undefined
+            : plan?.stripe_price_id ?? undefined;
+      }
+
+      if (!finalPriceId) {
         return NextResponse.json({ error: "Missing price_id" }, { status: 400 });
       }
-      lineItems = [{ price: price_id, quantity: 1 }];
+
+      lineItems = [{ price: finalPriceId, quantity: 1 }];
     } else {
       if (!packId) {
         return NextResponse.json({ error: "Missing packId" }, { status: 400 });
@@ -122,6 +139,9 @@ export async function POST(req: NextRequest) {
         ...(packId ? { pack_id: packId } : {}),
         ...(checkoutCredits ? { credits: String(checkoutCredits) } : {}),
         ...(plan_slug ? { plan_slug } : {}),
+        ...(isSubscription
+          ? { billing_period: billing_period ?? "monthly" }
+          : {}),
       },
       ...(type === "subscription"
         ? {
@@ -129,6 +149,7 @@ export async function POST(req: NextRequest) {
               metadata: {
                 company_id: checkoutCompanyId ?? "",
                 plan_slug: plan_slug || "",
+                billing_period: billing_period ?? "monthly",
               },
             },
           }
