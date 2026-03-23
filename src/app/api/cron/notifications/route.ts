@@ -267,6 +267,14 @@ async function sendReminder24h() {
         .from('signatures')
         .update({ reminder_24h_sent_at: new Date().toISOString() })
         .eq('id', sig.id);
+
+      if (insp?.agent_id) {
+        await sendToUser(insp.agent_id, {
+          title: '📧 Reminder sent',
+          body: `24h reminder sent to ${sig.signer_name || sig.signer_type} for ${propertyAddress}.`,
+          url: `/inspection/${sig.inspection_id}/report`,
+        });
+      }
     }
   } catch (error) {
     console.error('[Cron] Reminder 24h error:', error);
@@ -409,6 +417,14 @@ async function sendReminder72h() {
         .from('signatures')
         .update({ reminder_72h_sent_at: new Date().toISOString() })
         .eq('id', sig.id);
+
+      if (insp?.agent_id) {
+        await sendToUser(insp.agent_id, {
+          title: '⚠️ Final reminder sent',
+          body: `72h urgent reminder sent to ${sig.signer_name || sig.signer_type} for ${propertyAddress}. 4 days left.`,
+          url: `/inspection/${sig.inspection_id}/report`,
+        });
+      }
     }
   } catch (error) {
     console.error('[Cron] Reminder 72h error:', error);
@@ -590,6 +606,14 @@ async function processExpiredSignatures() {
               </div>
             </div>
           `,
+        });
+      }
+
+      if (insp.agent_id) {
+        await sendToUser(insp.agent_id, {
+          title: '🔒 Signature window expired',
+          body: `${propertyAddress} — ${unsignedNames} did not sign within 7 days. Report marked as expired.`,
+          url: `/inspection/${inspectionId}/report`,
         });
       }
 
