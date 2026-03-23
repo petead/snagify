@@ -197,23 +197,27 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
 
   const handleSignatureSave = async (dataUrl: string) => {
     try {
-      const supabase = createClient();
-      const blob = await fetch(dataUrl).then(r => r.blob());
-      const fileName = `${userId}/signature.png`;
-      const { error: uploadErr } = await supabase.storage
-        .from("signatures")
-        .upload(fileName, blob, { contentType: "image/png", upsert: true });
-      if (uploadErr) {
-        console.error(uploadErr);
+      // Convert dataUrl to blob
+      const blob = await fetch(dataUrl).then((r) => r.blob());
+      const formData = new FormData();
+      formData.append("signature", blob, "signature.png");
+
+      // Use the server-side API route which uses service role key
+      const res = await fetch("/api/profile/inspector-signature", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error("[handleSignatureSave]", err);
         return;
       }
-      const { data: { publicUrl } } = supabase.storage.from("signatures").getPublicUrl(fileName);
-      const publicUrlWithCacheBust = `${publicUrl}?t=${Date.now()}`;
-      await supabase.from("profiles").update({ signature_image_url: publicUrlWithCacheBust }).eq("id", userId);
+
       setShowSignaturePad(false);
       await loadProfile();
     } catch (e) {
-      console.error(e);
+      console.error("[handleSignatureSave]", e);
     }
   };
 
