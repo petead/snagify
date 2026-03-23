@@ -934,7 +934,6 @@ export function DashboardClient({
             </div>
           )}
         </div>
-        </div>
       </div>
 
       <BuyCreditsModal
