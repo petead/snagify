@@ -246,8 +246,12 @@ export function DashboardClient({
 
   return (
     <div
-      className="fixed inset-0 mx-auto flex min-h-0 w-full max-w-[480px] flex-col overflow-hidden bg-[#F8F7F4]"
-      style={{ paddingBottom: 64, fontFamily: "'DM Sans', sans-serif" }}
+      className="fixed inset-0 mx-auto flex min-h-0 w-full max-w-[480px] flex-col bg-[#F8F7F4]"
+      style={{
+        paddingBottom: 64,
+        fontFamily: "'DM Sans', sans-serif",
+        overflow: "hidden",
+      }}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
@@ -308,6 +312,8 @@ export function DashboardClient({
         .stat-card:active {
           transform: scale(0.96);
         }
+
+        [data-pull-scroll]::-webkit-scrollbar { display: none; }
       `}</style>
 
       <div className="flex-shrink-0">
@@ -837,9 +843,9 @@ export function DashboardClient({
           overscrollBehavior: "contain",
           scrollbarWidth: "none",
           msOverflowStyle: "none",
+          WebkitOverflowScrolling: "touch",
         }}
       >
-        <style>{`[data-pull-scroll]::-webkit-scrollbar { display: none; }`}</style>
         <div className="overflow-hidden rounded-2xl border border-[#EEECFF] bg-white">
           {notificationsLoading ? (
             <div className="flex items-center justify-center py-10">
