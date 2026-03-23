@@ -85,11 +85,14 @@ export async function POST(req: NextRequest) {
 
     const { data: allSigs } = await supabase
       .from("signatures")
-      .select("signer_type, signer_name, email")
+      .select("signer_type, signer_name, email, signed_at, refused_at")
       .eq("inspection_id", sig.inspection_id);
 
     const landlordSig = allSigs?.find((s) => s.signer_type === "landlord");
     const tenantSig = allSigs?.find((s) => s.signer_type === "tenant");
+    const landlordExpressed = !!(landlordSig?.signed_at || landlordSig?.refused_at);
+    const tenantExpressed = !!(tenantSig?.signed_at || tenantSig?.refused_at);
+    const allExpressed = landlordExpressed && tenantExpressed;
     const agent = insp?.agent as {
       full_name?: string | null;
       email?: string | null;
@@ -110,7 +113,7 @@ export async function POST(req: NextRequest) {
         } | null
       ) || "Property";
 
-    if (insp?.report_url) {
+    if (allExpressed && insp?.report_url) {
       await sendSignedPdfEmail({
         landlordName: landlordSig?.signer_name || "Landlord",
         landlordEmail: landlordSig?.email || "",
