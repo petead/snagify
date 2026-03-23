@@ -7,6 +7,7 @@ interface Props {
   signerType: 'landlord' | 'tenant'
   signerName: string
   signerEmail: string
+  refuseToken: string | null
   onSuccess: () => void
   onClose: () => void
 }
@@ -15,12 +16,16 @@ type Step = 'sending' | 'otp' | 'pad' | 'done'
 
 export function InPersonSignModal({
   inspectionId, signerType, signerName, signerEmail,
-  onSuccess, onClose
+  refuseToken, onSuccess, onClose
 }: Props) {
   const [step, setStep] = useState<Step>('sending')
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [otpError, setOtpError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showRefuseForm, setShowRefuseForm] = useState(false)
+  const [refuseReason, setRefuseReason] = useState('')
+  const [refuseLoading, setRefuseLoading] = useState(false)
+  const [refuseDone, setRefuseDone] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [hasDrawn, setHasDrawn] = useState(false)
@@ -179,6 +184,26 @@ export function InPersonSignModal({
       setOtpError('Network error — please try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleRefuse() {
+    if (!refuseToken) return
+    setRefuseLoading(true)
+    try {
+      const res = await fetch('/api/signatures/refuse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: refuseToken, reason: refuseReason }),
+      })
+      if (res.ok) {
+        setRefuseDone(true)
+        setTimeout(() => onClose(), 2000)
+      }
+    } catch {
+      // silent fail — user can try again
+    } finally {
+      setRefuseLoading(false)
     }
   }
 
@@ -383,6 +408,82 @@ export function InPersonSignModal({
                 )}
               </button>
             </div>
+
+            {refuseToken && !refuseDone && (
+              <div className="px-5 pb-4 bg-white flex-shrink-0">
+                {!showRefuseForm ? (
+                  <div className="text-center">
+                    <p className="text-[11px] text-gray-400 mb-1">
+                      Do you contest the findings?
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowRefuseForm(true)}
+                      className="text-[12px] font-semibold text-[#EF4444]
+                        underline bg-transparent border-none cursor-pointer"
+                    >
+                      Refuse to sign this report
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-red-50 rounded-2xl p-4">
+                    <p className="text-[13px] font-bold text-[#EF4444] mb-2">
+                      Refuse to sign
+                    </p>
+                    <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
+                      Your refusal will be documented and sent to all parties.
+                      The report remains legally valid.
+                    </p>
+                    <textarea
+                      placeholder="Reason for refusal (optional)..."
+                      value={refuseReason}
+                      onChange={e => setRefuseReason(e.target.value)}
+                      rows={3}
+                      className="w-full rounded-xl border border-red-200 bg-white
+                        px-3 py-2 text-[12px] resize-none outline-none
+                        focus:border-[#EF4444] mb-3"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setShowRefuseForm(false); setRefuseReason('') }}
+                        className="flex-1 py-2.5 rounded-xl bg-gray-100
+                          text-[12px] font-semibold text-gray-500"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleRefuse()}
+                        disabled={refuseLoading}
+                        className="flex-1 py-2.5 rounded-xl bg-[#EF4444]
+                          text-[12px] font-bold text-white
+                          flex items-center justify-center gap-1.5
+                          disabled:opacity-50"
+                      >
+                        {refuseLoading
+                          ? <Loader2 size={14} className="animate-spin" />
+                          : 'Confirm refusal'
+                        }
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {refuseDone && (
+              <div className="px-5 pb-4 bg-white flex-shrink-0">
+                <div className="bg-amber-50 rounded-2xl p-4 text-center">
+                  <p className="text-[13px] font-bold text-amber-700 mb-1">
+                    Refusal recorded
+                  </p>
+                  <p className="text-[11px] text-amber-600">
+                    All parties have been notified.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -42,6 +42,7 @@ type SignatureStatus = {
   sign_url: string | null
   email: string | null
   expires_at: string | null
+  refuse_token?: string | null
 }
 
 function formatOpenedAtLine(dateStr: string): string {
@@ -274,8 +275,9 @@ function SendForSignaturePartySections({
                   const existingSig = signatureStatus.find((s) => s.signer_type === "landlord");
                   if (existingSig?.signed_at) return;
                   if (existingSig && !existingSig.signed_at) {
+                    const currentMode = existingSig.signing_mode === "remote" ? "remote" : "in-person";
                     const confirmed = window.confirm(
-                      `A ${existingSig.signing_mode === "remote" ? "remote" : "in-person"} signature request is already active. Switch to in-person and cancel the previous request?`
+                      `An active ${currentMode} signature request exists. Switch to in-person and cancel the previous request?`
                     );
                     if (!confirmed) return;
                   }
@@ -506,8 +508,9 @@ function SendForSignaturePartySections({
                   const existingSig = signatureStatus.find((s) => s.signer_type === "tenant");
                   if (existingSig?.signed_at) return;
                   if (existingSig && !existingSig.signed_at) {
+                    const currentMode = existingSig.signing_mode === "remote" ? "remote" : "in-person";
                     const confirmed = window.confirm(
-                      `A ${existingSig.signing_mode === "remote" ? "remote" : "in-person"} signature request is already active. Switch to in-person and cancel the previous request?`
+                      `An active ${currentMode} signature request exists. Switch to in-person and cancel the previous request?`
                     );
                     if (!confirmed) return;
                   }
@@ -980,8 +983,9 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
       return;
     }
     if (existingSig && !existingSig.signed_at) {
+      const currentMode = existingSig.signing_mode === "in_person" ? "in-person" : "remote";
       const confirmed = window.confirm(
-        `A ${existingSig.signing_mode === "in_person" ? "in-person" : "remote"} signature request is already active for this party. Switch to remote and cancel the previous request?`
+        `An active ${currentMode} signature request exists for this party. Switch to remote and cancel the previous request?`
       );
       if (!confirmed) return;
     }
@@ -1038,6 +1042,15 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
 
     const handleSign = (signerType: 'landlord' | 'tenant') => {
       const ten = normalizeOne(inspection.tenancies) as TenancyRelation | null;
+      const existingSig = signatureStatus.find((s) => s.signer_type === signerType);
+      if (existingSig?.signed_at) return;
+      if (existingSig && !existingSig.signed_at) {
+        const currentMode = existingSig.signing_mode === "remote" ? "remote" : "in-person";
+        const confirmed = window.confirm(
+          `An active ${currentMode} signature request exists. Switch to in-person and cancel the previous request?`
+        );
+        if (!confirmed) return;
+      }
       setInPersonModal({
         signerType,
         name: signerType === 'landlord' ? (ten?.landlord_name || 'Landlord') : (ten?.tenant_name || 'Tenant'),
@@ -1236,6 +1249,10 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
             signerType={inPersonModal.signerType}
             signerName={inPersonModal.name}
             signerEmail={inPersonModal.email}
+          refuseToken={
+            signatureStatus.find((s) => s.signer_type === inPersonModal.signerType)
+              ?.refuse_token ?? null
+          }
             onSuccess={() => {
               setInPersonModal(null);
               router.refresh();
@@ -2219,6 +2236,10 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
           signerType={inPersonModal.signerType}
           signerName={inPersonModal.name}
           signerEmail={inPersonModal.email}
+          refuseToken={
+            signatureStatus.find((s) => s.signer_type === inPersonModal.signerType)
+              ?.refuse_token ?? null
+          }
           onSuccess={() => {
             setInPersonModal(null);
             router.refresh();

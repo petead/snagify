@@ -74,20 +74,6 @@ export async function POST(request: NextRequest) {
         })
       : "—";
 
-    const signingWindowMs = 7 * 24 * 60 * 60 * 1000;
-    const { data: existingSigRefuse } = await supabaseAdmin
-      .from("signatures")
-      .select("refuse_token, refuse_token_expires_at")
-      .eq("inspection_id", inspectionId)
-      .eq("signer_type", signerType)
-      .maybeSingle();
-
-    const refuseToken =
-      existingSigRefuse?.refuse_token ?? randomUUID();
-    const refuseTokenExpiresAt =
-      existingSigRefuse?.refuse_token_expires_at ??
-      new Date(Date.now() + signingWindowMs).toISOString();
-
     const { data: existingRow } = await supabaseAdmin
       .from("signatures")
       .select("id, signed_at")
@@ -102,6 +88,11 @@ export async function POST(request: NextRequest) {
     if (existingRow?.id) {
       await supabaseAdmin.from("signatures").delete().eq("id", existingRow.id);
     }
+
+    const refuseToken = randomUUID();
+    const refuseTokenExpiresAt = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000
+    ).toISOString();
 
     const { error: dbError } = await supabaseAdmin.from("signatures").insert({
       inspection_id: inspectionId,
