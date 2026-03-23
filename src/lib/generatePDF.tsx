@@ -1020,6 +1020,8 @@ export interface SignatureEntry {
   signed_at?: string | null;
   signature_data?: string | null;
   otp_verified?: boolean;
+  refused_at?: string | null;
+  refused_reason?: string | null;
 }
 
 interface InspectionMeta {
@@ -1896,6 +1898,8 @@ function InspectionReport({
               const tenantImg = sigE?.tenant.data ?? tenantSig?.signature_data ?? null;
               const landlordSignedAt = sigE?.landlord.signedAt ?? landlordSig?.signed_at ?? null;
               const tenantSignedAt = sigE?.tenant.signedAt ?? tenantSig?.signed_at ?? null;
+              const landlordRefusedAt = landlordSig?.refused_at ?? null;
+              const tenantRefusedAt = tenantSig?.refused_at ?? null;
               const sigBoxStyle = {
                 borderWidth: 1,
                 borderStyle: "solid" as const,
@@ -1906,6 +1910,17 @@ function InspectionReport({
                 justifyContent: "center" as const,
                 backgroundColor: "#FAFAFA",
                 marginBottom: 6,
+              };
+              const refusedSigBoxStyle = {
+                borderWidth: 1,
+                borderStyle: "solid" as const,
+                borderColor: "#EF4444",
+                borderRadius: 6,
+                padding: 8,
+                backgroundColor: "#FEF2F2",
+                marginBottom: 6,
+                alignItems: "flex-start" as const,
+                justifyContent: "flex-start" as const,
               };
               return (
                 <>
@@ -1932,8 +1947,35 @@ function InspectionReport({
                     >
                       {tenancy.landlord_name ?? "—"}
                     </Text>
-                    <View style={sigBoxStyle}>
-                      {landlordImg ? (
+                    <View style={landlordRefusedAt ? refusedSigBoxStyle : sigBoxStyle}>
+                      {landlordRefusedAt ? (
+                        <>
+                          <Text style={{ fontSize: 8, fontWeight: "bold", color: "#EF4444" }}>
+                            REFUSED TO SIGN
+                          </Text>
+                          {landlordSig?.refused_reason ? (
+                            <Text
+                              style={{
+                                fontSize: 7,
+                                color: "#DC2626",
+                                marginTop: 3,
+                                fontStyle: "italic",
+                              }}
+                            >
+                              &quot;{landlordSig.refused_reason}&quot;
+                            </Text>
+                          ) : null}
+                          <Text style={{ fontSize: 7, color: "#9B9BA8", marginTop: 3 }}>
+                            {landlordRefusedAt
+                              ? new Date(landlordRefusedAt).toLocaleDateString("en-AE", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })
+                              : ""}
+                          </Text>
+                        </>
+                      ) : landlordImg ? (
                         <Image
                           src={landlordImg}
                           style={{ width: 160, height: 70, objectFit: "contain" }}
@@ -1942,7 +1984,22 @@ function InspectionReport({
                         <Text style={{ fontSize: 10, color: "#9CA3AF" }}>Pending Signature</Text>
                       )}
                     </View>
-                    {landlordSignedAt ? (
+                    {landlordRefusedAt ? (
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <View
+                          style={{
+                            width: 5,
+                            height: 5,
+                            borderRadius: 2.5,
+                            backgroundColor: "#EF4444",
+                            marginRight: 4,
+                          }}
+                        />
+                        <Text style={{ fontSize: 8, color: "#EF4444", fontFamily: "Helvetica-Bold" }}>
+                          ● Refused to sign
+                        </Text>
+                      </View>
+                    ) : landlordSignedAt ? (
                       <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <View
                           style={{
@@ -1996,8 +2053,35 @@ function InspectionReport({
                     >
                       {tenancy.tenant_name ?? "—"}
                     </Text>
-                    <View style={sigBoxStyle}>
-                      {tenantImg ? (
+                    <View style={tenantRefusedAt ? refusedSigBoxStyle : sigBoxStyle}>
+                      {tenantRefusedAt ? (
+                        <>
+                          <Text style={{ fontSize: 8, fontWeight: "bold", color: "#EF4444" }}>
+                            REFUSED TO SIGN
+                          </Text>
+                          {tenantSig?.refused_reason ? (
+                            <Text
+                              style={{
+                                fontSize: 7,
+                                color: "#DC2626",
+                                marginTop: 3,
+                                fontStyle: "italic",
+                              }}
+                            >
+                              &quot;{tenantSig.refused_reason}&quot;
+                            </Text>
+                          ) : null}
+                          <Text style={{ fontSize: 7, color: "#9B9BA8", marginTop: 3 }}>
+                            {tenantRefusedAt
+                              ? new Date(tenantRefusedAt).toLocaleDateString("en-AE", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })
+                              : ""}
+                          </Text>
+                        </>
+                      ) : tenantImg ? (
                         <Image
                           src={tenantImg}
                           style={{ width: 160, height: 70, objectFit: "contain" }}
@@ -2006,7 +2090,22 @@ function InspectionReport({
                         <Text style={{ fontSize: 10, color: "#9CA3AF" }}>Pending Signature</Text>
                       )}
                     </View>
-                    {tenantSignedAt ? (
+                    {tenantRefusedAt ? (
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <View
+                          style={{
+                            width: 5,
+                            height: 5,
+                            borderRadius: 2.5,
+                            backgroundColor: "#EF4444",
+                            marginRight: 4,
+                          }}
+                        />
+                        <Text style={{ fontSize: 8, color: "#EF4444", fontFamily: "Helvetica-Bold" }}>
+                          ● Refused to sign
+                        </Text>
+                      </View>
+                    ) : tenantSignedAt ? (
                       <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <View
                           style={{

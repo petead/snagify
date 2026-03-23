@@ -43,6 +43,8 @@ type SignatureStatus = {
   email: string | null
   expires_at: string | null
   refuse_token?: string | null
+  refused_at?: string | null
+  refused_reason?: string | null
 }
 
 function formatOpenedAtLine(dateStr: string): string {
@@ -62,6 +64,7 @@ function formatOpenedAtLine(dateStr: string): string {
 
 function getRemoteStatus(sig?: SignatureStatus | null) {
   if (!sig) return null;
+  if (sig.refused_at) return null;
   if (sig.signing_mode !== "remote") return null;
   if (sig.signed_at) return null;
   if (sig.opened_at) {
@@ -227,6 +230,28 @@ function SendForSignaturePartySections({
                 — {formatDate(landlordSig.signed_at)}
               </span>
             )}
+          </div>
+        ) : landlordStatusSig?.refused_at ? (
+          <div className="mt-2 rounded-xl bg-[#FEF2F2] px-3 py-2.5 flex items-start gap-2">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="mt-0.5 flex-shrink-0">
+              <circle cx="12" cy="12" r="10" stroke="#EF4444" strokeWidth="1.8" />
+              <path d="M15 9l-6 6M9 9l6 6" stroke="#EF4444" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            <div>
+              <span className="text-[12px] font-bold text-[#EF4444]">Refused to sign</span>
+              {landlordStatusSig.refused_reason && (
+                <p className="text-[11px] text-[#EF4444]/80 mt-0.5 leading-relaxed">
+                  &quot;{landlordStatusSig.refused_reason}&quot;
+                </p>
+              )}
+              <span className="text-[10px] text-gray-400 mt-0.5 block">
+                {new Date(landlordStatusSig.refused_at).toLocaleDateString("en-AE", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+            </div>
           </div>
         ) : (
           <div>
@@ -460,6 +485,28 @@ function SendForSignaturePartySections({
                 — {formatDate(tenantSig.signed_at)}
               </span>
             )}
+          </div>
+        ) : tenantStatusSig?.refused_at ? (
+          <div className="mt-2 rounded-xl bg-[#FEF2F2] px-3 py-2.5 flex items-start gap-2">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="mt-0.5 flex-shrink-0">
+              <circle cx="12" cy="12" r="10" stroke="#EF4444" strokeWidth="1.8" />
+              <path d="M15 9l-6 6M9 9l6 6" stroke="#EF4444" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            <div>
+              <span className="text-[12px] font-bold text-[#EF4444]">Refused to sign</span>
+              {tenantStatusSig.refused_reason && (
+                <p className="text-[11px] text-[#EF4444]/80 mt-0.5 leading-relaxed">
+                  &quot;{tenantStatusSig.refused_reason}&quot;
+                </p>
+              )}
+              <span className="text-[10px] text-gray-400 mt-0.5 block">
+                {new Date(tenantStatusSig.refused_at).toLocaleDateString("en-AE", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+            </div>
           </div>
         ) : (
           <div>

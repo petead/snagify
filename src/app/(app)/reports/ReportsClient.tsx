@@ -16,6 +16,7 @@ type ReportRow = {
   type: string | null;
   status: string | null;
   created_at: string;
+  signed_at?: string | null;
   report_url?: string | null;
   properties?: unknown;
   tenancies?: unknown;
@@ -51,8 +52,9 @@ function tenantInitials(name: string | null | undefined): string {
 
 function isSigned(report: ReportRow): boolean {
   // Fully signed = status is 'signed' AND both landlord + tenant have signed
-  if (report.status === "signed") return true;
-  
+  if (report.status === "signed" || report.signed_at) return true;
+  if (report.status === "disputed" || report.status === "expired") return true;
+
   // Also check signatures directly: BOTH landlord AND tenant must have signed_at
   const sigs = report.signatures ?? [];
   const landlordSig = sigs.find(s => s.signer_type === 'landlord');
@@ -69,7 +71,7 @@ function formatDate(dateStr: string): string {
   });
 }
 
-const TABS = ["All", "Pending", "Signed"] as const;
+const TABS = ["All", "Pending", "Signed", "Disputed"] as const;
 type Tab = (typeof TABS)[number];
 
 export function ReportsClient({ initialReports, fullName, userEmail }: ReportsClientProps) {
@@ -108,10 +110,14 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
     (r) => r.status === "completed" && !isSigned(r)
   ).length;
   const signedCount = reports.filter((r) => isSigned(r)).length;
+  const disputedCount = reports.filter(
+    (r) => r.status === "disputed" || r.status === "expired"
+  ).length;
 
   const tabCount = (tab: Tab) => {
     if (tab === "All") return reports.length;
     if (tab === "Pending") return pendingCount;
+    if (tab === "Disputed") return disputedCount;
     return signedCount;
   };
 
@@ -122,7 +128,9 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
     const matchesTab =
       activeTab === "All" ||
       (activeTab === "Pending" && r.status === "completed" && !signed) ||
-      (activeTab === "Signed" && signed);
+      (activeTab === "Signed" && signed) ||
+      (activeTab === "Disputed" &&
+        (r.status === "disputed" || r.status === "expired"));
     const q = search.toLowerCase();
     const matchesSearch =
       !q ||

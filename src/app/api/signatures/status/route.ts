@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   const { data } = await supabaseAdmin
     .from('signatures')
-    .select('signer_type, signed_at, opened_at, signing_mode, sign_url, email, expires_at, refuse_token')
+    .select('signer_type, signed_at, opened_at, signing_mode, sign_url, email, expires_at, refuse_token, refused_at, refused_reason')
     .eq('inspection_id', inspectionId)
 
   return NextResponse.json({ signatures: data || [] })

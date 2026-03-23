@@ -88,7 +88,9 @@ function getInspectionState(inspection: {
   status?: string | null;
   report_url?: string | null;
   signed_at?: string | null;
-}): "draft" | "to_sign" | "signed" {
+}): "draft" | "to_sign" | "signed" | "disputed" | "expired" {
+  if (inspection.status === "disputed") return "disputed";
+  if (inspection.status === "expired") return "expired";
   if (inspection.signed_at || inspection.status === "signed") return "signed";
   if (inspection.report_url) return "to_sign";
   return "draft";
@@ -97,6 +99,7 @@ function getInspectionState(inspection: {
 /** Same rules as dashboard / reports — fully signed inspection */
 function inspectionFullySignedGroup(inspection: InspectionInGroup): boolean {
   if (inspection.status === "signed" || inspection.signed_at) return true;
+  if (inspection.status === "disputed" || inspection.status === "expired") return true;
   const sigs = inspection.signatures ?? [];
   const landlordSig = sigs.find((s) => s.signer_type === "landlord");
   const tenantSig = sigs.find((s) => s.signer_type === "tenant");
@@ -361,6 +364,33 @@ function InspectionRow({
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
               {getStatusLabel("in_progress")}
+            </button>
+          ) : state === "disputed" || state === "expired" ? (
+            <button
+              type="button"
+              disabled={pdfLoading}
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleDownloadPdf();
+              }}
+              className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-[13px] font-bold text-white disabled:opacity-60"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              {pdfLoading ? "…" : "PDF"}
             </button>
           ) : isSigned ? (
             <button

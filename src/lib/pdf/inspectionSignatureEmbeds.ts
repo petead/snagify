@@ -6,6 +6,8 @@ export type SignatureRow = {
   signed_at?: string | null;
   signature_data?: string | null;
   otp_verified?: boolean | null;
+  refused_at?: string | null;
+  refused_reason?: string | null;
 };
 
 /** Which PDF signature column the logged-in agent (inspection creator) maps to */

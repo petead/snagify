@@ -473,7 +473,9 @@ export async function buildPdfAndUpload(
     if (supabaseAdmin) {
       const { data: sigData, error: sigFetchErr } = await supabaseAdmin
         .from("signatures")
-        .select("signer_type, signer_name, signed_at, signature_data, otp_verified")
+        .select(
+          "signer_type, signer_name, signed_at, signature_data, otp_verified, refused_at, refused_reason"
+        )
         .eq("inspection_id", inspectionId);
       if (sigFetchErr) {
         console.error("[generate-pdf] Signatures fetch error:", sigFetchErr);
@@ -582,6 +584,8 @@ export async function buildPdfAndUpload(
         signed_at: s.signed_at ?? null,
         signature_data: s.signature_data ?? null,
         otp_verified: s.otp_verified ?? false,
+        refused_at: s.refused_at ?? null,
+        refused_reason: s.refused_reason ?? null,
       })),
       signatureEmbeds,
       creatorPdfRole,
@@ -682,6 +686,8 @@ export async function buildPdfAndUpload(
           signer_name: s.signer_name ?? undefined,
           signature_data: s.signature_data ?? undefined,
           signed_at: s.signed_at ?? null,
+          refused_at: s.refused_at ?? null,
+          refused_reason: s.refused_reason ?? null,
         })),
         signatureEmbeds: meta.signatureEmbeds,
         creatorPdfRole: meta.creatorPdfRole,
