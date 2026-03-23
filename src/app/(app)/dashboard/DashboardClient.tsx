@@ -300,6 +300,7 @@ export function DashboardClient({
         }
 
         .scroll-hide::-webkit-scrollbar { display: none; }
+        [data-pull-scroll]::-webkit-scrollbar { display: none; }
 
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(16px); }
@@ -848,7 +849,12 @@ export function DashboardClient({
         ref={containerRef}
         data-pull-scroll
         className="min-h-0 flex-1 overflow-y-auto scroll-hide px-4 pb-4"
-        style={{ overscrollBehavior: "contain", position: "relative" }}
+        style={{
+          overscrollBehavior: "contain",
+          position: "relative",
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+        }}
       >
         <div
           style={{
