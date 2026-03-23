@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, type TouchEvent } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -12,6 +12,8 @@ import { OnboardingTutorial } from "@/components/onboarding/OnboardingTutorial";
 import { trackAction } from "@/lib/breadcrumb";
 import { createClient } from "@/lib/supabase/client";
 import { planSlugForBuyCredits, pricePerCreditForBuy } from "@/lib/buyCreditsPlan";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 type DashboardNotificationRow = {
   id: string;
   title: string;
@@ -143,12 +145,6 @@ export function DashboardClient({
   const [showOnboarding, setShowOnboarding] = useState(false);
   const router = useRouter();
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const touchStartY = useRef<number | null>(null);
-  const pullEligibleRef = useRef(false);
-  const [isPulling, setIsPulling] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
   useEffect(() => {
     setLoaded(true);
     trackAction("Viewed Dashboard");
@@ -208,36 +204,14 @@ export function DashboardClient({
     [supabase]
   );
 
-  function handleTouchStart(e: TouchEvent<HTMLDivElement>) {
-    pullEligibleRef.current = false;
-    if (scrollRef.current && scrollRef.current.scrollTop === 0) {
-      touchStartY.current = e.touches[0].clientY;
-    } else {
-      touchStartY.current = null;
-    }
-  }
-
-  function handleTouchMove(e: TouchEvent<HTMLDivElement>) {
-    if (touchStartY.current === null) return;
-    const delta = e.touches[0].clientY - touchStartY.current;
-    if (delta > 40 && scrollRef.current?.scrollTop === 0) {
-      pullEligibleRef.current = true;
-      setIsPulling(true);
-    }
-  }
-
-  async function handleTouchEnd() {
-    touchStartY.current = null;
-    if (!pullEligibleRef.current) {
-      setIsPulling(false);
-      return;
-    }
-    pullEligibleRef.current = false;
-    setIsRefreshing(true);
+  const handleRefresh = useCallback(async () => {
     await fetchNotifications({ silent: true });
-    setIsRefreshing(false);
-    setIsPulling(false);
-  }
+    router.refresh();
+  }, [fetchNotifications, router]);
+
+  const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  });
 
   useEffect(() => {
     void fetchNotifications();
@@ -283,13 +257,12 @@ export function DashboardClient({
 
   return (
     <div
-      className="fixed inset-0 flex min-h-0 flex-col overflow-hidden bg-[#F8F7F4]"
+      className="mx-auto flex h-screen w-full max-w-[480px] flex-col overflow-hidden bg-[#F8F7F4]"
       style={{
         paddingBottom: 64,
         fontFamily: "'DM Sans', sans-serif",
       }}
     >
-      <div className="mx-auto flex min-h-0 w-full max-w-[480px] flex-1 flex-col">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -351,7 +324,7 @@ export function DashboardClient({
         }
       `}</style>
 
-      <div className="flex-shrink-0 bg-[#F8F7F4]">
+      <div className="flex-shrink-0">
       {/* Header */}
       <div
         className={loaded ? "fade-up" : ""}
@@ -872,30 +845,40 @@ export function DashboardClient({
       </div>
 
       <div
+        ref={containerRef}
+        data-pull-scroll
         className="min-h-0 flex-1 overflow-y-auto scroll-hide px-4 pb-4"
-        ref={scrollRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={() => void handleTouchEnd()}
+        style={{ overscrollBehavior: "contain", position: "relative" }}
       >
-        {isPulling && (
-          <div className="flex items-center justify-center py-3">
-            <div
-              className={`flex items-center gap-2 text-[12px] font-semibold text-[#9A88FD] transition-opacity ${
-                isRefreshing ? "opacity-100" : "opacity-60"
-              }`}
-            >
-              <div
-                className={`h-4 w-4 rounded-full border-2 border-[#9A88FD] border-t-transparent ${
-                  isRefreshing ? "animate-spin" : ""
-                }`}
-              />
-              {isRefreshing ? "Refreshing..." : "Release to refresh"}
-            </div>
-          </div>
-        )}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: pullDistance,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            pointerEvents: "none",
+            zIndex: 10,
+          }}
+        >
+          <PullToRefreshIndicator
+            pullDistance={pullDistance}
+            isRefreshing={isRefreshing}
+            isTriggered={isTriggered}
+          />
+        </div>
 
-        <div className="overflow-hidden rounded-2xl border border-[#EEECFF] bg-white">
+        <div
+          className="overflow-hidden rounded-2xl border border-[#EEECFF] bg-white"
+          style={{
+            transform: `translateY(${pullDistance}px)`,
+            transition: isRefreshing ? "transform 0.25s ease" : "none",
+          }}
+        >
           {notificationsLoading ? (
             <div className="flex items-center justify-center py-10">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#9A88FD] border-t-transparent" />
@@ -951,7 +934,7 @@ export function DashboardClient({
             </div>
           )}
         </div>
-      </div>
+        </div>
       </div>
 
       <BuyCreditsModal

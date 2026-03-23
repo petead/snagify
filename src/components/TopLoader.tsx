@@ -54,7 +54,9 @@ export function TopLoader() {
     };
 
     const onStart = (e: TouchEvent | MouseEvent) => {
-      if (isInternalLink(e.target)) startBar();
+      const t = e.target;
+      if (t instanceof Element && t.closest("[data-pull-scroll]")) return;
+      if (isInternalLink(t)) startBar();
     };
 
     // touchstart = instantane sur mobile (pas de delai 300ms)
