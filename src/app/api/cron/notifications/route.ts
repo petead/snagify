@@ -143,6 +143,7 @@ async function sendReminder24h() {
         id, email, signer_name, signer_type, sign_url, refuse_token,
         inspection_id, expires_at,
         inspections:inspection_id (
+          agent_id,
           type, created_at,
           properties:property_id (building_name, unit_number, location),
           agent:agent_id (
@@ -161,7 +162,17 @@ async function sendReminder24h() {
     for (const sig of sigs ?? []) {
       if (!sig.email || !sig.sign_url) continue;
 
-      const insp = Array.isArray(sig.inspections) ? sig.inspections[0] : sig.inspections;
+      const insp = (Array.isArray(sig.inspections) ? sig.inspections[0] : sig.inspections) as {
+        agent_id?: string | null
+        type?: string
+        created_at?: string
+        properties?:
+          | { building_name?: string; unit_number?: string; location?: string }
+          | { building_name?: string; unit_number?: string; location?: string }[]
+        agent?:
+          | { company?: { name?: string; logo_url?: string; primary_color?: string } | { name?: string; logo_url?: string; primary_color?: string }[] }
+          | { company?: { name?: string; logo_url?: string; primary_color?: string } | { name?: string; logo_url?: string; primary_color?: string }[] }[]
+      } | null
       const prop = Array.isArray(insp?.properties) ? insp.properties[0] : insp?.properties;
       const agentRaw = Array.isArray(insp?.agent) ? insp.agent[0] : insp?.agent;
       const company = Array.isArray(agentRaw?.company) ? agentRaw.company[0] : agentRaw?.company;
@@ -292,6 +303,7 @@ async function sendReminder72h() {
         id, email, signer_name, signer_type, sign_url, refuse_token,
         inspection_id, expires_at,
         inspections:inspection_id (
+          agent_id,
           type, created_at,
           properties:property_id (building_name, unit_number, location),
           agent:agent_id (
@@ -311,7 +323,17 @@ async function sendReminder72h() {
     for (const sig of sigs ?? []) {
       if (!sig.email || !sig.sign_url) continue;
 
-      const insp = Array.isArray(sig.inspections) ? sig.inspections[0] : sig.inspections;
+      const insp = (Array.isArray(sig.inspections) ? sig.inspections[0] : sig.inspections) as {
+        agent_id?: string | null
+        type?: string
+        created_at?: string
+        properties?:
+          | { building_name?: string; unit_number?: string; location?: string }
+          | { building_name?: string; unit_number?: string; location?: string }[]
+        agent?:
+          | { company?: { name?: string; logo_url?: string; primary_color?: string } | { name?: string; logo_url?: string; primary_color?: string }[] }
+          | { company?: { name?: string; logo_url?: string; primary_color?: string } | { name?: string; logo_url?: string; primary_color?: string }[] }[]
+      } | null
       const prop = Array.isArray(insp?.properties) ? insp.properties[0] : insp?.properties;
       const agentRaw = Array.isArray(insp?.agent) ? insp.agent[0] : insp?.agent;
       const company = Array.isArray(agentRaw?.company) ? agentRaw.company[0] : agentRaw?.company;
