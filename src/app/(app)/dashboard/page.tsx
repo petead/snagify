@@ -36,7 +36,7 @@ export default async function DashboardPage() {
       if (accountType === "pro" && companyId) {
         const { data: company } = await supabase
           .from("companies")
-          .select("plan, stripe_subscription_id")
+          .select("plan, stripe_subscription_id, billing_period")
           .eq("id", companyId)
           .single();
         const plan = (company as { plan?: string } | null)?.plan;

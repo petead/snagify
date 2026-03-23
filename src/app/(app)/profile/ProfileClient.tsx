@@ -44,6 +44,7 @@ export type CompanyData = {
   name: string;
   stripe_subscription_id?: string | null;
   billing_cycle_reset_at?: string | null;
+  billing_period?: string | null;
 } | null;
 
 interface ProfileClientProps {

@@ -54,6 +54,8 @@ export default async function ProfilePage() {
     max_users: (company as { max_users?: number }).max_users ?? 1,
     name: (company as { name?: string }).name ?? "",
     stripe_subscription_id: (company as { stripe_subscription_id?: string | null }).stripe_subscription_id ?? null,
+    billing_cycle_reset_at: (company as { billing_cycle_reset_at?: string | null }).billing_cycle_reset_at ?? null,
+    billing_period: (company as { billing_period?: string | null }).billing_period ?? null,
   } : null;
 
   return (
