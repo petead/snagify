@@ -1,20 +1,50 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
-import { PenLine, AlertTriangle } from "lucide-react";
+import { PenLine, AlertTriangle, Bell, Check } from "lucide-react";
 import { useCredits } from "@/hooks/useCredits";
 import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
 import { OnboardingTutorial } from "@/components/onboarding/OnboardingTutorial";
 import { trackAction } from "@/lib/breadcrumb";
-import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 import { createClient } from "@/lib/supabase/client";
 import { planSlugForBuyCredits, pricePerCreditForBuy } from "@/lib/buyCreditsPlan";
-import { DashboardNotifications } from "@/components/notifications/DashboardNotifications";
+type DashboardNotificationRow = {
+  id: string;
+  title: string;
+  body: string;
+  url: string | null;
+  type: string;
+  read_at: string | null;
+  created_at: string;
+};
+
+const NOTIF_TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string }> = {
+  signature: { icon: "✍️", color: "#9A88FD", bg: "#EDE9FF" },
+  lease: { icon: "🔑", color: "#F59E0B", bg: "#FEF3C7" },
+  expired: { icon: "🔒", color: "#6B7280", bg: "#F3F4F6" },
+  disputed: { icon: "⚠️", color: "#EF4444", bg: "#FEF2F2" },
+  report: { icon: "📝", color: "#16A34A", bg: "#DCFCE7" },
+  general: { icon: "🔔", color: "#9A88FD", bg: "#EDE9FF" },
+};
+
+function notificationTimeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString("en-AE", {
+    day: "numeric",
+    month: "short",
+  });
+}
 
 type InspectionRow = {
   id: string;
@@ -67,11 +97,6 @@ interface DashboardClientProps {
   alerts?: AlertItem[];
 }
 
-function first<T>(x: T | T[] | null | undefined): T | null {
-  if (x == null) return null;
-  return Array.isArray(x) ? (x[0] ?? null) : x;
-}
-
 function getInitials(fullName: string | null, email: string | null): string {
   if (fullName?.trim()) {
     const parts = fullName.trim().split(/\s+/);
@@ -87,11 +112,6 @@ function getGreeting(): string {
   if (h < 12) return "Good morning";
   if (h < 18) return "Good afternoon";
   return "Good evening";
-}
-
-function formatCardDate(dateStr: string | null): string {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 function normalizeProperties(rows: PropertyRow[]): PropertyRow[] {
@@ -143,15 +163,6 @@ export function DashboardClient({
     setProperties(normalizeProperties(initialProperties));
   }, [initialProperties]);
 
-  const handleRefresh = useCallback(async () => {
-    await refreshCredits();
-    router.refresh();
-  }, [refreshCredits, router]);
-
-  const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
-    onRefresh: handleRefresh,
-  });
-
   const allInspections = properties?.flatMap((p) => p.inspections ?? []) ?? [];
   const totalProperties = properties.length;
   const totalInspections = allInspections.length;
@@ -173,51 +184,71 @@ export function DashboardClient({
     await supabase.from("profiles").update({ tour_completed: true }).eq("id", userId);
   };
 
+  const [notifications, setNotifications] = useState<DashboardNotificationRow[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(true);
+
+  const fetchNotifications = useCallback(async () => {
+    setNotificationsLoading(true);
+    const { data } = await supabase
+      .from("notifications")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setNotifications((data as DashboardNotificationRow[] | null) ?? []);
+    setNotificationsLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    void fetchNotifications();
+
+    const channel = supabase
+      .channel("dashboard-notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+        },
+        () => void fetchNotifications()
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [supabase, fetchNotifications]);
+
+  async function markNotificationAsRead(id: string) {
+    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
+    const nowIso = new Date().toISOString();
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: nowIso } : n)));
+  }
+
+  async function markAllNotificationsAsRead() {
+    const unreadIds = notifications.filter((n) => !n.read_at).map((n) => n.id);
+    if (!unreadIds.length) return;
+    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).in("id", unreadIds);
+    const nowIso = new Date().toISOString();
+    setNotifications((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? nowIso })));
+  }
+
+  function handleNotificationRowClick(notif: DashboardNotificationRow) {
+    void markNotificationAsRead(notif.id);
+    if (notif.url) window.location.href = notif.url;
+  }
+
+  const notificationsUnreadCount = notifications.filter((n) => !n.read_at).length;
+
   return (
     <div
-      ref={containerRef}
-      data-pull-scroll
-      className="scroll-hide"
+      className="fixed inset-0 flex min-h-0 flex-col overflow-hidden bg-[#F8F7F4]"
       style={{
-        maxWidth: 480,
-        margin: "0 auto",
-        height: "calc(100dvh - 4rem)",
-        maxHeight: "calc(100dvh - 4rem)",
-        overflowY: "auto",
-        background: "#F8F7F4",
+        paddingBottom: 64,
         fontFamily: "'DM Sans', sans-serif",
-        position: "relative",
-        paddingBottom: 24,
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: pullDistance,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "hidden",
-          pointerEvents: "none",
-          zIndex: 10,
-        }}
-      >
-        <PullToRefreshIndicator
-          pullDistance={pullDistance}
-          isRefreshing={isRefreshing}
-          isTriggered={isTriggered}
-        />
-      </div>
-
-      <div
-        style={{
-          transform: `translateY(${pullDistance}px)`,
-          transition: isRefreshing ? "transform 0.25s ease" : "none",
-        }}
-      >
+      <div className="mx-auto flex min-h-0 w-full max-w-[480px] flex-1 flex-col">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Poppins:wght@500;600;700;800&display=swap');
 
@@ -279,6 +310,7 @@ export function DashboardClient({
         }
       `}</style>
 
+      <div className="flex-shrink-0 bg-[#F8F7F4]">
       {/* Header */}
       <div
         className={loaded ? "fade-up" : ""}
@@ -775,8 +807,89 @@ export function DashboardClient({
         </Link>
       </div>
 
-      <DashboardNotifications />
+      <div className="flex items-center justify-between px-4 pb-2 pt-4">
+        <div className="flex items-center gap-2">
+          <Bell size={16} className="text-[#9A88FD]" />
+          <span className="text-[15px] font-bold text-[#1A1A2E]">Notifications</span>
+          {notificationsUnreadCount > 0 && (
+            <span className="rounded-full bg-[#9A88FD] px-2 py-0.5 text-[10px] font-bold leading-snug text-white">
+              {notificationsUnreadCount} new
+            </span>
+          )}
+        </div>
+        {notificationsUnreadCount > 0 && (
+          <button
+            type="button"
+            onClick={() => void markAllNotificationsAsRead()}
+            className="flex items-center gap-1 text-[12px] font-semibold text-[#9A88FD]"
+          >
+            <Check size={11} />
+            Mark all read
+          </button>
+        )}
       </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto scroll-hide px-4 pb-4">
+        <div className="overflow-hidden rounded-2xl border border-[#EEECFF] bg-white">
+          {notificationsLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#9A88FD] border-t-transparent" />
+            </div>
+          ) : notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EDE9FF]">
+                <Bell size={20} className="text-[#9A88FD]" />
+              </div>
+              <p className="mb-1 text-[13px] font-semibold text-[#1A1A2E]">No notifications yet</p>
+              <p className="text-[12px] leading-relaxed text-gray-400">
+                Signature updates, lease alerts and reminders will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-[#F3F3F8]">
+              {notifications.map((notif) => {
+                const config = NOTIF_TYPE_CONFIG[notif.type] ?? NOTIF_TYPE_CONFIG.general;
+                const isUnread = !notif.read_at;
+                return (
+                  <button
+                    key={notif.id}
+                    type="button"
+                    onClick={() => handleNotificationRowClick(notif)}
+                    className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors active:bg-[#F8F7F4]"
+                    style={{ background: isUnread ? "#FAFAFA" : "white" }}
+                  >
+                    <div
+                      className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-[15px]"
+                      style={{ background: config.bg }}
+                    >
+                      {config.icon}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <span
+                          className={`text-[13px] leading-snug ${
+                            isUnread ? "font-bold text-[#1A1A2E]" : "font-semibold text-[#374151]"
+                          }`}
+                        >
+                          {notif.title}
+                        </span>
+                        <span className="mt-0.5 flex-shrink-0 whitespace-nowrap text-[10px] text-gray-400">
+                          {notificationTimeAgo(notif.created_at)}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-gray-500">{notif.body}</p>
+                    </div>
+                    {isUnread && <div className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-[#9A88FD]" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+      </div>
+
       <BuyCreditsModal
         isOpen={showBuyCredits}
         onClose={() => setShowBuyCredits(false)}
