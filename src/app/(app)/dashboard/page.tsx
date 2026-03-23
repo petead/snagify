@@ -219,37 +219,6 @@ export default async function DashboardPage() {
     }
   }
 
-  // Recent inspections with rooms/photos for dashboard cards
-  type RecentInspection = {
-    id: string;
-    type: string | null;
-    status: string | null;
-    created_at: string | null;
-    completed_at: string | null;
-    properties?: unknown;
-    tenancies?: unknown;
-    signatures?: { signer_type: string; otp_verified: boolean; signed_at: string | null }[];
-    rooms?: { id: string; photos?: { id: string }[] }[];
-  };
-  let recentInspections: RecentInspection[] = [];
-  if (user) {
-    const { data: recent } = await supabase
-      .from("inspections")
-      .select(
-        `
-        id, type, status, created_at, completed_at,
-        properties (building_name, unit_number),
-        tenancies (tenant_name),
-        signatures (signer_type, otp_verified, signed_at),
-        rooms (id, photos (id))
-      `
-      )
-      .eq("agent_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(10);
-    recentInspections = (recent ?? []) as RecentInspection[];
-  }
-
   return (
     <main className="min-h-screen" style={{ background: "#F8F7F4" }}>
       <DashboardClient
@@ -264,7 +233,6 @@ export default async function DashboardPage() {
         stripeSubscriptionId={stripeSubscriptionId}
         properties={propertiesData}
         alerts={alerts}
-        recentInspections={recentInspections}
       />
     </main>
   );
