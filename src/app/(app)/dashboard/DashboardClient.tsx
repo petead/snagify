@@ -12,8 +12,6 @@ import { OnboardingTutorial } from "@/components/onboarding/OnboardingTutorial";
 import { trackAction } from "@/lib/breadcrumb";
 import { createClient } from "@/lib/supabase/client";
 import { planSlugForBuyCredits, pricePerCreditForBuy } from "@/lib/buyCreditsPlan";
-import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 type DashboardNotificationRow = {
   id: string;
   title: string;
@@ -203,15 +201,6 @@ export function DashboardClient({
     },
     [supabase]
   );
-
-  const handleRefresh = useCallback(async () => {
-    await fetchNotifications({ silent: true });
-    router.refresh();
-  }, [fetchNotifications, router]);
-
-  const { pullDistance, isRefreshing, isTriggered, containerRef } = usePullToRefresh({
-    onRefresh: handleRefresh,
-  });
 
   useEffect(() => {
     void fetchNotifications();
@@ -846,45 +835,15 @@ export function DashboardClient({
       </div>
 
       <div
-        ref={containerRef}
         data-pull-scroll
-        className="min-h-0 flex-1 overflow-y-auto scroll-hide px-4 pb-4"
+        className="min-h-0 flex-1 overflow-y-auto px-4 pb-4"
         style={{
           overscrollBehavior: "contain",
-          position: "relative",
           scrollbarWidth: "none",
           msOverflowStyle: "none",
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: pullDistance,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-            pointerEvents: "none",
-            zIndex: 10,
-          }}
-        >
-          <PullToRefreshIndicator
-            pullDistance={pullDistance}
-            isRefreshing={isRefreshing}
-            isTriggered={isTriggered}
-          />
-        </div>
-
-        <div
-          className="overflow-hidden rounded-2xl border border-[#EEECFF] bg-white"
-          style={{
-            transform: `translateY(${pullDistance}px)`,
-            transition: isRefreshing ? "transform 0.25s ease" : "none",
-          }}
-        >
+        <div className="overflow-hidden rounded-2xl border border-[#EEECFF] bg-white">
           {notificationsLoading ? (
             <div className="flex items-center justify-center py-10">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#9A88FD] border-t-transparent" />
