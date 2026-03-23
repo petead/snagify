@@ -26,7 +26,7 @@ export default async function ReportPage({
         id, name, condition, order_index,
         photos (id, url, ai_analysis, damage_tags, notes, checkin_photo_id)
       ),
-      signatures (signer_type, otp_verified, signed_at, signature_data)
+      signatures (signer_type, otp_verified, signed_at, signature_data, refused_at, refused_reason)
     `
     )
     .eq("id", id)
