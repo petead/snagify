@@ -31,7 +31,7 @@ export default async function ReportsPage() {
     `
     )
     .eq("agent_id", user.id)
-    .in("status", ["completed", "signed", "in_progress"])
+    .in("status", ["completed", "signed", "in_progress", "disputed", "expired"])
     .order("created_at", { ascending: false });
 
   return (
