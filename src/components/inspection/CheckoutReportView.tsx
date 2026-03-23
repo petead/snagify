@@ -46,6 +46,8 @@ interface Props {
   signatures?: Array<{
     signer_type: string
     signed_at?: string | null
+    refused_at?: string | null
+    refused_reason?: string | null
   }>
 }
 
@@ -95,6 +97,9 @@ export function CheckoutReportView({
 
 
   const isSigned = inspection.signed_at || inspection.status === 'signed'
+  const isDisputed = inspection.status === 'disputed'
+  const isExpired = inspection.status === 'expired'
+  const isClosed = isSigned || isDisputed || isExpired
   const property = inspection.property
 
   return (
@@ -143,12 +148,34 @@ export function CheckoutReportView({
           className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 ${
             isSigned
               ? 'bg-[#16A34A]/20 border border-[#16A34A]/30'
-              : 'bg-[#FEF9C3] border border-[#D97706]/20'
+              : isDisputed || isExpired
+                ? 'bg-white/10 border border-white/20'
+                : 'bg-[#FEF9C3] border border-[#D97706]/20'
           }`}
         >
-          <div className={`w-1.5 h-1.5 rounded-full ${isSigned ? 'bg-green-400' : 'bg-[#D97706]'}`} />
-          <span className={`text-[12px] font-bold ${isSigned ? 'text-green-300' : 'text-[#B45309]'}`}>
-            {isSigned ? '✓ Fully Signed' : 'Awaiting Signatures'}
+          <div
+            className={`w-1.5 h-1.5 rounded-full ${
+              isSigned ? 'bg-green-400' : isDisputed || isExpired ? 'bg-white/50' : 'bg-[#D97706]'
+            }`}
+          />
+          <span
+            className={`text-[12px] font-bold ${
+              isSigned
+                ? 'text-green-300'
+                : isDisputed
+                  ? 'text-white/70'
+                  : isExpired
+                    ? 'text-white/50'
+                    : 'text-[#B45309]'
+            }`}
+          >
+            {isSigned
+              ? '✓ Fully Signed'
+              : isDisputed
+                ? '⚠ Disputed'
+                : isExpired
+                  ? '🔒 Expired'
+                  : 'Awaiting Signatures'}
           </span>
         </div>
       </div>
@@ -718,15 +745,24 @@ export function CheckoutReportView({
               },
             ].map(({ label, name, sig }) => {
               const isSigned = !!sig?.signed_at
+              const isRefused = !!sig?.refused_at
+              const refusedReason = sig?.refused_reason
+              const refusedAt = sig?.refused_at
               const initials = name?.split(' ').map((n: string) => n[0])
                 .slice(0, 2).join('') || label.slice(0,2).toUpperCase()
 
               return (
                 <div key={label} className="flex items-center gap-3 px-4 py-3.5">
                   {/* Avatar */}
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold flex-shrink-0 ${
-                    isSigned ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#EDE9FF] text-[#9A88FD]'
-                  }`}>
+                  <div
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold flex-shrink-0 ${
+                      isSigned
+                        ? 'bg-[#DCFCE7] text-[#16A34A]'
+                        : isRefused
+                          ? 'bg-[#FEF2F2] text-[#EF4444]'
+                          : 'bg-[#EDE9FF] text-[#9A88FD]'
+                    }`}
+                  >
                     {isSigned ? (
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                         <path
@@ -737,7 +773,19 @@ export function CheckoutReportView({
                           strokeLinejoin="round"
                         />
                       </svg>
-                    ) : initials}
+                    ) : isRefused ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="#EF4444" strokeWidth="2" />
+                        <path
+                          d="M15 9l-6 6M9 9l6 6"
+                          stroke="#EF4444"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    ) : (
+                      initials
+                    )}
                   </div>
 
                   {/* Name + date/pending */}
@@ -745,23 +793,38 @@ export function CheckoutReportView({
                     <div className="text-[13px] font-semibold text-[#1A1A2E] truncate">
                       {name || label}
                     </div>
-                    <div className="text-[11px] text-[#9B9BA8] mt-0.5">
+                    <div
+                      className={`text-[11px] mt-0.5 ${isRefused ? 'text-[#EF4444]' : 'text-[#9B9BA8]'}`}
+                    >
                       {isSigned && sig?.signed_at
                         ? `Signed on ${new Date(sig.signed_at).toLocaleDateString('en-AE', {
                             day: 'numeric', month: 'long', year: 'numeric'
                           })}`
-                        : 'Pending signature'
-                      }
+                        : isRefused
+                          ? `Refused to sign${refusedReason ? ` — "${refusedReason}"` : ''}${
+                              refusedAt
+                                ? ` · ${new Date(refusedAt).toLocaleDateString('en-AE', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                  })}`
+                                : ''
+                            }`
+                          : 'Pending signature'}
                     </div>
                   </div>
 
                   {/* Badge */}
-                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
-                    isSigned
-                      ? 'bg-[#DCFCE7] text-[#16A34A]'
-                      : 'bg-[#F3F3F8] text-[#9B9BA8]'
-                  }`}>
-                    {isSigned ? 'Signed' : 'Pending'}
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
+                      isSigned
+                        ? 'bg-[#DCFCE7] text-[#16A34A]'
+                        : isRefused
+                          ? 'bg-[#FEF2F2] text-[#EF4444]'
+                          : 'bg-[#F3F3F8] text-[#9B9BA8]'
+                    }`}
+                  >
+                    {isSigned ? 'Signed' : isRefused ? 'Refused' : 'Pending'}
                   </span>
                 </div>
               )
