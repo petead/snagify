@@ -58,7 +58,7 @@ export default async function ProfilePage() {
 
   return (
     <main className="min-h-screen" style={{ background: "#F8F7F4" }}>
-      <Suspense fallback={<div style={{ padding: 24 }}>Loading...</div>}>
+      <Suspense fallback={<div style={{ background: "#F8F7F4", minHeight: "100vh" }} />}>
         <ProfileClient
           userId={user.id}
           userEmail={user.email ?? null}
