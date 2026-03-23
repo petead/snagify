@@ -489,6 +489,7 @@ async function processExpiredSignatures() {
     }
 
     for (const [inspectionId, inspSigs] of Array.from(byInspection.entries())) {
+      if (!inspSigs?.length) continue
       const firstSig = inspSigs[0];
       const insp = Array.isArray(firstSig.inspections)
         ? firstSig.inspections[0]
