@@ -220,7 +220,23 @@ export function BuyCreditsModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-lg leading-none text-white/60 transition-colors hover:text-white"
+                style={{
+                  position: "absolute",
+                  right: 16,
+                  top: 16,
+                  zIndex: 50,
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  background: "rgba(255,255,255,0.15)",
+                  border: "1.5px solid rgba(255,255,255,0.2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  color: "white",
+                  fontSize: 16,
+                }}
                 aria-label="Close"
               >
                 ✕

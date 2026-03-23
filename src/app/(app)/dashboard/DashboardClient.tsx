@@ -659,8 +659,8 @@ export function DashboardClient({
           role="button"
           tabIndex={0}
           className="stat-card relative"
-          onClick={() => accountType === "individual" && setShowBuyCredits(true)}
-          onKeyDown={(e) => e.key === "Enter" && accountType === "individual" && setShowBuyCredits(true)}
+          onClick={() => setShowBuyCredits(true)}
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setShowBuyCredits(true)}
           style={{
             background: "#fff",
             borderRadius: 18,
@@ -673,27 +673,28 @@ export function DashboardClient({
             justifyContent: "space-between",
             minHeight: 130,
             border: "1px solid #F3F4F6",
-            cursor: accountType === "individual" ? "pointer" : "default",
+            cursor: "pointer",
           }}
         >
           <div className="absolute top-3 right-3 z-10">
-            <a
-              href="/credits"
-              className="text-xs font-semibold text-[#9A88FD] active:opacity-70 transition-opacity"
+            <button
+              type="button"
               onClick={(e) => {
-                // Conserve le comportement historique: uniquement `individual` ouvre le modal.
-                if (accountType !== "individual") {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  return;
-                }
-                e.preventDefault();
                 e.stopPropagation();
                 setShowBuyCredits(true);
               }}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                color: "#9A88FD",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
             >
               Buy credits →
-            </a>
+            </button>
           </div>
 
           <div
