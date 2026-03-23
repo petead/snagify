@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins, DM_Sans } from "next/font/google";
+import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
 import { NavigationReset } from "@/components/NavigationReset";
 
@@ -49,6 +50,14 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${poppins.variable} ${dmSans.variable}`}>
       <body className="font-body antialiased bg-[#F8F7F4] overscroll-none">
+        <NextTopLoader
+          color="#9A88FD"
+          height={3}
+          showSpinner={false}
+          shadow={false}
+          easing="ease"
+          speed={200}
+        />
         <NavigationReset />
         {children}
       </body>
