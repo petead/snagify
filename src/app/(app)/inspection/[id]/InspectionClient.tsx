@@ -441,6 +441,7 @@ export function InspectionClient({
   const [checkinGhostMap, setCheckinGhostMap] = useState<Record<string, GhostPhoto[]>>({});
   const [checkinInspectionId, setCheckinInspectionId] = useState<string | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(false);
 
   // Setup state
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -479,6 +480,13 @@ export function InspectionClient({
 
   useEffect(() => {
     setAbandonPortalMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const update = () => setIsLandscape(window.innerWidth > window.innerHeight);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
   }, []);
 
   // Hide bottom nav on inspect screen
@@ -1658,6 +1666,66 @@ export function InspectionClient({
               }}
             />
           )}
+
+          {typeof document !== "undefined" &&
+            isLandscape &&
+            (screen === "inspect" || isCameraOpen) &&
+            createPortal(
+              <div
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  zIndex: 99999,
+                  background: "black",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 20,
+                }}
+              >
+                <svg
+                  width="52"
+                  height="52"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                >
+                  <rect x="2" y="7" width="10" height="14" rx="2" />
+                  <path d="M14 9l3-3 3 3M17 6v8" />
+                </svg>
+                <p
+                  style={{
+                    color: "white",
+                    fontSize: 17,
+                    fontWeight: 700,
+                    fontFamily: "Poppins, sans-serif",
+                    textAlign: "center",
+                    margin: 0,
+                    padding: "0 40px",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Please rotate your phone
+                  <br />
+                  to portrait mode
+                </p>
+                <p
+                  style={{
+                    color: "rgba(255,255,255,0.45)",
+                    fontSize: 13,
+                    textAlign: "center",
+                    margin: 0,
+                    padding: "0 40px",
+                  }}
+                >
+                  Photos must be taken in portrait for best results
+                </p>
+              </div>,
+              document.body
+            )}
 
           {/* Photo dock — uses PhotoCard for expand/tag/notes */}
           <div
