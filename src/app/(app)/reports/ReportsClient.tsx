@@ -73,7 +73,6 @@ type Tab = (typeof TABS)[number];
 
 export function ReportsClient({ initialReports, fullName, userEmail }: ReportsClientProps) {
   const router = useRouter();
-  const [loaded, setLoaded] = useState(false);
   const [reports, setReports] = useState(initialReports);
   const rollbackRef = useRef<ReportRow[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -98,9 +97,6 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
     [pdfLoadingId]
   );
 
-  useEffect(() => {
-    setLoaded(true);
-  }, []);
   useEffect(() => {
     setReports(initialReports);
   }, [initialReports]);
@@ -158,7 +154,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
     >
       {/* Header — NE BOUGE JAMAIS */}
       <div style={{ flexShrink: 0, padding: "16px 20px 12px", background: "#F8F7F4" }}>
-        <div className={loaded ? "fade-up" : ""} style={{ animationDelay: "0s" }}>
+        <div className="" style={{}}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <Image
@@ -188,7 +184,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
           </div>
         </div>
 
-        <div className={loaded ? "fade-up" : ""} style={{ paddingTop: 12, animationDelay: "0.06s" }}>
+        <div className="" style={{ paddingTop: 12 }}>
           <p style={{ fontSize: 13, color: "#BBB", margin: 0, fontWeight: 500, letterSpacing: 1.2, textTransform: "uppercase" }}>
             Documents
           </p>
@@ -200,8 +196,8 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
         </div>
 
         <div
-          className={loaded ? "fade-up" : ""}
-          style={{ paddingTop: 12, display: "flex", gap: 8, animationDelay: "0.1s" }}
+          className=""
+          style={{ paddingTop: 12, display: "flex", gap: 8 }}
         >
           {TABS.map((tab) => {
             const isActive = activeTab === tab;
@@ -234,7 +230,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
           })}
         </div>
 
-        <div className={loaded ? "fade-up" : ""} style={{ paddingTop: 12, animationDelay: "0.14s" }}>
+        <div className="" style={{ paddingTop: 12 }}>
           <div style={{ position: "relative" }}>
             <svg
               width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -348,14 +344,6 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
           box-shadow: 0 4px 20px rgba(154,136,253,0.1);
         }
         .scroll-hide::-webkit-scrollbar { display: none; }
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(16px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .fade-up {
-          animation: fadeUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          opacity: 0;
-        }
         .nav-item { transition: all 0.2s ease; cursor: pointer; }
         .trash-btn { transition: all 0.2s ease; cursor: pointer; }
         .trash-btn:active { transform: scale(0.9); }
@@ -412,7 +400,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                   key={report.id}
                   role="button"
                   tabIndex={0}
-                  className={`${loaded ? "fade-up" : ""} ${deletingId === report.id ? "report-card-deleting" : "report-card"}`}
+                  className={deletingId === report.id ? "report-card-deleting" : "report-card"}
                   onClick={() => {
                     if (report.status === "in_progress") {
                       router.push(`/inspection/${report.id}`);
@@ -436,8 +424,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                     padding: 20,
                     marginBottom: 14,
                     boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                    animationDelay: `${0.2 + i * 0.07}s`,
-                    position: "relative",
+                                        position: "relative",
                     cursor: "pointer",
                   }}
                 >

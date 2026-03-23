@@ -82,7 +82,6 @@ function getInitials(fullName: string | null, email: string | null): string {
 
 export function PropertiesClient({ properties: initialProperties, fullName, userEmail }: PropertiesClientProps) {
   const router = useRouter();
-  const [loaded, setLoaded] = useState(false);
   const [search, setSearch] = useState("");
 
   const normalizeProperties = useCallback(
@@ -96,9 +95,6 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
 
   const [properties, setProperties] = useState(() => normalizeProperties(initialProperties));
 
-  useEffect(() => {
-    setLoaded(true);
-  }, []);
 
   useEffect(() => {
     setProperties(normalizeProperties(initialProperties));
@@ -146,8 +142,8 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
       {/* Header — NE BOUGE JAMAIS */}
       <div style={{ flexShrink: 0, padding: "16px 20px 12px", background: "#F8F7F4" }}>
         <div
-          className={loaded ? "fade-up" : ""}
-          style={{ animationDelay: "0s" }}
+          className=""
+          style={{}}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -186,8 +182,8 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
         </div>
 
         <div
-          className={loaded ? "fade-up" : ""}
-          style={{ paddingTop: 12, animationDelay: "0.06s" }}
+          className=""
+          style={{ paddingTop: 12 }}
         >
           <p style={{ fontSize: 13, color: "#BBB", margin: 0, fontWeight: 500, letterSpacing: 1.2, textTransform: "uppercase" }}>
             Portfolio
@@ -227,7 +223,7 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
           </div>
         </div>
 
-        <div className={loaded ? "fade-up" : ""} style={{ paddingTop: 12, animationDelay: "0.1s" }}>
+        <div className="" style={{ paddingTop: 12 }}>
           <div style={{ position: "relative" }}>
             <svg
               width="18"
@@ -327,14 +323,6 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
           box-shadow: 0 4px 20px rgba(154,136,253,0.1);
         }
         .scroll-hide::-webkit-scrollbar { display: none; }
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(16px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .fade-up {
-          animation: fadeUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          opacity: 0;
-        }
       `}</style>
 
       {/* Property Cards */}
@@ -349,7 +337,7 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
             return (
               <div
                 key={property.id}
-                className={`prop-card ${loaded ? "fade-up" : ""}`}
+                className="prop-card"
                 onClick={() => router.push(`/property/${property.id}`)}
                 role="button"
                 tabIndex={0}
@@ -360,8 +348,7 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
                   padding: "16px 18px",
                   marginBottom: 10,
                   boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                  animationDelay: `${0.16 + i * 0.08}s`,
-                  display: "flex",
+                                    display: "flex",
                   alignItems: "center",
                   gap: 14,
                 }}
