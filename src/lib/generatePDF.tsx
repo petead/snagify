@@ -1996,7 +1996,7 @@ function InspectionReport({
                           }}
                         />
                         <Text style={{ fontSize: 8, color: "#EF4444", fontFamily: "Helvetica-Bold" }}>
-                          ● Refused to sign
+                          Refused to sign
                         </Text>
                       </View>
                     ) : landlordSignedAt ? (
@@ -2011,7 +2011,7 @@ function InspectionReport({
                           }}
                         />
                         <Text style={{ fontSize: 8, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
-                          ● Signed on {formatDate(landlordSignedAt, true)}
+                          Signed on {formatDate(landlordSignedAt, true)}
                         </Text>
                       </View>
                     ) : (
@@ -2025,7 +2025,7 @@ function InspectionReport({
                             marginRight: 4,
                           }}
                         />
-                        <Text style={{ fontSize: 8, color: "#9CA3AF" }}>● Awaiting signature</Text>
+                        <Text style={{ fontSize: 8, color: "#9CA3AF" }}>Awaiting signature</Text>
                       </View>
                     )}
                   </View>
@@ -2102,7 +2102,7 @@ function InspectionReport({
                           }}
                         />
                         <Text style={{ fontSize: 8, color: "#EF4444", fontFamily: "Helvetica-Bold" }}>
-                          ● Refused to sign
+                          Refused to sign
                         </Text>
                       </View>
                     ) : tenantSignedAt ? (
@@ -2117,7 +2117,7 @@ function InspectionReport({
                           }}
                         />
                         <Text style={{ fontSize: 8, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
-                          ● Signed on {formatDate(tenantSignedAt, true)}
+                          Signed on {formatDate(tenantSignedAt, true)}
                         </Text>
                       </View>
                     ) : (
@@ -2131,7 +2131,7 @@ function InspectionReport({
                             marginRight: 4,
                           }}
                         />
-                        <Text style={{ fontSize: 8, color: "#9CA3AF" }}>● Awaiting signature</Text>
+                        <Text style={{ fontSize: 8, color: "#9CA3AF" }}>Awaiting signature</Text>
                       </View>
                     )}
                   </View>
@@ -2201,7 +2201,7 @@ function InspectionReport({
                       />
                       <Text style={{ fontSize: 7, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
                         {inspectorImg
-                          ? `● Signed on ${formatDate(inspectorSignedAt ?? meta.inspection.created_at, true)}`
+                          ? `Signed on ${formatDate(inspectorSignedAt ?? meta.inspection.created_at, true)}`
                           : `Report generated on ${formatDate(meta.inspection.created_at, true)}`}
                       </Text>
                     </View>

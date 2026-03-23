@@ -2423,7 +2423,7 @@ export function CheckoutPDFDocument({
                           }}
                         />
                         <Text style={{ fontSize: 8, color: "#EF4444", fontFamily: "Helvetica-Bold" }}>
-                          ● Refused to sign
+                          Refused to sign
                         </Text>
                       </View>
                     ) : landlordSignedAt ? (
@@ -2438,7 +2438,7 @@ export function CheckoutPDFDocument({
                           }}
                         />
                         <Text style={{ fontSize: 8, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
-                          ● Signed on {formatDate(landlordSignedAt, true)}
+                          Signed on {formatDate(landlordSignedAt, true)}
                         </Text>
                       </View>
                     ) : (
@@ -2452,7 +2452,7 @@ export function CheckoutPDFDocument({
                             marginRight: 4,
                           }}
                         />
-                        <Text style={{ fontSize: 8, color: "#9CA3AF" }}>● Awaiting signature</Text>
+                        <Text style={{ fontSize: 8, color: "#9CA3AF" }}>Awaiting signature</Text>
                       </View>
                     )}
                   </View>
@@ -2529,7 +2529,7 @@ export function CheckoutPDFDocument({
                           }}
                         />
                         <Text style={{ fontSize: 8, color: "#EF4444", fontFamily: "Helvetica-Bold" }}>
-                          ● Refused to sign
+                          Refused to sign
                         </Text>
                       </View>
                     ) : tenantSignedAt ? (
@@ -2544,7 +2544,7 @@ export function CheckoutPDFDocument({
                           }}
                         />
                         <Text style={{ fontSize: 8, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
-                          ● Signed on {formatDate(tenantSignedAt, true)}
+                          Signed on {formatDate(tenantSignedAt, true)}
                         </Text>
                       </View>
                     ) : (
@@ -2558,7 +2558,7 @@ export function CheckoutPDFDocument({
                             marginRight: 4,
                           }}
                         />
-                        <Text style={{ fontSize: 8, color: "#9CA3AF" }}>● Awaiting signature</Text>
+                        <Text style={{ fontSize: 8, color: "#9CA3AF" }}>Awaiting signature</Text>
                       </View>
                     )}
                   </View>
@@ -2627,7 +2627,7 @@ export function CheckoutPDFDocument({
                       />
                       <Text style={{ fontSize: 7, color: tokens.primary, fontFamily: "Helvetica-Bold" }}>
                         {inspectorImg
-                          ? `● Signed on ${formatDate(inspectorSignedAt ?? inspection.created_at, true)}`
+                          ? `Signed on ${formatDate(inspectorSignedAt ?? inspection.created_at, true)}`
                           : `Report generated on ${formatDate(inspection.created_at, true)}`}
                       </Text>
                     </View>
