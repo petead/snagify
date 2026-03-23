@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, type TouchEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -143,6 +143,12 @@ export function DashboardClient({
   const [showOnboarding, setShowOnboarding] = useState(false);
   const router = useRouter();
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef<number | null>(null);
+  const pullEligibleRef = useRef(false);
+  const [isPulling, setIsPulling] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   useEffect(() => {
     setLoaded(true);
     trackAction("Viewed Dashboard");
@@ -187,16 +193,51 @@ export function DashboardClient({
   const [notifications, setNotifications] = useState<DashboardNotificationRow[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
 
-  const fetchNotifications = useCallback(async () => {
-    setNotificationsLoading(true);
-    const { data } = await supabase
-      .from("notifications")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(50);
-    setNotifications((data as DashboardNotificationRow[] | null) ?? []);
-    setNotificationsLoading(false);
-  }, [supabase]);
+  const fetchNotifications = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const silent = opts?.silent;
+      if (!silent) setNotificationsLoading(true);
+      const { data } = await supabase
+        .from("notifications")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      setNotifications((data as DashboardNotificationRow[] | null) ?? []);
+      if (!silent) setNotificationsLoading(false);
+    },
+    [supabase]
+  );
+
+  function handleTouchStart(e: TouchEvent<HTMLDivElement>) {
+    pullEligibleRef.current = false;
+    if (scrollRef.current && scrollRef.current.scrollTop === 0) {
+      touchStartY.current = e.touches[0].clientY;
+    } else {
+      touchStartY.current = null;
+    }
+  }
+
+  function handleTouchMove(e: TouchEvent<HTMLDivElement>) {
+    if (touchStartY.current === null) return;
+    const delta = e.touches[0].clientY - touchStartY.current;
+    if (delta > 40 && scrollRef.current?.scrollTop === 0) {
+      pullEligibleRef.current = true;
+      setIsPulling(true);
+    }
+  }
+
+  async function handleTouchEnd() {
+    touchStartY.current = null;
+    if (!pullEligibleRef.current) {
+      setIsPulling(false);
+      return;
+    }
+    pullEligibleRef.current = false;
+    setIsRefreshing(true);
+    await fetchNotifications({ silent: true });
+    setIsRefreshing(false);
+    setIsPulling(false);
+  }
 
   useEffect(() => {
     void fetchNotifications();
@@ -807,7 +848,7 @@ export function DashboardClient({
         </Link>
       </div>
 
-      <div className="flex items-center justify-between px-4 pb-2 pt-4">
+      <div className="flex items-center justify-between px-4 pb-2 pt-7">
         <div className="flex items-center gap-2">
           <Bell size={16} className="text-[#9A88FD]" />
           <span className="text-[15px] font-bold text-[#1A1A2E]">Notifications</span>
@@ -830,7 +871,30 @@ export function DashboardClient({
       </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto scroll-hide px-4 pb-4">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto scroll-hide px-4 pb-4"
+        ref={scrollRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={() => void handleTouchEnd()}
+      >
+        {isPulling && (
+          <div className="flex items-center justify-center py-3">
+            <div
+              className={`flex items-center gap-2 text-[12px] font-semibold text-[#9A88FD] transition-opacity ${
+                isRefreshing ? "opacity-100" : "opacity-60"
+              }`}
+            >
+              <div
+                className={`h-4 w-4 rounded-full border-2 border-[#9A88FD] border-t-transparent ${
+                  isRefreshing ? "animate-spin" : ""
+                }`}
+              />
+              {isRefreshing ? "Refreshing..." : "Release to refresh"}
+            </div>
+          </div>
+        )}
+
         <div className="overflow-hidden rounded-2xl border border-[#EEECFF] bg-white">
           {notificationsLoading ? (
             <div className="flex items-center justify-center py-10">
