@@ -9,6 +9,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 import { InspectionStatusBadge } from "@/components/inspection/InspectionStatusBadge";
+import { planSlugForBuyCredits, pricePerCreditForBuy } from "@/lib/buyCreditsPlan";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 import { motion } from "framer-motion";
@@ -158,6 +159,9 @@ function InspectionRow({
   const [preparingCheckOut, setPreparingCheckOut] = useState(false);
   const [showBuyCredits, setShowBuyCredits] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+
+  const buyPlanSlug = planSlugForBuyCredits(creditsPlan);
+  const buyPricePerCredit = pricePerCreditForBuy(creditsPlan);
 
   const state = inspection ? getInspectionState(inspection) : null;
   const isDraft = inspection?.status === "in_progress";
@@ -453,6 +457,8 @@ function InspectionRow({
           currentBalance={creditsBalance}
           accountType={creditsAccountType}
           plan={creditsPlan}
+          planSlug={buyPlanSlug}
+          pricePerCredit={buyPricePerCredit}
           onPurchaseSuccess={async () => {
             await refreshCredits();
             setShowBuyCredits(false);
@@ -507,6 +513,8 @@ function InspectionRow({
         currentBalance={creditsBalance}
         accountType={creditsAccountType}
         plan={creditsPlan}
+        planSlug={buyPlanSlug}
+        pricePerCredit={buyPricePerCredit}
         onPurchaseSuccess={async () => {
           await refreshCredits();
           setShowBuyCredits(false);

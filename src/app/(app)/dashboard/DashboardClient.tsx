@@ -14,6 +14,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 import { createClient } from "@/lib/supabase/client";
+import { planSlugForBuyCredits, pricePerCreditForBuy } from "@/lib/buyCreditsPlan";
 import { InspectionStatusBadge } from "@/components/inspection/InspectionStatusBadge";
 
 type InspectionRow = {
@@ -1226,6 +1227,8 @@ export function DashboardClient({
         currentBalance={balance}
         accountType={(accountType as "individual" | "pro") || "individual"}
         plan={plan}
+        planSlug={planSlugForBuyCredits(plan)}
+        pricePerCredit={pricePerCreditForBuy(plan)}
       />
       {showOnboarding && (
         <OnboardingTutorial

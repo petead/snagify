@@ -11,6 +11,10 @@ interface BuyCreditsModalProps {
   currentBalance: number;
   accountType: "individual" | "pro";
   plan: string;
+  /** Current subscription plan slug (starter | growth | agency) for pro checkout metadata */
+  planSlug?: string;
+  /** From subscription_plans.extra_credit_price_aed or tier default */
+  pricePerCredit?: number;
   onPurchaseSuccess?: () => void;
 }
 
@@ -31,12 +35,17 @@ function mapPackDisplayName(name: string): string {
   return name;
 }
 
+const MIN_QTY = 1;
+const MAX_QTY = 50;
+
 export function BuyCreditsModal({
   isOpen,
   onClose,
   currentBalance,
   accountType,
   plan: _plan,
+  planSlug,
+  pricePerCredit,
   onPurchaseSuccess,
 }: BuyCreditsModalProps) {
   const [mounted, setMounted] = useState(false);
@@ -44,6 +53,7 @@ export function BuyCreditsModal({
   const [packs, setPacks] = useState<Pack[]>([]);
   const [selectedPack, setSelectedPack] = useState<Pack | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [quantity, setQuantity] = useState(5);
 
   useEffect(() => {
     setMounted(true);
@@ -51,11 +61,15 @@ export function BuyCreditsModal({
 
   useEffect(() => {
     if (!isOpen) return;
+    if (accountType === "pro") {
+      setPacks([]);
+      setLoadingCatalog(false);
+      return;
+    }
     const fetchPacks = async () => {
       setLoadingCatalog(true);
       try {
-        const target = accountType === "pro" ? "pro" : "individual";
-        const res = await fetch(`/api/credits/packs?target=${target}`);
+        const res = await fetch(`/api/credits/packs?target=individual`);
         const data = (await res.json()) as {
           packs?: Pack[];
         };
@@ -98,6 +112,35 @@ export function BuyCreditsModal({
     }
   }
 
+  async function handleProBuy() {
+    setLoadingPriceId("pro");
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "one_time",
+          pro_credits: true,
+          quantity,
+          plan_slug: planSlug,
+          price_per_credit: pricePerCredit ?? 18,
+          successUrl: `${window.location.origin}/dashboard?credits=success`,
+          cancelUrl: window.location.href,
+        }),
+      });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data.error || "Checkout failed");
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Checkout failed");
+    } finally {
+      setLoadingPriceId(null);
+    }
+  }
+
   const modalStyles = `
   @keyframes coinFloat {
     0%, 100% { transform: translateY(0) rotate(-4deg); }
@@ -124,10 +167,17 @@ export function BuyCreditsModal({
 `;
 
   const currentCredits = currentBalance;
-  const loading = !!selectedPack && loadingPriceId === selectedPack.id;
+  const loadingIndividual = !!selectedPack && loadingPriceId === selectedPack.id;
+  const loadingPro = accountType === "pro" && loadingPriceId === "pro";
+  const loading = loadingIndividual || loadingPro;
+  const canPurchasePro = accountType === "pro";
   const handlePurchase = () => {
-    if (!selectedPack) return;
-    void handleBuy(selectedPack);
+    if (accountType === "pro") {
+      void handleProBuy();
+    } else {
+      if (!selectedPack) return;
+      void handleBuy(selectedPack);
+    }
   };
 
   const portal = mounted
@@ -266,173 +316,352 @@ export function BuyCreditsModal({
                     gap: 10,
                   }}
                 >
-                  {loadingCatalog ? (
-                    <p
-                      style={{
-                        margin: "8px 0",
-                        textAlign: "center",
-                        fontSize: 12,
-                        color: "rgba(255,255,255,0.6)",
-                      }}
-                    >
-                      Loading offers...
-                    </p>
-                  ) : (
-                    packs.map((pack, i) => {
-                      const isSelected = selectedPack?.id === pack.id;
-                      const isBestValue = i === packs.length - 1;
-                      const isStarter = i === 0;
-
-                      return (
-                        <button
-                          key={pack.id}
-                          type="button"
-                          onClick={() => setSelectedPack(pack)}
-                          className={`pack-card${isSelected ? " selected" : ""}`}
+                  {accountType === "pro" ? (
+                    <div style={{ padding: "8px 0" }}>
+                      <div
+                        style={{
+                          background: "rgba(154,136,253,0.1)",
+                          borderRadius: 14,
+                          padding: "12px 16px",
+                          marginBottom: 16,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
+                          Price per credit
+                        </span>
+                        <span
                           style={{
-                            width: "100%",
-                            textAlign: "left",
-                            background: isSelected
-                              ? "rgba(154,136,253,0.18)"
-                              : "rgba(255,255,255,0.05)",
-                            border: isSelected
-                              ? "1.5px solid rgba(154,136,253,0.7)"
-                              : isBestValue
-                                ? "1.5px solid rgba(254,222,128,0.4)"
-                                : "1.5px solid rgba(255,255,255,0.07)",
-                            borderRadius: 18,
-                            padding: "14px 16px",
-                            boxShadow: isSelected
-                              ? "0 4px 20px rgba(154,136,253,0.2)"
-                              : "none",
+                            fontSize: 16,
+                            fontWeight: 800,
+                            color: "#9A88FD",
+                            fontFamily: "Poppins, sans-serif",
                           }}
                         >
-                          <div
+                          AED {pricePerCredit ?? 18}
+                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          background: "rgba(255,255,255,0.05)",
+                          border: "1.5px solid rgba(154,136,253,0.4)",
+                          borderRadius: 20,
+                          padding: "20px 20px",
+                        }}
+                      >
+                        <p
+                          style={{
+                            color: "rgba(255,255,255,0.5)",
+                            fontSize: 12,
+                            margin: "0 0 16px",
+                            textAlign: "center",
+                          }}
+                        >
+                          How many credits do you need?
+                        </p>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 24,
+                            marginBottom: 20,
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setQuantity((q) => Math.max(MIN_QTY, q - 1))}
                             style={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 14,
+                              background:
+                                quantity <= MIN_QTY
+                                  ? "rgba(255,255,255,0.05)"
+                                  : "rgba(154,136,253,0.2)",
+                              border: "none",
+                              cursor: quantity <= MIN_QTY ? "not-allowed" : "pointer",
+                              color: "white",
+                              fontSize: 22,
+                              fontWeight: 300,
                               display: "flex",
                               alignItems: "center",
-                              gap: 14,
+                              justifyContent: "center",
                             }}
                           >
-                            <div
+                            −
+                          </button>
+
+                          <div style={{ textAlign: "center" }}>
+                            <span
                               style={{
-                                width: 52,
-                                height: 52,
-                                borderRadius: 16,
-                                flexShrink: 0,
-                                background: isSelected
-                                  ? "linear-gradient(135deg, #9A88FD, #7B65FC)"
-                                  : isBestValue
-                                    ? "linear-gradient(135deg, #FEDE80, #D4A800)"
-                                    : "rgba(154,136,253,0.2)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                boxShadow: isSelected
-                                  ? "0 4px 16px rgba(154,136,253,0.4)"
-                                  : "none",
-                                position: "relative",
+                                fontSize: 52,
+                                fontWeight: 800,
+                                color: "white",
+                                fontFamily: "Poppins, sans-serif",
+                                lineHeight: 1,
                               }}
                             >
-                              <span
-                                style={{
-                                  fontSize: 20,
-                                  fontWeight: 800,
-                                  color:
-                                    isBestValue && !isSelected
-                                      ? "#1A1A2E"
-                                      : "white",
-                                  fontFamily: "Poppins, sans-serif",
-                                  lineHeight: 1,
-                                }}
-                              >
-                                {pack.credits}
-                              </span>
-                            </div>
+                              {quantity}
+                            </span>
+                            <p
+                              style={{
+                                color: "rgba(255,255,255,0.4)",
+                                fontSize: 12,
+                                margin: "4px 0 0",
+                              }}
+                            >
+                              credit{quantity > 1 ? "s" : ""}
+                            </p>
+                          </div>
 
-                            <div style={{ flex: 1, minWidth: 0 }}>
+                          <button
+                            type="button"
+                            onClick={() => setQuantity((q) => Math.min(MAX_QTY, q + 1))}
+                            style={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 14,
+                              background:
+                                quantity >= MAX_QTY
+                                  ? "rgba(255,255,255,0.05)"
+                                  : "rgba(154,136,253,0.2)",
+                              border: "none",
+                              cursor: quantity >= MAX_QTY ? "not-allowed" : "pointer",
+                              color: "white",
+                              fontSize: 22,
+                              fontWeight: 300,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            ＋
+                          </button>
+                        </div>
+
+                        <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+                          {[5, 10, 20].map((q) => (
+                            <button
+                              key={q}
+                              type="button"
+                              onClick={() => setQuantity(q)}
+                              style={{
+                                padding: "6px 14px",
+                                borderRadius: 20,
+                                border: "none",
+                                background: quantity === q ? "#9A88FD" : "rgba(255,255,255,0.08)",
+                                color: quantity === q ? "white" : "rgba(255,255,255,0.4)",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {q}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginTop: 16,
+                          padding: "12px 4px",
+                        }}
+                      >
+                        <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
+                          Total
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 22,
+                            fontWeight: 800,
+                            color: "white",
+                            fontFamily: "Poppins, sans-serif",
+                          }}
+                        >
+                          AED {(quantity * (pricePerCredit ?? 18)).toLocaleString("en-AE")}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {loadingCatalog ? (
+                        <p
+                          style={{
+                            margin: "8px 0",
+                            textAlign: "center",
+                            fontSize: 12,
+                            color: "rgba(255,255,255,0.6)",
+                          }}
+                        >
+                          Loading offers...
+                        </p>
+                      ) : (
+                        packs.map((pack, i) => {
+                          const isSelected = selectedPack?.id === pack.id;
+                          const isBestValue = i === packs.length - 1;
+                          const isStarter = i === 0;
+
+                          return (
+                            <button
+                              key={pack.id}
+                              type="button"
+                              onClick={() => setSelectedPack(pack)}
+                              className={`pack-card${isSelected ? " selected" : ""}`}
+                              style={{
+                                width: "100%",
+                                textAlign: "left",
+                                background: isSelected
+                                  ? "rgba(154,136,253,0.18)"
+                                  : "rgba(255,255,255,0.05)",
+                                border: isSelected
+                                  ? "1.5px solid rgba(154,136,253,0.7)"
+                                  : isBestValue
+                                    ? "1.5px solid rgba(254,222,128,0.4)"
+                                    : "1.5px solid rgba(255,255,255,0.07)",
+                                borderRadius: 18,
+                                padding: "14px 16px",
+                                boxShadow: isSelected
+                                  ? "0 4px 20px rgba(154,136,253,0.2)"
+                                  : "none",
+                              }}
+                            >
                               <div
                                 style={{
                                   display: "flex",
                                   alignItems: "center",
-                                  gap: 6,
-                                  marginBottom: 4,
+                                  gap: 14,
                                 }}
                               >
-                                <span
+                                <div
                                   style={{
-                                    fontSize: 16,
-                                    fontWeight: 800,
-                                    color: "white",
-                                    fontFamily: "Poppins, sans-serif",
+                                    width: 52,
+                                    height: 52,
+                                    borderRadius: 16,
+                                    flexShrink: 0,
+                                    background: isSelected
+                                      ? "linear-gradient(135deg, #9A88FD, #7B65FC)"
+                                      : isBestValue
+                                        ? "linear-gradient(135deg, #FEDE80, #D4A800)"
+                                        : "rgba(154,136,253,0.2)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    boxShadow: isSelected
+                                      ? "0 4px 16px rgba(154,136,253,0.4)"
+                                      : "none",
+                                    position: "relative",
                                   }}
                                 >
-                                  {mapPackDisplayName(pack.name)}
-                                </span>
-                                {isBestValue && (
                                   <span
                                     style={{
-                                      fontSize: 9,
+                                      fontSize: 20,
                                       fontWeight: 800,
-                                      background:
-                                        "linear-gradient(90deg, #FEDE80, #FFB800)",
-                                      color: "#1A1A2E",
-                                      padding: "3px 8px",
-                                      borderRadius: 20,
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      whiteSpace: "nowrap",
-                                      flexShrink: 0,
+                                      color:
+                                        isBestValue && !isSelected
+                                          ? "#1A1A2E"
+                                          : "white",
+                                      fontFamily: "Poppins, sans-serif",
+                                      lineHeight: 1,
                                     }}
                                   >
-                                    ⭐ Best value
+                                    {pack.credits}
                                   </span>
-                                )}
-                                {isStarter && (
+                                </div>
+
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 6,
+                                      marginBottom: 4,
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontSize: 16,
+                                        fontWeight: 800,
+                                        color: "white",
+                                        fontFamily: "Poppins, sans-serif",
+                                      }}
+                                    >
+                                      {mapPackDisplayName(pack.name)}
+                                    </span>
+                                    {isBestValue && (
+                                      <span
+                                        style={{
+                                          fontSize: 9,
+                                          fontWeight: 800,
+                                          background:
+                                            "linear-gradient(90deg, #FEDE80, #FFB800)",
+                                          color: "#1A1A2E",
+                                          padding: "3px 8px",
+                                          borderRadius: 20,
+                                          textTransform: "uppercase",
+                                          letterSpacing: "0.5px",
+                                          whiteSpace: "nowrap",
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        ⭐ Best value
+                                      </span>
+                                    )}
+                                    {isStarter && (
+                                      <span
+                                        style={{
+                                          fontSize: 9,
+                                          fontWeight: 700,
+                                          background: "rgba(154,136,253,0.2)",
+                                          color: "#9A88FD",
+                                          padding: "3px 8px",
+                                          borderRadius: 20,
+                                          whiteSpace: "nowrap",
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        Starter
+                                      </span>
+                                    )}
+                                  </div>
                                   <span
                                     style={{
-                                      fontSize: 9,
-                                      fontWeight: 700,
-                                      background: "rgba(154,136,253,0.2)",
-                                      color: "#9A88FD",
-                                      padding: "3px 8px",
-                                      borderRadius: 20,
-                                      whiteSpace: "nowrap",
-                                      flexShrink: 0,
+                                      fontSize: 12,
+                                      color: "rgba(255,255,255,0.35)",
                                     }}
                                   >
-                                    Starter
+                                    {pack.credits} credit{pack.credits > 1 ? "s" : ""}{" "}
+                                    · AED{" "}
+                                    {Math.round(pack.price_aed / pack.credits)}/cr
                                   </span>
-                                )}
-                              </div>
-                              <span
-                                style={{
-                                  fontSize: 12,
-                                  color: "rgba(255,255,255,0.35)",
-                                }}
-                              >
-                                {pack.credits} credit{pack.credits > 1 ? "s" : ""}{" "}
-                                · AED{" "}
-                                {Math.round(pack.price_aed / pack.credits)}/cr
-                              </span>
-                            </div>
+                                </div>
 
-                            <span
-                              style={{
-                                fontSize: 18,
-                                fontWeight: 800,
-                                color: isSelected ? "#c4b8ff" : "#9A88FD",
-                                fontFamily: "Poppins, sans-serif",
-                                whiteSpace: "nowrap",
-                                flexShrink: 0,
-                              }}
-                            >
-                              AED {pack.price_aed}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })
+                                <span
+                                  style={{
+                                    fontSize: 18,
+                                    fontWeight: 800,
+                                    color: isSelected ? "#c4b8ff" : "#9A88FD",
+                                    fontFamily: "Poppins, sans-serif",
+                                    whiteSpace: "nowrap",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  AED {pack.price_aed}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -440,13 +669,17 @@ export function BuyCreditsModal({
                   <button
                     type="button"
                     onClick={handlePurchase}
-                    disabled={!selectedPack || loading}
+                    disabled={
+                      accountType === "pro"
+                        ? loadingPriceId === "pro"
+                        : !selectedPack || loading
+                    }
                     className={cn(
                       "w-full rounded-2xl border-none py-4 text-base font-extrabold transition-all",
                       "flex items-center justify-center gap-2",
-                      loading && selectedPack
+                      loading && (selectedPack || canPurchasePro)
                         ? "cursor-wait bg-[#9A88FD] text-white opacity-90"
-                        : selectedPack
+                        : selectedPack || canPurchasePro
                           ? "shimmer-cta cursor-pointer text-white shadow-[0_8px_28px_rgba(154,136,253,0.4)]"
                           : "cursor-not-allowed bg-white/10 text-white/30"
                     )}
@@ -479,6 +712,8 @@ export function BuyCreditsModal({
                       </>
                     ) : selectedPack ? (
                       `Buy ${selectedPack.credits} credits · AED ${selectedPack.price_aed}`
+                    ) : canPurchasePro ? (
+                      `Buy ${quantity} credits · AED ${quantity * (pricePerCredit ?? 18)}`
                     ) : (
                       "Choose a pack above"
                     )}

@@ -61,6 +61,8 @@ export async function POST(req: NextRequest) {
             .single();
           if (pack?.credits) creditsToAdd = Number(pack.credits);
           if (pack?.name) packName = pack.name;
+        } else if (session.metadata?.pro_credits === "true" && creditsFromMeta) {
+          packName = "Pro top-up";
         }
         if (!creditsToAdd || Number.isNaN(creditsToAdd)) break;
 

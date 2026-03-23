@@ -30,6 +30,9 @@ export async function POST(req: NextRequest) {
       userId?: string;
       successUrl?: string;
       cancelUrl?: string;
+      pro_credits?: boolean;
+      quantity?: number;
+      price_per_credit?: number;
     };
     const { type, price_id, plan_slug, billing_period = "monthly" } = body;
     const packId = body.packId ?? body.pack_id;
@@ -98,32 +101,58 @@ export async function POST(req: NextRequest) {
 
       lineItems = [{ price: finalPriceId, quantity: 1 }];
     } else {
-      if (!packId) {
-        return NextResponse.json({ error: "Missing packId" }, { status: 400 });
-      }
-      const { data: pack } = await supabaseAdmin
-        .from("credit_packs")
-        .select("id, name, credits, price_aed, is_active")
-        .eq("id", packId)
-        .eq("is_active", true)
-        .single();
-      if (!pack) {
-        return NextResponse.json({ error: "Pack not found" }, { status: 404 });
-      }
-      checkoutCredits = Number(pack.credits ?? 0);
-      lineItems = [
-        {
-          price_data: {
-            currency: "aed",
-            unit_amount: Math.round(Number(pack.price_aed) * 100),
-            product_data: {
-              name: `Snagify Credits — ${pack.name}`,
-              description: `${pack.credits} credit${Number(pack.credits) > 1 ? "s" : ""} for Snagify inspections`,
+      // ── PRO: dynamic quantity × price_per_credit ──
+      if (
+        body.pro_credits &&
+        body.quantity != null &&
+        body.price_per_credit != null
+      ) {
+        const qty = Math.max(1, Math.min(50, Number(body.quantity)));
+        const unitPrice = Number(body.price_per_credit);
+        checkoutCredits = qty;
+
+        lineItems = [
+          {
+            price_data: {
+              currency: "aed",
+              unit_amount: Math.round(unitPrice * 100),
+              product_data: {
+                name: "Snagify Credits",
+                description: `${qty} inspection credit${qty > 1 ? "s" : ""} · ${body.plan_slug ?? ""} plan`,
+              },
             },
+            quantity: qty,
           },
-          quantity: 1,
-        },
-      ];
+        ];
+      } else {
+        // ── INDIVIDUAL: fixed pack ──
+        if (!packId) {
+          return NextResponse.json({ error: "Missing packId" }, { status: 400 });
+        }
+        const { data: pack } = await supabaseAdmin
+          .from("credit_packs")
+          .select("id, name, credits, price_aed, is_active")
+          .eq("id", packId)
+          .eq("is_active", true)
+          .single();
+        if (!pack) {
+          return NextResponse.json({ error: "Pack not found" }, { status: 404 });
+        }
+        checkoutCredits = Number(pack.credits ?? 0);
+        lineItems = [
+          {
+            price_data: {
+              currency: "aed",
+              unit_amount: Math.round(Number(pack.price_aed) * 100),
+              product_data: {
+                name: `Snagify Credits — ${pack.name}`,
+                description: `${pack.credits} credit${Number(pack.credits) > 1 ? "s" : ""} for Snagify inspections`,
+              },
+            },
+            quantity: 1,
+          },
+        ];
+      }
     }
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
@@ -137,6 +166,7 @@ export async function POST(req: NextRequest) {
         company_id: checkoutCompanyId ?? "",
         type: type ?? "one_time",
         ...(packId ? { pack_id: packId } : {}),
+        ...(body.pro_credits ? { pro_credits: "true" } : {}),
         ...(checkoutCredits ? { credits: String(checkoutCredits) } : {}),
         ...(plan_slug ? { plan_slug } : {}),
         ...(isSubscription
