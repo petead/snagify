@@ -3,6 +3,7 @@ import { Poppins, DM_Sans } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
 import { NavigationReset } from "@/components/NavigationReset";
+import { TopLoader } from "@/components/TopLoader";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -50,6 +51,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${poppins.variable} ${dmSans.variable}`}>
       <body className="font-body antialiased bg-[#F8F7F4] overscroll-none">
+        <TopLoader />
         <NextTopLoader
           color="#9A88FD"
           height={3}
