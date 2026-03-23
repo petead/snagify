@@ -38,8 +38,10 @@ export async function POST(request: NextRequest) {
     // This hides inspectionId and email from the URL
     const signUrl = `${appUrl}/sign?inspectionId=${inspectionId}&signerType=${signerType}&email=${encodeURIComponent(email)}`;
 
-    // 30-minute expiration for remote links
-    const expiresAt = new Date(Date.now() + REMOTE_OTP_MS).toISOString();
+    // Remote mode has no OTP — expiry matches the signing window (7 days)
+    const expiresAt = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000
+    ).toISOString();
 
     // Fetch inspection details for branded email
     const { data: inspection } = await supabaseAdmin
