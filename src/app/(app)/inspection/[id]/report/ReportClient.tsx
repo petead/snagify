@@ -1221,16 +1221,23 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
               const bothSignedStatus = !!landlordSigStatus?.signed_at && !!tenantSigStatus?.signed_at;
               const noSignaturesSentYet = !landlordSigStatus && !tenantSigStatus;
               const landlordSignedStatus = !!landlordSigStatus?.signed_at;
+              const landlordRefused = !!landlordSigStatus?.refused_at;
+              const tenantRefused = !!tenantSigStatus?.refused_at;
+              const landlordExpressed = landlordSignedStatus || landlordRefused;
+              const tenantExpressed = !!tenantSigStatus?.signed_at || tenantRefused;
+              const allExpressed = landlordExpressed && tenantExpressed;
 
-              // Fully signed
-              if (bothSignedStatus) return (
-                <div className="flex-1 py-3 rounded-2xl border-2 border-green-200 bg-green-50 flex items-center justify-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <span className="text-[13px] font-bold text-green-700">
-                    Fully Signed
-                  </span>
-                </div>
-              );
+              // All expressed (signed or refused) → closed, show PDF only
+              if (allExpressed) {
+                return (
+                  <div className="flex-1 py-3 rounded-2xl border-2 border-gray-200 bg-gray-50 flex items-center justify-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-gray-400" />
+                    <span className="text-[13px] font-bold text-gray-500">
+                      {bothSignedStatus ? "Fully Signed" : "Closed — Disputed"}
+                    </span>
+                  </div>
+                );
+              }
 
               // No signatures sent yet -> same as check-in
               if (noSignaturesSentYet) return (
@@ -1253,8 +1260,8 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
                 </button>
               );
 
-              // One signed, one pending -> Awaiting X
-              const pendingLabel = !landlordSignedStatus ? 'Awaiting Landlord' : 'Awaiting Tenant';
+              // One signed/refused, one still pending
+              const pendingLabel = !landlordExpressed ? "Awaiting Landlord" : "Awaiting Tenant";
 
               return (
                 <button
@@ -1918,6 +1925,9 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
           {(["landlord", "tenant"] as const).map((type, i) => {
             const sig = signatures.find((s) => s.signer_type === type);
             const signed = !!sig?.signed_at;
+            const refused = !!(sig as { refused_at?: string | null } | undefined)?.refused_at;
+            const refusedReason = (sig as { refused_reason?: string | null } | undefined)
+              ?.refused_reason;
             return (
               <div
                 key={type}
@@ -1935,7 +1945,11 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
                       width: 30,
                       height: 30,
                       borderRadius: 10,
-                      background: signed ? "rgba(154,136,253,0.1)" : "#EEEDE9",
+                      background: signed
+                        ? "rgba(154,136,253,0.1)"
+                        : refused
+                          ? "rgba(239,68,68,0.1)"
+                          : "#EEEDE9",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -1952,6 +1966,19 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
                         strokeLinecap="round"
                       >
                         <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : refused ? (
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#EF4444"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M15 9l-6 6M9 9l6 6" />
                       </svg>
                     ) : (
                       <svg
@@ -1971,10 +1998,18 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
                     <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
                       {type.charAt(0).toUpperCase() + type.slice(1)}
                     </p>
-                    <p style={{ fontSize: 11, color: "#BBB", margin: "1px 0 0" }}>
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: refused ? "#EF4444" : "#BBB",
+                        margin: "1px 0 0",
+                      }}
+                    >
                       {signed && sig?.signed_at
                         ? `Signed on ${formatDate(sig.signed_at)}`
-                        : "Pending signature"}
+                        : refused
+                          ? `Refused to sign${refusedReason ? ` — "${refusedReason}"` : ""}`
+                          : "Pending signature"}
                     </p>
                   </div>
                 </div>
@@ -1982,14 +2017,18 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
                   style={{
                     fontSize: 10,
                     fontWeight: 600,
-                    color: signed ? "#9A88FD" : "#999",
-                    background: signed ? "rgba(154,136,253,0.1)" : "#EEEDE9",
+                    color: signed ? "#9A88FD" : refused ? "#EF4444" : "#999",
+                    background: signed
+                      ? "rgba(154,136,253,0.1)"
+                      : refused
+                        ? "rgba(239,68,68,0.1)"
+                        : "#EEEDE9",
                     padding: "4px 10px",
                     borderRadius: 8,
                     textTransform: "uppercase",
                   }}
                 >
-                  {signed ? "Signed" : "Pending"}
+                  {signed ? "Signed" : refused ? "Refused" : "Pending"}
                 </span>
               </div>
             );
