@@ -271,6 +271,14 @@ function SendForSignaturePartySections({
               <button
                 type="button"
                 onClick={() => {
+                  const existingSig = signatureStatus.find((s) => s.signer_type === "landlord");
+                  if (existingSig?.signed_at) return;
+                  if (existingSig && !existingSig.signed_at) {
+                    const confirmed = window.confirm(
+                      `A ${existingSig.signing_mode === "remote" ? "remote" : "in-person"} signature request is already active. Switch to in-person and cancel the previous request?`
+                    );
+                    if (!confirmed) return;
+                  }
                   setShowSignModal(false);
                   setTimeout(() => {
                     setInPersonModal({
@@ -495,6 +503,14 @@ function SendForSignaturePartySections({
               <button
                 type="button"
                 onClick={() => {
+                  const existingSig = signatureStatus.find((s) => s.signer_type === "tenant");
+                  if (existingSig?.signed_at) return;
+                  if (existingSig && !existingSig.signed_at) {
+                    const confirmed = window.confirm(
+                      `A ${existingSig.signing_mode === "remote" ? "remote" : "in-person"} signature request is already active. Switch to in-person and cancel the previous request?`
+                    );
+                    if (!confirmed) return;
+                  }
                   setShowSignModal(false);
                   setTimeout(() => {
                     setInPersonModal({
@@ -957,6 +973,17 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
     if (!email?.trim()) {
       alert("No email for this signer.");
       return;
+    }
+    const existingSig = signatureStatus.find((s) => s.signer_type === signerType);
+    if (existingSig?.signed_at) {
+      alert("This party has already signed.");
+      return;
+    }
+    if (existingSig && !existingSig.signed_at) {
+      const confirmed = window.confirm(
+        `A ${existingSig.signing_mode === "in_person" ? "in-person" : "remote"} signature request is already active for this party. Switch to remote and cancel the previous request?`
+      );
+      if (!confirmed) return;
     }
     setSending(true);
     try {

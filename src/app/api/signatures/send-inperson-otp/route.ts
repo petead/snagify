@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
+import { randomUUID } from 'node:crypto'
 import { IN_PERSON_OTP_MS } from '@/lib/constants'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -26,10 +27,27 @@ export async function POST(req: NextRequest) {
   const otp = Math.floor(100000 + Math.random() * 900000).toString()
   const expiresAt = new Date(Date.now() + IN_PERSON_OTP_MS)
 
-  // Upsert signature record with in_person mode
+  const { data: existingRow } = await supabaseAdmin
+    .from('signatures')
+    .select('id, signed_at')
+    .eq('inspection_id', inspectionId)
+    .eq('signer_type', signerType)
+    .maybeSingle()
+
+  if (existingRow?.signed_at) {
+    return NextResponse.json({ error: 'Already signed' }, { status: 400 })
+  }
+
+  if (existingRow?.id) {
+    await supabaseAdmin
+      .from('signatures')
+      .delete()
+      .eq('id', existingRow.id)
+  }
+
   const { data: sig, error } = await supabaseAdmin
     .from('signatures')
-    .upsert({
+    .insert({
       inspection_id: inspectionId,
       signer_type: signerType,
       email,
@@ -39,13 +57,11 @@ export async function POST(req: NextRequest) {
       expires_at: expiresAt.toISOString(),
       signing_mode: 'in_person',
       ip_address: ip,
-      // Reset remote fields in case remote was sent before
       sign_url: null,
       signature_data: null,
       signed_at: null,
-    }, {
-      onConflict: 'inspection_id,signer_type',
-      ignoreDuplicates: false,
+      refuse_token: randomUUID(),
+      refuse_token_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     })
     .select('id')
     .single()

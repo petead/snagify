@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       : "—";
 
     const signingWindowMs = 7 * 24 * 60 * 60 * 1000;
-    const { data: existingSig } = await supabaseAdmin
+    const { data: existingSigRefuse } = await supabaseAdmin
       .from("signatures")
       .select("refuse_token, refuse_token_expires_at")
       .eq("inspection_id", inspectionId)
@@ -83,32 +83,42 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     const refuseToken =
-      existingSig?.refuse_token ?? randomUUID();
+      existingSigRefuse?.refuse_token ?? randomUUID();
     const refuseTokenExpiresAt =
-      existingSig?.refuse_token_expires_at ??
+      existingSigRefuse?.refuse_token_expires_at ??
       new Date(Date.now() + signingWindowMs).toISOString();
 
-    // Upsert signature record with remote mode
-    const { error: dbError } = await supabaseAdmin.from("signatures").upsert(
-      {
-        inspection_id: inspectionId,
-        signer_type: signerType,
-        email,
-        signer_name: signerName,
-        sign_url: signUrl,
-        signing_mode: "remote",
-        expires_at: expiresAt,
-        ip_address: ip,
-        refuse_token: refuseToken,
-        refuse_token_expires_at: refuseTokenExpiresAt,
-        // Reset in_person fields in case it was attempted before
-        otp_code: null,
-        otp_verified: false,
-        signature_data: null,
-        signed_at: null,
-      },
-      { onConflict: "inspection_id,signer_type", ignoreDuplicates: false }
-    );
+    const { data: existingRow } = await supabaseAdmin
+      .from("signatures")
+      .select("id, signed_at")
+      .eq("inspection_id", inspectionId)
+      .eq("signer_type", signerType)
+      .maybeSingle();
+
+    if (existingRow?.signed_at) {
+      return Response.json({ error: "Already signed" }, { status: 400 });
+    }
+
+    if (existingRow?.id) {
+      await supabaseAdmin.from("signatures").delete().eq("id", existingRow.id);
+    }
+
+    const { error: dbError } = await supabaseAdmin.from("signatures").insert({
+      inspection_id: inspectionId,
+      signer_type: signerType,
+      email,
+      signer_name: signerName,
+      sign_url: signUrl,
+      signing_mode: "remote",
+      expires_at: expiresAt,
+      ip_address: ip,
+      refuse_token: refuseToken,
+      refuse_token_expires_at: refuseTokenExpiresAt,
+      otp_code: null,
+      otp_verified: false,
+      signature_data: null,
+      signed_at: null,
+    });
 
     if (dbError) {
       console.error("Supabase error:", dbError);

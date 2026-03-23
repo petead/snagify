@@ -53,6 +53,7 @@ function SignPageContent() {
   const [otpLoading, setOtpLoading] = useState(false)
   const [hasDrawn, setHasDrawn] = useState(false)
   const [submitLoading, setSubmitLoading] = useState(false)
+  const [signingMode, setSigningMode] = useState<'remote' | 'in_person'>('remote')
   const [refuseToken, setRefuseToken] = useState<string | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const isDrawing = useRef(false)
@@ -76,10 +77,12 @@ function SignPageContent() {
 
     const { inspection, mySig, refuseToken: rt } = await res.json() as {
       inspection: SignInspectionData
-      mySig?: { signed_at?: string | null }
+      mySig?: { signed_at?: string | null; signing_mode?: string | null }
       refuseToken?: string | null
     }
 
+    const detectedMode = (mySig as { signing_mode?: string } | null)?.signing_mode ?? 'remote'
+    setSigningMode(detectedMode as 'remote' | 'in_person')
     setRefuseToken(rt ?? null)
 
     if (mySig?.signed_at) {
@@ -109,6 +112,12 @@ function SignPageContent() {
   }
 
   async function handleRequestOtp() {
+    if (signingMode === 'remote') {
+      setStep('pad')
+      setTimeout(() => initCanvas(), 150)
+      return
+    }
+
     setOtpLoading(true)
     try {
       await fetch('/api/signatures/send-inperson-otp', {
@@ -610,7 +619,7 @@ function SignPageContent() {
                       stroke="white" strokeWidth="2" strokeLinecap="round"
                       strokeLinejoin="round"/>
                   </svg>
-                  Sign this report
+                  {signingMode === 'remote' ? 'Sign this report' : 'Sign this report'}
                 </>
             }
           </button>
