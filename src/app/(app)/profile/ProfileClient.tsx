@@ -502,62 +502,230 @@ export function ProfileClient({
             <p style={{ fontSize: 13, color: "#BBB", margin: "0 0 12px", fontWeight: 500, letterSpacing: 2, textTransform: "uppercase" }}>
               Subscription
             </p>
-            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowSubscription(true)} className="w-full text-left" type="button">
-              <div className="w-full overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-                <div className="h-1 w-full" style={{ backgroundColor: planColor }} />
-                <div className="flex items-center justify-between px-4 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: `${planColor}15` }}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={planColor} strokeWidth="2" strokeLinecap="round">
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setShowSubscription(true)}
+              className="w-full text-left"
+              type="button"
+            >
+              <div
+                style={{
+                  background: "white",
+                  borderRadius: 20,
+                  overflow: "hidden",
+                  border: "1px solid #F3F4F6",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+                }}
+              >
+                {/* Color top bar */}
+                <div style={{ height: 3, background: planColor, width: "100%" }} />
+
+                {/* Main row */}
+                <div
+                  style={{
+                    padding: "16px 18px 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    {/* Icon */}
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 14,
+                        background: `${planColor}15`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke={planColor}
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      >
                         <rect x="2" y="3" width="20" height="14" rx="2" />
                         <path d="M8 21h8M12 17v4" />
                       </svg>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Subscription</p>
-                      <div className="mt-0.5 flex items-center gap-2">
-                        <p className="text-base font-black text-gray-900 capitalize">{company?.plan ?? "Free"}</p>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          marginBottom: 3,
+                        }}
+                      >
+                        <p
+                          style={{
+                            fontFamily: "Poppins, sans-serif",
+                            fontSize: 17,
+                            fontWeight: 800,
+                            color: "#1A1A1A",
+                            margin: 0,
+                            textTransform: "capitalize",
+                          }}
+                        >
+                          {company?.plan ?? "Free"}
+                        </p>
                         {isSubscribed ? (
-                          <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white" style={{ backgroundColor: planColor }}>
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 700,
+                              color: "white",
+                              background: planColor,
+                              padding: "2px 7px",
+                              borderRadius: 20,
+                              textTransform: "uppercase",
+                              letterSpacing: 0.5,
+                            }}
+                          >
                             Active
                           </span>
                         ) : (
-                          <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold text-gray-500">No plan</span>
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 700,
+                              color: "#9CA3AF",
+                              background: "#F3F4F6",
+                              padding: "2px 7px",
+                              borderRadius: 20,
+                            }}
+                          >
+                            No plan
+                          </span>
                         )}
                       </div>
+                      {/* Billing period */}
+                      {isSubscribed && (
+                        <p style={{ fontSize: 11, color: "#9CA3AF", margin: 0 }}>
+                          {company?.billing_period === "annual"
+                            ? "📅 Annual billing"
+                            : "📅 Monthly billing"}
+                        </p>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <p className="text-[10px] text-gray-400">Credits</p>
-                      <p className="text-lg font-black" style={{ color: planColor }}>
+
+                  {/* Credits + arrow */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ textAlign: "right" }}>
+                      <p style={{ fontSize: 10, color: "#9CA3AF", margin: "0 0 2px" }}>
+                        Credits
+                      </p>
+                      <p
+                        style={{
+                          fontSize: 20,
+                          fontWeight: 800,
+                          color: planColor,
+                          fontFamily: "Poppins, sans-serif",
+                          margin: 0,
+                        }}
+                      >
                         {company?.credits_balance ?? 0}
                       </p>
                     </div>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#D1D5DB"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                    >
                       <polyline points="9 18 15 12 9 6" />
                     </svg>
                   </div>
                 </div>
+
+                {/* Bottom section */}
                 {isSubscribed ? (
-                  <div className="flex items-center justify-between border-t border-gray-50 px-4 pb-3">
-                    <p className="text-[11px] text-gray-400">Renews {formatDate(company?.billing_cycle_reset_at)}</p>
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-gray-100">
+                  <div
+                    style={{
+                      borderTop: "1px solid #F9FAFB",
+                      padding: "10px 18px 14px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                    }}
+                  >
+                    {/* Renewal date */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#9CA3AF"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      >
+                        <rect x="3" y="4" width="18" height="18" rx="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                      <p style={{ fontSize: 11, color: "#9CA3AF", margin: 0 }}>
+                        Renews {formatDate(company?.billing_cycle_reset_at)}
+                      </p>
+                    </div>
+
+                    {/* Credits progress bar */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div
+                        style={{
+                          width: 72,
+                          height: 5,
+                          borderRadius: 99,
+                          background: "#F3F4F6",
+                          overflow: "hidden",
+                        }}
+                      >
                         <div
-                          className="h-full rounded-full transition-all duration-500"
                           style={{
-                            backgroundColor: planColor,
-                            width: `${Math.min(100, maxCredits > 0 ? ((company?.credits_balance ?? 0) / maxCredits) * 100 : 0)}%`,
+                            height: "100%",
+                            borderRadius: 99,
+                            background: planColor,
+                            width: `${Math.min(
+                              100,
+                              maxCredits > 0
+                                ? ((company?.credits_balance ?? 0) / maxCredits) * 100
+                                : 0
+                            )}%`,
+                            transition: "width 0.5s ease",
                           }}
                         />
                       </div>
-                      <p className="text-[10px] text-gray-400">{company?.credits_balance ?? 0}/{maxCredits} cr</p>
+                      <p
+                        style={{
+                          fontSize: 10,
+                          color: "#9CA3AF",
+                          margin: 0,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {company?.credits_balance ?? 0}/{maxCredits} cr
+                      </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="border-t border-gray-50 px-4 pb-3">
-                    <p className="text-[11px] font-semibold text-[#9A88FD]">Upgrade to Pro to start inspecting →</p>
+                  <div style={{ borderTop: "1px solid #F9FAFB", padding: "10px 18px 14px" }}>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: planColor, margin: 0 }}>
+                      Upgrade to Pro to start inspecting →
+                    </p>
                   </div>
                 )}
               </div>
