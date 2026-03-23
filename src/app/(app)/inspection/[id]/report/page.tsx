@@ -100,6 +100,8 @@ export type Signature = {
   otp_verified: boolean | null;
   signed_at: string | null;
   signature_data: string | null;
+  refused_at?: string | null;
+  refused_reason?: string | null;
 };
 
 export type PropertyRelation = {
