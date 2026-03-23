@@ -1095,7 +1095,7 @@ export function InspectionClient({
 
     for (const file of fileArray) {
       const isLandscapePhoto = await new Promise<boolean>((resolve) => {
-        const img = new Image();
+        const img = new window.Image();
         img.onload = () => {
           resolve(img.naturalWidth > img.naturalHeight);
           URL.revokeObjectURL(img.src);
