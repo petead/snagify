@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { Check, Camera } from "lucide-react";
 import { motion } from "framer-motion";
@@ -394,6 +394,7 @@ export function InspectionClient({
   initialCheckinKeyHandover = [],
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const isCheckout = inspectionType === "check-out";
 
@@ -471,6 +472,13 @@ export function InspectionClient({
   const notesTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const tagsTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const deletedPhotoIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (searchParams.get("autostart") === "1" && screen === "rooms") {
+      setScreen("inspect");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount for autostart deep-link
+  }, []);
 
   // Lock body scroll
   useEffect(() => {
