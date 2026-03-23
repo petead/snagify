@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import {
   generateInspectionPDFBuffer,
   type ReportData,
@@ -737,48 +737,6 @@ export async function buildPdfAndUpload(
         console.error("[generate-pdf] Failed to save report_url:", updateErr.message);
       } else {
         reportUrl = bustUrl;
-        // Refuse tokens for landlord + tenant (7-day window, same as signing_deadline)
-        const refuseExp = signingDeadline;
-        const tenancyForTokens = Array.isArray(row.tenancies)
-          ? row.tenancies[0]
-          : row.tenancies;
-        for (const signerType of ["landlord", "tenant"] as const) {
-          const signerEmail =
-            signerType === "landlord"
-              ? tenancyForTokens?.landlord_email
-              : tenancyForTokens?.tenant_email;
-          const signerName =
-            signerType === "landlord"
-              ? tenancyForTokens?.landlord_name
-              : tenancyForTokens?.tenant_name;
-          if (!signerEmail) continue;
-          const refuseToken = randomUUID();
-          const { data: sigRow } = await storageClient
-            .from("signatures")
-            .select("id, signed_at")
-            .eq("inspection_id", inspectionId)
-            .eq("signer_type", signerType)
-            .maybeSingle();
-          if (sigRow?.signed_at) continue;
-          if (sigRow) {
-            await storageClient
-              .from("signatures")
-              .update({
-                refuse_token: refuseToken,
-                refuse_token_expires_at: refuseExp,
-              })
-              .eq("id", sigRow.id);
-          } else {
-            await storageClient.from("signatures").insert({
-              inspection_id: inspectionId,
-              signer_type: signerType,
-              email: signerEmail,
-              signer_name: signerName ?? "",
-              refuse_token: refuseToken,
-              refuse_token_expires_at: refuseExp,
-            });
-          }
-        }
       }
     }
 
