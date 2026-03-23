@@ -214,35 +214,27 @@ export function CheckoutReportView({
           </div>
 
           {!hasCheckinData ? (
-            /* Skeleton loader when checkinData is not available */
-            <div className="animate-pulse p-4">
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <div className="bg-[#F8F7F4] rounded-xl p-3">
-                  <div className="h-3 bg-gray-200 rounded w-16 mb-3" />
-                  <div className="space-y-2">
-                    <div className="h-3 bg-gray-200 rounded w-full" />
-                    <div className="h-3 bg-gray-200 rounded w-full" />
-                    <div className="h-3 bg-gray-200 rounded w-full" />
-                  </div>
-                </div>
-                <div className="bg-[#EDE9FF]/30 rounded-xl p-3 border border-[#EDE9FF]">
-                  <div className="h-3 bg-[#EDE9FF] rounded w-16 mb-3" />
-                  <div className="space-y-2">
-                    <div className="h-3 bg-[#EDE9FF] rounded w-full" />
-                    <div className="h-3 bg-[#EDE9FF] rounded w-full" />
-                    <div className="h-3 bg-[#EDE9FF] rounded w-full" />
-                  </div>
-                </div>
-              </div>
-              <div className="bg-[#FEF3C7] rounded-xl p-3 flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
-                  <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-                    stroke="#D97706" strokeWidth="1.8" strokeLinecap="round"/>
-                </svg>
-                <span className="text-[12px] text-[#92400E] font-medium">
-                  No check-in report found for this property
-                </span>
-              </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '40px 0',
+              }}
+            >
+              <svg
+                style={{ animation: 'spin 0.7s linear infinite' }}
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#9A88FD"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
             </div>
           ) : stats && (
             <div className="p-4">
