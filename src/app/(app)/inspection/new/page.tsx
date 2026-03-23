@@ -443,12 +443,26 @@ function NewInspectionContent() {
     const tenantEmail = formData.tenant_email?.trim().toLowerCase();
     if (!tenantEmail) return false;
 
-    const { data: existingTenancies } = await supabase
+    // Determine the property we're creating for
+    const currentPropertyId = existingProperty?.id ?? null;
+
+    // Only warn if this tenant has an active tenancy on THIS SAME property
+    // without a completed check-out — not on other properties
+    const query = supabase
       .from("tenancies")
-      .select("id")
+      .select("id, property_id")
       .eq("tenant_email", tenantEmail)
       .eq("status", "active");
 
+    // If we know the property, scope to it
+    if (currentPropertyId) {
+      query.eq("property_id", currentPropertyId);
+    } else {
+      // New property — no conflict possible, tenant never had this property
+      return false;
+    }
+
+    const { data: existingTenancies } = await query;
     if (!existingTenancies || existingTenancies.length === 0) return false;
 
     const tenancyIds = existingTenancies.map((t) => t.id);
