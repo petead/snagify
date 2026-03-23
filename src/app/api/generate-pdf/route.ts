@@ -241,8 +241,7 @@ const INSPECTION_SELECT = `
 /** Build PDF and upload to storage; always overwrites. Returns report_url and buffer. */
 export async function buildPdfAndUpload(
   inspectionId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  existingClient?: any
+  existingClient?: any // noqa
 ): Promise<{ report_url: string | null; buffer: Uint8Array }> {
   try {
     // Use provided admin client if available (e.g. called from submit-pad/cron)
