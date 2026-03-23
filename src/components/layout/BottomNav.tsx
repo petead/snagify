@@ -1,11 +1,11 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Home, Building2, Plus, FileText, User } from "lucide-react";
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const router = useRouter();
 
   const tabs = [
     { icon: Home, label: "Home", path: "/dashboard" },
@@ -30,25 +30,23 @@ export default function BottomNav() {
 
           if (isCenter) {
             return (
-              <button
+              <Link
                 key="new"
-                type="button"
-                onClick={() => router.push("/inspection/new")}
+                href="/inspection/new"
                 className="flex items-center justify-center w-14 h-14 rounded-2xl shadow-lg -mt-5 transition-transform active:scale-95"
                 style={{
                   background: "linear-gradient(135deg, #9A88FD, #7B65FC)",
                 }}
               >
                 <Plus size={26} color="white" strokeWidth={2.5} />
-              </button>
+              </Link>
             );
           }
 
           return (
-            <button
+            <Link
               key={tab.path}
-              type="button"
-              onClick={() => router.push(tab.path)}
+              href={tab.path}
               className="flex flex-col items-center justify-center gap-1 flex-1 h-full transition-all active:scale-95"
             >
               <tab.icon
@@ -62,7 +60,7 @@ export default function BottomNav() {
               >
                 {tab.label}
               </span>
-            </button>
+            </Link>
           );
         })}
       </div>

@@ -8,68 +8,72 @@ export function TopLoader() {
   const pathname = usePathname();
   const prevPath = useRef(pathname);
 
-  // Demarre au changement de pathname (fonctionne pour Link ET router.push)
-  useEffect(() => {
-    if (pathname === prevPath.current) return;
-    prevPath.current = pathname;
-
+  const startBar = () => {
     const bar = barRef.current;
     if (!bar) return;
-
-    // Reset
+    if (timerRef.current) clearTimeout(timerRef.current);
     bar.style.transition = "none";
     bar.style.width = "0%";
     bar.style.opacity = "1";
     void bar.offsetWidth;
+    bar.style.transition = "width 3s cubic-bezier(0.05, 0.8, 0.5, 1)";
+    bar.style.width = "92%";
+  };
 
-    // Avance rapidement a 90%
-    bar.style.transition = "width 0.3s ease";
-    bar.style.width = "90%";
-
-    // Complete apres 300ms
+  const completeBar = () => {
+    const bar = barRef.current;
+    if (!bar) return;
     if (timerRef.current) clearTimeout(timerRef.current);
+    bar.style.transition = "width 0.15s ease";
+    bar.style.width = "100%";
     timerRef.current = setTimeout(() => {
-      bar.style.transition = "width 0.1s ease";
-      bar.style.width = "100%";
+      bar.style.transition = "opacity 0.2s ease";
+      bar.style.opacity = "0";
       setTimeout(() => {
-        bar.style.transition = "opacity 0.25s ease";
-        bar.style.opacity = "0";
-        setTimeout(() => {
-          bar.style.transition = "none";
-          bar.style.width = "0%";
-        }, 300);
-      }, 100);
-    }, 300);
-  }, [pathname]);
+        bar.style.transition = "none";
+        bar.style.width = "0%";
+      }, 250);
+    }, 150);
+  };
 
-  // Demarre au clic sur <a> pour reactivite immediate
+  // -- Demarre immediatement au touchstart/mousedown --
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      const a = (e.target as HTMLElement).closest("a");
-      if (!a) return;
+    const isInternalLink = (el: EventTarget | null): boolean => {
+      const a = (el as HTMLElement)?.closest?.("a");
+      if (!a) return false;
       const href = a.getAttribute("href");
+      if (!href) return false;
       if (
-        !href ||
         href.startsWith("#") ||
         href.startsWith("http") ||
         href.startsWith("mailto")
       )
-        return;
-      if (href === window.location.pathname) return;
-
-      const bar = barRef.current;
-      if (!bar) return;
-      bar.style.transition = "none";
-      bar.style.width = "0%";
-      bar.style.opacity = "1";
-      void bar.offsetWidth;
-      bar.style.transition = "width 2s cubic-bezier(0.1,0.05,0,1)";
-      bar.style.width = "85%";
+        return false;
+      if (href === window.location.pathname) return false;
+      return true;
     };
 
-    document.addEventListener("click", handleClick);
-    return () => document.removeEventListener("click", handleClick);
+    const onStart = (e: TouchEvent | MouseEvent) => {
+      if (isInternalLink(e.target)) startBar();
+    };
+
+    // touchstart = instantane sur mobile (pas de delai 300ms)
+    document.addEventListener("touchstart", onStart, { passive: true });
+    // mousedown = instantane sur desktop
+    document.addEventListener("mousedown", onStart);
+
+    return () => {
+      document.removeEventListener("touchstart", onStart as EventListener);
+      document.removeEventListener("mousedown", onStart as EventListener);
+    };
   }, []);
+
+  // -- Complete quand la page est vraiment chargee --
+  useEffect(() => {
+    if (pathname === prevPath.current) return;
+    prevPath.current = pathname;
+    completeBar();
+  }, [pathname]);
 
   return (
     <div
@@ -85,7 +89,7 @@ export function TopLoader() {
         opacity: 0,
         pointerEvents: "none",
         borderRadius: "0 2px 2px 0",
-        boxShadow: "0 0 8px rgba(154,136,253,0.5)",
+        boxShadow: "0 0 10px rgba(154,136,253,0.6)",
       }}
     />
   );
