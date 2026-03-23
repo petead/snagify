@@ -312,7 +312,15 @@ export async function buildPdfAndUpload(
             .from("photos")
             .select("id, url, damage_tags, ai_analysis, width, height, taken_at")
             .in("id", checkinPhotoIds);
-          (checkinPhotos ?? []).forEach((p) => {
+          (checkinPhotos ?? []).forEach((p: {
+            id: string;
+            url: string | null;
+            damage_tags?: string[] | null;
+            ai_analysis?: string | null;
+            width?: number | null;
+            height?: number | null;
+            taken_at?: string | null;
+          }) => {
             checkinPhotosById.set(p.id, {
               id: p.id,
               url: p.url ?? "",
