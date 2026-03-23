@@ -1923,11 +1923,14 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
         {/* Signatures */}
         <Section delay="0.46s" loaded={loaded} icon={iconSign} title="Signatures">
           {(["landlord", "tenant"] as const).map((type, i) => {
+            // Prefer live signatureStatus (has refused_at) over initial signatures
+            const liveSig = signatureStatus.find((s) => s.signer_type === type);
             const sig = signatures.find((s) => s.signer_type === type);
-            const signed = !!sig?.signed_at;
-            const refused = !!(sig as { refused_at?: string | null } | undefined)?.refused_at;
-            const refusedReason = (sig as { refused_reason?: string | null } | undefined)
-              ?.refused_reason;
+
+            const signed = !!(liveSig?.signed_at ?? sig?.signed_at);
+            const refused = !!liveSig?.refused_at;
+            const refusedReason = liveSig?.refused_reason ?? null;
+            const signedAt = liveSig?.signed_at ?? sig?.signed_at ?? null;
             return (
               <div
                 key={type}
@@ -2005,8 +2008,8 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
                         margin: "1px 0 0",
                       }}
                     >
-                      {signed && sig?.signed_at
-                        ? `Signed on ${formatDate(sig.signed_at)}`
+                      {signed && signedAt
+                        ? `Signed on ${formatDate(signedAt)}`
                         : refused
                           ? `Refused to sign${refusedReason ? ` — "${refusedReason}"` : ""}`
                           : "Pending signature"}
