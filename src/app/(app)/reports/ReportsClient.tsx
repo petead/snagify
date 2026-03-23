@@ -442,13 +442,13 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                     <div
                       style={{
                         width: 50, height: 50, borderRadius: 15,
-                        background: "#EDE9FF",
+                        background: report.type === "check-in" ? "#EDE9FF" : "#FEF3C7",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         flexShrink: 0,
                       }}
                     >
                       {report.type === "check-in" ? (
-                        // Arrow entering — check-in
+                        // Arrow entering — check-in (purple)
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                           <path
                             d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"
@@ -467,21 +467,21 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                           />
                         </svg>
                       ) : (
-                        // Arrow leaving — check-out
+                        // Arrow leaving — check-out (amber)
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                           <path
                             d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"
-                            stroke="#9A88FD" strokeWidth="1.8"
+                            stroke="#D97706" strokeWidth="1.8"
                             strokeLinecap="round" strokeLinejoin="round"
                           />
                           <path
                             d="M16 17l5-5-5-5"
-                            stroke="#9A88FD" strokeWidth="1.8"
+                            stroke="#D97706" strokeWidth="1.8"
                             strokeLinecap="round" strokeLinejoin="round"
                           />
                           <path
                             d="M21 12H9"
-                            stroke="#9A88FD" strokeWidth="1.8"
+                            stroke="#D97706" strokeWidth="1.8"
                             strokeLinecap="round"
                           />
                         </svg>
