@@ -89,6 +89,15 @@ export async function POST(req: NextRequest) {
   const allExpressed = landlordExpressed && tenantExpressed
   const anyRefused = !!(landlordSig?.refused_at || tenantSig?.refused_at)
 
+  // Always regenerate PDF so the latest signatures are embedded
+  // regardless of whether all parties have signed yet
+  try {
+    await buildPdfAndUpload(inspectionId)
+  } catch (pdfErr) {
+    console.error('[submit-pad] PDF regeneration after signature failed:', pdfErr)
+    // Non-blocking — signature is saved even if PDF regeneration fails
+  }
+
   if (allSigned) {
     const now = new Date().toISOString()
 
@@ -116,16 +125,22 @@ export async function POST(req: NextRequest) {
       .eq('id', inspectionId)
       .single()
 
-    // Regenerate PDF so landlord/tenant/inspector signatures are embedded, then email once
     if (fullInspection && !fullInspection.pdf_sent_at) {
       try {
-        const { report_url: freshReportUrl } = await buildPdfAndUpload(inspectionId)
+        // PDF already regenerated above — just fetch the latest URL
+        const { data: freshInsp } = await supabaseAdmin
+          .from('inspections')
+          .select('report_url')
+          .eq('id', inspectionId)
+          .single()
+
+        const freshReportUrl = freshInsp?.report_url
         if (!freshReportUrl) {
-          console.error('[submit-pad] buildPdfAndUpload returned no report_url; skipping signed email')
+          console.error('[submit-pad] No report_url after regeneration; skipping signed email')
         } else {
         const company = (fullInspection.agent as any)?.company
         const tenancy = fullInspection.tenancy as any
-        const property = fullInspection.property as { location?: string; building_name?: string; unit_number?: string }
+        const property = fullInspection.property as any
         const agent = fullInspection.agent as any
 
         const propertyLabel = formatPropertyBuildingUnit(property)
@@ -170,7 +185,7 @@ export async function POST(req: NextRequest) {
           .eq('id', inspectionId)
         }
       } catch (emailErr) {
-        console.error('Failed to regenerate PDF or send signed PDF email:', emailErr)
+        console.error('[submit-pad] Failed to send signed PDF email:', emailErr)
       }
     }
   } else if (allExpressed && anyRefused) {
