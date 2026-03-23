@@ -11,11 +11,55 @@ interface PricingGridProps {
   onSuccess?: () => void;
 }
 
-const starterPricePerCredit = 149 / 10;
 const plans = [
-  { slug: "starter", name: "Starter", price: 149, credits: 10, extraCredit: 18, users: "1", usersLabel: "inspector", popular: false, color: "#9A88FD", priceId: "price_1TC1CrKIsjOh5d33lCuUGmcd", savings: null },
-  { slug: "growth", name: "Growth", price: 249, credits: 20, extraCredit: 15, users: "3", usersLabel: "inspectors", popular: true, color: "#7C3AED", priceId: "price_1TC1D3KIsjOh5d33oEd1E3T1", savings: Math.round(((starterPricePerCredit - 12.45) / starterPricePerCredit) * 100) },
-  { slug: "agency", name: "Agency", price: 349, credits: 30, extraCredit: 13, users: "∞", usersLabel: "inspectors", popular: false, color: "#1E1B4B", priceId: "price_1TC1DPKIsjOh5d33hlQhhUTf", savings: Math.round(((starterPricePerCredit - 11.63) / starterPricePerCredit) * 100) },
+  {
+    slug: "starter",
+    name: "Starter",
+    priceMonthly: 163,
+    priceAnnual: 1788,
+    priceAnnualPerMonth: Math.round(1788 / 12),
+    credits: 10,
+    extraCredit: 18,
+    users: "2",
+    usersLabel: "inspectors",
+    popular: false,
+    color: "#9A88FD",
+    priceIdMonthly: "price_1TE2MgKIsjOh5d33hZSBKdcA",
+    priceIdAnnual: "price_1TE2MgKIsjOh5d332jt7VWLL",
+    savings: null,
+  },
+  {
+    slug: "growth",
+    name: "Growth",
+    priceMonthly: 272,
+    priceAnnual: 2988,
+    priceAnnualPerMonth: Math.round(2988 / 12),
+    credits: 20,
+    extraCredit: 15,
+    users: "5",
+    usersLabel: "inspectors",
+    popular: true,
+    color: "#7C3AED",
+    priceIdMonthly: "price_1TE2MiKIsjOh5d33TNdCW9Zt",
+    priceIdAnnual: "price_1TE2MiKIsjOh5d33eIFo0iZA",
+    savings: 16,
+  },
+  {
+    slug: "agency",
+    name: "Agency",
+    priceMonthly: 381,
+    priceAnnual: 4188,
+    priceAnnualPerMonth: Math.round(4188 / 12),
+    credits: 30,
+    extraCredit: 13,
+    users: "15",
+    usersLabel: "inspectors",
+    popular: false,
+    color: "#1E1B4B",
+    priceIdMonthly: "price_1TE2MjKIsjOh5d33N0LSakoU",
+    priceIdAnnual: "price_1TE2MjKIsjOh5d33qysgoe08",
+    savings: 22,
+  },
 ] as const;
 
 function normalizePlan(plan: string): string {
@@ -28,7 +72,14 @@ function normalizePlan(plan: string): string {
 export function PricingGrid({ currentPlan, creditsBalance, companyId: _companyId, onSuccess }: PricingGridProps) {
   const [selected, setSelected] = useState(1);
   const [loading, setLoading] = useState<string | null>(null);
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("annual");
   const activePlan = normalizePlan(currentPlan ?? "free");
+
+  const getPrice = (plan: (typeof plans)[number]) =>
+    billingPeriod === "annual" ? plan.priceAnnualPerMonth : plan.priceMonthly;
+
+  const getPriceId = (plan: (typeof plans)[number]) =>
+    billingPeriod === "annual" ? plan.priceIdAnnual : plan.priceIdMonthly;
 
   const handleSelectPlan = async (slug: string) => {
     const plan = plans.find((p) => p.slug === slug);
@@ -38,7 +89,12 @@ export function PricingGrid({ currentPlan, creditsBalance, companyId: _companyId
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "subscription", price_id: plan.priceId, plan_slug: plan.slug }),
+        body: JSON.stringify({
+          type: "subscription",
+          price_id: getPriceId(plan),
+          plan_slug: plan.slug,
+          billing_period: billingPeriod,
+        }),
       });
       const data = (await res.json()) as { url?: string };
       if (data.url) {
@@ -77,6 +133,60 @@ export function PricingGrid({ currentPlan, creditsBalance, companyId: _companyId
         </div>
       </div>
 
+      {/* Monthly / Annual toggle */}
+      <div className="px-5 mb-5">
+        <div className="flex items-center bg-white rounded-2xl border border-gray-100 p-1 gap-1">
+          <button
+            type="button"
+            onClick={() => setBillingPeriod("monthly")}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all"
+            style={{
+              background: billingPeriod === "monthly" ? "#1A1A1A" : "transparent",
+              color: billingPeriod === "monthly" ? "white" : "#9CA3AF",
+            }}
+          >
+            Monthly
+          </button>
+          <button
+            type="button"
+            onClick={() => setBillingPeriod("annual")}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all relative"
+            style={{
+              background: billingPeriod === "annual" ? "#9A88FD" : "transparent",
+              color: billingPeriod === "annual" ? "white" : "#9CA3AF",
+            }}
+          >
+            Annual
+            {/* Savings badge */}
+            <span
+              style={{
+                position: "absolute",
+                top: -8,
+                right: 8,
+                background: "#22C55E",
+                color: "white",
+                fontSize: 9,
+                fontWeight: 800,
+                padding: "1px 6px",
+                borderRadius: 20,
+              }}
+            >
+              1 month free
+            </span>
+          </button>
+        </div>
+        {billingPeriod === "annual" && (
+          <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 6 }}>
+            Billed annually · no commitment
+          </p>
+        )}
+        {billingPeriod === "monthly" && (
+          <p style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 6 }}>
+            Billed monthly · no commitment
+          </p>
+        )}
+      </div>
+
       <div className="px-5 mb-4">
         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Choose a plan</p>
         <div className="grid grid-cols-3 gap-2">
@@ -96,8 +206,23 @@ export function PricingGrid({ currentPlan, creditsBalance, companyId: _companyId
                 </motion.div>
               )}
               <motion.p animate={{ color: selected === i ? "#FFFFFF" : "#111827" }} className="text-xs font-bold mb-1">{plan.name}</motion.p>
-              <motion.p animate={{ color: selected === i ? "rgba(255,255,255,0.9)" : "#111827" }} className="text-xl font-black leading-none">{plan.price}</motion.p>
-              <motion.p animate={{ color: selected === i ? "rgba(255,255,255,0.5)" : "#9CA3AF" }} className="text-[9px] mt-0.5">AED/mo</motion.p>
+              <motion.p animate={{ color: selected === i ? "rgba(255,255,255,0.9)" : "#111827" }} className="text-xl font-black leading-none">
+                {getPrice(plan)}
+              </motion.p>
+              <motion.p animate={{ color: selected === i ? "rgba(255,255,255,0.5)" : "#9CA3AF" }} className="text-[9px] mt-0.5">
+                AED/mo
+              </motion.p>
+              {billingPeriod === "annual" && (
+                <p
+                  style={{
+                    fontSize: 8,
+                    color: selected === i ? "rgba(255,255,255,0.5)" : "#9CA3AF",
+                    marginTop: 1,
+                  }}
+                >
+                  billed {plan.priceAnnual}/yr
+                </p>
+              )}
             </motion.button>
           ))}
         </div>
@@ -134,7 +259,9 @@ export function PricingGrid({ currentPlan, creditsBalance, companyId: _companyId
           <div className="py-4 px-3 flex items-center"><p className="text-[11px] text-gray-500 leading-tight">Included price/cr</p></div>
           {plans.map((plan, i) => (
             <motion.div key={plan.slug} animate={{ backgroundColor: selected === i ? `${plan.color}08` : "transparent" }} className="py-4 flex items-center justify-center">
-              <motion.p animate={{ color: selected === i ? plan.color : "#111827" }} className="text-[12px] font-bold">{(plan.price / plan.credits).toFixed(2)}</motion.p>
+              <motion.p animate={{ color: selected === i ? plan.color : "#111827" }} className="text-[12px] font-bold">
+                {(getPrice(plan) / plan.credits).toFixed(2)}
+              </motion.p>
             </motion.div>
           ))}
         </div>
@@ -178,7 +305,18 @@ export function PricingGrid({ currentPlan, creditsBalance, companyId: _companyId
 
       <div className="fixed bottom-0 left-0 right-0 bg-[#F8F7F4]/95 backdrop-blur-sm px-5 pb-8 pt-4 border-t border-gray-100">
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={() => void handleSelectPlan(plans[selected].slug)} disabled={loading === plans[selected].slug || activePlan === plans[selected].slug} className="w-full py-4 rounded-2xl font-bold text-base text-white disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2" style={{ backgroundColor: plans[selected].color }} animate={{ backgroundColor: plans[selected].color }} transition={{ duration: 0.2 }}>
-          {loading === plans[selected].slug ? <><Loader2 className="h-4 w-4 animate-spin" />Processing...</> : activePlan === plans[selected].slug ? "✓ Current plan" : `Get ${plans[selected].name} — AED ${plans[selected].price}/mo`}
+          {loading === plans[selected].slug ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Processing...
+            </>
+          ) : activePlan === plans[selected].slug ? (
+            "✓ Current plan"
+          ) : billingPeriod === "annual" ? (
+            `Get ${plans[selected].name} — AED ${plans[selected].priceAnnual}/yr`
+          ) : (
+            `Get ${plans[selected].name} — AED ${plans[selected].priceMonthly}/mo`
+          )}
         </motion.button>
       </div>
     </div>
