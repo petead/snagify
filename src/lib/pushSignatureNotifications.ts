@@ -7,11 +7,20 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-async function sendToAgent(agentId: string, payload: {
-  title: string;
-  body: string;
-  url?: string;
-}) {
+async function sendToAgent(
+  agentId: string,
+  payload: { title: string; body: string; url?: string; type?: string }
+) {
+  await supabase
+    .from('notifications')
+    .insert({
+      user_id: agentId,
+      title: payload.title,
+      body: payload.body,
+      url: payload.url ?? null,
+      type: payload.type ?? 'general',
+    });
+
   const { data: subs } = await supabase
     .from('push_subscriptions')
     .select('endpoint, p256dh, auth')
@@ -72,6 +81,7 @@ export async function notifySignatureSigned(signatureId: string) {
       title: 'Signature Received',
       body: `${signerLabel} ${sig.signer_name || ''} just signed the inspection report for ${placeLabel}.`,
       url: `/inspection/${sig.inspection_id}/report`,
+      type: 'signature',
     });
   } catch (err) {
     console.error('[Push] notifySignatureSigned error:', err);
@@ -110,6 +120,7 @@ export async function notifyAllPartiesSigned(inspectionId: string) {
       title: 'All Parties Signed',
       body: `The inspection report for ${placeLabel} is fully signed and complete.`,
       url: `/inspection/${inspectionId}/report`,
+      type: 'signature',
     });
   } catch (err) {
     console.error('[Push] notifyAllPartiesSigned error:', err);
@@ -144,6 +155,7 @@ export async function notifyOpenedNotSigned() {
         title: 'Report Opened — Not Signed Yet',
         body: `${signerLabel} ${sig.signer_name || ''} opened the report for ${placeLabel} but hasn't signed yet.`,
         url: `/inspection/${sig.inspection_id}/report`,
+        type: 'signature',
       });
 
       await supabase
@@ -186,6 +198,7 @@ export async function notifyExpiringSignatures() {
         title: 'Signature Link Expiring Soon',
         body: `${signerLabel} ${sig.signer_name || ''}'s signature link for ${placeLabel} expires in less than 24 hours.`,
         url: `/inspection/${sig.inspection_id}/report`,
+        type: 'signature',
       });
 
       await supabase

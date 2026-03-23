@@ -17,11 +17,20 @@ const supabase = createClient(
 );
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-async function sendToUser(userId: string, payload: {
-  title: string;
-  body: string;
-  url?: string;
-}) {
+async function sendToUser(
+  userId: string,
+  payload: { title: string; body: string; url?: string; type?: string }
+) {
+  await supabase
+    .from('notifications')
+    .insert({
+      user_id: userId,
+      title: payload.title,
+      body: payload.body,
+      url: payload.url ?? null,
+      type: payload.type ?? 'general',
+    });
+
   const { data: subs } = await supabase
     .from('push_subscriptions')
     .select('endpoint, p256dh, auth')
@@ -87,6 +96,7 @@ async function notifyLeaseExpiry() {
         title: 'Lease Expiring in 30 Days',
         body: `${tenantName}'s lease at ${placeLabel} ends on ${contractTo}. Time to schedule a check-out inspection.`,
         url: '/properties',
+        type: 'lease',
       });
     }
   }
@@ -124,6 +134,7 @@ async function notifyInactivity() {
           title: 'Stay on top of your portfolio',
           body: "You haven't conducted any inspection in 30 days. Keep your records up to date.",
           url: '/properties',
+          type: 'general',
         });
       }
     }
@@ -284,6 +295,7 @@ async function sendReminder24h() {
           title: '📧 Reminder sent',
           body: `24h reminder sent to ${sig.signer_name || sig.signer_type} for ${propertyAddress}.`,
           url: `/inspection/${sig.inspection_id}/report`,
+          type: 'signature',
         });
       }
     }
@@ -445,6 +457,7 @@ async function sendReminder72h() {
           title: '⚠️ Final reminder sent',
           body: `72h urgent reminder sent to ${sig.signer_name || sig.signer_type} for ${propertyAddress}. 4 days left.`,
           url: `/inspection/${sig.inspection_id}/report`,
+          type: 'signature',
         });
       }
     }
@@ -637,6 +650,7 @@ async function processExpiredSignatures() {
           title: '🔒 Signature window expired',
           body: `${propertyAddress} — ${unsignedNames} did not sign within 7 days. Report marked as expired.`,
           url: `/inspection/${inspectionId}/report`,
+          type: 'expired',
         });
       }
 
