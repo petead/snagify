@@ -89,10 +89,10 @@ export async function POST(req: NextRequest) {
   const allExpressed = landlordExpressed && tenantExpressed
   const anyRefused = !!(landlordSig?.refused_at || tenantSig?.refused_at)
 
-  // Always regenerate PDF so the latest signatures are embedded
+  // Pass supabaseAdmin so buildPdfAndUpload doesn't need HTTP cookie context
   // regardless of whether all parties have signed yet
   try {
-    await buildPdfAndUpload(inspectionId)
+    await buildPdfAndUpload(inspectionId, supabaseAdmin)
   } catch (pdfErr) {
     console.error('[submit-pad] PDF regeneration after signature failed:', pdfErr)
     // Non-blocking — signature is saved even if PDF regeneration fails

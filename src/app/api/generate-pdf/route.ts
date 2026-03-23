@@ -240,10 +240,13 @@ const INSPECTION_SELECT = `
 
 /** Build PDF and upload to storage; always overwrites. Returns report_url and buffer. */
 export async function buildPdfAndUpload(
-  inspectionId: string
+  inspectionId: string,
+  existingClient?: ReturnType<typeof createClient>
 ): Promise<{ report_url: string | null; buffer: Uint8Array }> {
   try {
-    const supabase = await createServerClient();
+    // Use provided admin client if available (e.g. called from submit-pad/cron)
+    // Fall back to server client only when called from an HTTP route context
+    const supabase = existingClient ?? (await createServerClient());
 
     const { data: inspection, error: inspErr } = await supabase
       .from("inspections")
