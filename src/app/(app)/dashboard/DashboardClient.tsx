@@ -237,9 +237,12 @@ export function DashboardClient({
     setNotifications((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? nowIso })));
   }
 
-  function handleNotificationRowClick(notif: DashboardNotificationRow) {
-    void markNotificationAsRead(notif.id);
-    if (notif.url) window.location.href = notif.url;
+  async function handleNotificationRowClick(notif: DashboardNotificationRow) {
+    // Mark as read first (optimistic already done in markNotificationAsRead)
+    await markNotificationAsRead(notif.id);
+    if (notif.url) {
+      router.push(notif.url);
+    }
   }
 
   const notificationsUnreadCount = notifications.filter((n) => !n.read_at).length;
@@ -870,7 +873,7 @@ export function DashboardClient({
                   <button
                     key={notif.id}
                     type="button"
-                    onClick={() => handleNotificationRowClick(notif)}
+                    onClick={() => void handleNotificationRowClick(notif)}
                     className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors active:bg-[#F8F7F4]"
                     style={{ background: isUnread ? "#FAFAFA" : "white" }}
                   >
