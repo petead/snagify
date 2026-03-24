@@ -125,33 +125,28 @@ export async function POST(req: NextRequest) {
           },
         ];
       } else {
-        // ── INDIVIDUAL: fixed pack ──
+        // ── INDIVIDUAL: fixed pack — use stripe_price_id from DB ──
         if (!packId) {
           return NextResponse.json({ error: "Missing packId" }, { status: 400 });
         }
         const { data: pack } = await supabaseAdmin
           .from("credit_packs")
-          .select("id, name, credits, price_aed, is_active")
+          .select("id, name, credits, price_aed, stripe_price_id, is_active")
           .eq("id", packId)
           .eq("is_active", true)
           .single();
         if (!pack) {
           return NextResponse.json({ error: "Pack not found" }, { status: 404 });
         }
+        if (!pack.stripe_price_id) {
+          return NextResponse.json(
+            { error: "Pack not configured in Stripe yet" },
+            { status: 400 }
+          );
+        }
         checkoutCredits = Number(pack.credits ?? 0);
-        lineItems = [
-          {
-            price_data: {
-              currency: "aed",
-              unit_amount: Math.round(Number(pack.price_aed) * 100),
-              product_data: {
-                name: `Snagify Credits — ${pack.name}`,
-                description: `${pack.credits} credit${Number(pack.credits) > 1 ? "s" : ""} for Snagify inspections`,
-              },
-            },
-            quantity: 1,
-          },
-        ];
+        // Use the pre-created Stripe price ID — clean revenue reporting
+        lineItems = [{ price: pack.stripe_price_id, quantity: 1 }];
       }
     }
 
