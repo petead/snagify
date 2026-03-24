@@ -1114,7 +1114,7 @@ export function InspectionClient({
 
       if (isLandscapePhoto) {
         setLandscapePhotoError(true);
-        setTimeout(() => setLandscapePhotoError(false), 3500);
+        // No auto-dismiss — user must explicitly close
         continue;
       }
 
@@ -1341,53 +1341,105 @@ export function InspectionClient({
           <div
             style={{
               position: "fixed",
-              bottom: 100,
-              left: "50%",
-              transform: "translateX(-50%)",
+              bottom: 90,
+              left: 16,
+              right: 16,
               zIndex: 9999,
-              background: "rgba(239,68,68,0.95)",
-              borderRadius: 16,
-              padding: "14px 24px",
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              maxWidth: 320,
-              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
             }}
           >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
+            <div
+              style={{
+                background: "#1A1A2E",
+                borderRadius: 20,
+                padding: "16px 16px 16px 20px",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 14,
+                border: "1.5px solid rgba(239,68,68,0.4)",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+              }}
             >
-              <rect x="2" y="7" width="10" height="14" rx="2" />
-              <path d="M14 9l3-3 3 3M17 6v8" />
-            </svg>
-            <div>
-              <p
+              <div
                 style={{
-                  color: "white",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  margin: 0,
-                  fontFamily: "Poppins, sans-serif",
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  background: "rgba(239,68,68,0.15)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  marginTop: 1,
                 }}
               >
-                Portrait mode required
-              </p>
-              <p
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#EF4444"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <rect x="5" y="2" width="14" height="20" rx="2" />
+                  <line x1="12" y1="18" x2="12" y2="18.01" />
+                </svg>
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p
+                  style={{
+                    color: "white",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    margin: "0 0 4px",
+                    fontFamily: "Poppins, sans-serif",
+                  }}
+                >
+                  Photo not saved
+                </p>
+                <p
+                  style={{
+                    color: "rgba(255,255,255,0.65)",
+                    fontSize: 12,
+                    margin: 0,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Landscape photos are not accepted. Please retake this photo in{" "}
+                  <span style={{ color: "white", fontWeight: 600 }}>portrait orientation</span>{" "}
+                  (hold your phone upright).
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setLandscapePhotoError(false)}
                 style={{
-                  color: "rgba(255,255,255,0.85)",
-                  fontSize: 12,
-                  margin: "2px 0 0",
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  background: "rgba(255,255,255,0.1)",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
                 }}
               >
-                Please retake in portrait orientation
-              </p>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.7)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                >
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
             </div>
           </div>,
           document.body
