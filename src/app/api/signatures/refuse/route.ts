@@ -136,6 +136,8 @@ export async function POST(req: NextRequest) {
         // Non-blocking — fall back to existing PDF
       }
 
+      const bothRefused = !!landlordSig?.refused_at && !!tenantSig?.refused_at;
+
       await sendSignedPdfEmail({
         landlordName: landlordSig?.signer_name || "Landlord",
         landlordEmail: landlordSig?.email || "",
@@ -157,11 +159,17 @@ export async function POST(req: NextRequest) {
             })
           : "—",
         pdfUrl: finalPdfUrl.split("?")[0],
-        refusalInfo: {
-          refusedParty: sig.signer_type as "landlord" | "tenant",
-          refusedReason: reason || null,
-          refusedAt: new Date().toISOString(),
-        },
+        refusalInfo: bothRefused
+          ? {
+              refusedParty: "both",
+              refusedReason: reason || null,
+              refusedAt: new Date().toISOString(),
+            }
+          : {
+              refusedParty: sig.signer_type as "landlord" | "tenant",
+              refusedReason: reason || null,
+              refusedAt: new Date().toISOString(),
+            },
       });
     }
 

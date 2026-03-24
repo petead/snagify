@@ -20,7 +20,7 @@ interface SendSignedPdfEmailParams {
   pdfUrl: string
   /** When set, email explains a party refused to sign (disputed flow). */
   refusalInfo?: {
-    refusedParty: 'landlord' | 'tenant'
+    refusedParty: 'landlord' | 'tenant' | 'both'
     refusedReason: string | null
     refusedAt: string
   }
@@ -53,7 +53,9 @@ export async function sendSignedPdfEmail(params: SendSignedPdfEmailParams) {
     : `<span style="font-size:18px;font-weight:800;color:white;">${agencyName}</span>`
 
   const refusalPartyLabel =
-    refusalInfo?.refusedParty === 'landlord' ? 'Landlord' : 'Tenant'
+    refusalInfo?.refusedParty === 'both'
+      ? 'both the Landlord and the Tenant'
+      : refusalInfo?.refusedParty === 'landlord' ? 'the Landlord' : 'the Tenant'
 
   const buildHtml = (recipientName: string, recipientRole: string) => `
     <div style="font-family:-apple-system,sans-serif;max-width:480px;
@@ -71,10 +73,13 @@ export async function sendSignedPdfEmail(params: SendSignedPdfEmailParams) {
       </h2>
       <p style="font-size:14px;color:#6B7280;margin:0 0 24px;line-height:1.6;">
         ${refusalInfo
-          ? `Hi ${recipientName}, the <strong style="color:#1A1A2E;">${refusalPartyLabel}</strong> has refused to sign the inspection report for
-        <strong style="color:#1A1A2E;">${propertyAddress}</strong>.
-        The inspection is marked as disputed. ${refusalInfo.refusedReason
-            ? `<br/><br/><span style="color:#1A1A2E;font-weight:600;">Reason given:</span> ${refusalInfo.refusedReason}`
+          ? `Hi ${recipientName}, ${
+              refusalInfo?.refusedParty === 'both'
+                ? `<strong style="color:#1A1A2E;">${refusalPartyLabel}</strong> have refused to sign the inspection report for`
+                : `<strong style="color:#1A1A2E;">${refusalPartyLabel}</strong> has refused to sign the inspection report for`
+            } <strong style="color:#1A1A2E;">${propertyAddress}</strong>.
+        The inspection is marked as disputed.${refusalInfo?.refusedReason
+            ? `<br/><br/><span style="color:#1A1A2E;font-weight:600;">Reason given by last party:</span> ${refusalInfo.refusedReason}`
             : ''}
         Please find the report PDF attached for your records.`
           : `Hi ${recipientName}, the inspection report for
@@ -156,7 +161,9 @@ export async function sendSignedPdfEmail(params: SendSignedPdfEmailParams) {
   ].filter((r) => r.email)
 
   const emailSubject = refusalInfo
-    ? `Report update — refusal recorded — ${propertyAddress}`
+    ? refusalInfo.refusedParty === 'both'
+      ? `Both parties refused to sign — ${propertyAddress}`
+      : `Report update — refusal recorded — ${propertyAddress}`
     : `Signed inspection report — ${propertyAddress}`
 
   const results = await Promise.allSettled(
