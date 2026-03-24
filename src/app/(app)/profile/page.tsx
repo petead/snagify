@@ -56,6 +56,7 @@ export default async function ProfilePage() {
     stripe_subscription_id: (company as { stripe_subscription_id?: string | null }).stripe_subscription_id ?? null,
     billing_cycle_reset_at: (company as { billing_cycle_reset_at?: string | null }).billing_cycle_reset_at ?? null,
     billing_period: (company as { billing_period?: string | null }).billing_period ?? null,
+    billing_status: (company as { billing_status?: string | null }).billing_status ?? "active",
   } : null;
 
   return (

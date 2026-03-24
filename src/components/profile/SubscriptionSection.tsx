@@ -24,6 +24,7 @@ interface Props {
     plan: string
     credits_balance: number
     stripe_subscription_id?: string | null
+    billing_status?: string | null
   }
 }
 
@@ -105,6 +106,42 @@ export function SubscriptionSection({ company }: Props) {
 
   return (
     <div className="px-4 pb-8">
+      {/* Past due warning banner */}
+      {company.billing_status === 'past_due' && (
+        <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-2xl p-4 mb-4
+          flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-[#EF4444]/10 flex items-center
+            justify-center flex-shrink-0 mt-0.5">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="#EF4444" strokeWidth="2"/>
+              <path d="M12 8v4M12 16h.01" stroke="#EF4444" strokeWidth="2"
+                strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-bold text-[#DC2626] mb-1">
+              Payment failed
+            </p>
+            <p className="text-[12px] text-[#EF4444]/80 leading-relaxed mb-3">
+              Your last payment didn't go through. Stripe will retry automatically.
+              Please update your payment method to avoid losing access.
+            </p>
+            <button
+              type="button"
+              onClick={() => void handleManageBilling()}
+              disabled={loading === 'portal'}
+              className="flex items-center gap-2 bg-[#EF4444] rounded-xl px-4 py-2.5
+                text-[12px] font-bold text-white disabled:opacity-50"
+            >
+              {loading === 'portal'
+                ? <Loader2 size={12} className="animate-spin" />
+                : 'Update payment method →'
+              }
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Current plan banner */}
       <div className="bg-white rounded-2xl border border-[#EEECFF] p-4 mb-6">
         <div className="flex items-center justify-between">

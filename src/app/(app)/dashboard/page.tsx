@@ -17,6 +17,7 @@ export default async function DashboardPage() {
   let profileNeedsOnboardingFix = false;
   let showProUpgradeBanner = false;
   let stripeSubscriptionId: string | null = null;
+  let billingStatus: string | null = null;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
@@ -36,13 +37,16 @@ export default async function DashboardPage() {
       if (accountType === "pro" && companyId) {
         const { data: company } = await supabase
           .from("companies")
-          .select("plan, stripe_subscription_id, billing_period")
+          .select("plan, stripe_subscription_id, billing_period, billing_status")
           .eq("id", companyId)
           .single();
         const plan = (company as { plan?: string } | null)?.plan;
         stripeSubscriptionId =
           (company as { stripe_subscription_id?: string | null } | null)
             ?.stripe_subscription_id ?? null;
+        billingStatus =
+          (company as { billing_status?: string | null } | null)
+            ?.billing_status ?? null;
         if (plan === "free" || plan == null) {
           showProUpgradeBanner = true;
         }
@@ -187,6 +191,19 @@ export default async function DashboardPage() {
         };
       }),
     ];
+
+    // Past due billing alert
+    if (billingStatus === "past_due") {
+      alerts.push({
+        type: "billing",
+        icon: "alert",
+        color: "#EF4444",
+        title: "Payment failed — action required",
+        subtitle: "Update your payment method to avoid losing access",
+        href: "/profile?section=subscription",
+        actionLabel: "Fix now →",
+      });
+    }
   }
 
   if (user) {
