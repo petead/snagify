@@ -60,9 +60,11 @@ async function sendToUser(
 
 async function notifyLeaseExpiry() {
   const today = new Date();
-  const in30Days = new Date(today);
-  in30Days.setDate(today.getDate() + 30);
-  const target = in30Days.toISOString().split('T')[0];
+
+  const from30 = new Date(today);
+  from30.setDate(today.getDate() + 29);
+  const to30 = new Date(today);
+  to30.setDate(today.getDate() + 31);
 
   const { data: tenancies, error } = await supabase
     .from('tenancies')
@@ -73,7 +75,8 @@ async function notifyLeaseExpiry() {
       contract_to,
       properties (building_name, unit_number, location)
     `)
-    .eq('contract_to', target)
+    .gte('contract_to', from30.toISOString().split('T')[0])
+    .lte('contract_to', to30.toISOString().split('T')[0])
     .eq('status', 'active');
 
   if (error) {
@@ -81,9 +84,33 @@ async function notifyLeaseExpiry() {
     return;
   }
 
-  console.log(`[Cron] Lease expiry: ${tenancies?.length ?? 0} tenancies expiring in 30 days`);
-
+  const filteredTenancies: NonNullable<typeof tenancies> = [];
   for (const tenancy of tenancies ?? []) {
+    const agentId = (tenancy as { agent_id?: string }).agent_id;
+    if (!agentId) continue;
+    const tenancyId = (tenancy as { id: string }).id;
+
+    const fiveDaysAgo = new Date(today);
+    fiveDaysAgo.setDate(today.getDate() - 5);
+    const { data: existing } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('user_id', agentId)
+      .eq('type', 'lease')
+      .ilike('body', `%${tenancyId}%`)
+      .gte('created_at', fiveDaysAgo.toISOString())
+      .maybeSingle();
+
+    if (!existing) {
+      filteredTenancies.push(tenancy);
+    }
+  }
+
+  console.log(
+    `[Cron] Lease expiry: ${filteredTenancies.length} tenancies (after dedup, ${tenancies?.length ?? 0} in window)`
+  );
+
+  for (const tenancy of filteredTenancies) {
     const prop = (tenancy as { properties?: { building_name?: string; unit_number?: string; location?: string } }).properties;
     const propLabel = formatPropertyBuildingUnit(prop ?? null);
     const placeLabel = propLabel !== '—' ? propLabel : 'your property';
@@ -94,7 +121,7 @@ async function notifyLeaseExpiry() {
     if (agentId) {
       await sendToUser(agentId, {
         title: 'Lease Expiring in 30 Days',
-        body: `${tenantName}'s lease at ${placeLabel} ends on ${contractTo}. Time to schedule a check-out inspection.`,
+        body: `${tenantName}'s lease at ${placeLabel} ends on ${contractTo}. Time to schedule a check-out inspection. [ref:${(tenancy as { id: string }).id}]`,
         url: '/properties',
         type: 'lease',
       });
@@ -278,7 +305,7 @@ async function sendReminder24h() {
 
       if (insp?.agent_id) {
         await sendToUser(insp.agent_id, {
-          title: '📧 Reminder sent',
+          title: 'Reminder sent',
           body: `24h reminder sent to ${sig.signer_name || sig.signer_type} for ${propertyAddress}.`,
           url: `/inspection/${sig.inspection_id}/report`,
           type: 'signature',
@@ -423,7 +450,7 @@ async function sendReminder72h() {
 
       if (insp?.agent_id) {
         await sendToUser(insp.agent_id, {
-          title: '⚠️ Final reminder sent',
+          title: 'Final reminder sent',
           body: `72h urgent reminder sent to ${sig.signer_name || sig.signer_type} for ${propertyAddress}. 4 days left.`,
           url: `/inspection/${sig.inspection_id}/report`,
           type: 'signature',
@@ -618,7 +645,7 @@ async function processExpiredSignatures() {
 
       if (insp.agent_id) {
         await sendToUser(insp.agent_id, {
-          title: '🔒 Signature window expired',
+          title: 'Signature window expired',
           body: `${propertyAddress} — ${unsignedNames} did not sign within 7 days. Report marked as expired.`,
           url: `/inspection/${inspectionId}/report`,
           type: 'expired',
