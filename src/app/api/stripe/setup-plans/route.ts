@@ -8,7 +8,13 @@ const supabaseAdmin = createClient(
 );
 
 // Call POST /api/stripe/setup-plans ONCE to create all products + prices
-export async function POST() {
+export async function POST(req: Request) {
+  // ── Secret guard: only callable with INTERNAL_API_SECRET ──
+  const secret = req.headers.get("x-internal-secret");
+  if (secret !== process.env.INTERNAL_API_SECRET) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const plans = [
     {
       slug: "starter",
@@ -79,7 +85,13 @@ export async function POST() {
   return NextResponse.json({ success: true, results });
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  // ── Secret guard ──
+  const secret = req.headers.get("x-internal-secret");
+  if (secret !== process.env.INTERNAL_API_SECRET) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   try {
     // Fetch all individual packs from DB
     const { data: packs } = await supabaseAdmin

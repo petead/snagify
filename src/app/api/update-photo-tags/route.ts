@@ -1,8 +1,18 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   try {
+    // ── Auth guard ──
+    const supabaseAuth = await createServerClient();
+    const {
+      data: { user },
+    } = await supabaseAuth.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { photoId, damage_tags, notes } = (await request.json()) as {
       photoId: string;
       damage_tags?: string[];
@@ -17,6 +27,18 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+
+    // ── Ownership guard: verify photo belongs to an inspection owned by user ──
+    const { data: photoCheck } = await supabase
+      .from("photos")
+      .select("room_id, rooms(inspection_id, inspections(agent_id))")
+      .eq("id", photoId)
+      .single();
+
+    const agentId = (photoCheck?.rooms as any)?.inspections?.agent_id;
+    if (!agentId || agentId !== user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const updateData: Record<string, unknown> = {};
     if (damage_tags !== undefined) updateData.damage_tags = damage_tags;

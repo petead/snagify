@@ -1,6 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 export async function DELETE(request: Request) {
+  // ── Auth guard ──
+  const supabaseAuth = await createServerClient();
+  const {
+    data: { user },
+  } = await supabaseAuth.auth.getUser();
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { inspectionId } = await request.json();
 
   const supabase = createClient(
@@ -22,6 +32,11 @@ export async function DELETE(request: Request) {
 
   if (!inspection) {
     return Response.json({ error: "Inspection not found" }, { status: 404 });
+  }
+
+  // ── Ownership guard: only the agent who created it can delete ──
+  if (inspection.agent_id !== user.id) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const tenancyId = inspection.tenancy_id ?? null;
