@@ -187,13 +187,45 @@ export async function POST(req: NextRequest) {
         const billingPeriod =
           subscription.metadata?.billing_period ?? "monthly";
 
+        // Fetch new plan limits to cap credits on downgrade
+        const { data: newPlan } = await supabaseAdmin
+          .from("subscription_plans")
+          .select("credits_per_month, roll_max_multiplier")
+          .eq("slug", planSlug)
+          .maybeSingle();
+
+        const { data: currentCompany } = await supabaseAdmin
+          .from("companies")
+          .select("credits_balance, plan")
+          .eq("id", companyId)
+          .single();
+
+        const updatePayload: Record<string, unknown> = {
+          plan: planSlug,
+          stripe_subscription_id: subscription.id,
+          billing_period: billingPeriod,
+          billing_status: "active",
+        };
+
+        // Cap credits if downgrading to a lower plan
+        if (newPlan && currentCompany) {
+          const creditsPerMonth = Number(newPlan.credits_per_month ?? 0);
+          const rollMax =
+            creditsPerMonth * Number(newPlan.roll_max_multiplier ?? 1);
+          const currentBalance = Number(currentCompany.credits_balance ?? 0);
+
+          if (currentBalance > rollMax) {
+            updatePayload.credits_balance = rollMax;
+            console.log(
+              `[webhook] Downgrade cap: ${currentCompany.plan} → ${planSlug}, ` +
+                `balance ${currentBalance} → ${rollMax}`
+            );
+          }
+        }
+
         await supabaseAdmin
           .from("companies")
-          .update({
-            plan: planSlug,
-            stripe_subscription_id: subscription.id,
-            billing_period: billingPeriod,
-          })
+          .update(updatePayload)
           .eq("id", companyId);
         break;
       }
