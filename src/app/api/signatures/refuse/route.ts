@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       .from("inspections")
       .select(
         `
-        type, created_at, report_url,
+        type, created_at, report_url, agent_id,
         property:properties(building_name, unit_number, location),
         agent:profiles(
           full_name, email, receive_signed_report_email,
@@ -114,6 +114,28 @@ export async function POST(req: NextRequest) {
       ) || "Property";
 
     if (allExpressed && insp?.report_url) {
+      // Regenerate PDF so refused state is embedded before sending
+      let finalPdfUrl = insp.report_url;
+      try {
+        const { buildPdfAndUpload } = await import("@/app/api/generate-pdf/route");
+        if (insp.agent_id) {
+          const { data: inspProfile } = await supabase
+            .from("profiles")
+            .select("account_type, company_id")
+            .eq("id", insp.agent_id)
+            .maybeSingle();
+
+          // Only regenerate if we have enough context
+          if (inspProfile) {
+            const result = await buildPdfAndUpload(sig.inspection_id, supabase);
+            if (result.report_url) finalPdfUrl = result.report_url;
+          }
+        }
+      } catch (pdfErr) {
+        console.error("[refuse] PDF regen failed, using existing URL:", pdfErr);
+        // Non-blocking — fall back to existing PDF
+      }
+
       await sendSignedPdfEmail({
         landlordName: landlordSig?.signer_name || "Landlord",
         landlordEmail: landlordSig?.email || "",
@@ -134,7 +156,7 @@ export async function POST(req: NextRequest) {
               year: "numeric",
             })
           : "—",
-        pdfUrl: insp.report_url,
+        pdfUrl: finalPdfUrl.split("?")[0],
         refusalInfo: {
           refusedParty: sig.signer_type as "landlord" | "tenant",
           refusedReason: reason || null,
