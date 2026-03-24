@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
 
   const agencyName = (insp?.agent as any)?.company?.name || 'Snagify'
   const primaryColor = (insp?.agent as any)?.company?.primary_color || '#9A88FD'
+  const agencyLogo = (insp?.agent as any)?.company?.logo_url || null
 
   // Send OTP email via Resend
   await resend.emails.send({
@@ -88,10 +89,28 @@ export async function POST(req: NextRequest) {
     html: `
       <div style="font-family:-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
         <div style="background:${primaryColor};border-radius:16px;padding:20px 24px;margin-bottom:24px;">
-          <div style="font-size:18px;font-weight:800;color:white;">${agencyName}</div>
-          <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px;">
-            Property Inspection Report
-          </div>
+          <table cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="vertical-align:middle;padding-right:12px;">
+                ${agencyLogo
+                  ? `<img src="${agencyLogo}" alt="${agencyName}"
+                      style="height:44px;border-radius:10px;object-fit:contain;
+                      background:rgba(255,255,255,0.2);" />`
+                  : `<div style="width:44px;height:44px;border-radius:10px;
+                      background:rgba(255,255,255,0.2);display:flex;align-items:center;
+                      justify-content:center;font-size:20px;font-weight:800;color:white;">
+                      ${agencyName.charAt(0)}
+                    </div>`
+                }
+              </td>
+              <td style="vertical-align:middle;">
+                <div style="font-size:18px;font-weight:800;color:white;">${agencyName}</div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px;">
+                  Property Inspection Report
+                </div>
+              </td>
+            </tr>
+          </table>
         </div>
         <h2 style="font-size:20px;font-weight:800;color:#1A1A2E;margin:0 0 8px;">Your signature code</h2>
         <p style="font-size:14px;color:#6B7280;margin:0 0 24px;line-height:1.6;">
@@ -107,7 +126,9 @@ export async function POST(req: NextRequest) {
         </p>
         <div style="margin-top:32px;padding-top:16px;border-top:1px solid #F3F3F8;
           text-align:center;font-size:11px;color:#C4C4C4;">
-          Powered by Snagify · app.snagify.net
+          Powered by <a href="https://www.snagify.net"
+            style="color:#9A88FD;text-decoration:none;font-weight:600;">Snagify</a>
+          · Dubai Property Inspections
         </div>
       </div>
     `,

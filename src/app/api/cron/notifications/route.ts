@@ -263,7 +263,9 @@ async function sendReminder24h() {
 
             <div style="margin-top:32px;padding-top:16px;border-top:1px solid #F3F3F8;
               text-align:center;font-size:11px;color:#C4C4C4;">
-              Powered by Snagify · snagify.net
+              Powered by <a href="https://www.snagify.net"
+              style="color:#9A88FD;text-decoration:none;font-weight:600;">Snagify</a>
+            · Dubai Property Inspections
             </div>
           </div>
         `,
@@ -406,7 +408,9 @@ async function sendReminder72h() {
 
             <div style="margin-top:32px;padding-top:16px;border-top:1px solid #F3F3F8;
               text-align:center;font-size:11px;color:#C4C4C4;">
-              Powered by Snagify · snagify.net
+              Powered by <a href="https://www.snagify.net"
+              style="color:#9A88FD;text-decoration:none;font-weight:600;">Snagify</a>
+            · Dubai Property Inspections
             </div>
           </div>
         `,
@@ -603,7 +607,9 @@ async function processExpiredSignatures() {
 
               <div style="margin-top:32px;padding-top:16px;border-top:1px solid #F3F3F8;
                 text-align:center;font-size:11px;color:#C4C4C4;">
-                Powered by Snagify · snagify.net
+                Powered by <a href="https://www.snagify.net"
+              style="color:#9A88FD;text-decoration:none;font-weight:600;">Snagify</a>
+            · Dubai Property Inspections
               </div>
             </div>
           `,
