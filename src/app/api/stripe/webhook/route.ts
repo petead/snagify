@@ -282,6 +282,91 @@ export async function POST(req: NextRequest) {
         break;
       }
 
+      case "payment_intent.succeeded": {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+
+        // Only handle one-time payments (not subscription invoices)
+        // Subscription payments are handled by invoice.payment_succeeded
+        if (paymentIntent.invoice) break;
+
+        const companyId = paymentIntent.metadata?.company_id;
+        const userId = paymentIntent.metadata?.supabase_user_id;
+        const creditsFromMeta = Number(paymentIntent.metadata?.credits ?? 0);
+        const packId = paymentIntent.metadata?.pack_id;
+
+        if (!creditsFromMeta) break;
+
+        // Dedup check: skip if this payment_intent was already processed
+        // by checkout.session.completed
+        const { data: existing } = await supabaseAdmin
+          .from("credit_transactions")
+          .select("id")
+          .eq("stripe_payment_intent_id", paymentIntent.id)
+          .maybeSingle();
+
+        if (existing) {
+          console.log(
+            `[webhook] payment_intent.succeeded skipped — already processed: ${paymentIntent.id}`
+          );
+          break;
+        }
+
+        // Resolve company
+        let targetCompanyId = companyId;
+        if (!targetCompanyId && userId) {
+          const { data: profile } = await supabaseAdmin
+            .from("profiles")
+            .select("company_id")
+            .eq("id", userId)
+            .single();
+          targetCompanyId = profile?.company_id ?? "";
+        }
+        if (!targetCompanyId) break;
+
+        // Fetch pack name for transaction note
+        let packName = "credits";
+        let creditsToAdd = creditsFromMeta;
+        if (packId) {
+          const { data: pack } = await supabaseAdmin
+            .from("credit_packs")
+            .select("credits, name")
+            .eq("id", packId)
+            .single();
+          if (pack?.credits) creditsToAdd = Number(pack.credits);
+          if (pack?.name) packName = pack.name;
+        }
+
+        // Add credits
+        const { data: company } = await supabaseAdmin
+          .from("companies")
+          .select("credits_balance")
+          .eq("id", targetCompanyId)
+          .single();
+
+        const newBalance = Number(company?.credits_balance ?? 0) + creditsToAdd;
+
+        await supabaseAdmin
+          .from("companies")
+          .update({ credits_balance: newBalance })
+          .eq("id", targetCompanyId);
+
+        await supabaseAdmin.from("credit_transactions").insert({
+          company_id: targetCompanyId,
+          type: "purchase",
+          credits: creditsToAdd,
+          balance_after: newBalance,
+          ...(packId ? { pack_id: packId } : {}),
+          stripe_payment_intent_id: paymentIntent.id,
+          action: "pack_purchase",
+          note: `[Fallback] Purchased ${packName} - ${creditsToAdd} credits`,
+        });
+
+        console.log(
+          `[webhook] payment_intent.succeeded fallback: +${creditsToAdd} credits for company ${targetCompanyId}`
+        );
+        break;
+      }
+
       default:
         break;
     }
