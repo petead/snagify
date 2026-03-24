@@ -287,7 +287,7 @@ export async function POST(req: NextRequest) {
 
         // Only handle one-time payments (not subscription invoices)
         // Subscription payments are handled by invoice.payment_succeeded
-        if (paymentIntent.invoice) break;
+        if ((paymentIntent as any).invoice) break;
 
         const companyId = paymentIntent.metadata?.company_id;
         const userId = paymentIntent.metadata?.supabase_user_id;
