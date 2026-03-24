@@ -112,15 +112,21 @@ export async function POST(req: NextRequest) {
         const unitPrice = Number(body.price_per_credit);
         checkoutCredits = qty;
 
+        const proCreditsProductId = process.env.STRIPE_PRO_CREDITS_PRODUCT_ID;
+
         lineItems = [
           {
             price_data: {
               currency: "aed",
               unit_amount: Math.round(unitPrice * 100),
-              product_data: {
-                name: "Snagify Credits",
-                description: `${qty} inspection credit${qty > 1 ? "s" : ""} · ${body.plan_slug ?? ""} plan`,
-              },
+              ...(proCreditsProductId
+                ? { product: proCreditsProductId }
+                : {
+                    product_data: {
+                      name: "Snagify Pro Credits",
+                      description: `${qty} inspection credit${qty > 1 ? "s" : ""} · ${body.plan_slug ?? ""} plan`,
+                    },
+                  }),
             },
             quantity: qty,
           },
