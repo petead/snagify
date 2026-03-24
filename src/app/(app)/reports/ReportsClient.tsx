@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import DeleteInspectionButton from "@/components/inspection/DeleteInspectionButton";
 import { regenerateAndDownloadInspectionPdf } from "@/lib/regenerateAndDownloadInspectionPdf";
 import { InspectionStatusBadge } from "@/components/inspection/InspectionStatusBadge";
-import { getStatusLabel } from "@/lib/utils/statusHelpers";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefresh";
 
@@ -501,7 +500,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                         </h3>
                         {isDraft ? (
                           <span className="flex-shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-gray-500">
-                            {getStatusLabel("in_progress")}
+                            Edit
                           </span>
                         ) : (
                           <InspectionStatusBadge status={report.status} fullySigned={signed} />
@@ -583,7 +582,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>
-                        {getStatusLabel("in_progress")}
+                        Edit
                       </button>
                     ) : signed ? (
                       <button
