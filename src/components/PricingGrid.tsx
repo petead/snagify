@@ -24,8 +24,6 @@ const plans = [
     usersLabel: "inspectors",
     popular: false,
     color: "#9A88FD",
-    priceIdMonthly: "price_1TE2MgKIsjOh5d33hZSBKdcA",
-    priceIdAnnual: "price_1TE2MgKIsjOh5d332jt7VWLL",
     savings: null,
   },
   {
@@ -40,8 +38,6 @@ const plans = [
     usersLabel: "inspectors",
     popular: true,
     color: "#7C3AED",
-    priceIdMonthly: "price_1TE2MiKIsjOh5d33TNdCW9Zt",
-    priceIdAnnual: "price_1TE2MiKIsjOh5d33eIFo0iZA",
     savings: 16,
   },
   {
@@ -56,8 +52,6 @@ const plans = [
     usersLabel: "inspectors",
     popular: false,
     color: "#1E1B4B",
-    priceIdMonthly: "price_1TE2MjKIsjOh5d33N0LSakoU",
-    priceIdAnnual: "price_1TE2MjKIsjOh5d33qysgoe08",
     savings: 22,
   },
 ] as const;
@@ -78,9 +72,6 @@ export function PricingGrid({ currentPlan, creditsBalance, companyId: _companyId
   const getPrice = (plan: (typeof plans)[number]) =>
     billingPeriod === "annual" ? plan.priceAnnualPerMonth : plan.priceMonthly;
 
-  const getPriceId = (plan: (typeof plans)[number]) =>
-    billingPeriod === "annual" ? plan.priceIdAnnual : plan.priceIdMonthly;
-
   const handleSelectPlan = async (slug: string) => {
     const plan = plans.find((p) => p.slug === slug);
     if (!plan) return;
@@ -91,7 +82,6 @@ export function PricingGrid({ currentPlan, creditsBalance, companyId: _companyId
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "subscription",
-          price_id: getPriceId(plan),
           plan_slug: plan.slug,
           billing_period: billingPeriod,
         }),
