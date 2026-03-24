@@ -69,7 +69,8 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.snagify.net";
 
     const isSubscription = type === "subscription";
-    const checkoutCompanyId = body.companyId ?? profile.company_id;
+    // Always use server-side company_id — never trust client input
+    const checkoutCompanyId = profile.company_id;
     const successUrl = isSubscription
       ? (body.successUrl ?? `${appUrl}/profile?subscribed=true`)
       : (body.successUrl ?? `${appUrl}/dashboard?credits=success`);
@@ -157,8 +158,8 @@ export async function POST(req: NextRequest) {
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: {
-        supabase_user_id: body.userId ?? user.id,
-        company_id: checkoutCompanyId ?? "",
+        supabase_user_id: user.id,
+        company_id: checkoutCompanyId,
         type: type ?? "one_time",
         ...(packId ? { pack_id: packId } : {}),
         ...(body.pro_credits ? { pro_credits: "true" } : {}),
@@ -172,7 +173,7 @@ export async function POST(req: NextRequest) {
         ? {
             subscription_data: {
               metadata: {
-                company_id: checkoutCompanyId ?? "",
+                company_id: checkoutCompanyId,
                 plan_slug: plan_slug || "",
                 billing_period: billing_period ?? "monthly",
               },
