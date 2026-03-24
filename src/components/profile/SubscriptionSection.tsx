@@ -123,7 +123,7 @@ export function SubscriptionSection({ company }: Props) {
               Payment failed
             </p>
             <p className="text-[12px] text-[#EF4444]/80 leading-relaxed mb-3">
-              Your last payment didn't go through. Stripe will retry automatically.
+              Your last payment did not go through. Stripe will retry automatically.
               Please update your payment method to avoid losing access.
             </p>
             <button
