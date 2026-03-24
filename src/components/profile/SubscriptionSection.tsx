@@ -1,8 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Loader2 } from 'lucide-react'
+
+type DbPlan = {
+  id: string
+  slug: string
+  name: string
+  price_aed_monthly: number
+  credits_per_month: number
+  stripe_price_id: string | null
+  white_label: boolean
+  max_users: number | null
+  highlight: boolean
+  extra_credit_price_aed: number | null
+  sort_order: number | null
+}
 
 interface Props {
   company: {
@@ -13,62 +27,44 @@ interface Props {
   }
 }
 
-export function SubscriptionSection({ company }: Props) {
-  const plans = [
-    {
-      slug: 'starter',
-      name: 'Starter',
-      price: 149,
-      credits: 10,
-      extraCredit: 18,
-      users: '1',
-      usersLabel: 'inspector',
-      popular: false,
-      color: '#9A88FD',
-      priceId: 'price_1TC1CrKIsjOh5d33lCuUGmcd',
-    },
-    {
-      slug: 'growth',
-      name: 'Growth',
-      price: 249,
-      credits: 20,
-      extraCredit: 15,
-      users: '3',
-      usersLabel: 'inspectors',
-      popular: true,
-      color: '#7C3AED',
-      priceId: 'price_1TC1D3KIsjOh5d33oEd1E3T1',
-    },
-    {
-      slug: 'agency',
-      name: 'Agency',
-      price: 349,
-      credits: 30,
-      extraCredit: 13,
-      users: '∞',
-      usersLabel: 'inspectors',
-      popular: false,
-      color: '#1E1B4B',
-      priceId: 'price_1TC1DPKIsjOh5d33hlQhhUTf',
-    },
-  ] as const
+const PLAN_COLORS: Record<string, string> = {
+  starter: '#9A88FD',
+  growth: '#7C3AED',
+  agency: '#1E1B4B',
+}
 
+export function SubscriptionSection({ company }: Props) {
+  const [plans, setPlans] = useState<DbPlan[]>([])
+  const [loadingPlans, setLoadingPlans] = useState(true)
   const [loading, setLoading] = useState<string | null>(null)
   const [selected, setSelected] = useState(1)
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('annual')
+
+  useEffect(() => {
+    async function fetchPlans() {
+      try {
+        const res = await fetch('/api/credits/packs')
+        const data = (await res.json()) as { plans?: DbPlan[] }
+        setPlans(data.plans ?? [])
+      } catch {
+        setPlans([])
+      } finally {
+        setLoadingPlans(false)
+      }
+    }
+    void fetchPlans()
+  }, [])
 
   const normalizedCurrentPlan =
-    company.plan === 'pro_solo'
-      ? 'starter'
-      : company.plan === 'pro_agency'
-        ? 'growth'
-        : company.plan === 'pro_max'
-          ? 'agency'
-          : company.plan
+    company.plan === 'pro_solo' ? 'starter' :
+    company.plan === 'pro_agency' ? 'growth' :
+    company.plan === 'pro_max' ? 'agency' :
+    company.plan
 
-  const currentPlan = plans.find((p) => p.slug === normalizedCurrentPlan)?.name ?? 'Free'
-  const creditsBalance = company.credits_balance
+  const isActive = !!company.stripe_subscription_id &&
+    company.plan !== 'free' && company.plan !== null
 
-  async function handleSubscribe(plan: (typeof plans)[number]) {
+  async function handleSubscribe(plan: DbPlan) {
     setLoading(plan.slug)
     try {
       const res = await fetch('/api/stripe/checkout', {
@@ -76,293 +72,201 @@ export function SubscriptionSection({ company }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'subscription',
-          price_id: plan.priceId,
           plan_slug: plan.slug,
+          billing_period: billingPeriod,
+          companyId: company.id,
         }),
       })
       const data = (await res.json()) as { url?: string; error?: string }
       if (data.url) window.location.href = data.url
-    } catch (err) {
-      console.error('Checkout error:', err)
+    } catch {
+      // silent
     } finally {
       setLoading(null)
     }
   }
 
-  function handleSelectPlan(slug: string) {
-    const plan = plans.find((p) => p.slug === slug)
-    if (!plan) return
-    void handleSubscribe(plan)
+  async function handleManageBilling() {
+    setLoading('portal')
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' })
+      const data = (await res.json()) as { url?: string }
+      if (data.url) window.location.href = data.url
+    } finally {
+      setLoading(null)
+    }
   }
 
+  if (loadingPlans) return (
+    <div className="flex items-center justify-center py-12">
+      <Loader2 size={24} className="animate-spin text-[#9A88FD]" />
+    </div>
+  )
+
   return (
-    <div className="min-h-screen bg-[#F8F7F4] pb-32">
-      <div className="flex items-center justify-between px-5 pb-4 pt-5">
-        <div>
-          <p className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-            Current plan
-          </p>
-          <p className="text-2xl font-black text-gray-900">{currentPlan ?? 'Free'}</p>
-        </div>
-        <div className="text-right">
-          <p className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-            Balance
-          </p>
-          <p className="text-2xl font-black text-[#9A88FD]">{creditsBalance} cr</p>
-        </div>
-      </div>
-
-      <div className="mx-5 mb-5 rounded-2xl border border-gray-100 bg-white px-4 py-3">
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          Included in every plan
-        </p>
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
-          {[
-            'White-label PDF',
-            'AI photo analysis',
-            'GPS & timestamp',
-            'E-signature',
-            'Sign tracking',
-            'SHA-256 verified',
-            'Key handover',
-            'RERA compliant',
-            'Push notifications',
-          ].map((f) => (
-            <div key={f} className="flex items-center gap-1.5">
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#9A88FD"
-                strokeWidth="3"
-                strokeLinecap="round"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span className="text-[11px] text-gray-500">{f}</span>
-            </div>
-          ))}
+    <div className="px-4 pb-8">
+      {/* Current plan banner */}
+      <div className="bg-white rounded-2xl border border-[#EEECFF] p-4 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold text-[#9B9BA8] uppercase tracking-wide mb-1">
+              Current plan
+            </p>
+            <p className="text-[16px] font-bold text-[#1A1A2E] capitalize">
+              {normalizedCurrentPlan === 'free' ? 'Free' : normalizedCurrentPlan}
+            </p>
+            <p className="text-[12px] text-[#9B9BA8] mt-0.5">
+              {company.credits_balance} credits remaining
+            </p>
+          </div>
+          {isActive && (
+            <button
+              type="button"
+              onClick={() => void handleManageBilling()}
+              disabled={loading === 'portal'}
+              className="flex items-center gap-2 bg-[#F3F3F8] rounded-xl px-4 py-2.5
+                text-[12px] font-semibold text-[#1A1A2E] disabled:opacity-50"
+            >
+              {loading === 'portal'
+                ? <Loader2 size={12} className="animate-spin" />
+                : 'Manage billing'
+              }
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="mb-4 px-5">
-        <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          Choose a plan
-        </p>
-        <div className="grid grid-cols-3 gap-2">
-          {plans.map((plan, i) => (
-            <motion.button
+      {/* Billing toggle */}
+      <div className="flex items-center justify-center gap-3 mb-6">
+        <button
+          type="button"
+          onClick={() => setBillingPeriod('monthly')}
+          className={`text-[13px] font-semibold px-4 py-2 rounded-xl transition-all ${
+            billingPeriod === 'monthly'
+              ? 'bg-[#1A1A2E] text-white'
+              : 'text-[#9B9BA8]'
+          }`}
+        >
+          Monthly
+        </button>
+        <button
+          type="button"
+          onClick={() => setBillingPeriod('annual')}
+          className={`text-[13px] font-semibold px-4 py-2 rounded-xl transition-all ${
+            billingPeriod === 'annual'
+              ? 'bg-[#1A1A2E] text-white'
+              : 'text-[#9B9BA8]'
+          }`}
+        >
+          Annual
+          <span className="ml-1.5 text-[10px] font-bold text-[#16A34A] bg-[#DCFCE7]
+            px-1.5 py-0.5 rounded-full">
+            Save up to 22%
+          </span>
+        </button>
+      </div>
+
+      {/* Plans */}
+      <div className="flex flex-col gap-3">
+        {plans.map((plan, i) => {
+          const color = PLAN_COLORS[plan.slug] ?? '#9A88FD'
+          const isCurrentPlan = normalizedCurrentPlan === plan.slug
+          const isSelected = selected === i
+          const monthlyPrice = plan.price_aed_monthly
+          // Annual price = monthly * 10 (2 months free)
+          const annualPricePerMonth = Math.round(monthlyPrice * 10 / 12)
+          const displayPrice = billingPeriod === 'annual'
+            ? annualPricePerMonth
+            : monthlyPrice
+
+          return (
+            <motion.div
               key={plan.slug}
               onClick={() => setSelected(i)}
-              animate={{
-                backgroundColor: selected === i ? plan.color : '#FFFFFF',
-                borderColor: selected === i ? plan.color : '#E5E7EB',
-                scale: selected === i ? 1.02 : 1,
-                boxShadow:
-                  selected === i
-                    ? `0 4px 20px ${plan.color}35`
-                    : '0 1px 4px rgba(0,0,0,0.05)',
+              whileTap={{ scale: 0.98 }}
+              className="relative bg-white rounded-2xl border-2 cursor-pointer transition-all"
+              style={{
+                borderColor: isSelected ? color : '#EEECFF',
               }}
-              transition={{ duration: 0.2 }}
-              className="relative flex flex-col items-center rounded-2xl border-2 p-3"
             >
-              {plan.popular && (
-                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#7C3AED] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
-                  Popular
+              {plan.highlight && (
+                <div className="absolute -top-3 left-4">
+                  <span className="text-[10px] font-bold text-white px-3 py-1
+                    rounded-full" style={{ background: color }}>
+                    Most popular
+                  </span>
                 </div>
               )}
-              <motion.p
-                animate={{ color: selected === i ? '#FFFFFF' : '#111827' }}
-                className="mb-1 text-xs font-bold"
-              >
-                {plan.name}
-              </motion.p>
-              <motion.p
-                animate={{ color: selected === i ? 'rgba(255,255,255,0.9)' : '#111827' }}
-                className="text-xl font-black leading-none"
-              >
-                {plan.price}
-              </motion.p>
-              <motion.p
-                animate={{ color: selected === i ? 'rgba(255,255,255,0.5)' : '#9CA3AF' }}
-                className="mt-0.5 text-[9px]"
-              >
-                AED/mo
-              </motion.p>
-            </motion.button>
-          ))}
-        </div>
-      </div>
 
-      <div className="mx-5 overflow-hidden rounded-2xl border border-gray-100 bg-white">
-        <div className="grid grid-cols-4 border-b border-gray-100 bg-gray-50">
-          <div className="px-3 py-3" />
-          {plans.map((plan, i) => (
-            <motion.div
-              key={plan.slug}
-              animate={{
-                backgroundColor: selected === i ? `${plan.color}15` : 'transparent',
-              }}
-              className="py-3 text-center"
-            >
-              <motion.p
-                animate={{ color: selected === i ? plan.color : '#6B7280' }}
-                className="text-[11px] font-bold"
-              >
-                {plan.name}
-              </motion.p>
-            </motion.div>
-          ))}
-        </div>
+              <div className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <div className="text-[15px] font-bold text-[#1A1A2E]">
+                      {plan.name}
+                    </div>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <span className="text-[24px] font-extrabold text-[#1A1A2E]"
+                        style={{ fontFamily: 'Poppins, sans-serif' }}>
+                        {displayPrice}
+                      </span>
+                      <span className="text-[12px] text-[#9B9BA8]">AED/mo</span>
+                    </div>
+                    {billingPeriod === 'annual' && (
+                      <div className="text-[11px] text-[#9B9BA8] mt-0.5">
+                        Billed {Math.round(monthlyPrice * 10)} AED/year
+                      </div>
+                    )}
+                  </div>
 
-        <div className="grid grid-cols-4 border-b border-gray-50">
-          <div className="flex items-center px-3 py-4">
-            <p className="text-[11px] leading-tight text-gray-500">Monthly credits</p>
-          </div>
-          {plans.map((plan, i) => (
-            <motion.div
-              key={plan.slug}
-              animate={{ backgroundColor: selected === i ? `${plan.color}08` : 'transparent' }}
-              className="flex flex-col items-center justify-center gap-1 py-4"
-            >
-              <motion.p
-                animate={{ color: selected === i ? plan.color : '#111827' }}
-                className="text-base font-black"
-              >
-                {plan.credits}
-              </motion.p>
-              <div className="h-1 w-8 overflow-hidden rounded-full bg-gray-100">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${(plan.credits / 30) * 100}%` }}
-                  transition={{ delay: 0.2 + i * 0.05, duration: 0.6 }}
-                  className="h-full rounded-full"
-                  style={{ backgroundColor: plan.color }}
-                />
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                      style={{ background: `${color}20`, color }}>
+                      {plan.credits_per_month} credits/mo
+                    </span>
+                    <span className="text-[10px] text-[#9B9BA8]">
+                      +{plan.extra_credit_price_aed ?? '—'} AED/extra
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-[12px] text-[#6B7280]
+                  border-t border-[#F3F3F8] pt-3">
+                  <span>
+                    {plan.max_users ? `${plan.max_users} inspectors` : 'Unlimited'}
+                  </span>
+                  {plan.white_label && (
+                    <span className="flex items-center gap-1">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                        <path d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                          stroke="#16A34A" strokeWidth="2" strokeLinecap="round"/>
+                      </svg>
+                      White label
+                    </span>
+                  )}
+                </div>
               </div>
+
+              {isSelected && (
+                <div className="px-4 pb-4">
+                  <button
+                    type="button"
+                    onClick={() => void handleSubscribe(plan)}
+                    disabled={!!loading || isCurrentPlan}
+                    className="w-full py-3 rounded-xl text-[14px] font-bold text-white
+                      flex items-center justify-center gap-2 disabled:opacity-50
+                      transition-all"
+                    style={{ background: isCurrentPlan ? '#9B9BA8' : color }}
+                  >
+                    {loading === plan.slug
+                      ? <Loader2 size={16} className="animate-spin" />
+                      : isCurrentPlan ? 'Current plan' : 'Subscribe'
+                    }
+                  </button>
+                </div>
+              )}
             </motion.div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-4 border-b border-gray-50">
-          <div className="flex items-center px-3 py-4">
-            <p className="text-[11px] leading-tight text-gray-500">Included price/cr</p>
-          </div>
-          {plans.map((plan, i) => {
-            const inclPrice = (plan.price / plan.credits).toFixed(2)
-            return (
-              <motion.div
-                key={plan.slug}
-                animate={{ backgroundColor: selected === i ? `${plan.color}08` : 'transparent' }}
-                className="flex items-center justify-center py-4"
-              >
-                <motion.p
-                  animate={{ color: selected === i ? plan.color : '#111827' }}
-                  className="text-[12px] font-bold"
-                >
-                  {inclPrice}
-                </motion.p>
-              </motion.div>
-            )
-          })}
-        </div>
-
-        <div className="grid grid-cols-4 border-b border-gray-50">
-          <div className="flex items-center px-3 py-4">
-            <p className="text-[11px] leading-tight text-gray-500">Extra credit</p>
-          </div>
-          {plans.map((plan, i) => (
-            <motion.div
-              key={plan.slug}
-              animate={{ backgroundColor: selected === i ? `${plan.color}08` : 'transparent' }}
-              className="flex flex-col items-center justify-center py-4"
-            >
-              <motion.p
-                animate={{ color: selected === i ? plan.color : '#111827' }}
-                className="text-[12px] font-bold"
-              >
-                {plan.extraCredit}
-              </motion.p>
-              <p className="text-[9px] text-gray-400">AED/cr</p>
-            </motion.div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-4">
-          <div className="flex items-center px-3 py-4">
-            <p className="text-[11px] leading-tight text-gray-500">Team size</p>
-          </div>
-          {plans.map((plan, i) => (
-            <motion.div
-              key={plan.slug}
-              animate={{ backgroundColor: selected === i ? `${plan.color}08` : 'transparent' }}
-              className="flex flex-col items-center justify-center py-4"
-            >
-              <motion.p
-                animate={{ color: selected === i ? plan.color : '#111827' }}
-                className="text-base font-black"
-              >
-                {plan.users}
-              </motion.p>
-              <p className="text-[9px] text-gray-400">{plan.usersLabel}</p>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {selected > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className="mx-5 mt-3 flex items-center gap-2 rounded-xl border border-green-100 bg-green-50 px-4 py-3"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#16A34A"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <p className="text-xs font-medium text-green-700">
-              {selected === 1
-                ? `Save AED ${18 - 15}/cr vs Starter on extra credits`
-                : `Save AED ${18 - 13}/cr vs Starter on extra credits`}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="fixed bottom-0 left-0 right-0 border-t border-gray-100 bg-[#F8F7F4]/95 px-5 pb-8 pt-4 backdrop-blur-sm">
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => handleSelectPlan(plans[selected].slug)}
-          disabled={loading === plans[selected].slug}
-          className="w-full rounded-2xl py-4 text-base font-bold text-white disabled:opacity-70"
-          style={{ backgroundColor: plans[selected].color }}
-          animate={{ backgroundColor: plans[selected].color }}
-          transition={{ duration: 0.2 }}
-        >
-          {loading === plans[selected].slug ? (
-            <span className="inline-flex items-center gap-2">
-              <Loader2 size={16} className="animate-spin" /> Processing...
-            </span>
-          ) : normalizedCurrentPlan === plans[selected].slug ? (
-            `✓ Current plan`
-          ) : (
-            `Get ${plans[selected].name} — AED ${plans[selected].price}/mo`
-          )}
-        </motion.button>
-        <p className="mt-2 text-center text-[10px] text-gray-400">
-          Cancel anytime · Unused credits roll over monthly
-        </p>
+          )
+        })}
       </div>
     </div>
   )

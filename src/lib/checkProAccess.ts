@@ -23,7 +23,12 @@ export async function checkProAccess(
     company.plan !== null &&
     company.stripe_subscription_id !== null;
 
-  if (!hasActivePlan) {
+  // Individual users with purchased credit packs can proceed
+  // even without a subscription — they just need credits
+  const hasCredits = Number(company.credits_balance ?? 0) >= requiredCredits;
+  const isIndividualWithCredits = !hasActivePlan && hasCredits;
+
+  if (!hasActivePlan && !isIndividualWithCredits) {
     return {
       state: "no_subscription",
       balance: Number(company.credits_balance ?? 0),

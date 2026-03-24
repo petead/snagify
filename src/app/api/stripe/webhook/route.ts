@@ -160,21 +160,6 @@ export async function POST(req: NextRequest) {
         break;
       }
 
-      case "customer.subscription.deleted": {
-        const subscription = event.data.object as Stripe.Subscription;
-        const companyId = subscription.metadata?.company_id;
-        if (!companyId) break;
-
-        await supabaseAdmin
-          .from("companies")
-          .update({
-            plan: "free",
-            stripe_subscription_id: null,
-          })
-          .eq("id", companyId);
-        break;
-      }
-
       case "customer.subscription.created":
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
@@ -226,9 +211,41 @@ export async function POST(req: NextRequest) {
         const companyId = subscription.metadata?.company_id;
         if (!companyId) break;
 
+        // Only downgrade to free if Stripe has marked the subscription
+        // as past_due or canceled — not on the first failed attempt.
+        // Stripe retries 3-4 times before canceling, we respect that.
+        const subStatus = subscription.status;
+
+        if (subStatus === "canceled" || subStatus === "unpaid") {
+          // Final failure → downgrade to free
+          await supabaseAdmin
+            .from("companies")
+            .update({ plan: "free", stripe_subscription_id: null })
+            .eq("id", companyId);
+        } else if (subStatus === "past_due") {
+          // Payment failed but Stripe is still retrying → mark as past_due
+          // Keep the plan active but flag it so UI can warn the user
+          await supabaseAdmin
+            .from("companies")
+            .update({ billing_status: "past_due" })
+            .eq("id", companyId);
+        }
+        // status === 'active' on first failure → do nothing, Stripe will retry
+        break;
+      }
+
+      case "customer.subscription.deleted": {
+        const subscription = event.data.object as Stripe.Subscription;
+        const companyId = subscription.metadata?.company_id;
+        if (!companyId) break;
+
         await supabaseAdmin
           .from("companies")
-          .update({ plan: "free" })
+          .update({
+            plan: "free",
+            stripe_subscription_id: null,
+            billing_status: "inactive",
+          })
           .eq("id", companyId);
         break;
       }
