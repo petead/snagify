@@ -29,9 +29,11 @@ type Pack = {
 
 function mapPackDisplayName(name: string): string {
   const n = name.trim().toLowerCase();
+  // Legacy French names → English
   if (n === "découverte" || n === "decouverte") return "Starter";
   if (n === "essentiel") return "Essential";
-  if (n === "sérénité" || n === "serenite") return "Serenity";
+  if (n === "sérénité" || n === "serenite" || n === "serenity") return "Professional";
+  // Current names pass through as-is
   return name;
 }
 
