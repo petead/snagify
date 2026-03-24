@@ -25,6 +25,8 @@ type DashboardNotificationRow = {
 const NOTIF_TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string }> = {
   signature: { icon: "✍️", color: "#9A88FD", bg: "#EDE9FF" },
   lease: { icon: "🔑", color: "#F59E0B", bg: "#FEF3C7" },
+  lease_renewal: { icon: "📅", color: "#D97706", bg: "#FEF3C7" },
+  credits: { icon: "💳", color: "#EF4444", bg: "#FEF2F2" },
   expired: { icon: "🔒", color: "#6B7280", bg: "#F3F4F6" },
   disputed: { icon: "⚠️", color: "#EF4444", bg: "#FEF2F2" },
   report: { icon: "📝", color: "#16A34A", bg: "#DCFCE7" },

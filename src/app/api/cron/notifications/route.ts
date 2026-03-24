@@ -659,6 +659,128 @@ async function processExpiredSignatures() {
   }
 }
 
+async function notifyLowCredits() {
+  try {
+    const { data: companies } = await supabase
+      .from('companies')
+      .select('id, name, credit_balance')
+      .lt('credit_balance', 3)
+      .gt('credit_balance', -1);
+
+    console.log(`[Cron] Low credits: ${companies?.length ?? 0} companies`);
+
+    for (const company of companies ?? []) {
+      const balance = (company as { credit_balance?: number }).credit_balance ?? 0;
+      const companyId = (company as { id: string }).id;
+
+      const { data: agents } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('company_id', companyId);
+
+      for (const agent of agents ?? []) {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        const { data: existing } = await supabase
+          .from('notifications')
+          .select('id')
+          .eq('user_id', agent.id)
+          .eq('type', 'credits')
+          .gte('created_at', sevenDaysAgo.toISOString())
+          .maybeSingle();
+
+        if (existing) continue;
+
+        await sendToUser(agent.id, {
+          title:
+            balance === 0
+              ? 'No credits remaining'
+              : `Only ${balance} credit${balance > 1 ? 's' : ''} left`,
+          body:
+            balance === 0
+              ? 'You have no credits left. Top up now to generate new inspection reports.'
+              : `You have ${balance} credit${balance > 1 ? 's' : ''} remaining. Top up to avoid interruptions to your inspections.`,
+          url: '/profile?section=subscription',
+          type: 'credits',
+        });
+      }
+    }
+  } catch (err) {
+    console.error('[Cron] notifyLowCredits error:', err);
+  }
+}
+
+async function notifyLeaseRenewalReminder() {
+  try {
+    const today = new Date();
+
+    const from100 = new Date(today);
+    from100.setDate(today.getDate() + 99);
+    const to100 = new Date(today);
+    to100.setDate(today.getDate() + 101);
+
+    const { data: tenancies } = await supabase
+      .from('tenancies')
+      .select(`
+        id,
+        agent_id,
+        tenant_name,
+        landlord_name,
+        contract_to,
+        annual_rent,
+        properties (building_name, unit_number, location)
+      `)
+      .gte('contract_to', from100.toISOString().split('T')[0])
+      .lte('contract_to', to100.toISOString().split('T')[0])
+      .eq('status', 'active');
+
+    console.log(`[Cron] Lease renewal J-100: ${tenancies?.length ?? 0} tenancies`);
+
+    for (const tenancy of tenancies ?? []) {
+      const agentId = (tenancy as { agent_id?: string }).agent_id;
+      if (!agentId) continue;
+
+      const tenancyId = (tenancy as { id: string }).id;
+
+      const { data: existing } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', agentId)
+        .eq('type', 'lease_renewal')
+        .ilike('body', `%${tenancyId}%`)
+        .maybeSingle();
+
+      if (existing) continue;
+
+      const prop = Array.isArray((tenancy as { properties?: unknown }).properties)
+        ? (tenancy as { properties: unknown[] }).properties[0]
+        : (tenancy as { properties?: unknown }).properties;
+      const propLabel = formatPropertyBuildingUnit(prop ?? null);
+      const placeLabel = propLabel !== '—' ? propLabel : 'a property';
+      const tenantName = (tenancy as { tenant_name?: string | null }).tenant_name || 'Your tenant';
+      const landlordName = (tenancy as { landlord_name?: string | null }).landlord_name || 'The owner';
+      const contractTo = (tenancy as { contract_to?: string }).contract_to;
+      const formattedDate = contractTo
+        ? new Date(contractTo).toLocaleDateString('en-AE', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })
+        : '—';
+
+      await sendToUser(agentId, {
+        title: 'Lease ending in 100 days',
+        body: `${tenantName}'s lease at ${placeLabel} ends on ${formattedDate}. Now is the time to contact ${tenantName} and ${landlordName} to discuss renewal, rent revision, or release. [ref:${tenancyId}]`,
+        url: '/properties',
+        type: 'lease_renewal',
+      });
+    }
+  } catch (err) {
+    console.error('[Cron] notifyLeaseRenewalReminder error:', err);
+  }
+}
+
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
   if (
@@ -673,6 +795,8 @@ export async function GET(req: Request) {
   try {
     await Promise.all([
       notifyLeaseExpiry(),
+      notifyLeaseRenewalReminder(),
+      notifyLowCredits(),
       notifyInactivity(),
       notifyOpenedNotSigned(),
       notifyExpiringSignatures(),
