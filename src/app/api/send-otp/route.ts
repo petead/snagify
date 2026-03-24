@@ -118,14 +118,6 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: dbError.message }, { status: 500 });
     }
 
-    const refuseUrl = `${appUrl}/sign/refuse?token=${encodeURIComponent(
-      refuseToken
-    )}&inspectionId=${encodeURIComponent(
-      inspectionId
-    )}&signerType=${encodeURIComponent(
-      signerType
-    )}&email=${encodeURIComponent(email)}`;
-
     // Build agency header HTML
     const agencyHeader = agencyLogo
       ? `<img src="${agencyLogo}" alt="${agencyName}" style="width:44px;height:44px;border-radius:10px;object-fit:contain;background:rgba(255,255,255,0.2);" />`
@@ -198,17 +190,6 @@ export async function POST(request: NextRequest) {
             This link expires in 30 minutes. By signing, you agree to the findings of this report.
             If you didn't expect this email, please ignore it.
           </p>
-
-          <!-- Refuse option -->
-          <div style="margin-top:24px;padding-top:16px;border-top:1px solid #F0EFEC;text-align:center;">
-            <p style="font-size:12px;color:#9B9BA8;margin:0 0 8px;line-height:1.5;">
-              Do you contest the findings of this report?
-            </p>
-            <a href="${refuseUrl}"
-              style="font-size:12px;color:#EF4444;font-weight:600;text-decoration:none;">
-              Refuse to sign this report →
-            </a>
-          </div>
 
           <!-- Footer -->
           <div style="margin-top:32px;padding-top:16px;border-top:1px solid #F3F3F8;

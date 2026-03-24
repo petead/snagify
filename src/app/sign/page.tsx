@@ -4,7 +4,6 @@ import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { Loader2, FileText, Check, RotateCcw, ShieldCheck } from 'lucide-react'
 import { formatPropertyBuildingUnit } from '@/lib/formatPropertyAddress'
-import { RefuseButton } from '@/app/sign/RefuseButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -251,6 +250,61 @@ function SignPageContent() {
   }
 
   const propAddress = formatPropertyBuildingUnit(property)
+
+  const refuseToSignSection =
+    refuseToken ? (
+      <div
+        style={{
+          marginTop: 12,
+          background: 'rgba(239,68,68,0.05)',
+          borderRadius: 14,
+          padding: '12px 16px',
+          border: '1px solid rgba(239,68,68,0.15)',
+        }}
+      >
+        <p
+          style={{
+            fontSize: 11,
+            color: '#6B7280',
+            textAlign: 'center',
+            margin: '0 0 8px',
+            lineHeight: 1.5,
+          }}
+        >
+          Do you disagree with the findings of this report?
+          You can formally refuse to sign — your objection will be
+          documented and sent to all parties. The report remains
+          legally valid and can be submitted to the RERA Dispute Centre.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            const q = new URLSearchParams({
+              token: refuseToken,
+              inspectionId: inspectionId ?? '',
+              signerType: signerType ?? '',
+              email: email ?? '',
+            })
+            window.location.href = `/sign/refuse?${q.toString()}`
+          }}
+          style={{
+            display: 'block',
+            width: '100%',
+            background: 'none',
+            border: '1px solid rgba(239,68,68,0.3)',
+            borderRadius: 10,
+            padding: '10px 0',
+            color: '#EF4444',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            textAlign: 'center',
+          }}
+        >
+          Refuse to sign this report
+        </button>
+      </div>
+    ) : null
 
   if (step === 'loading') return (
     <div className="min-h-screen bg-[#F8F7F4] flex items-center justify-center">
@@ -588,12 +642,7 @@ function SignPageContent() {
                 }
               </button>
             </div>
-            <RefuseButton
-              refuseToken={refuseToken}
-              inspectionId={inspectionId}
-              signerType={signerType}
-              email={email}
-            />
+            {refuseToSignSection}
           </div>
         )}
 
@@ -623,12 +672,7 @@ function SignPageContent() {
                 </>
             }
           </button>
-          <RefuseButton
-            refuseToken={refuseToken}
-            inspectionId={inspectionId}
-            signerType={signerType}
-            email={email}
-          />
+          {refuseToSignSection}
           <p className="text-center text-[11px] text-gray-400 mt-2 flex
             items-center justify-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full inline-block"

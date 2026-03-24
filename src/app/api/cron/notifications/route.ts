@@ -199,11 +199,6 @@ async function sendReminder24h() {
           })
         : '7 days from now';
 
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.snagify.net';
-      const refuseUrl = sig.refuse_token
-        ? `${appUrl}/sign/refuse?token=${encodeURIComponent(sig.refuse_token)}&inspectionId=${encodeURIComponent(sig.inspection_id)}&signerType=${encodeURIComponent(sig.signer_type)}&email=${encodeURIComponent(sig.email)}`
-        : null;
-
       const agencyHeader = agencyLogo
         ? `<img src="${agencyLogo}" alt="${agencyName}" style="height:44px;border-radius:10px;object-fit:contain;" />`
         : `<div style="font-size:18px;font-weight:800;color:white;">${agencyName}</div>`;
@@ -265,17 +260,6 @@ async function sendReminder24h() {
             <p style="font-size:11px;color:#9B9BA8;text-align:center;line-height:1.5;margin:0 0 24px;">
               By signing, you confirm you have read and agree with the inspection findings.
             </p>
-
-            ${refuseUrl ? `
-            <div style="margin-top:16px;padding-top:16px;border-top:1px solid #F0EFEC;text-align:center;">
-              <p style="font-size:12px;color:#9B9BA8;margin:0 0 6px;">
-                Do you contest the findings of this report?
-              </p>
-              <a href="${refuseUrl}"
-                style="font-size:12px;color:#EF4444;font-weight:600;text-decoration:none;">
-                Refuse to sign this report →
-              </a>
-            </div>` : ''}
 
             <div style="margin-top:32px;padding-top:16px;border-top:1px solid #F3F3F8;
               text-align:center;font-size:11px;color:#C4C4C4;">
@@ -361,11 +345,6 @@ async function sendReminder72h() {
           })
         : 'very soon';
 
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.snagify.net';
-      const refuseUrl = sig.refuse_token
-        ? `${appUrl}/sign/refuse?token=${encodeURIComponent(sig.refuse_token)}&inspectionId=${encodeURIComponent(sig.inspection_id)}&signerType=${encodeURIComponent(sig.signer_type)}&email=${encodeURIComponent(sig.email)}`
-        : null;
-
       const agencyHeader = agencyLogo
         ? `<img src="${agencyLogo}" alt="${agencyName}" style="height:44px;border-radius:10px;object-fit:contain;" />`
         : `<div style="font-size:18px;font-weight:800;color:white;">${agencyName}</div>`;
@@ -424,20 +403,6 @@ async function sendReminder72h() {
               text-decoration:none;margin-bottom:16px;">
               Sign Now — ${expiresDate} deadline →
             </a>
-
-            ${refuseUrl ? `
-            <div style="margin-top:16px;padding-top:16px;border-top:1px solid #F0EFEC;text-align:center;">
-              <p style="font-size:12px;color:#9B9BA8;margin:0 0 6px;">
-                Don't agree with the report findings?
-              </p>
-              <a href="${refuseUrl}"
-                style="font-size:12px;color:#EF4444;font-weight:600;text-decoration:none;">
-                Formally refuse to sign →
-              </a>
-              <p style="font-size:11px;color:#C4C4C4;margin:6px 0 0;">
-                A formal refusal is better than no response — it puts your objection on record.
-              </p>
-            </div>` : ''}
 
             <div style="margin-top:32px;padding-top:16px;border-top:1px solid #F3F3F8;
               text-align:center;font-size:11px;color:#C4C4C4;">
