@@ -64,6 +64,16 @@ export async function POST(request: Request) {
   let inspectionId: string | undefined;
   let step = "init";
   try {
+    // ── Auth guard ──
+    const { createClient: createServerClient } = await import("@/lib/supabase/server");
+    const supabaseAuth = await createServerClient();
+    const {
+      data: { user },
+    } = await supabaseAuth.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     step = "parse body";
     const body = (await request.json()) as { inspectionId?: string };
     inspectionId = body.inspectionId;
@@ -82,6 +92,9 @@ export async function POST(request: Request) {
 
     if (inspErr || !inspection) {
       return NextResponse.json({ error: "Inspection not found" }, { status: 404 });
+    }
+    if (inspection.agent_id !== user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 export const maxDuration = 30;
 
@@ -86,6 +87,15 @@ EXAMPLES:
 Respond with keywords/fragments only. No sentences.`;
 
 export async function POST(request: Request) {
+  // ── Auth guard ──
+  const supabaseAuth = await createServerClient();
+  const {
+    data: { user },
+  } = await supabaseAuth.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const {

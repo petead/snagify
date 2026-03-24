@@ -769,6 +769,16 @@ export async function buildPdfAndUpload(
 export async function POST(request: NextRequest) {
   let step = "init";
   try {
+    // ── Auth guard ──
+    const { createClient: createServerClient } = await import("@/lib/supabase/server");
+    const supabaseAuth = await createServerClient();
+    const {
+      data: { user },
+    } = await supabaseAuth.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     step = "parse body";
     const { inspectionId } = (await request.json()) as { inspectionId?: string };
     if (!inspectionId) {
