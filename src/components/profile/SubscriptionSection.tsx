@@ -228,12 +228,25 @@ export function SubscriptionSection({ company }: Props) {
         {plans.map((plan) => {
           const isPopular   = plan.highlight
           const isCurrent   = normalizedPlan === plan.slug
-          const annualPerMo = plan.price_aed_monthly
-          const monthlyPrice = plan.price_aed_monthly_billing ?? plan.price_aed_monthly
+          const monthlyPrice = Number(
+            plan.price_aed_monthly_billing ?? plan.price_aed_monthly ?? 0
+          )
+          const annualTotalDb =
+            plan.price_aed_annual != null ? Number(plan.price_aed_annual) : NaN
+          const annualTotal =
+            Number.isFinite(annualTotalDb) && annualTotalDb > 0
+              ? annualTotalDb
+              : Math.round(monthlyPrice * 12)
+          const annualPerMo =
+            Number.isFinite(annualTotalDb) && annualTotalDb > 0
+              ? Math.round(annualTotalDb / 12)
+              : Number(plan.price_aed_monthly ?? monthlyPrice)
           const displayPrice = billing === 'annual' ? annualPerMo : monthlyPrice
-          const annualTotal  = plan.price_aed_annual ?? annualPerMo * 12
-          const savedAmount  = monthlyPrice * 12 - annualTotal
-          const savedPct     = Math.round(savedAmount / (monthlyPrice * 12) * 100)
+          const savedAmount = monthlyPrice * 12 - annualTotal
+          const savedPct =
+            monthlyPrice > 0
+              ? Math.round((savedAmount / (monthlyPrice * 12)) * 100)
+              : 0
           const pricePerCredit = plan.credits_per_month > 0
             ? (displayPrice / plan.credits_per_month).toFixed(1)
             : '—'
