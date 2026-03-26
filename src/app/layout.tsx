@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/react";
 import type { Metadata, Viewport } from "next";
 import { Poppins, DM_Sans } from "next/font/google";
 import "./globals.css";
@@ -53,6 +54,7 @@ export default function RootLayout({
         <TopLoader />
         <NavigationReset />
         {children}
+        <Analytics />
       </body>
     </html>
   );
