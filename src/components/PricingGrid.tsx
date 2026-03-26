@@ -15,46 +15,45 @@ const plans = [
   {
     slug: "starter",
     name: "Starter",
-    priceMonthly: 163,
+    priceMonthly: 179,
     priceAnnual: 1788,
-    priceAnnualPerMonth: Math.round(1788 / 12),
-    credits: 10,
-    extraCredit: 18,
+    priceAnnualPerMonth: 149,
+    credits: 15,
+    extraCredit: 28,
     users: "2",
-    usersLabel: "inspectors",
     popular: false,
     color: "#9A88FD",
-    savings: null,
+    savings: 17,
   },
   {
     slug: "growth",
     name: "Growth",
-    priceMonthly: 272,
+    priceMonthly: 299,
     priceAnnual: 2988,
-    priceAnnualPerMonth: Math.round(2988 / 12),
-    credits: 20,
-    extraCredit: 15,
+    priceAnnualPerMonth: 249,
+    credits: 30,
+    extraCredit: 22,
     users: "5",
-    usersLabel: "inspectors",
     popular: true,
     color: "#7C3AED",
-    savings: 16,
+    savings: 17,
   },
   {
     slug: "agency",
     name: "Agency",
-    priceMonthly: 381,
-    priceAnnual: 4188,
-    priceAnnualPerMonth: Math.round(4188 / 12),
-    credits: 30,
-    extraCredit: 13,
+    priceMonthly: 449,
+    priceAnnual: 4488,
+    priceAnnualPerMonth: 374,
+    credits: 50,
+    extraCredit: 16,
     users: "15",
-    usersLabel: "inspectors",
     popular: false,
     color: "#1E1B4B",
-    savings: 22,
+    savings: 17,
   },
 ] as const;
+
+const maxPlanCredits = Math.max(...plans.map((p) => p.credits));
 
 function normalizePlan(plan: string): string {
   if (plan === "pro_solo") return "starter";
@@ -71,6 +70,8 @@ export function PricingGrid({ currentPlan, creditsBalance, companyId: _companyId
 
   const getPrice = (plan: (typeof plans)[number]) =>
     billingPeriod === "annual" ? plan.priceAnnualPerMonth : plan.priceMonthly;
+
+  const perCreditAed = (plan: (typeof plans)[number]) => getPrice(plan) / plan.credits;
 
   const handleSelectPlan = async (slug: string) => {
     const plan = plans.find((p) => p.slug === slug);
@@ -224,7 +225,7 @@ export function PricingGrid({ currentPlan, creditsBalance, companyId: _companyId
           {plans.map((plan, i) => (
             <motion.div key={plan.slug} animate={{ backgroundColor: selected === i ? `${plan.color}15` : "transparent" }} className="py-3 text-center">
               <motion.p animate={{ color: selected === i ? plan.color : "#6B7280" }} className="text-[11px] font-bold">{plan.name}</motion.p>
-              {plan.savings && selected === i && (
+              {plan.slug !== "starter" && plan.savings && selected === i && (
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -241,7 +242,7 @@ export function PricingGrid({ currentPlan, creditsBalance, companyId: _companyId
           {plans.map((plan, i) => (
             <motion.div key={plan.slug} animate={{ backgroundColor: selected === i ? `${plan.color}08` : "transparent" }} className="py-4 flex flex-col items-center justify-center gap-1">
               <motion.p animate={{ color: selected === i ? plan.color : "#111827" }} className="text-base font-black">{plan.credits}</motion.p>
-              <div className="w-8 h-1 bg-gray-100 rounded-full overflow-hidden"><motion.div initial={{ width: 0 }} animate={{ width: `${(plan.credits / 30) * 100}%` }} transition={{ delay: 0.2 + i * 0.05, duration: 0.6 }} className="h-full rounded-full" style={{ backgroundColor: plan.color }} /></div>
+              <div className="w-8 h-1 bg-gray-100 rounded-full overflow-hidden"><motion.div initial={{ width: 0 }} animate={{ width: `${(plan.credits / maxPlanCredits) * 100}%` }} transition={{ delay: 0.2 + i * 0.05, duration: 0.6 }} className="h-full rounded-full" style={{ backgroundColor: plan.color }} /></div>
             </motion.div>
           ))}
         </div>
@@ -269,7 +270,7 @@ export function PricingGrid({ currentPlan, creditsBalance, companyId: _companyId
           {plans.map((plan, i) => (
             <motion.div key={plan.slug} animate={{ backgroundColor: selected === i ? `${plan.color}08` : "transparent" }} className="py-4 flex flex-col items-center justify-center">
               <motion.p animate={{ color: selected === i ? plan.color : "#111827" }} className="text-base font-black">{plan.users}</motion.p>
-              <p className="text-[9px] text-gray-400">{plan.usersLabel}</p>
+              <p className="text-[9px] text-gray-400">inspectors</p>
             </motion.div>
           ))}
         </div>
@@ -281,12 +282,20 @@ export function PricingGrid({ currentPlan, creditsBalance, companyId: _companyId
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
             {selected === 1 && (
               <p className="text-xs text-green-700 font-medium">
-                Save 16% per credit vs Starter
+                Save{" "}
+                {Math.round(
+                  (1 - perCreditAed(plans[1]) / perCreditAed(plans[0])) * 100
+                )}
+                % per credit vs Starter
               </p>
             )}
             {selected === 2 && (
               <p className="text-xs text-green-700 font-medium">
-                Save 22% per credit vs Starter — best value
+                Save{" "}
+                {Math.round(
+                  (1 - perCreditAed(plans[2]) / perCreditAed(plans[0])) * 100
+                )}
+                % per credit vs Starter — best value
               </p>
             )}
           </motion.div>
