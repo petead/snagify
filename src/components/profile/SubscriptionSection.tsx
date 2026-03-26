@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 import { Loader2 } from 'lucide-react'
 
 type DbPlan = {
@@ -9,8 +8,11 @@ type DbPlan = {
   slug: string
   name: string
   price_aed_monthly: number
+  price_aed_monthly_billing: number | null
+  price_aed_annual: number | null
   credits_per_month: number
   stripe_price_id: string | null
+  stripe_price_id_annual: string | null
   white_label: boolean
   max_users: number | null
   highlight: boolean
@@ -28,42 +30,36 @@ interface Props {
   }
 }
 
-const PLAN_COLORS: Record<string, string> = {
-  starter: '#9A88FD',
-  growth: '#7C3AED',
-  agency: '#1E1B4B',
-}
+const FEATURES = [
+  'AI photo analysis',
+  'White-label branding',
+  'Digital signatures',
+  'PDF report generation',
+  'Push notifications',
+]
 
 export function SubscriptionSection({ company }: Props) {
   const [plans, setPlans] = useState<DbPlan[]>([])
-  const [loadingPlans, setLoadingPlans] = useState(true)
   const [loading, setLoading] = useState<string | null>(null)
-  const [selected, setSelected] = useState(1)
-  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('annual')
+  const [loadingPlans, setLoadingPlans] = useState(true)
+  const [billing, setBilling] = useState<'monthly' | 'annual'>('annual')
 
-  useEffect(() => {
-    async function fetchPlans() {
-      try {
-        const res = await fetch('/api/credits/packs')
-        const data = (await res.json()) as { plans?: DbPlan[] }
-        setPlans(data.plans ?? [])
-      } catch {
-        setPlans([])
-      } finally {
-        setLoadingPlans(false)
-      }
-    }
-    void fetchPlans()
-  }, [])
-
-  const normalizedCurrentPlan =
-    company.plan === 'pro_solo' ? 'starter' :
-    company.plan === 'pro_agency' ? 'growth' :
-    company.plan === 'pro_max' ? 'agency' :
+  const normalizedPlan =
+    company.plan === 'pro_solo'   ? 'starter' :
+    company.plan === 'pro_agency' ? 'growth'  :
+    company.plan === 'pro_max'    ? 'agency'  :
     company.plan
 
   const isActive = !!company.stripe_subscription_id &&
     company.plan !== 'free' && company.plan !== null
+
+  useEffect(() => {
+    fetch('/api/credits/packs')
+      .then(r => r.json())
+      .then((d: { plans?: DbPlan[] }) => setPlans(d.plans ?? []))
+      .catch(() => setPlans([]))
+      .finally(() => setLoadingPlans(false))
+  }, [])
 
   async function handleSubscribe(plan: DbPlan) {
     setLoading(plan.slug)
@@ -74,24 +70,22 @@ export function SubscriptionSection({ company }: Props) {
         body: JSON.stringify({
           type: 'subscription',
           plan_slug: plan.slug,
-          billing_period: billingPeriod,
+          billing_period: billing,
           companyId: company.id,
         }),
       })
-      const data = (await res.json()) as { url?: string; error?: string }
+      const data = await res.json() as { url?: string }
       if (data.url) window.location.href = data.url
-    } catch {
-      // silent
     } finally {
       setLoading(null)
     }
   }
 
-  async function handleManageBilling() {
+  async function handlePortal() {
     setLoading('portal')
     try {
       const res = await fetch('/api/stripe/portal', { method: 'POST' })
-      const data = (await res.json()) as { url?: string }
+      const data = await res.json() as { url?: string }
       if (data.url) window.location.href = data.url
     } finally {
       setLoading(null)
@@ -99,212 +93,316 @@ export function SubscriptionSection({ company }: Props) {
   }
 
   if (loadingPlans) return (
-    <div className="flex items-center justify-center py-12">
-      <Loader2 size={24} className="animate-spin text-[#9A88FD]" />
+    <div style={{ display:'flex', justifyContent:'center', padding:'3rem 0' }}>
+      <Loader2 size={20} style={{ animation:'spin 1s linear infinite', color:'#9A88FD' }} />
     </div>
   )
 
   return (
-    <div className="px-4 pb-8">
-      {/* Past due warning banner */}
+    <div style={{ padding:'0 0 32px', fontFamily:'DM Sans, sans-serif' }}>
+
+      {/* Past due banner */}
       {company.billing_status === 'past_due' && (
-        <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-2xl p-4 mb-4
-          flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#EF4444]/10 flex items-center
-            justify-center flex-shrink-0 mt-0.5">
+        <div style={{
+          background:'#FEF2F2', border:'0.5px solid #FECACA',
+          borderRadius:16, padding:'14px 16px',
+          display:'flex', alignItems:'flex-start', gap:12, marginBottom:16,
+        }}>
+          <div style={{
+            width:36, height:36, borderRadius:10,
+            background:'rgba(239,68,68,0.1)',
+            display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+          }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="#EF4444" strokeWidth="2"/>
-              <path d="M12 8v4M12 16h.01" stroke="#EF4444" strokeWidth="2"
-                strokeLinecap="round"/>
+              <path d="M12 8v4M12 16h.01" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-bold text-[#DC2626] mb-1">
+          <div style={{ flex:1 }}>
+            <p style={{ fontSize:13, fontWeight:700, color:'#DC2626', margin:'0 0 4px', fontFamily:'Poppins, sans-serif' }}>
               Payment failed
             </p>
-            <p className="text-[12px] text-[#EF4444]/80 leading-relaxed mb-3">
-              Your last payment did not go through. Stripe will retry automatically.
-              Please update your payment method to avoid losing access.
+            <p style={{ fontSize:12, color:'rgba(239,68,68,0.8)', margin:'0 0 10px', lineHeight:1.5 }}>
+              Your last payment did not go through. Please update your payment method to avoid losing access.
             </p>
             <button
               type="button"
-              onClick={() => void handleManageBilling()}
+              onClick={() => void handlePortal()}
               disabled={loading === 'portal'}
-              className="flex items-center gap-2 bg-[#EF4444] rounded-xl px-4 py-2.5
-                text-[12px] font-bold text-white disabled:opacity-50"
+              style={{
+                background:'#EF4444', color:'white',
+                border:'none', borderRadius:8, padding:'8px 16px',
+                fontSize:12, fontWeight:700, cursor:'pointer',
+                display:'flex', alignItems:'center', gap:6,
+                fontFamily:'Poppins, sans-serif',
+              }}
             >
-              {loading === 'portal'
-                ? <Loader2 size={12} className="animate-spin" />
-                : 'Update payment method →'
-              }
+              {loading === 'portal' ? <Loader2 size={12} style={{ animation:'spin 1s linear infinite' }} /> : 'Update payment method →'}
             </button>
           </div>
         </div>
       )}
 
-      {/* Current plan banner */}
-      <div className="bg-white rounded-2xl border border-[#EEECFF] p-4 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-[#9B9BA8] uppercase tracking-wide mb-1">
-              Current plan
-            </p>
-            <p className="text-[16px] font-bold text-[#1A1A2E] capitalize">
-              {normalizedCurrentPlan === 'free' ? 'Free' : normalizedCurrentPlan}
-            </p>
-            <p className="text-[12px] text-[#9B9BA8] mt-0.5">
-              {company.credits_balance} credits remaining
-            </p>
-          </div>
-          {isActive && (
-            <button
-              type="button"
-              onClick={() => void handleManageBilling()}
-              disabled={loading === 'portal'}
-              className="flex items-center gap-2 bg-[#F3F3F8] rounded-xl px-4 py-2.5
-                text-[12px] font-semibold text-[#1A1A2E] disabled:opacity-50"
-            >
-              {loading === 'portal'
-                ? <Loader2 size={12} className="animate-spin" />
-                : 'Manage billing'
-              }
-            </button>
-          )}
+      {/* Current plan + manage billing */}
+      <div style={{
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        padding:'14px 16px',
+        background:'#F8F7F4',
+        border:'0.5px solid rgba(14,14,16,0.1)',
+        borderRadius:14, marginBottom:20,
+      }}>
+        <div>
+          <p style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'1.5px', color:'rgba(14,14,16,0.5)', margin:'0 0 2px', fontFamily:'Poppins, sans-serif' }}>
+            Current plan
+          </p>
+          <p style={{ fontSize:15, fontWeight:700, color:'#0E0E10', margin:0, fontFamily:'Poppins, sans-serif', textTransform:'capitalize' }}>
+            {normalizedPlan === 'free' ? 'Free' : normalizedPlan}
+          </p>
+          <p style={{ fontSize:12, color:'rgba(14,14,16,0.5)', margin:'2px 0 0' }}>
+            {company.credits_balance} credits remaining
+          </p>
         </div>
+        {isActive && (
+          <button
+            type="button"
+            onClick={() => void handlePortal()}
+            disabled={loading === 'portal'}
+            style={{
+              background:'white', border:'0.5px solid rgba(14,14,16,0.15)',
+              borderRadius:10, padding:'9px 16px',
+              fontSize:12, fontWeight:600, color:'#0E0E10',
+              cursor:'pointer', display:'flex', alignItems:'center', gap:6,
+              fontFamily:'Poppins, sans-serif',
+            }}
+          >
+            {loading === 'portal' ? <Loader2 size={12} style={{ animation:'spin 1s linear infinite' }} /> : 'Manage billing'}
+          </button>
+        )}
       </div>
 
       {/* Billing toggle */}
-      <div className="flex items-center justify-center gap-3 mb-6">
-        <button
-          type="button"
-          onClick={() => setBillingPeriod('monthly')}
-          className={`text-[13px] font-semibold px-4 py-2 rounded-xl transition-all ${
-            billingPeriod === 'monthly'
-              ? 'bg-[#1A1A2E] text-white'
-              : 'text-[#9B9BA8]'
-          }`}
-        >
-          Monthly
-        </button>
-        <button
-          type="button"
-          onClick={() => setBillingPeriod('annual')}
-          className={`text-[13px] font-semibold px-4 py-2 rounded-xl transition-all ${
-            billingPeriod === 'annual'
-              ? 'bg-[#1A1A2E] text-white'
-              : 'text-[#9B9BA8]'
-          }`}
-        >
-          Annual
-          <span className="ml-1.5 text-[10px] font-bold text-[#16A34A] bg-[#DCFCE7]
-            px-1.5 py-0.5 rounded-full">
-            Save up to 22%
-          </span>
-        </button>
+      <div style={{ display:'flex', justifyContent:'center', marginBottom:20 }}>
+        <div style={{
+          display:'flex', gap:4, padding:5,
+          background:'white', border:'0.5px solid rgba(14,14,16,0.12)',
+          borderRadius:999,
+        }}>
+          <button
+            type="button"
+            onClick={() => setBilling('monthly')}
+            style={{
+              padding:'9px 20px', borderRadius:999, border:'none',
+              fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:12,
+              cursor:'pointer', transition:'all .2s',
+              background: billing === 'monthly' ? '#0E0E10' : 'transparent',
+              color: billing === 'monthly' ? 'white' : 'rgba(14,14,16,0.5)',
+            }}
+          >
+            Monthly
+          </button>
+          <button
+            type="button"
+            onClick={() => setBilling('annual')}
+            style={{
+              padding:'9px 20px', borderRadius:999, border:'none',
+              fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:12,
+              cursor:'pointer', transition:'all .2s',
+              display:'flex', flexDirection:'column', alignItems:'center', gap:1,
+              background: billing === 'annual' ? '#0E0E10' : 'transparent',
+              color: billing === 'annual' ? 'white' : 'rgba(14,14,16,0.5)',
+            }}
+          >
+            Annual
+            <span style={{
+              fontSize:10, fontWeight:600,
+              color: billing === 'annual' ? '#CAFE87' : '#3A7A00',
+            }}>
+              2 months free
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Plans */}
-      <div className="flex flex-col gap-3">
-        {plans.map((plan, i) => {
-          const color = PLAN_COLORS[plan.slug] ?? '#9A88FD'
-          const isCurrentPlan = normalizedCurrentPlan === plan.slug
-          const isSelected = selected === i
-          const monthlyPrice = plan.price_aed_monthly
-          // Annual price = monthly * 10 (2 months free)
-          const annualPricePerMonth = Math.round(monthlyPrice * 10 / 12)
-          const displayPrice = billingPeriod === 'annual'
-            ? annualPricePerMonth
-            : monthlyPrice
+      <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+        {plans.map((plan) => {
+          const isPopular   = plan.highlight
+          const isCurrent   = normalizedPlan === plan.slug
+          const annualPerMo = plan.price_aed_monthly
+          const monthlyPrice = plan.price_aed_monthly_billing ?? plan.price_aed_monthly
+          const displayPrice = billing === 'annual' ? annualPerMo : monthlyPrice
+          const annualTotal  = plan.price_aed_annual ?? annualPerMo * 12
+          const savedAmount  = monthlyPrice * 12 - annualTotal
+          const savedPct     = Math.round(savedAmount / (monthlyPrice * 12) * 100)
+          const pricePerCredit = plan.credits_per_month > 0
+            ? (displayPrice / plan.credits_per_month).toFixed(1)
+            : '—'
+
+          const dark = isPopular
 
           return (
-            <motion.div
+            <div
               key={plan.slug}
-              onClick={() => setSelected(i)}
-              whileTap={{ scale: 0.98 }}
-              className="relative bg-white rounded-2xl border-2 cursor-pointer transition-all"
               style={{
-                borderColor: isSelected ? color : '#EEECFF',
+                background: dark ? '#0E0E10' : 'white',
+                border: dark ? '0.5px solid #0E0E10' : '0.5px solid rgba(14,14,16,0.12)',
+                borderRadius: 20,
+                padding: '28px 24px',
+                position: 'relative',
               }}
             >
-              {plan.highlight && (
-                <div className="absolute -top-3 left-4">
-                  <span className="text-[10px] font-bold text-white px-3 py-1
-                    rounded-full" style={{ background: color }}>
-                    Most popular
-                  </span>
+              {/* Popular badge */}
+              {isPopular && (
+                <div style={{
+                  position:'absolute', top:-12, left:'50%', transform:'translateX(-50%)',
+                  background:'#9A88FD', color:'#0E0E10',
+                  fontSize:10, fontWeight:800,
+                  padding:'4px 14px', borderRadius:999,
+                  fontFamily:'Poppins, sans-serif',
+                  letterSpacing:'0.5px', whiteSpace:'nowrap',
+                }}>
+                  Most Popular
                 </div>
               )}
 
-              <div className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="text-[15px] font-bold text-[#1A1A2E]">
-                      {plan.name}
-                    </div>
-                    <div className="flex items-baseline gap-1 mt-1">
-                      <span className="text-[24px] font-extrabold text-[#1A1A2E]"
-                        style={{ fontFamily: 'Poppins, sans-serif' }}>
-                        {displayPrice}
-                      </span>
-                      <span className="text-[12px] text-[#9B9BA8]">AED/mo</span>
-                    </div>
-                    {billingPeriod === 'annual' && (
-                      <div className="text-[11px] text-[#9B9BA8] mt-0.5">
-                        Billed {Math.round(monthlyPrice * 10)} AED/year
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full"
-                      style={{ background: `${color}20`, color }}>
-                      {plan.credits_per_month} credits/mo
-                    </span>
-                    <span className="text-[10px] text-[#9B9BA8]">
-                      +{plan.extra_credit_price_aed ?? '—'} AED/extra
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 text-[12px] text-[#6B7280]
-                  border-t border-[#F3F3F8] pt-3">
-                  <span>
-                    {plan.max_users ? `${plan.max_users} inspectors` : 'Unlimited'}
+              {/* Plan name + price */}
+              <div style={{ marginBottom:16 }}>
+                <p style={{
+                  fontSize:10, fontWeight:700, textTransform:'uppercase',
+                  letterSpacing:'2px', margin:'0 0 8px',
+                  color: dark ? 'rgba(255,255,255,0.45)' : 'rgba(14,14,16,0.5)',
+                  fontFamily:'Poppins, sans-serif',
+                }}>
+                  {plan.name}
+                </p>
+                <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
+                  <span style={{
+                    fontSize:44, fontWeight:800, letterSpacing:'-2.5px', lineHeight:1,
+                    color: dark ? 'white' : '#0E0E10',
+                    fontFamily:'Poppins, sans-serif',
+                  }}>
+                    {displayPrice}
                   </span>
-                  {plan.white_label && (
-                    <span className="flex items-center gap-1">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                        <path d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                          stroke="#16A34A" strokeWidth="2" strokeLinecap="round"/>
-                      </svg>
-                      White label
+                  <span style={{ fontSize:14, color: dark ? 'rgba(255,255,255,0.45)' : 'rgba(14,14,16,0.5)' }}>
+                    AED/mo
+                  </span>
+                </div>
+                {billing === 'annual' && (
+                  <p style={{ fontSize:11, margin:'4px 0 0', color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(14,14,16,0.5)' }}>
+                    {annualTotal.toLocaleString()} AED billed annually ·{' '}
+                    <span style={{ color:'#3A7A00', fontWeight:700 }}>
+                      Save {savedPct}% · {savedAmount.toLocaleString()} AED saved
                     </span>
-                  )}
+                  </p>
+                )}
+              </div>
+
+              {/* Stats block */}
+              <div style={{
+                display:'grid', gridTemplateColumns:'1fr 1fr',
+                gap:1, borderRadius:12, overflow:'hidden',
+                background: dark ? 'rgba(255,255,255,0.06)' : '#F3F1EB',
+                marginBottom:12,
+              }}>
+                <div style={{ padding:'14px 16px', background: dark ? 'rgba(255,255,255,0.04)' : 'white' }}>
+                  <p style={{
+                    fontSize:28, fontWeight:800, letterSpacing:'-1.5px', lineHeight:1,
+                    color: dark ? 'white' : '#0E0E10', margin:0,
+                    fontFamily:'Poppins, sans-serif',
+                  }}>
+                    {plan.credits_per_month}
+                  </p>
+                  <p style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', margin:'3px 0 0', color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(14,14,16,0.5)' }}>
+                    Credits / mo
+                  </p>
+                  <p style={{ fontSize:11, fontWeight:700, color:'#9A88FD', margin:'3px 0 0' }}>
+                    {pricePerCredit} AED / credit
+                  </p>
+                </div>
+                <div style={{ padding:'14px 16px', background: dark ? 'rgba(255,255,255,0.04)' : 'white' }}>
+                  <p style={{
+                    fontSize:28, fontWeight:800, letterSpacing:'-1.5px', lineHeight:1,
+                    color: dark ? 'white' : '#0E0E10', margin:0,
+                    fontFamily:'Poppins, sans-serif',
+                  }}>
+                    {plan.max_users ?? '∞'}
+                  </p>
+                  <p style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', margin:'3px 0 0', color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(14,14,16,0.5)' }}>
+                    Inspectors
+                  </p>
                 </div>
               </div>
 
-              {isSelected && (
-                <div className="px-4 pb-4">
-                  <button
-                    type="button"
-                    onClick={() => void handleSubscribe(plan)}
-                    disabled={!!loading || isCurrentPlan}
-                    className="w-full py-3 rounded-xl text-[14px] font-bold text-white
-                      flex items-center justify-center gap-2 disabled:opacity-50
-                      transition-all"
-                    style={{ background: isCurrentPlan ? '#9B9BA8' : color }}
-                  >
-                    {loading === plan.slug
-                      ? <Loader2 size={16} className="animate-spin" />
-                      : isCurrentPlan ? 'Current plan' : 'Subscribe'
-                    }
-                  </button>
-                </div>
-              )}
-            </motion.div>
+              {/* Extra credit row */}
+              <div style={{
+                display:'flex', alignItems:'center', gap:8,
+                padding:'9px 14px',
+                background: dark ? 'rgba(255,255,255,0.06)' : '#F3F1EB',
+                borderRadius:10, marginBottom:16,
+                fontSize:13,
+                color: dark ? 'rgba(255,255,255,0.5)' : 'rgba(14,14,16,0.6)',
+              }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                Extra credit:{' '}
+                <strong style={{ color: dark ? 'white' : '#0E0E10', fontWeight:700 }}>
+                  {plan.extra_credit_price_aed} AED each
+                </strong>
+              </div>
+
+              {/* Feature list */}
+              <ul style={{ listStyle:'none', padding:0, margin:'0 0 20px', display:'flex', flexDirection:'column', gap:8 }}>
+                {FEATURES.map(feat => (
+                  <li key={feat} style={{ display:'flex', alignItems:'center', gap:10, fontSize:13, color: dark ? 'rgba(255,255,255,0.7)' : 'rgba(14,14,16,0.7)' }}>
+                    <span style={{ color:'#3A7A00', fontWeight:700, fontSize:12 }}>✓</span>
+                    {feat}
+                  </li>
+                ))}
+              </ul>
+
+              {/* CTA */}
+              <button
+                type="button"
+                onClick={() => void handleSubscribe(plan)}
+                disabled={!!loading || isCurrent}
+                style={{
+                  width:'100%', padding:'13px 0',
+                  borderRadius:12, border:'none', cursor: isCurrent ? 'default' : 'pointer',
+                  fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:14,
+                  transition:'all .2s',
+                  background: isCurrent
+                    ? (dark ? 'rgba(255,255,255,0.1)' : 'rgba(14,14,16,0.06)')
+                    : isPopular
+                      ? '#9A88FD'
+                      : (dark ? 'rgba(255,255,255,0.1)' : 'transparent'),
+                  color: isCurrent
+                    ? (dark ? 'rgba(255,255,255,0.3)' : 'rgba(14,14,16,0.35)')
+                    : isPopular
+                      ? '#0E0E10'
+                      : (dark ? 'rgba(255,255,255,0.7)' : '#0E0E10'),
+                  ...((!isCurrent && !isPopular) ? {
+                    border: dark ? '1.5px solid rgba(255,255,255,0.12)' : '1.5px solid rgba(14,14,16,0.2)',
+                  } : {}),
+                }}
+              >
+                {loading === plan.slug
+                  ? <Loader2 size={16} style={{ animation:'spin 1s linear infinite', display:'inline' }} />
+                  : isCurrent
+                    ? 'Current plan'
+                    : `Get ${plan.name}`
+                }
+              </button>
+            </div>
           )
         })}
       </div>
+
+      <p style={{ textAlign:'center', fontSize:11, color:'rgba(14,14,16,0.4)', marginTop:16, lineHeight:1.6 }}>
+        All plans include white-label · digital signatures · AI reports · Prices in AED
+      </p>
+
     </div>
   )
 }
