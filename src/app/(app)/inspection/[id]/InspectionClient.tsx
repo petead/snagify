@@ -490,9 +490,6 @@ export function InspectionClient({
 
   const [isFurnished, setIsFurnished] = useState<boolean | null>(initialIsFurnished ?? null)
   const [wantsInventory, setWantsInventory] = useState<boolean | null>(initialWantsInventory || null)
-  const [inventoryReferenceItems, setInventoryReferenceItems] = useState<{
-    id: string; name: string; category: string; quantity: number; source: string
-  }[]>([])
   const [aiDetectedItems, setAiDetectedItems] = useState<{
     name: string; condition: string
   }[]>([])
@@ -1584,31 +1581,32 @@ export function InspectionClient({
     } catch { return [] }
   }
 
-  async function loadInventoryReference() {
-    if (!propertyId) return
+  async function loadInventoryReference(): Promise<{
+    name: string; category: string; quantity: number; source: string
+  }[]> {
+    if (!propertyId) return []
     try {
-      const res = await fetch(`/api/inventory/reference?property_id=${propertyId}`)
-      const data = await res.json() as { items?: typeof inventoryReferenceItems }
-      if (data.items?.length) {
-        setInventoryReferenceItems(data.items)
-      }
-    } catch { /* silent */ }
+      const res = await fetch(`/api/inventory/snapshots/by-property?property_id=${propertyId}`)
+      const data = await res.json() as { items?: { name: string; category: string; quantity: number; source?: string | null; condition?: string | null }[] }
+      return (data.items ?? [])
+        .filter(i => i.condition !== 'missing')
+        .map(i => ({ name: i.name, category: i.category, quantity: i.quantity, source: i.source ?? 'history' }))
+    } catch { return [] }
   }
 
   function buildInventorySelectionWithDB(
-    dbSnapshots: { name: string; category: string; quantity: number; condition_checkin: string | null; photo_url: string | null; notes: string; source: string; reference_item_id: string | null }[]
+    dbSnapshots: { name: string; category: string; quantity: number; condition_checkin: string | null; photo_url: string | null; notes: string; source: string; reference_item_id: string | null }[],
+    historyItems: { name: string; category: string; quantity: number; source: string }[] = []
   ) {
-    // Build a lookup map from DB by name (lowercase)
     const dbByName = new Map(dbSnapshots.map(s => [s.name.toLowerCase(), s]))
 
-    // Always start from standard inventory based on bedroom count
     const bedroomCount = liveRooms.filter(r =>
       r.name.toLowerCase().includes('bedroom') ||
       r.name.toLowerCase().includes('bed') ||
       r.name.toLowerCase().includes('chambre')
     ).length
-    const standard = inventoryReferenceItems.length > 0
-      ? inventoryReferenceItems.map(r => ({ name: r.name, category: r.category, quantity: r.quantity }))
+    const standard = historyItems.length > 0
+      ? historyItems.map(r => ({ name: r.name, category: r.category, quantity: r.quantity }))
       : getStandardInventory(bedroomCount)
 
     const seen = new Set<string>()
@@ -1621,11 +1619,10 @@ export function InspectionClient({
       seen.add(key)
       const inDB = dbByName.has(key)
       selection.push({
-        referenceItemId: inventoryReferenceItems.find(r => r.name.toLowerCase() === key)?.id,
         name: item.name,
         category: item.category,
         quantity: inDB ? (dbByName.get(key)!.quantity) : item.quantity,
-        source: inventoryReferenceItems.length > 0 ? 'history' : 'standard',
+        source: historyItems.length > 0 ? 'history' : 'standard',
         selected: dbSnapshots.length === 0 ? true : inDB, // first time → all selected; returning → only DB ones
       })
     }
@@ -1682,12 +1679,12 @@ export function InspectionClient({
     }
   }
 
-  function buildInventorySelection() {
+  function buildInventorySelection(historyItems: { name: string; category: string; quantity: number; source: string }[] = []) {
     const merged: typeof inventorySelection = []
     const seen = new Set<string>()
 
-    // If no reference items → use standard inventory based on bedroom count
-    if (inventoryReferenceItems.length === 0) {
+    // If no history → use standard inventory based on bedroom count
+    if (historyItems.length === 0) {
       const bedroomCount = liveRooms.filter(r =>
         r.name.toLowerCase().includes('bedroom') ||
         r.name.toLowerCase().includes('bed') ||
@@ -1720,17 +1717,16 @@ export function InspectionClient({
       return
     }
 
-    // From reference (history)
-    for (const ref of inventoryReferenceItems) {
+    // From history snapshots
+    for (const ref of historyItems) {
       const key = ref.name.toLowerCase()
       if (!seen.has(key)) {
         seen.add(key)
         merged.push({
-          referenceItemId: ref.id,
           name: ref.name,
           category: ref.category,
           quantity: ref.quantity,
-          source: 'history',
+          source: ref.source,
           selected: true,
         })
       }
@@ -2386,9 +2382,9 @@ export function InspectionClient({
                   return
                 }
                 if (!isCheckout && isFurnished === true && wantsInventory === true && inventoryDetails.length === 0) {
-                  await loadInventoryReference()
+                  const historyItems = await loadInventoryReference()
                   const dbSnapshots = await loadExistingSnapshots()
-                  buildInventorySelectionWithDB(dbSnapshots)
+                  buildInventorySelectionWithDB(dbSnapshots, historyItems)
                   setInventoryDetailIndex(0)
                   setScreen('inventory')
                   return
@@ -3376,9 +3372,9 @@ export function InspectionClient({
                   <button
                     type="button"
                     onClick={async () => {
-                      await loadInventoryReference()
+                      const historyItems = await loadInventoryReference()
                       const dbSnapshots = await loadExistingSnapshots()
-                      buildInventorySelectionWithDB(dbSnapshots)
+                      buildInventorySelectionWithDB(dbSnapshots, historyItems)
                       setInventoryDetailIndex(0)
                       setInventoryScreen('selection')
                       setScreen('inventory')
@@ -3769,7 +3765,7 @@ export function InspectionClient({
             <div style={{ flex:1, overflowY:'auto', padding:'16px 20px', WebkitOverflowScrolling:'touch' }}>
 
               {/* AI suggestion banner */}
-              {(aiDetectedItems.length > 0 || inventoryReferenceItems.length === 0) && (
+              {aiDetectedItems.length > 0 && (
                 <div style={{
                   background:'#EDE9FF', borderRadius:12, padding:'10px 14px',
                   marginBottom:16, display:'flex', alignItems:'center', gap:8,
@@ -3778,10 +3774,7 @@ export function InspectionClient({
                     <path d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m1.636-6.364.707.707M6 18l.343-.343A7.963 7.963 0 0 1 4 12a8 8 0 0 1 16 0"/>
                   </svg>
                   <p style={{ fontSize:12, color:'#534AB7', margin:0, fontWeight:600 }}>
-                    {inventoryReferenceItems.length === 0
-                      ? `Standard list for ${liveRooms.filter(r => r.name.toLowerCase().includes('bed')).length}BR · ${aiDetectedItems.length > 0 ? `+ ${aiDetectedItems.length} AI detected` : 'edit as needed'}`
-                      : `AI detected ${aiDetectedItems.length} item${aiDetectedItems.length > 1 ? 's' : ''} in your photos`
-                    }
+                    {`AI detected ${aiDetectedItems.length} item${aiDetectedItems.length > 1 ? 's' : ''} in your photos`}
                   </p>
                 </div>
               )}
@@ -4109,22 +4102,6 @@ export function InspectionClient({
                       })),
                     }),
                   })
-                  // Update inventory_reference
-                  if (propertyId) {
-                    await fetch('/api/inventory/reference', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        property_id: propertyId,
-                        items: inventoryDetails.map(it => ({
-                          name: it.name,
-                          category: it.category,
-                          quantity: it.quantity,
-                          source: it.source,
-                        })),
-                      }),
-                    })
-                  }
                 } catch { /* silent */ } finally {
                   setInventorySaving(false)
                 }
@@ -4398,21 +4375,6 @@ export function InspectionClient({
                           })),
                         }),
                       })
-                      if (propertyId) {
-                        const activeItems = checkoutInventoryItems
-                          .filter(it => it.condition !== 'missing')
-                          .map(it => ({
-                            name: it.name,
-                            category: it.category,
-                            quantity: it.quantity,
-                            source: it.source,
-                          }))
-                        await fetch('/api/inventory/reference', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ property_id: propertyId, items: activeItems }),
-                        })
-                      }
                     } else {
                       await fetch('/api/inventory/snapshots', {
                         method: 'POST',
@@ -4431,21 +4393,6 @@ export function InspectionClient({
                           })),
                         }),
                       })
-                      if (propertyId) {
-                        await fetch('/api/inventory/reference', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            property_id: propertyId,
-                            items: inventoryDetails.map(it => ({
-                              name: it.name,
-                              category: it.category,
-                              quantity: it.quantity,
-                              source: it.source,
-                            })),
-                          }),
-                        })
-                      }
                     }
                   } catch { /* silent */ } finally {
                     setInventorySaving(false)
@@ -4717,21 +4664,6 @@ export function InspectionClient({
                         })),
                       }),
                     })
-                    if (propertyId) {
-                      const activeItems = checkoutInventoryItems
-                        .filter(it => it.condition !== 'missing')
-                        .map(it => ({
-                          name: it.name,
-                          category: it.category,
-                          quantity: it.quantity,
-                          source: it.source,
-                        }))
-                      await fetch('/api/inventory/reference', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ property_id: propertyId, items: activeItems }),
-                      })
-                    }
                   } catch { /* silent */ }
 
                   setShowCheckoutInventory(false)
