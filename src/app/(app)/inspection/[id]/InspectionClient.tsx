@@ -402,12 +402,40 @@ export function InspectionClient({
   const [activeRoom, setActiveRoom] = useState(0);
   const [activeReviewRoom, setActiveReviewRoom] = useState<string | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
-  const [screen, setScreen] = useState<"rooms" | "inspect" | "review">(
+  const [screen, setScreen] = useState<"rooms" | "inspect" | "review" | "inventory">(
     initialRooms.length > 0 ? "inspect" : "rooms"
   );
   const [toast, setToast] = useState<string | null>(null);
 
   const [keyHandover, setKeyHandover] = useState<{ item: string; qty: number }[]>([]);
+
+  const [isFurnished, setIsFurnished] = useState<boolean | null>(null)
+  const [inventoryReferenceItems, setInventoryReferenceItems] = useState<{
+    id: string; name: string; category: string; quantity: number; source: string
+  }[]>([])
+  const [aiDetectedItems, setAiDetectedItems] = useState<{
+    name: string; condition: string
+  }[]>([])
+  const [inventorySelection, setInventorySelection] = useState<{
+    referenceItemId?: string
+    name: string
+    category: string
+    quantity: number
+    source: string
+    selected: boolean
+  }[]>([])
+  const [inventoryScreen, setInventoryScreen] = useState<'selection' | 'detail'>('selection')
+  const [inventoryDetailIndex, setInventoryDetailIndex] = useState(0)
+  const [inventoryDetails, setInventoryDetails] = useState<{
+    referenceItemId?: string
+    name: string
+    category: string
+    quantity: number
+    condition: 'good' | 'fair' | 'poor' | null
+    photo_url: string | null
+    notes: string
+    source: string
+  }[]>([])
 
   // Keys inline edit mode
   const [editingKeys, setEditingKeys] = useState(false);
@@ -1012,6 +1040,15 @@ export function InspectionClient({
           const data = await res.json();
           const aiTags = Array.isArray(data.damage_tags) ? data.damage_tags : [];
           const mergedTags = aiTags.length > 0 ? aiTags : [...prefillDamageTags];
+          // Accumulate AI detected inventory items
+          if (Array.isArray(data.detected_items) && data.detected_items.length > 0) {
+            setAiDetectedItems(prev => {
+              const existing = new Set(prev.map(i => i.name.toLowerCase()))
+              const newItems = (data.detected_items as { name: string; condition: string }[])
+                .filter(i => !existing.has(i.name.toLowerCase()))
+              return [...prev, ...newItems]
+            })
+          }
           // Update state with AI result; keep pre-filled check-in tags if AI returns none
           setPhotos((prev) => prev.map((p) =>
             p.id === realPhotoId
@@ -1250,6 +1287,27 @@ export function InspectionClient({
   // ── Generate report (from review screen)
   const handleGenerateReport = async () => {
     if (generating || navigating) return;
+    // If check-in and furnished status not yet determined, go to inventory first
+    if (
+      (inspection as any)?.type === 'check-in' &&
+      isFurnished === null
+    ) {
+      const suggested = suggestFurnished()
+      setIsFurnished(suggested)
+      await loadInventoryReference()
+      buildInventorySelection()
+      setScreen('inventory')
+      return
+    }
+    if (
+      (inspection as any)?.type === 'check-in' &&
+      isFurnished === true &&
+      inventoryDetails.length === 0
+    ) {
+      buildInventorySelection()
+      setScreen('inventory')
+      return
+    }
     setGenerating(true);
 
     for (const [photoId, timer] of Object.entries(notesTimers.current)) {
@@ -1308,6 +1366,66 @@ export function InspectionClient({
   };
 
   const accentColor = inspectionType === "check-in" ? "#9A88FD" : "#FF8A65";
+
+  function suggestFurnished(): boolean | null {
+    const rent = (inspection as any)?.tenancy?.annual_rent
+    const deposit = (inspection as any)?.tenancy?.deposit_amount
+    if (!rent || !deposit || Number(rent) === 0) return null
+    const ratio = Number(deposit) / Number(rent)
+    if (ratio >= 0.04 && ratio <= 0.06) return false  // ~5% = unfurnished
+    if (ratio >= 0.09 && ratio <= 0.11) return true   // ~10% = furnished
+    return null
+  }
+
+  async function loadInventoryReference() {
+    const propertyId = (inspection as any)?.property_id
+    if (!propertyId) return
+    try {
+      const res = await fetch(`/api/inventory/reference?property_id=${propertyId}`)
+      const data = await res.json() as { items?: typeof inventoryReferenceItems }
+      if (data.items?.length) {
+        setInventoryReferenceItems(data.items)
+      }
+    } catch { /* silent */ }
+  }
+
+  function buildInventorySelection() {
+    const merged: typeof inventorySelection = []
+    const seen = new Set<string>()
+
+    // From reference (history)
+    for (const ref of inventoryReferenceItems) {
+      const key = ref.name.toLowerCase()
+      if (!seen.has(key)) {
+        seen.add(key)
+        merged.push({
+          referenceItemId: ref.id,
+          name: ref.name,
+          category: ref.category,
+          quantity: ref.quantity,
+          source: 'history',
+          selected: true,
+        })
+      }
+    }
+
+    // From AI detection — add only if not already in reference
+    for (const ai of aiDetectedItems) {
+      const key = ai.name.toLowerCase()
+      if (!seen.has(key)) {
+        seen.add(key)
+        merged.push({
+          name: ai.name,
+          category: 'other',
+          quantity: 1,
+          source: 'ai',
+          selected: true,
+        })
+      }
+    }
+
+    setInventorySelection(merged)
+  }
 
   // ═══════════════════════════════════════════════
   return (
@@ -2753,6 +2871,449 @@ export function InspectionClient({
               ) : (
                 "Generate Report"
               )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {screen === "inventory" && inventoryScreen === 'selection' && (
+        <div style={{ minHeight:'100vh', background:'#F8F7F4', display:'flex', flexDirection:'column' }}>
+          {/* Header */}
+          <div style={{
+            padding:'20px 20px 16px',
+            borderBottom:'1px solid rgba(14,14,16,0.08)',
+            background:'white',
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+              <button
+                type="button"
+                onClick={() => setScreen('review')}
+                style={{ background:'none', border:'none', cursor:'pointer', padding:4 }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E0E10" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M19 12H5M12 5l-7 7 7 7"/>
+                </svg>
+              </button>
+              <div>
+                <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:16, margin:0, color:'#0E0E10' }}>
+                  Inventory
+                </p>
+                <p style={{ fontSize:12, color:'rgba(14,14,16,0.5)', margin:0 }}>
+                  {inventorySelection.filter(i => i.selected).length} items selected
+                </p>
+              </div>
+            </div>
+
+            {/* Furnished toggle */}
+            <div style={{
+              display:'flex', alignItems:'center', justifyContent:'space-between',
+              padding:'10px 14px',
+              background: isFurnished ? '#EDE9FF' : '#F3F1EB',
+              borderRadius:12,
+            }}>
+              <div>
+                <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:0, fontFamily:'Poppins, sans-serif' }}>
+                  Furnished apartment
+                </p>
+                {isFurnished === null && suggestFurnished() !== null && (
+                  <p style={{ fontSize:11, color:'rgba(14,14,16,0.5)', margin:'2px 0 0' }}>
+                    Suggested based on deposit ratio
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFurnished(prev => !prev)}
+                style={{
+                  width:44, height:26, borderRadius:999,
+                  background: isFurnished ? '#9A88FD' : 'rgba(14,14,16,0.15)',
+                  border:'none', cursor:'pointer', position:'relative', transition:'background .2s',
+                }}
+              >
+                <span style={{
+                  position:'absolute', top:3,
+                  left: isFurnished ? 21 : 3,
+                  width:20, height:20, borderRadius:'50%',
+                  background:'white', transition:'left .2s',
+                }}/>
+              </button>
+            </div>
+          </div>
+
+          {isFurnished && (
+            <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }}>
+
+              {/* AI suggestion banner */}
+              {aiDetectedItems.length > 0 && (
+                <div style={{
+                  background:'#EDE9FF', borderRadius:12, padding:'10px 14px',
+                  marginBottom:16, display:'flex', alignItems:'center', gap:8,
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round">
+                    <path d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m1.636-6.364.707.707M6 18l.343-.343A7.963 7.963 0 0 1 4 12a8 8 0 0 1 16 0"/>
+                  </svg>
+                  <p style={{ fontSize:12, color:'#534AB7', margin:0, fontWeight:600 }}>
+                    AI detected {aiDetectedItems.length} items in your photos
+                  </p>
+                </div>
+              )}
+
+              {/* Items list */}
+              {inventorySelection.length === 0 ? (
+                <p style={{ fontSize:14, color:'rgba(14,14,16,0.4)', textAlign:'center', marginTop:40 }}>
+                  No items yet. Add items below.
+                </p>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
+                  {inventorySelection.map((item, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        background:'white', borderRadius:12,
+                        border:`1px solid ${item.selected ? '#9A88FD' : 'rgba(14,14,16,0.1)'}`,
+                        padding:'12px 14px',
+                        display:'flex', alignItems:'center', gap:12,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setInventorySelection(prev =>
+                          prev.map((it, i) => i === idx ? { ...it, selected: !it.selected } : it)
+                        )}
+                        style={{
+                          width:22, height:22, borderRadius:6,
+                          border:`2px solid ${item.selected ? '#9A88FD' : 'rgba(14,14,16,0.2)'}`,
+                          background: item.selected ? '#9A88FD' : 'transparent',
+                          cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+                          flexShrink:0,
+                        }}
+                      >
+                        {item.selected && (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        )}
+                      </button>
+
+                      <div style={{ flex:1 }}>
+                        <p style={{ fontSize:13, fontWeight:600, margin:0, color:'#0E0E10' }}>{item.name}</p>
+                        <p style={{ fontSize:11, color:'rgba(14,14,16,0.4)', margin:'2px 0 0' }}>
+                          {item.category}
+                          {item.source === 'ai' && (
+                            <span style={{ marginLeft:6, color:'#9A88FD', fontWeight:600 }}>· AI</span>
+                          )}
+                          {item.source === 'history' && (
+                            <span style={{ marginLeft:6, color:'#3A7A00', fontWeight:600 }}>· History</span>
+                          )}
+                        </p>
+                      </div>
+
+                      {/* Quantity */}
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <button type="button" onClick={() => setInventorySelection(prev =>
+                          prev.map((it, i) => i === idx ? { ...it, quantity: Math.max(1, it.quantity - 1) } : it)
+                        )} style={{ width:24, height:24, borderRadius:6, border:'1px solid rgba(14,14,16,0.1)', background:'#F3F1EB', cursor:'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
+                        <span style={{ fontSize:13, fontWeight:600, minWidth:16, textAlign:'center' }}>{item.quantity}</span>
+                        <button type="button" onClick={() => setInventorySelection(prev =>
+                          prev.map((it, i) => i === idx ? { ...it, quantity: it.quantity + 1 } : it)
+                        )} style={{ width:24, height:24, borderRadius:6, border:'1px solid rgba(14,14,16,0.1)', background:'#F3F1EB', cursor:'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add custom item */}
+              <button
+                type="button"
+                onClick={() => {
+                  const name = window.prompt('Item name:')
+                  if (name?.trim()) {
+                    setInventorySelection(prev => [...prev, {
+                      name: name.trim(),
+                      category: 'other',
+                      quantity: 1,
+                      source: 'manual',
+                      selected: true,
+                    }])
+                  }
+                }}
+                style={{
+                  width:'100%', padding:'12px',
+                  background:'white', border:'1.5px dashed rgba(14,14,16,0.15)',
+                  borderRadius:12, cursor:'pointer', fontSize:13,
+                  color:'rgba(14,14,16,0.5)', fontWeight:600,
+                }}
+              >
+                + Add item manually
+              </button>
+            </div>
+          )}
+
+          {/* CTA */}
+          <div style={{ padding:'16px 20px', background:'white', borderTop:'1px solid rgba(14,14,16,0.08)' }}>
+            {isFurnished ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const selected = inventorySelection.filter(i => i.selected)
+                  const details = selected.map(item => ({
+                    referenceItemId: item.referenceItemId,
+                    name: item.name,
+                    category: item.category,
+                    quantity: item.quantity,
+                    condition: null as 'good' | 'fair' | 'poor' | null,
+                    photo_url: null,
+                    notes: '',
+                    source: item.source,
+                  }))
+                  setInventoryDetails(details)
+                  setInventoryDetailIndex(0)
+                  setInventoryScreen('detail')
+                }}
+                style={{
+                  width:'100%', padding:'15px',
+                  background:'#0E0E10', color:'white', border:'none',
+                  borderRadius:14, cursor:'pointer',
+                  fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15,
+                }}
+              >
+                Confirm {inventorySelection.filter(i => i.selected).length} items →
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setInventoryDetails([])
+                  void handleGenerateReport()
+                }}
+                style={{
+                  width:'100%', padding:'15px',
+                  background:'#0E0E10', color:'white', border:'none',
+                  borderRadius:14, cursor:'pointer',
+                  fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15,
+                }}
+              >
+                Continue without inventory →
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {screen === "inventory" && inventoryScreen === 'detail' && (
+        <div style={{ minHeight:'100vh', background:'#F8F7F4', display:'flex', flexDirection:'column' }}>
+          {/* Progress dots */}
+          <div style={{ padding:'16px 20px 0', display:'flex', justifyContent:'center', gap:6 }}>
+            {inventoryDetails.map((_, i) => (
+              <div key={i} style={{
+                width: i === inventoryDetailIndex ? 20 : 6,
+                height:6, borderRadius:999,
+                background: i === inventoryDetailIndex ? '#9A88FD' : 'rgba(14,14,16,0.15)',
+                transition:'all .2s',
+              }}/>
+            ))}
+          </div>
+
+          {inventoryDetails[inventoryDetailIndex] && (() => {
+            const item = inventoryDetails[inventoryDetailIndex]
+
+            return (
+              <div style={{ flex:1, padding:'24px 20px', display:'flex', flexDirection:'column', gap:20 }}>
+                <div>
+                  <p style={{ fontSize:12, color:'rgba(14,14,16,0.4)', margin:'0 0 4px', textTransform:'uppercase', letterSpacing:'1px' }}>
+                    Item {inventoryDetailIndex + 1} of {inventoryDetails.length}
+                  </p>
+                  <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:22, margin:0, color:'#0E0E10' }}>
+                    {item.name}
+                  </p>
+                  <p style={{ fontSize:12, color:'rgba(14,14,16,0.4)', margin:'4px 0 0' }}>{item.category}</p>
+                </div>
+
+                {/* Condition */}
+                <div>
+                  <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:'0 0 10px' }}>Condition</p>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                    {(['good', 'fair', 'poor'] as const).map(cond => (
+                      <button
+                        key={cond}
+                        type="button"
+                        onClick={() => setInventoryDetails(prev =>
+                          prev.map((it, i) => i === inventoryDetailIndex ? { ...it, condition: cond } : it)
+                        )}
+                        style={{
+                          padding:'12px 8px', borderRadius:12, border:'none', cursor:'pointer',
+                          fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:13,
+                          background: item.condition === cond
+                            ? cond === 'good' ? '#CAFE87' : cond === 'fair' ? '#FEDE80' : '#FCA5A5'
+                            : '#F3F1EB',
+                          color: item.condition === cond
+                            ? cond === 'good' ? '#1A4A00' : cond === 'fair' ? '#6B4A00' : '#7A0000'
+                            : 'rgba(14,14,16,0.5)',
+                        }}
+                      >
+                        {cond.charAt(0).toUpperCase() + cond.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Photo */}
+                <div>
+                  <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:'0 0 10px' }}>
+                    Photo
+                    <span style={{ fontSize:11, color:'rgba(14,14,16,0.4)', fontWeight:400, marginLeft:6 }}>
+                      recommended
+                    </span>
+                  </p>
+                  {item.photo_url ? (
+                    <div style={{ position:'relative' }}>
+                      <img src={item.photo_url} alt={item.name} style={{ width:'100%', borderRadius:12, maxHeight:200, objectFit:'cover' }}/>
+                      <button
+                        type="button"
+                        onClick={() => setInventoryDetails(prev =>
+                          prev.map((it, i) => i === inventoryDetailIndex ? { ...it, photo_url: null } : it)
+                        )}
+                        style={{ position:'absolute', top:8, right:8, background:'rgba(0,0,0,0.5)', border:'none', borderRadius:999, width:28, height:28, cursor:'pointer', color:'white', fontSize:14 }}
+                      >✕</button>
+                    </div>
+                  ) : (
+                    <label style={{
+                      display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                      padding:'20px', borderRadius:12,
+                      border:'1.5px dashed rgba(14,14,16,0.15)',
+                      background:'white', cursor:'pointer', fontSize:13, color:'rgba(14,14,16,0.5)',
+                    }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                      </svg>
+                      Take photo
+                      <input
+                        type="file" accept="image/*" capture="environment"
+                        style={{ display:'none' }}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          const reader = new FileReader()
+                          reader.onload = (ev) => {
+                            setInventoryDetails(prev =>
+                              prev.map((it, i) => i === inventoryDetailIndex
+                                ? { ...it, photo_url: ev.target?.result as string }
+                                : it
+                              )
+                            )
+                          }
+                          reader.readAsDataURL(file)
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* Note */}
+                <div>
+                  <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:'0 0 8px' }}>
+                    Note <span style={{ fontSize:11, color:'rgba(14,14,16,0.4)', fontWeight:400 }}>optional</span>
+                  </p>
+                  <textarea
+                    value={item.notes}
+                    onChange={e => setInventoryDetails(prev =>
+                      prev.map((it, i) => i === inventoryDetailIndex ? { ...it, notes: e.target.value } : it)
+                    )}
+                    placeholder="Any observation..."
+                    rows={3}
+                    style={{
+                      width:'100%', padding:'12px', borderRadius:12,
+                      border:'1px solid rgba(14,14,16,0.1)',
+                      background:'white', fontSize:14, fontFamily:'DM Sans, sans-serif',
+                      resize:'none', outline:'none',
+                    }}
+                  />
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Navigation */}
+          <div style={{ padding:'16px 20px', background:'white', borderTop:'1px solid rgba(14,14,16,0.08)', display:'flex', gap:10 }}>
+            <button
+              type="button"
+              onClick={() => {
+                if (inventoryDetailIndex === 0) {
+                  setInventoryScreen('selection')
+                } else {
+                  setInventoryDetailIndex(prev => prev - 1)
+                }
+              }}
+              style={{
+                flex:1, padding:'14px',
+                background:'#F3F1EB', border:'none', borderRadius:14,
+                cursor:'pointer', fontFamily:'Poppins, sans-serif', fontWeight:600, fontSize:14,
+                color:'#0E0E10',
+              }}
+            >
+              ← Back
+            </button>
+            <button
+              type="button"
+              disabled={!inventoryDetails[inventoryDetailIndex]?.condition}
+              onClick={async () => {
+                const isLast = inventoryDetailIndex === inventoryDetails.length - 1
+                if (!isLast) {
+                  setInventoryDetailIndex(prev => prev + 1)
+                  return
+                }
+                // Last item — save snapshots then generate
+                try {
+                  await fetch('/api/inventory/snapshots', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      inspection_id: inspectionId,
+                      items: inventoryDetails.map(it => ({
+                        reference_item_id: it.referenceItemId ?? null,
+                        name: it.name,
+                        category: it.category,
+                        quantity: it.quantity,
+                        condition_checkin: it.condition,
+                        photo_url: it.photo_url,
+                        notes: it.notes,
+                        source: it.source,
+                      })),
+                    }),
+                  })
+                  // Update inventory_reference
+                  const propertyId = (inspection as any)?.property_id
+                  if (propertyId) {
+                    await fetch('/api/inventory/reference', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        property_id: propertyId,
+                        items: inventoryDetails.map(it => ({
+                          name: it.name,
+                          category: it.category,
+                          quantity: it.quantity,
+                          source: it.source,
+                        })),
+                      }),
+                    })
+                  }
+                } catch { /* silent — don't block report generation */ }
+                // Back to normal generate flow
+                setScreen('review')
+                setInventoryScreen('selection')
+                void handleGenerateReport()
+              }}
+              style={{
+                flex:2, padding:'14px',
+                background: inventoryDetails[inventoryDetailIndex]?.condition ? '#0E0E10' : 'rgba(14,14,16,0.2)',
+                border:'none', borderRadius:14, cursor:'pointer',
+                fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15, color:'white',
+              }}
+            >
+              {inventoryDetailIndex === inventoryDetails.length - 1 ? 'Save & Generate Report' : 'Next item →'}
             </button>
           </div>
         </div>
