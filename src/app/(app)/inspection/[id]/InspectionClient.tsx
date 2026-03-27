@@ -1708,6 +1708,48 @@ export function InspectionClient({
                   <path d="M18 6L6 18M6 6l12 12" />
                 </svg>
               </button>
+              {/* Inventory tab — only if furnished with inventory */}
+              {!isCheckout && inventoryDetails.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveReviewRoom("inventory")}
+                  style={{
+                    flexShrink: 0,
+                    padding: "8px 16px",
+                    borderRadius: 100,
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 12, fontWeight: 700,
+                    whiteSpace: "nowrap",
+                    transition: "all 0.15s",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: activeReviewRoom === "inventory" ? "#9A88FD" : "#f5f5f5",
+                    color: activeReviewRoom === "inventory" ? "white" : "#374151",
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"
+                      stroke={activeReviewRoom === "inventory" ? "white" : "#9A88FD"}
+                      strokeWidth="1.8" strokeLinecap="round"/>
+                    <rect x="9" y="3" width="6" height="4" rx="1"
+                      stroke={activeReviewRoom === "inventory" ? "white" : "#9A88FD"}
+                      strokeWidth="1.8"/>
+                    <path d="M9 12h6M9 16h4"
+                      stroke={activeReviewRoom === "inventory" ? "white" : "#9A88FD"}
+                      strokeWidth="1.8" strokeLinecap="round"/>
+                  </svg>
+                  Inventory
+                  <span style={{
+                    marginLeft: 2, opacity: 0.7, fontSize: 11,
+                    background: activeReviewRoom === "inventory" ? "rgba(255,255,255,0.2)" : "#e5e7eb",
+                    padding: "1px 6px", borderRadius: 100,
+                  }}>
+                    {inventoryDetails.length}
+                  </span>
+                </button>
+              )}
             </div>
           </div>,
           document.body
@@ -2984,8 +3026,125 @@ export function InspectionClient({
             );
           })()}
 
+          {/* ── INVENTORY TAB CONTENT ── */}
+          {activeReviewRoom === "inventory" && (
+            <div style={{ flex:1, overflowY:'auto', padding:'16px 16px 160px', WebkitOverflowScrolling:'touch' as any }}>
+
+              <div style={{ marginBottom:16, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:18, margin:0, color:'#1a1a2e' }}>
+                  Inventory
+                </p>
+                <span style={{
+                  fontSize:11, fontWeight:700, color:'#9A88FD',
+                  background:'#EDE9FF', padding:'3px 10px', borderRadius:99,
+                }}>
+                  {inventoryDetails.length} items
+                </span>
+              </div>
+
+              {/* Group by category */}
+              {Object.entries(
+                inventoryDetails.reduce((acc, item) => {
+                  const cat = item.category ?? 'other'
+                  if (!acc[cat]) acc[cat] = []
+                  acc[cat].push(item)
+                  return acc
+                }, {} as Record<string, typeof inventoryDetails>)
+              ).map(([category, items]) => (
+                <div key={category} style={{ marginBottom:20 }}>
+                  <p style={{
+                    fontSize:10, fontWeight:700, color:'#9ca3af',
+                    textTransform:'uppercase', letterSpacing:1.5, margin:'0 0 8px',
+                  }}>
+                    {category}
+                  </p>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    {items.map((item, idx) => (
+                      <div key={idx} style={{
+                        background:'white', borderRadius:12,
+                        border:'0.5px solid rgba(14,14,16,0.08)',
+                        padding:'12px 14px',
+                        display:'flex', alignItems:'center', gap:12,
+                      }}>
+                        {/* Photo thumbnail */}
+                        {item.photo_url ? (
+                          <img src={item.photo_url} alt={item.name}
+                            style={{ width:44, height:44, borderRadius:8, objectFit:'cover', flexShrink:0 }}/>
+                        ) : (
+                          <div style={{
+                            width:44, height:44, borderRadius:8,
+                            background:'#F3F1EB', flexShrink:0,
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                          }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(14,14,16,0.25)" strokeWidth="2" strokeLinecap="round">
+                              <rect x="3" y="3" width="18" height="18" rx="2"/>
+                              <circle cx="8.5" cy="8.5" r="1.5"/>
+                              <polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                          </div>
+                        )}
+
+                        {/* Name + qty */}
+                        <div style={{ flex:1 }}>
+                          <p style={{ fontSize:13, fontWeight:600, margin:0, color:'#0E0E10' }}>
+                            {item.name}
+                            {item.quantity > 1 && (
+                              <span style={{ fontSize:11, color:'#9ca3af', marginLeft:6 }}>x{item.quantity}</span>
+                            )}
+                          </p>
+                          {item.notes && (
+                            <p style={{ fontSize:11, color:'#9ca3af', margin:'2px 0 0' }}>{item.notes}</p>
+                          )}
+                        </div>
+
+                        {/* Condition badge */}
+                        {item.condition && (
+                          <div style={{
+                            padding:'4px 10px', borderRadius:99,
+                            background:
+                              item.condition === 'good' ? '#EEFAD5' :
+                              item.condition === 'fair' ? '#FFF8DC' : '#FEE2E2',
+                          }}>
+                            <p style={{
+                              fontSize:11, fontWeight:700, margin:0,
+                              color:
+                                item.condition === 'good' ? '#3A7A00' :
+                                item.condition === 'fair' ? '#8A6000' : '#7A0000',
+                              fontFamily:'Poppins, sans-serif',
+                            }}>
+                              {item.condition.charAt(0).toUpperCase() + item.condition.slice(1)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* Edit button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setInventoryScreen('selection')
+                  setScreen('inventory')
+                }}
+                style={{
+                  width:'100%', padding:'12px',
+                  background:'transparent',
+                  border:'1.5px dashed rgba(154,136,253,0.4)',
+                  borderRadius:12, cursor:'pointer',
+                  fontSize:13, fontWeight:600, color:'#9A88FD',
+                  marginTop:8,
+                }}
+              >
+                Edit inventory
+              </button>
+            </div>
+          )}
+
           {/* ── ROOM CONTENT ── */}
-          {activeReviewRoom !== "keys" && (() => {
+          {activeReviewRoom !== "keys" && activeReviewRoom !== "inventory" && (() => {
             const room = liveRooms.find((r) => r.id === activeReviewRoom);
             if (!room) return null;
             const roomPhotos = photos.filter((p) => p.room_id === room.id);
@@ -3475,7 +3634,7 @@ export function InspectionClient({
                 fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15,
               }}
             >
-              Confirm {inventorySelection.filter(i => i.selected).length} items →
+              Continue to Review · {inventorySelection.filter(i => i.selected).length} items
             </button>
           </div>
         </div>
