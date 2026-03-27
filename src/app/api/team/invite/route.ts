@@ -81,16 +81,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check if already in THIS team
     const { data: existingMember } = await supabaseAdmin
       .from("profiles")
-      .select("id")
+      .select("id, company_id")
       .eq("email", rawEmail)
-      .eq("company_id", companyId)
       .maybeSingle();
 
     if (existingMember) {
+      if (existingMember.company_id === companyId) {
+        return NextResponse.json(
+          { error: "This person is already in your team." },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
-        { error: "This person is already in your team" },
+        {
+          error:
+            "This email is already registered on Snagify with another agency. They cannot be invited.",
+        },
         { status: 400 }
       );
     }

@@ -376,13 +376,13 @@ export function TeamSection({ company, currentUserId }: Props) {
                 }}
                 placeholder="inspector@agency.com"
                 required
-                className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-[13px] outline-none focus:border-[#9A88FD] focus:bg-white transition-all"
+                className={`w-full pl-8 pr-3 py-2.5 rounded-xl border text-[13px] outline-none focus:bg-white transition-all ${inviteError ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50 focus:border-[#9A88FD]"}`}
                 style={{ fontSize: "16px" }}
               />
             </div>
             <button
               type="submit"
-              disabled={inviting || !inviteEmail}
+              disabled={inviting || !inviteEmail || !!inviteError}
               className="flex items-center gap-1.5 bg-[#9A88FD] text-white rounded-xl px-4 py-2.5 text-[13px] font-bold disabled:opacity-50 flex-shrink-0"
             >
               {inviting ? (
@@ -398,7 +398,46 @@ export function TeamSection({ company, currentUserId }: Props) {
           </form>
         )}
 
-        {inviteError && <p className="text-[12px] text-red-500 mt-2">{inviteError}</p>}
+        {inviteError && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              background: "#FEF2F2",
+              border: "1px solid #FECACA",
+              borderRadius: 12,
+              padding: "10px 14px",
+              marginTop: 10,
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#EF4444"
+              strokeWidth="2"
+              strokeLinecap="round"
+              style={{ flexShrink: 0, marginTop: 1 }}
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <p
+              style={{
+                fontSize: 12,
+                color: "#B91C1C",
+                margin: 0,
+                lineHeight: 1.5,
+                fontWeight: 500,
+              }}
+            >
+              {inviteError}
+            </p>
+          </div>
+        )}
       </div>
 
       {portalMounted &&
