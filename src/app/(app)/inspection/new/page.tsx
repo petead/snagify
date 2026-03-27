@@ -670,7 +670,8 @@ function NewInspectionContent() {
         await supabase.from("rooms").insert(roomInserts);
       }
 
-      router.replace(`/inspection/${inspection.id}?autostart=1&wants_inventory=${wantsInventory ? "1" : "0"}&is_furnished=${isFurnished ? "1" : "0"}`);
+      // Hard navigation — destroys React tree immediately, no re-render flash
+      window.location.replace(`/inspection/${inspection.id}?autostart=1&wants_inventory=${wantsInventory ? "1" : "0"}&is_furnished=${isFurnished ? "1" : "0"}`);
     } catch (err: unknown) {
       const e = err as { message?: string; details?: string; hint?: string; code?: string };
       console.error("=== INSPECTION CREATION ERROR ===");
@@ -685,7 +686,6 @@ function NewInspectionContent() {
         e?.message || e?.details || (typeof err === "object" ? JSON.stringify(err) : String(err));
       setSaveError(displayMessage);
       alert(`Error: ${displayMessage}`);
-    } finally {
       setSaving(false);
     }
   };
