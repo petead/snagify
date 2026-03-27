@@ -670,7 +670,7 @@ function NewInspectionContent() {
         await supabase.from("rooms").insert(roomInserts);
       }
 
-      router.push(`/inspection/${inspection.id}?autostart=1&wants_inventory=${wantsInventory ? "1" : "0"}&is_furnished=${isFurnished ? "1" : "0"}`);
+      router.replace(`/inspection/${inspection.id}?autostart=1&wants_inventory=${wantsInventory ? "1" : "0"}&is_furnished=${isFurnished ? "1" : "0"}`);
     } catch (err: unknown) {
       const e = err as { message?: string; details?: string; hint?: string; code?: string };
       console.error("=== INSPECTION CREATION ERROR ===");
@@ -1777,7 +1777,7 @@ function NewInspectionContent() {
       )}
 
       {duplicateWarning && duplicateWarning.length > 0 && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-yellow-50 mx-auto mb-4">
               <svg
