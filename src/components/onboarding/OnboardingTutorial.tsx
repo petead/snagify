@@ -280,9 +280,10 @@ export function OnboardingTutorial({
       <div
         style={{
           position: 'fixed', inset: 0, zIndex: 100,
-          background: 'rgba(10,8,20,0.7)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          background: 'rgba(10,8,20,0.75)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '0 20px',
         }}
       >
         <div
@@ -290,10 +291,12 @@ export function OnboardingTutorial({
           style={{
             width: '100%', maxWidth: 480,
             background: 'linear-gradient(170deg, #1A1A2E 0%, #12102a 100%)',
-            borderRadius: '28px 28px 0 0',
-            paddingBottom: 'max(32px, env(safe-area-inset-bottom))',
-            boxShadow: '0 -24px 80px rgba(154,136,253,0.3)',
+            borderRadius: 28,
+            paddingBottom: 24,
+            boxShadow: '0 32px 80px rgba(10,8,20,0.6), 0 0 0 1px rgba(154,136,253,0.12)',
             position: 'relative', overflow: 'hidden',
+            maxHeight: 'calc(100dvh - 80px)',
+            overflowY: 'auto',
           }}
         >
           <div style={{
