@@ -1187,6 +1187,15 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
               signer_type: s.signer_type ?? "",
               signed_at: s.signed_at,
             }))}
+            inventorySnapshots={(inspection as {
+              inventory_snapshots?: Array<{
+                id: string; name: string; category: string; quantity: number;
+                condition_checkin?: string | null; photo_url?: string | null;
+                status_checkout?: string | null; notes?: string | null;
+                photo_url_checkout?: string | null; quantity_checkout?: number | null;
+                is_tenant_item?: boolean | null;
+              }>
+            }).inventory_snapshots ?? []}
           />
         </div>
 

@@ -49,6 +49,19 @@ interface Props {
     refused_at?: string | null
     refused_reason?: string | null
   }>
+  inventorySnapshots?: Array<{
+    id: string
+    name: string
+    category: string
+    quantity: number
+    condition_checkin?: string | null
+    photo_url?: string | null
+    status_checkout?: string | null
+    notes?: string | null
+    photo_url_checkout?: string | null
+    quantity_checkout?: number | null
+    is_tenant_item?: boolean | null
+  }>
 }
 
 export function CheckoutReportView({
@@ -56,6 +69,7 @@ export function CheckoutReportView({
   checkinData,
   tenancy,
   signatures,
+  inventorySnapshots = [],
 }: Props) {
   const hasCheckinData = checkinData !== null
 
@@ -711,6 +725,128 @@ export function CheckoutReportView({
                   </span>
                 </div>
               )}
+
+            </div>
+          )
+        })()}
+
+        {/* ── INVENTORY COMPARISON ── */}
+        {inventorySnapshots && inventorySnapshots.filter(s => !s.is_tenant_item).length > 0 && (() => {
+          const items = inventorySnapshots.filter(s => !s.is_tenant_item)
+          const okCount = items.filter(i => i.status_checkout === 'ok').length
+          const damagedCount = items.filter(i => i.status_checkout === 'damaged').length
+          const missingCount = items.filter(i => i.status_checkout === 'missing').length
+
+          return (
+            <div className="bg-white rounded-2xl border border-[#EEECFF] mx-4 mb-3">
+
+              {/* Header */}
+              <div className="flex items-center gap-2 px-4 py-4 border-b border-[#F3F3F8]">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"
+                    stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round"/>
+                  <rect x="9" y="3" width="6" height="4" rx="1"
+                    stroke="#9A88FD" strokeWidth="1.8"/>
+                  <path d="M9 12h6M9 16h4"
+                    stroke="#9A88FD" strokeWidth="1.8" strokeLinecap="round"/>
+                </svg>
+                <span className="text-[15px] font-bold text-[#1A1A2E]">
+                  Inventory
+                </span>
+                <span className="ml-auto text-[12px] font-semibold text-[#9A88FD] bg-[#EDE9FF] px-2.5 py-0.5 rounded-full">
+                  {items.length} items
+                </span>
+              </div>
+
+              {/* Summary pills */}
+              <div className="flex gap-2 px-4 pt-3 pb-2">
+                <div className="flex-1 bg-[#EEFAD5] rounded-xl p-2.5 text-center">
+                  <p className="text-[18px] font-extrabold text-[#3A7A00]">{okCount}</p>
+                  <p className="text-[10px] font-semibold text-[#3A7A00]">OK</p>
+                </div>
+                <div className="flex-1 bg-[#FFF8DC] rounded-xl p-2.5 text-center">
+                  <p className="text-[18px] font-extrabold text-[#8A6000]">{damagedCount}</p>
+                  <p className="text-[10px] font-semibold text-[#8A6000]">Damaged</p>
+                </div>
+                <div className="flex-1 bg-[#FEE2E2] rounded-xl p-2.5 text-center">
+                  <p className="text-[18px] font-extrabold text-[#7A0000]">{missingCount}</p>
+                  <p className="text-[10px] font-semibold text-[#7A0000]">Missing</p>
+                </div>
+              </div>
+
+              {/* Item rows */}
+              <div className="px-4 pb-4 flex flex-col gap-2 mt-1">
+                {items.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-3 p-3 rounded-xl"
+                    style={{
+                      background:
+                        item.status_checkout === 'missing' ? '#FEF2F2' :
+                        item.status_checkout === 'damaged' ? '#FFFBEB' : '#F8F7F4',
+                    }}
+                  >
+                    {/* Photo — checkout first, fallback to checkin */}
+                    {(item.photo_url_checkout ?? item.photo_url) ? (
+                      <img
+                        src={(item.photo_url_checkout ?? item.photo_url)!}
+                        alt={item.name}
+                        className="w-11 h-11 rounded-lg object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-11 h-11 rounded-lg bg-[#EEEDE9] flex-shrink-0 flex items-center justify-center">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round">
+                          <rect x="3" y="3" width="18" height="18" rx="2"/>
+                          <circle cx="8.5" cy="8.5" r="1.5"/>
+                          <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                      </div>
+                    )}
+
+                    {/* Name + notes */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-[#1A1A1A] truncate">
+                        {item.name}
+                        {(item.quantity ?? 1) > 1 && (
+                          <span className="text-[11px] text-[#999] ml-1.5">×{item.quantity}</span>
+                        )}
+                      </p>
+                      {/* Check-in condition */}
+                      {item.condition_checkin && (
+                        <p className="text-[11px] text-[#9ca3af]">
+                          Check-in: {item.condition_checkin}
+                        </p>
+                      )}
+                      {item.notes && (
+                        <p className="text-[11px] text-[#888] truncate">{item.notes}</p>
+                      )}
+                    </div>
+
+                    {/* Status badge */}
+                    <div
+                      className="flex-shrink-0 px-2.5 py-1 rounded-full"
+                      style={{
+                        background:
+                          item.status_checkout === 'ok'      ? '#EEFAD5' :
+                          item.status_checkout === 'damaged' ? '#FFF8DC' : '#FEE2E2',
+                      }}
+                    >
+                      <span
+                        className="text-[11px] font-bold"
+                        style={{
+                          color:
+                            item.status_checkout === 'ok'      ? '#3A7A00' :
+                            item.status_checkout === 'damaged' ? '#8A6000' : '#7A0000',
+                        }}
+                      >
+                        {item.status_checkout === 'ok'      ? '✓ OK' :
+                         item.status_checkout === 'damaged' ? '⚠ Damaged' :
+                         item.status_checkout === 'missing' ? '✗ Missing' : '—'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
             </div>
           )

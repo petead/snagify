@@ -29,7 +29,8 @@ export default async function ReportPage({
       signatures (signer_type, otp_verified, signed_at, signature_data, refused_at, refused_reason),
       inventory_snapshots (
         id, name, category, quantity,
-        condition_checkin, photo_url, notes, source, is_tenant_item
+        condition_checkin, photo_url, notes, source, is_tenant_item,
+        status_checkout, photo_url_checkout, quantity_checkout
       )
     `
     )
@@ -161,6 +162,9 @@ export type InspectionWithRelations = {
     notes: string | null;
     source: string | null;
     is_tenant_item: boolean | null;
+    status_checkout?: string | null;
+    photo_url_checkout?: string | null;
+    quantity_checkout?: number | null;
   }[] | null;
 };
 
