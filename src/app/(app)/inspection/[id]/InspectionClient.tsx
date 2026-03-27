@@ -1499,11 +1499,19 @@ export function InspectionClient({
     return null
   }
 
-  async function loadExistingSnapshots(): Promise<boolean> {
+  async function loadExistingSnapshots(): Promise<{
+    name: string
+    category: string
+    quantity: number
+    condition_checkin: string | null
+    photo_url: string | null
+    notes: string
+    source: string
+    reference_item_id: string | null
+  }[]> {
     try {
       const res = await fetch(`/api/inventory/snapshots?inspection_id=${inspectionId}`)
       const data = await res.json() as { items?: {
-        id: string
         name: string
         category: string
         quantity: number
@@ -1513,31 +1521,17 @@ export function InspectionClient({
         source?: string | null
         reference_item_id?: string | null
       }[] }
-      if (data.items && data.items.length > 0) {
-        // Re-hydrate inventoryDetails from DB snapshots
-        setInventoryDetails(data.items.map(item => ({
-          referenceItemId: item.reference_item_id ?? undefined,
-          name: item.name,
-          category: item.category,
-          quantity: item.quantity,
-          condition: (item.condition_checkin ?? null) as 'good' | 'fair' | 'poor' | null,
-          photo_url: item.photo_url ?? null,
-          notes: item.notes ?? '',
-          source: item.source ?? 'manual',
-        })))
-        // Also re-hydrate inventorySelection from these items
-        setInventorySelection(data.items.map(item => ({
-          referenceItemId: item.reference_item_id ?? undefined,
-          name: item.name,
-          category: item.category,
-          quantity: item.quantity,
-          source: item.source ?? 'manual',
-          selected: true,
-        })))
-        return true
-      }
-    } catch { /* silent */ }
-    return false
+      return (data.items ?? []).map(item => ({
+        name: item.name,
+        category: item.category,
+        quantity: item.quantity,
+        condition_checkin: item.condition_checkin ?? null,
+        photo_url: item.photo_url ?? null,
+        notes: item.notes ?? '',
+        source: item.source ?? 'manual',
+        reference_item_id: item.reference_item_id ?? null,
+      }))
+    } catch { return [] }
   }
 
   async function loadInventoryReference() {
@@ -1549,6 +1543,93 @@ export function InspectionClient({
         setInventoryReferenceItems(data.items)
       }
     } catch { /* silent */ }
+  }
+
+  function buildInventorySelectionWithDB(
+    dbSnapshots: { name: string; category: string; quantity: number; condition_checkin: string | null; photo_url: string | null; notes: string; source: string; reference_item_id: string | null }[]
+  ) {
+    // Build a lookup map from DB by name (lowercase)
+    const dbByName = new Map(dbSnapshots.map(s => [s.name.toLowerCase(), s]))
+
+    // Always start from standard inventory based on bedroom count
+    const bedroomCount = liveRooms.filter(r =>
+      r.name.toLowerCase().includes('bedroom') ||
+      r.name.toLowerCase().includes('bed') ||
+      r.name.toLowerCase().includes('chambre')
+    ).length
+    const standard = inventoryReferenceItems.length > 0
+      ? inventoryReferenceItems.map(r => ({ name: r.name, category: r.category, quantity: r.quantity }))
+      : getStandardInventory(bedroomCount)
+
+    const seen = new Set<string>()
+    const selection: typeof inventorySelection = []
+
+    // Standard/history items — selected only if in DB
+    for (const item of standard) {
+      const key = item.name.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      const inDB = dbByName.has(key)
+      selection.push({
+        referenceItemId: inventoryReferenceItems.find(r => r.name.toLowerCase() === key)?.id,
+        name: item.name,
+        category: item.category,
+        quantity: inDB ? (dbByName.get(key)!.quantity) : item.quantity,
+        source: inventoryReferenceItems.length > 0 ? 'history' : 'standard',
+        selected: dbSnapshots.length === 0 ? true : inDB, // first time → all selected; returning → only DB ones
+      })
+    }
+
+    // AI detected items — add if not already in standard
+    for (const ai of aiDetectedItems) {
+      const key = ai.name.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      const inDB = dbByName.has(key)
+      selection.push({
+        name: ai.name,
+        category: 'other',
+        quantity: 1,
+        source: 'ai',
+        selected: dbSnapshots.length === 0 ? true : inDB,
+      })
+    }
+
+    // Items only in DB but not in standard/AI (manually added previously)
+    for (const snap of dbSnapshots) {
+      const key = snap.name.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      selection.push({
+        name: snap.name,
+        category: snap.category,
+        quantity: snap.quantity,
+        source: snap.source,
+        selected: true,
+      })
+    }
+
+    setInventorySelection(selection)
+
+    // Pre-fill inventoryDetails for items that have DB data
+    if (dbSnapshots.length > 0) {
+      const details = selection
+        .filter(i => i.selected)
+        .map(item => {
+          const db = dbByName.get(item.name.toLowerCase())
+          return {
+            referenceItemId: item.referenceItemId,
+            name: item.name,
+            category: item.category,
+            quantity: item.quantity,
+            condition: (db?.condition_checkin ?? null) as 'good' | 'fair' | 'poor' | null,
+            photo_url: db?.photo_url ?? null,
+            notes: db?.notes ?? '',
+            source: item.source,
+          }
+        })
+      setInventoryDetails(details)
+    }
   }
 
   function buildInventorySelection() {
@@ -2251,7 +2332,9 @@ export function InspectionClient({
               <button type="button" onClick={async () => {
                 if (!isCheckout && isFurnished === true && wantsInventory === true && inventoryDetails.length === 0) {
                   await loadInventoryReference()
-                  buildInventorySelection()
+                  const dbSnapshots = await loadExistingSnapshots()
+                  buildInventorySelectionWithDB(dbSnapshots)
+                  setInventoryDetailIndex(0)
                   setScreen('inventory')
                   return
                 }
@@ -3168,13 +3251,9 @@ export function InspectionClient({
               <button
                 type="button"
                 onClick={async () => {
-                  // Load existing snapshots from DB before editing
-                  const hasExisting = await loadExistingSnapshots()
-                  if (!hasExisting) {
-                    // No saved snapshots — rebuild from reference + AI
-                    await loadInventoryReference()
-                    buildInventorySelection()
-                  }
+                  await loadInventoryReference()
+                  const dbSnapshots = await loadExistingSnapshots()
+                  buildInventorySelectionWithDB(dbSnapshots)
                   setInventoryDetailIndex(0)
                   setInventoryScreen('selection')
                   setScreen('inventory')
@@ -3684,16 +3763,21 @@ export function InspectionClient({
               type="button"
               onClick={() => {
                 const selected = inventorySelection.filter(i => i.selected)
-                const details = selected.map(item => ({
-                  referenceItemId: item.referenceItemId,
-                  name: item.name,
-                  category: item.category,
-                  quantity: item.quantity,
-                  condition: null as 'good' | 'fair' | 'poor' | null,
-                  photo_url: null,
-                  notes: '',
-                  source: item.source,
-                }))
+                // Merge with existing inventoryDetails (pre-filled from DB)
+                const existingByName = new Map(inventoryDetails.map(d => [d.name.toLowerCase(), d]))
+                const details = selected.map(item => {
+                  const existing = existingByName.get(item.name.toLowerCase())
+                  return {
+                    referenceItemId: item.referenceItemId,
+                    name: item.name,
+                    category: item.category,
+                    quantity: item.quantity,
+                    condition: (existing?.condition ?? null) as 'good' | 'fair' | 'poor' | null,
+                    photo_url: existing?.photo_url ?? null,
+                    notes: existing?.notes ?? '',
+                    source: item.source,
+                  }
+                })
                 setInventoryDetails(details)
                 setInventoryDetailIndex(0)
                 setInventoryScreen('detail')
