@@ -1499,6 +1499,23 @@ export function InspectionClient({
     return null
   }
 
+  async function uploadInventoryPhoto(dataUrl: string): Promise<string | null> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.id) return null
+      const compressed = await compressPhotoDataUrl(dataUrl, { maxDimension: 1920, quality: 0.82 })
+      const fileName = `${user.id}/${inspectionId}/inventory/${Date.now()}.jpg`
+      const { error } = await supabase.storage
+        .from('inspection-photos')
+        .upload(fileName, compressed.blob, { contentType: 'image/jpeg', upsert: false })
+      if (error) return null
+      const { data: { publicUrl } } = supabase.storage
+        .from('inspection-photos')
+        .getPublicUrl(fileName)
+      return publicUrl ?? null
+    } catch { return null }
+  }
+
   async function loadExistingSnapshots(): Promise<{
     name: string
     category: string
@@ -3889,14 +3906,21 @@ export function InspectionClient({
                         onChange={async (e) => {
                           const file = e.target.files?.[0]
                           if (!file) return
+                          // Show local preview immediately
                           const reader = new FileReader()
-                          reader.onload = (ev) => {
+                          reader.onload = async (ev) => {
+                            const dataUrl = ev.target?.result as string
+                            // Set preview instantly
                             setInventoryDetails(prev =>
-                              prev.map((it, i) => i === inventoryDetailIndex
-                                ? { ...it, photo_url: ev.target?.result as string }
-                                : it
-                              )
+                              prev.map((it, i) => i === inventoryDetailIndex ? { ...it, photo_url: dataUrl } : it)
                             )
+                            // Upload to storage in background, replace base64 with public URL
+                            const publicUrl = await uploadInventoryPhoto(dataUrl)
+                            if (publicUrl) {
+                              setInventoryDetails(prev =>
+                                prev.map((it, i) => i === inventoryDetailIndex ? { ...it, photo_url: publicUrl } : it)
+                              )
+                            }
                           }
                           reader.readAsDataURL(file)
                         }}
@@ -4188,17 +4212,21 @@ export function InspectionClient({
                       <input
                         type="file" accept="image/*" capture="environment"
                         style={{ display:'none' }}
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0]
                           if (!file) return
                           const reader = new FileReader()
-                          reader.onload = (ev) => {
+                          reader.onload = async (ev) => {
+                            const dataUrl = ev.target?.result as string
                             setCheckoutInventoryItems(prev =>
-                              prev.map((it, i) => i === checkoutInventoryIndex
-                                ? { ...it, photo_url: ev.target?.result as string }
-                                : it
-                              )
+                              prev.map((it, i) => i === checkoutInventoryIndex ? { ...it, photo_url: dataUrl } : it)
                             )
+                            const publicUrl = await uploadInventoryPhoto(dataUrl)
+                            if (publicUrl) {
+                              setCheckoutInventoryItems(prev =>
+                                prev.map((it, i) => i === checkoutInventoryIndex ? { ...it, photo_url: publicUrl } : it)
+                              )
+                            }
                           }
                           reader.readAsDataURL(file)
                         }}
