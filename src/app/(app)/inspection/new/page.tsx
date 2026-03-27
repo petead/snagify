@@ -1772,6 +1772,30 @@ function NewInspectionContent() {
         </BottomBar>
       )}
 
+      {/* Fullscreen loading overlay — shown while creating inspection */}
+      {saving && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: '#F8F7F4',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 16,
+        }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: '50%',
+            border: '3px solid rgba(154,136,253,0.2)',
+            borderTopColor: '#9A88FD',
+            animation: 'spin 0.7s linear infinite',
+          }}/>
+          <p style={{
+            fontFamily: 'Poppins, sans-serif', fontWeight: 700,
+            fontSize: 15, color: '#0E0E10', margin: 0,
+          }}>
+            Starting inspection…
+          </p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
+
       {duplicateWarning && duplicateWarning.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
