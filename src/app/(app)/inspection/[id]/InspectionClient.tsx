@@ -2723,23 +2723,15 @@ export function InspectionClient({
                 )}
               </button>
 
-              {/* Inventory pill — check-in: inventoryDetails, check-out: checkoutInventoryItems */}
               {((!isCheckout && inventoryDetails.length > 0) || (isCheckout && checkoutInventoryItems.length > 0)) && (
                 <button
                   type="button"
                   onClick={() => setActiveReviewRoom("inventory")}
                   style={{
-                    flexShrink: 0,
-                    padding: "8px 16px",
-                    borderRadius: 100,
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: 12, fontWeight: 700,
-                    whiteSpace: "nowrap",
-                    transition: "all 0.15s",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
+                    flexShrink: 0, padding: "8px 16px", borderRadius: 100,
+                    border: "none", cursor: "pointer",
+                    fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+                    transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6,
                     background: activeReviewRoom === "inventory"
                       ? (inspectionType === "check-in" ? "#9A88FD" : "#FF8A65")
                       : "#f5f5f5",
@@ -3162,34 +3154,30 @@ export function InspectionClient({
           {activeReviewRoom === "inventory" && (() => {
             const items = isCheckout ? checkoutInventoryItems : inventoryDetails
 
-            const conditionRank = (c: string | null) => {
-              if (c === 'good') return 3
-              if (c === 'fair') return 2
-              if (c === 'poor') return 1
-              return 0
-            }
-
-            const getDelta = (checkin: string | null, checkout: string | null) => {
-              if (checkout === 'missing') return { label: 'Gone — missing', color: '#7A0000', bg: '#FEE2E2' }
-              if (!checkin || !checkout) return null
-              const ci = conditionRank(checkin)
-              const co = conditionRank(checkout)
-              if (co < ci) return { label: 'Deterioration proven', color: '#8A6000', bg: '#FFF8DC' }
-              if (co === ci) return { label: 'No change', color: '#3A7A00', bg: '#EEFAD5' }
+            const rank = (c: string | null) => c === 'good' ? 3 : c === 'fair' ? 2 : c === 'poor' ? 1 : 0
+            const getDelta = (ci: string | null, co: string | null) => {
+              if (co === 'missing') return { label: '✗ Missing', color: '#7A0000', bg: '#FEE2E2' }
+              if (!ci || !co) return null
+              if (rank(co) < rank(ci)) return { label: 'Deterioration proven', color: '#8A6000', bg: '#FFF8DC' }
+              if (rank(co) === rank(ci)) return { label: 'No change', color: '#3A7A00', bg: '#EEFAD5' }
               return null
             }
-
-            const condStyle = (c: string | null) => ({
+            const condBadge = (c: string | null) => ({
               bg: c === 'good' ? '#EEFAD5' : c === 'fair' ? '#FFF8DC' : c === 'poor' ? '#FEE2E2' : '#F3F1EB',
               color: c === 'good' ? '#3A7A00' : c === 'fair' ? '#8A6000' : c === 'poor' ? '#7A0000' : '#9ca3af',
               label: c ? c.charAt(0).toUpperCase() + c.slice(1) : '—',
             })
 
+            const goodCount = checkoutInventoryItems.filter(i => i.status_checkout === 'good').length
+            const fairCount = checkoutInventoryItems.filter(i => i.status_checkout === 'fair').length
+            const poorCount = checkoutInventoryItems.filter(i => i.status_checkout === 'poor').length
+            const missingCount = checkoutInventoryItems.filter(i => i.status_checkout === 'missing').length
+
             return (
               <div style={{ flex:1, overflowY:'auto', padding:'16px 16px 160px', WebkitOverflowScrolling:'touch' as any }}>
 
                 {/* Header */}
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
                   <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:18, margin:0, color:'#1a1a2e' }}>
                     Inventory
                   </p>
@@ -3199,28 +3187,37 @@ export function InspectionClient({
                 </div>
 
                 {/* Summary pills — checkout only */}
-                {isCheckout && (
-                  <div style={{ display:'flex', gap:6, marginBottom:16 }}>
-                    {[
-                      { label:'Good', status:'good', bg:'#EEFAD5', color:'#3A7A00' },
-                      { label:'Fair', status:'fair', bg:'#FFF8DC', color:'#8A6000' },
-                      { label:'Poor', status:'poor', bg:'#FEE2E2', color:'#7A0000' },
-                      { label:'Missing', status:'missing', bg:'#F3F1EB', color:'#374151' },
-                    ].map(({ label, status, bg, color }) => {
-                      const count = checkoutInventoryItems.filter(i => i.status_checkout === status).length
-                      if (count === 0) return null
-                      return (
-                        <div key={status} style={{ flex:1, background:bg, borderRadius:12, padding:'8px 4px', textAlign:'center' }}>
-                          <p style={{ fontSize:16, fontWeight:800, color, margin:0, fontFamily:'Poppins, sans-serif' }}>{count}</p>
-                          <p style={{ fontSize:10, fontWeight:700, color, margin:'1px 0 0' }}>{label}</p>
-                        </div>
-                      )
-                    })}
+                {isCheckout && (goodCount + fairCount + poorCount + missingCount) > 0 && (
+                  <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+                    {goodCount > 0 && (
+                      <div style={{ flex:1, background:'#EEFAD5', borderRadius:10, padding:'8px 4px', textAlign:'center' }}>
+                        <p style={{ fontSize:16, fontWeight:700, color:'#3A7A00', margin:0, fontFamily:'Poppins, sans-serif' }}>{goodCount}</p>
+                        <p style={{ fontSize:10, fontWeight:700, color:'#3A7A00', margin:'1px 0 0', letterSpacing:'.5px' }}>GOOD</p>
+                      </div>
+                    )}
+                    {fairCount > 0 && (
+                      <div style={{ flex:1, background:'#FFF8DC', borderRadius:10, padding:'8px 4px', textAlign:'center' }}>
+                        <p style={{ fontSize:16, fontWeight:700, color:'#8A6000', margin:0, fontFamily:'Poppins, sans-serif' }}>{fairCount}</p>
+                        <p style={{ fontSize:10, fontWeight:700, color:'#8A6000', margin:'1px 0 0', letterSpacing:'.5px' }}>FAIR</p>
+                      </div>
+                    )}
+                    {poorCount > 0 && (
+                      <div style={{ flex:1, background:'#FEE2E2', borderRadius:10, padding:'8px 4px', textAlign:'center' }}>
+                        <p style={{ fontSize:16, fontWeight:700, color:'#7A0000', margin:0, fontFamily:'Poppins, sans-serif' }}>{poorCount}</p>
+                        <p style={{ fontSize:10, fontWeight:700, color:'#7A0000', margin:'1px 0 0', letterSpacing:'.5px' }}>POOR</p>
+                      </div>
+                    )}
+                    {missingCount > 0 && (
+                      <div style={{ flex:1, background:'#F3F1EB', borderRadius:10, padding:'8px 4px', textAlign:'center', border:'0.5px solid rgba(14,14,16,0.08)' }}>
+                        <p style={{ fontSize:16, fontWeight:700, color:'#374151', margin:0, fontFamily:'Poppins, sans-serif' }}>{missingCount}</p>
+                        <p style={{ fontSize:10, fontWeight:700, color:'#374151', margin:'1px 0 0', letterSpacing:'.5px' }}>MISSING</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* Item cards */}
-                <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                   {items.map((item, idx) => {
                     const checkinCond = isCheckout
                       ? (item as typeof checkoutInventoryItems[0]).condition_checkin
@@ -3234,133 +3231,120 @@ export function InspectionClient({
                     const checkoutPhoto = isCheckout
                       ? (item as typeof checkoutInventoryItems[0]).photo_url
                       : null
-                    const checkinNote = isCheckout ? '' : (item as typeof inventoryDetails[0]).notes
-                    const checkoutNote = isCheckout ? (item as typeof checkoutInventoryItems[0]).notes : ''
+                    const note = isCheckout
+                      ? (item as typeof checkoutInventoryItems[0]).notes
+                      : (item as typeof inventoryDetails[0]).notes
                     const delta = isCheckout ? getDelta(checkinCond, checkoutCond) : null
-                    const ci = condStyle(checkinCond)
-                    const co = condStyle(checkoutCond)
+                    const ci = condBadge(checkinCond)
+                    const co = condBadge(checkoutCond)
+
+                    const PhotoThumb = ({ src, label }: { src: string | null | undefined; label: string }) => (
+                      <div style={{ width:40, height:40, borderRadius:8, flexShrink:0, overflow:'hidden', position:'relative', background:'#F3F1EB', border:'0.5px solid rgba(14,14,16,0.08)' }}>
+                        {src ? (
+                          <img src={src} alt={label} style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+                        ) : (
+                          <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(14,14,16,0.2)" strokeWidth="1.5" strokeLinecap="round">
+                              <rect x="3" y="3" width="18" height="18" rx="2"/>
+                              <circle cx="8.5" cy="8.5" r="1.5"/>
+                              <polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    )
 
                     return (
                       <div key={idx} style={{
                         background:'white', borderRadius:14,
                         border:'0.5px solid rgba(14,14,16,0.08)',
-                        padding:'12px 14px',
-                        display:'flex', alignItems:'flex-start', gap:10,
+                        overflow:'hidden',
                       }}>
-                        {/* Photos: small squares side by side */}
-                        <div style={{ display:'flex', flexDirection:'column', gap:4, flexShrink:0 }}>
-                          {[
-                            { photo: checkinPhoto, label: 'IN' },
-                            { photo: checkoutPhoto, label: 'OUT' },
-                          ].filter(p => p.photo || isCheckout).map(({ photo, label }) => (
-                            <div key={label} style={{ position:'relative' }}>
-                              {photo ? (
-                                <img src={photo} alt={label}
-                                  style={{ width:52, height:52, objectFit:'cover', borderRadius:8 }}/>
-                              ) : (
-                                <div style={{
-                                  width:52, height:52, borderRadius:8,
-                                  background:'#F3F1EB',
-                                  display:'flex', alignItems:'center', justifyContent:'center',
-                                }}>
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round">
-                                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                    <circle cx="8.5" cy="8.5" r="1.5"/>
-                                    <polyline points="21 15 16 10 5 21"/>
-                                  </svg>
-                                </div>
-                              )}
-                              <span style={{
-                                position:'absolute', bottom:2, left:2,
-                                fontSize:8, fontWeight:800, color:'white',
-                                background:'rgba(0,0,0,0.45)', padding:'1px 4px', borderRadius:4,
-                                letterSpacing:0.5,
-                              }}>{label}</span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Content */}
-                        <div style={{ flex:1, minWidth:0 }}>
-                          {/* Name + delta */}
-                          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6, gap:6 }}>
-                            <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:13, margin:0, color:'#0E0E10' }}>
-                              {item.name}
-                              {item.quantity > 1 && <span style={{ fontSize:10, color:'#9ca3af', marginLeft:5, fontWeight:400 }}>×{item.quantity}</span>}
-                            </p>
+                        {/* Header row: name + delta + edit */}
+                        <div style={{
+                          display:'flex', alignItems:'center', justifyContent:'space-between',
+                          padding:'11px 14px', gap:8,
+                          borderBottom:'0.5px solid rgba(14,14,16,0.06)',
+                        }}>
+                          <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:13, margin:0, color:'#0E0E10', flex:1, minWidth:0 }}>
+                            {item.name}
+                            {item.quantity > 1 && <span style={{ fontSize:10, color:'#9ca3af', marginLeft:5, fontWeight:400 }}>×{item.quantity}</span>}
+                          </p>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
                             {delta && (
                               <span style={{
                                 fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:99,
                                 background:delta.bg, color:delta.color,
-                                fontFamily:'Poppins, sans-serif', whiteSpace:'nowrap', flexShrink:0,
+                                fontFamily:'Poppins, sans-serif',
                               }}>
                                 {delta.label}
                               </span>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingInventoryIdx(idx)
+                                setEditingInventoryIsCheckout(isCheckout)
+                              }}
+                              style={{
+                                fontSize:11, fontWeight:600, color:'#555',
+                                background:'#F3F1EB', border:'none',
+                                borderRadius:6, padding:'4px 10px', cursor:'pointer',
+                              }}
+                            >
+                              Edit
+                            </button>
                           </div>
+                        </div>
 
-                          {/* Condition row */}
-                          <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                            {/* Check-in badge */}
-                            <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                              <span style={{ fontSize:9, color:'#9ca3af', fontWeight:600 }}>IN</span>
-                              <div style={{ padding:'2px 8px', borderRadius:99, background:ci.bg }}>
-                                <span style={{ fontSize:10, fontWeight:700, color:ci.color }}>{ci.label}</span>
+                        {/* Body: check-in | check-out */}
+                        <div style={{ display:'flex' }}>
+                          {/* Check-in */}
+                          <div style={{ flex:1, padding:'10px 14px', borderRight: isCheckout ? '0.5px solid rgba(14,14,16,0.06)' : 'none' }}>
+                            <p style={{ fontSize:9, fontWeight:700, color:'#9ca3af', letterSpacing:'.8px', textTransform:'uppercase', margin:'0 0 7px' }}>Check-in</p>
+                            <div style={{ display:'flex', gap:8, alignItems:'flex-start' }}>
+                              <PhotoThumb src={checkinPhoto} label="check-in"/>
+                              <div>
+                                <div style={{ display:'inline-flex', padding:'2px 8px', borderRadius:99, background:ci.bg, marginBottom:4 }}>
+                                  <span style={{ fontSize:10, fontWeight:700, color:ci.color }}>{ci.label}</span>
+                                </div>
                               </div>
                             </div>
-
-                            {isCheckout && (
-                              <>
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2" strokeLinecap="round">
-                                  <path d="M5 12h14M12 5l7 7-7 7"/>
-                                </svg>
-                                {/* Check-out badge */}
-                                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                                  <span style={{ fontSize:9, color:'#9ca3af', fontWeight:600 }}>OUT</span>
-                                  <div style={{ padding:'2px 8px', borderRadius:99, background: checkoutCond === 'missing' ? '#F3F1EB' : co.bg }}>
-                                    <span style={{ fontSize:10, fontWeight:700, color: checkoutCond === 'missing' ? '#374151' : co.color }}>
-                                      {checkoutCond === 'missing' ? '✗ Missing' : co.label}
-                                    </span>
-                                  </div>
-                                </div>
-                              </>
-                            )}
                           </div>
 
-                          {/* Notes */}
-                          {(checkinNote || checkoutNote) && (
-                            <p style={{ fontSize:11, color:'#888', margin:'5px 0 0', lineHeight:1.4 }}>
-                              {checkoutNote || checkinNote}
-                            </p>
+                          {/* Check-out */}
+                          {isCheckout && (
+                            <div style={{
+                              flex:1, padding:'10px 14px',
+                              background: checkoutCond === 'missing' ? '#FEF2F2' : 'transparent',
+                            }}>
+                              <p style={{ fontSize:9, fontWeight:700, letterSpacing:'.8px', textTransform:'uppercase', margin:'0 0 7px',
+                                color: checkoutCond === 'missing' ? '#C0998E' : '#9ca3af',
+                              }}>Check-out</p>
+                              {checkoutCond === 'missing' ? (
+                                <p style={{ fontSize:12, fontWeight:600, color:'#B45A5A', margin:0 }}>Not found in apartment</p>
+                              ) : (
+                                <div style={{ display:'flex', gap:8, alignItems:'flex-start' }}>
+                                  <PhotoThumb src={checkoutPhoto} label="check-out"/>
+                                  <div>
+                                    <div style={{ display:'inline-flex', padding:'2px 8px', borderRadius:99, background:co.bg, marginBottom:4 }}>
+                                      <span style={{ fontSize:10, fontWeight:700, color:co.color }}>{co.label}</span>
+                                    </div>
+                                    {note && (
+                                      <p style={{ fontSize:11, color:'#888', margin:0, lineHeight:1.4 }}>{note}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           )}
-
-                          {/* Edit button */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingInventoryIdx(idx)
-                              setEditingInventoryIsCheckout(isCheckout)
-                            }}
-                            style={{
-                              marginTop:8, padding:'5px 12px',
-                              background:'#F3F1EB', border:'none', borderRadius:99,
-                              cursor:'pointer', fontSize:11, fontWeight:700, color:'#0E0E10',
-                              display:'inline-flex', alignItems:'center', gap:5,
-                            }}
-                          >
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                            </svg>
-                            Edit
-                          </button>
                         </div>
                       </div>
                     )
                   })}
                 </div>
 
-                {/* Edit button — check-in only */}
+                {/* Edit all — check-in only */}
                 {!isCheckout && (
                   <button
                     type="button"
@@ -3378,7 +3362,7 @@ export function InspectionClient({
                       fontSize:13, fontWeight:600, color:'#9A88FD',
                     }}
                   >
-                    Edit inventory
+                    Edit all items
                   </button>
                 )}
               </div>
@@ -4354,7 +4338,7 @@ export function InspectionClient({
                     width:'100%', padding:'12px', borderRadius:12,
                     border:'1px solid rgba(14,14,16,0.1)',
                     background:'white', fontSize:14, fontFamily:'DM Sans, sans-serif',
-                    resize:'none', outline:'none', boxSizing:'border-box',
+                    resize:'none', outline:'none', boxSizing:'border-box' as any,
                   }}
                 />
               </div>
