@@ -69,6 +69,97 @@ export default async function DashboardPage() {
         ? user.email.split("@")[0]
         : "there";
 
+  // Team view — only for owners
+  let isOwner = false;
+  let teamMembers: { id: string; full_name: string | null }[] = [];
+  let teamProperties: Array<{
+    id: string;
+    building_name: string | null;
+    unit_number: string | null;
+    location: string | null;
+    property_type: string | null;
+    created_at: string | null;
+    agent_id: string;
+    agent_name: string | null;
+    tenancies?: Array<{
+      id: string;
+      tenant_name: string | null;
+      contract_from: string | null;
+      contract_to: string | null;
+      actual_end_date?: string | null;
+    }>;
+    inspections?: Array<{
+      id: string;
+      type: string | null;
+      status: string | null;
+      created_at: string | null;
+      completed_at: string | null;
+    }>;
+  }> = [];
+
+  if (user && accountType === "pro") {
+    const { data: myProfile } = await supabase
+      .from("profiles")
+      .select("role, company_id")
+      .eq("id", user.id)
+      .single();
+
+    if ((myProfile as { role?: string } | null)?.role === "owner") {
+      isOwner = true;
+      const companyId = (myProfile as { company_id?: string } | null)?.company_id;
+
+      if (companyId) {
+        const { data: members } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .eq("company_id", companyId)
+          .neq("id", user.id)
+          .eq("role", "inspector");
+
+        teamMembers = (members ?? []).map((m: { id: string; full_name?: string | null }) => ({
+          id: m.id,
+          full_name: m.full_name ?? null,
+        }));
+
+        if (teamMembers.length > 0) {
+          const memberIds = teamMembers.map((m) => m.id);
+          const memberNameMap = new Map(teamMembers.map((m) => [m.id, m.full_name]));
+
+          const { data: memberProps } = await supabase
+            .from("properties")
+            .select(
+              `
+              id, building_name, unit_number, location, property_type, created_at, agent_id,
+              tenancies (id, tenant_name, contract_from, contract_to, actual_end_date),
+              inspections (id, type, status, created_at, completed_at)
+            `
+            )
+            .in("agent_id", memberIds)
+            .order("created_at", { ascending: false });
+
+          teamProperties = (memberProps ?? []).map(
+            (p: {
+              id: string;
+              building_name: string | null;
+              unit_number: string | null;
+              location: string | null;
+              property_type: string | null;
+              created_at: string | null;
+              agent_id: string;
+              tenancies?: unknown;
+              inspections?: unknown;
+            }) => ({
+              ...p,
+              agent_name: memberNameMap.get(p.agent_id) ?? null,
+              tenancies: Array.isArray(p.tenancies) ? p.tenancies : [],
+              inspections: Array.isArray(p.inspections) ? p.inspections : [],
+            })
+          );
+        }
+      }
+    }
+  }
+
   // Try fetch with tenancies first (for status on cards)
   let propertiesData: Array<{
     id: string;
@@ -250,6 +341,9 @@ export default async function DashboardPage() {
         stripeSubscriptionId={stripeSubscriptionId}
         properties={propertiesData}
         alerts={alerts}
+        isOwner={isOwner}
+        teamMembers={teamMembers}
+        teamProperties={teamProperties}
       />
     </main>
   );
