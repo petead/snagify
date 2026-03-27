@@ -508,6 +508,7 @@ export function InspectionClient({
   const [inventoryDetailIndex, setInventoryDetailIndex] = useState(0)
   const [editingInventoryIdx, setEditingInventoryIdx] = useState<number | null>(null)
   const [editingInventoryIsCheckout, setEditingInventoryIsCheckout] = useState(false)
+  const [cameFromReview, setCameFromReview] = useState(false)
   const [inventorySaving, setInventorySaving] = useState(false)
   const [inventoryDetails, setInventoryDetails] = useState<{
     referenceItemId?: string
@@ -2349,6 +2350,11 @@ export function InspectionClient({
                 </p>
               </div>
               <button type="button" onClick={async () => {
+                if (cameFromReview) {
+                  setCameFromReview(false)
+                  setScreen('review')
+                  return
+                }
                 if (!isCheckout && isFurnished === true && wantsInventory === true && inventoryDetails.length === 0) {
                   await loadInventoryReference()
                   const dbSnapshots = await loadExistingSnapshots()
@@ -2369,9 +2375,11 @@ export function InspectionClient({
                   background: totalPhotos > 0 ? accentColor : "rgba(255,255,255,0.1)",
                   color: "white",
                 }}>
-                {!isCheckout && isFurnished === true && wantsInventory === true && inventoryDetails.length === 0
+                {cameFromReview
+                  ? "← Save"
+                  : (!isCheckout && isFurnished === true && wantsInventory === true && inventoryDetails.length === 0)
                   ? "Inventory →"
-                  : isCheckout && checkoutInventoryItems.length > 0
+                  : (isCheckout && checkoutInventoryItems.length > 0)
                   ? "Inventory →"
                   : "Review"}
               </button>
@@ -3429,6 +3437,7 @@ export function InspectionClient({
                   onClick={() => {
                     const roomIndex = liveRooms.findIndex((r) => r.id === activeReviewRoom);
                     if (roomIndex >= 0) setActiveRoom(roomIndex);
+                    setCameFromReview(true);
                     setScreen("inspect");
                   }}
                   style={{
@@ -3547,6 +3556,7 @@ export function InspectionClient({
                       onClick={() => {
                         const roomIndex = liveRooms.findIndex((r) => r.id === activeReviewRoom);
                         if (roomIndex >= 0) setActiveRoom(roomIndex);
+                        setCameFromReview(true);
                         setScreen("inspect");
                       }}
                       style={{
