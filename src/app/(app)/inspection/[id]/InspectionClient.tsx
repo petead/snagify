@@ -942,25 +942,57 @@ export function InspectionClient({
           }[]
         }
         if (data.items?.length) {
+          // Build check-in reference map by name
+          const checkinByName = new Map(
+            data.items
+              .filter((i: { is_tenant_item?: boolean | null }) => !i.is_tenant_item)
+              .map((i: { name: string; condition?: string | null; photo_url?: string | null }) => [
+                i.name.toLowerCase(),
+                { condition: i.condition ?? null, photo_url: i.photo_url ?? null }
+              ])
+          )
+
+          // Load already-saved checkout snapshots for this draft
+          let savedCheckout: Record<string, { condition: string | null; photo_url: string | null; notes: string }> = {}
+          try {
+            const coRes = await fetch(`/api/inventory/snapshots?inspection_id=${inspectionId}`)
+            const coData = await coRes.json() as { items?: { name: string; condition?: string | null; photo_url?: string | null; notes?: string | null }[] }
+            if (coData.items?.length) {
+              coData.items.forEach((it: { name: string; condition?: string | null; photo_url?: string | null; notes?: string | null }) => {
+                savedCheckout[it.name.toLowerCase()] = {
+                  condition: it.condition ?? null,
+                  photo_url: it.photo_url ?? null,
+                  notes: it.notes ?? '',
+                }
+              })
+            }
+          } catch { /* silent */ }
+
           const checkoutItems = data.items
             .filter((i: { is_tenant_item?: boolean | null }) => !i.is_tenant_item)
-            .map((i: { name: string; category: string; quantity: number; condition?: string | null; photo_url?: string | null; source?: string | null }) => ({
-              name: i.name,
-              category: i.category,
-              quantity: i.quantity,
-              condition: null as 'good' | 'fair' | 'poor' | 'missing' | null,
-              photo_url: null as string | null,
-              notes: '',
-              source: i.source ?? 'history',
-              checkin_condition: i.condition ?? null,
-              checkin_photo_url: i.photo_url ?? null,
-            }))
+            .map((i: { name: string; category: string; quantity: number; condition?: string | null; photo_url?: string | null; source?: string | null }) => {
+              const saved = savedCheckout[i.name.toLowerCase()]
+              const ci = checkinByName.get(i.name.toLowerCase())
+              return {
+                name: i.name,
+                category: i.category,
+                quantity: i.quantity,
+                // Pre-fill checkout data from saved draft if available
+                condition: (saved?.condition ?? null) as 'good' | 'fair' | 'poor' | 'missing' | null,
+                photo_url: saved?.photo_url ?? null,
+                notes: saved?.notes ?? '',
+                source: i.source ?? 'history',
+                // Check-in reference
+                checkin_condition: ci?.condition ?? i.condition ?? null,
+                checkin_photo_url: ci?.photo_url ?? null,
+              }
+            })
           setCheckoutInventoryItems(checkoutItems)
         }
       } catch { /* silent */ }
     };
     loadCheckinGhost();
-  }, [inspectionType, propertyId, supabase]);
+  }, [inspectionType, propertyId, supabase, inspectionId]);
 
   // Toast auto-dismiss
   useEffect(() => {
