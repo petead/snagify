@@ -2601,39 +2601,17 @@ export function InspectionClient({
             padding: "14px 16px 12px",
           }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              {isCheckout ? (
-                <button
-                  type="button"
-                  onClick={() => router.back()}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100"
-                  aria-label="Back"
-                >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#111827"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="15 18 9 12 15 6" />
-                  </svg>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleAbandonHeaderClick}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100"
-                  aria-label="Close inspection"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleAbandonHeaderClick}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100"
+                aria-label="Close inspection"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
               <div style={{ textAlign: "center" }}>
                 <p style={{
                   fontFamily: "Poppins, sans-serif", fontWeight: 700,
@@ -3190,12 +3168,12 @@ export function InspectionClient({
             }
 
             const getDelta = (checkin: string | null, checkout: string | null) => {
-              if (checkout === 'missing') return { label: 'Disparu', color: '#7A0000', bg: '#FEE2E2' }
+              if (checkout === 'missing') return { label: 'Gone — missing', color: '#7A0000', bg: '#FEE2E2' }
               if (!checkin || !checkout) return null
               const ci = conditionRank(checkin)
               const co = conditionRank(checkout)
-              if (co < ci) return { label: 'Dégradation prouvée', color: '#8A6000', bg: '#FFF8DC' }
-              if (co === ci) return { label: 'Aucun changement', color: '#3A7A00', bg: '#EEFAD5' }
+              if (co < ci) return { label: 'Deterioration proven', color: '#8A6000', bg: '#FFF8DC' }
+              if (co === ci) return { label: 'No change', color: '#3A7A00', bg: '#EEFAD5' }
               return null
             }
 
@@ -3262,83 +3240,96 @@ export function InspectionClient({
 
                     return (
                       <div key={idx} style={{
-                        background:'white', borderRadius:16,
+                        background:'white', borderRadius:14,
                         border:'0.5px solid rgba(14,14,16,0.08)',
-                        overflow:'hidden',
+                        padding:'12px 14px',
+                        display:'flex', alignItems:'flex-start', gap:10,
                       }}>
-                        {/* Item name + delta verdict */}
-                        <div style={{
-                          padding:'12px 14px 10px',
-                          display:'flex', alignItems:'center', justifyContent:'space-between',
-                          borderBottom:'0.5px solid rgba(14,14,16,0.06)',
-                        }}>
-                          <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:14, margin:0, color:'#0E0E10' }}>
-                            {item.name}
-                            {item.quantity > 1 && <span style={{ fontSize:11, color:'#9ca3af', marginLeft:6, fontWeight:400 }}>×{item.quantity}</span>}
-                          </p>
-                          {delta && (
-                            <span style={{
-                              fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:99,
-                              background:delta.bg, color:delta.color,
-                              fontFamily:'Poppins, sans-serif',
-                            }}>
-                              {delta.label}
-                            </span>
-                          )}
+                        {/* Photos: small squares side by side */}
+                        <div style={{ display:'flex', flexDirection:'column', gap:4, flexShrink:0 }}>
+                          {[
+                            { photo: checkinPhoto, label: 'IN' },
+                            { photo: checkoutPhoto, label: 'OUT' },
+                          ].filter(p => p.photo || isCheckout).map(({ photo, label }) => (
+                            <div key={label} style={{ position:'relative' }}>
+                              {photo ? (
+                                <img src={photo} alt={label}
+                                  style={{ width:52, height:52, objectFit:'cover', borderRadius:8 }}/>
+                              ) : (
+                                <div style={{
+                                  width:52, height:52, borderRadius:8,
+                                  background:'#F3F1EB',
+                                  display:'flex', alignItems:'center', justifyContent:'center',
+                                }}>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round">
+                                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                                    <polyline points="21 15 16 10 5 21"/>
+                                  </svg>
+                                </div>
+                              )}
+                              <span style={{
+                                position:'absolute', bottom:2, left:2,
+                                fontSize:8, fontWeight:800, color:'white',
+                                background:'rgba(0,0,0,0.45)', padding:'1px 4px', borderRadius:4,
+                                letterSpacing:0.5,
+                              }}>{label}</span>
+                            </div>
+                          ))}
                         </div>
 
-                        {/* Photos row */}
-                        {(checkinPhoto || checkoutPhoto) && (
-                          <div style={{ display:'flex', gap:6, padding:'10px 14px', borderBottom:'0.5px solid rgba(14,14,16,0.06)' }}>
-                            {checkinPhoto && (
-                              <div style={{ flex:1 }}>
-                                <p style={{ fontSize:9, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:1, margin:'0 0 4px' }}>Check-in</p>
-                                <img src={checkinPhoto} alt="check-in"
-                                  style={{ width:'100%', height:80, objectFit:'cover', borderRadius:8 }}/>
-                              </div>
-                            )}
-                            {checkoutPhoto && (
-                              <div style={{ flex:1 }}>
-                                <p style={{ fontSize:9, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:1, margin:'0 0 4px' }}>Check-out</p>
-                                <img src={checkoutPhoto} alt="check-out"
-                                  style={{ width:'100%', height:80, objectFit:'cover', borderRadius:8 }}/>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Condition + notes comparison */}
-                        <div style={{ display:'flex', gap:0 }}>
-                          {/* Check-in column */}
-                          <div style={{ flex:1, padding:'10px 14px', borderRight: isCheckout ? '0.5px solid rgba(14,14,16,0.06)' : 'none' }}>
-                            <p style={{ fontSize:9, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:1, margin:'0 0 6px' }}>Check-in</p>
-                            <div style={{
-                              display:'inline-flex', padding:'3px 10px', borderRadius:99, marginBottom:6,
-                              background:ci.bg,
-                            }}>
-                              <span style={{ fontSize:11, fontWeight:700, color:ci.color }}>{ci.label}</span>
-                            </div>
-                            {checkinNote && (
-                              <p style={{ fontSize:11, color:'#888', margin:0, lineHeight:1.4 }}>{checkinNote}</p>
-                            )}
-                          </div>
-
-                          {/* Check-out column */}
-                          {isCheckout && (
-                            <div style={{ flex:1, padding:'10px 14px' }}>
-                              <p style={{ fontSize:9, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:1, margin:'0 0 6px' }}>Check-out</p>
-                              <div style={{
-                                display:'inline-flex', padding:'3px 10px', borderRadius:99, marginBottom:6,
-                                background: checkoutCond === 'missing' ? '#F3F1EB' : co.bg,
+                        {/* Content */}
+                        <div style={{ flex:1, minWidth:0 }}>
+                          {/* Name + delta */}
+                          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6, gap:6 }}>
+                            <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:13, margin:0, color:'#0E0E10' }}>
+                              {item.name}
+                              {item.quantity > 1 && <span style={{ fontSize:10, color:'#9ca3af', marginLeft:5, fontWeight:400 }}>×{item.quantity}</span>}
+                            </p>
+                            {delta && (
+                              <span style={{
+                                fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:99,
+                                background:delta.bg, color:delta.color,
+                                fontFamily:'Poppins, sans-serif', whiteSpace:'nowrap', flexShrink:0,
                               }}>
-                                <span style={{ fontSize:11, fontWeight:700, color: checkoutCond === 'missing' ? '#374151' : co.color }}>
-                                  {checkoutCond === 'missing' ? '✗ Missing' : co.label}
-                                </span>
+                                {delta.label}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Condition row */}
+                          <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                            {/* Check-in badge */}
+                            <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                              <span style={{ fontSize:9, color:'#9ca3af', fontWeight:600 }}>IN</span>
+                              <div style={{ padding:'2px 8px', borderRadius:99, background:ci.bg }}>
+                                <span style={{ fontSize:10, fontWeight:700, color:ci.color }}>{ci.label}</span>
                               </div>
-                              {checkoutNote && (
-                                <p style={{ fontSize:11, color:'#888', margin:0, lineHeight:1.4 }}>{checkoutNote}</p>
-                              )}
                             </div>
+
+                            {isCheckout && (
+                              <>
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2" strokeLinecap="round">
+                                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                                </svg>
+                                {/* Check-out badge */}
+                                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                                  <span style={{ fontSize:9, color:'#9ca3af', fontWeight:600 }}>OUT</span>
+                                  <div style={{ padding:'2px 8px', borderRadius:99, background: checkoutCond === 'missing' ? '#F3F1EB' : co.bg }}>
+                                    <span style={{ fontSize:10, fontWeight:700, color: checkoutCond === 'missing' ? '#374151' : co.color }}>
+                                      {checkoutCond === 'missing' ? '✗ Missing' : co.label}
+                                    </span>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Notes */}
+                          {(checkinNote || checkoutNote) && (
+                            <p style={{ fontSize:11, color:'#888', margin:'5px 0 0', lineHeight:1.4 }}>
+                              {checkoutNote || checkinNote}
+                            </p>
                           )}
                         </div>
                       </div>
