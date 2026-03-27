@@ -2742,17 +2742,27 @@ export function InspectionClient({
                   </span>
                 )}
               </button>
-              {/* Inventory pill — check-in only, when items exist */}
-              {!isCheckout && inventoryDetails.length > 0 && (
+
+              {/* Inventory pill — check-in: inventoryDetails, check-out: checkoutInventoryItems */}
+              {((!isCheckout && inventoryDetails.length > 0) || (isCheckout && checkoutInventoryItems.length > 0)) && (
                 <button
                   type="button"
                   onClick={() => setActiveReviewRoom("inventory")}
                   style={{
-                    flexShrink: 0, padding: "8px 16px", borderRadius: 100,
-                    border: "none", cursor: "pointer",
-                    fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
-                    transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6,
-                    background: activeReviewRoom === "inventory" ? "#9A88FD" : "#f5f5f5",
+                    flexShrink: 0,
+                    padding: "8px 16px",
+                    borderRadius: 100,
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 12, fontWeight: 700,
+                    whiteSpace: "nowrap",
+                    transition: "all 0.15s",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: activeReviewRoom === "inventory"
+                      ? (inspectionType === "check-in" ? "#9A88FD" : "#FF8A65")
+                      : "#f5f5f5",
                     color: activeReviewRoom === "inventory" ? "white" : "#374151",
                   }}
                 >
@@ -2773,7 +2783,7 @@ export function InspectionClient({
                     background: activeReviewRoom === "inventory" ? "rgba(255,255,255,0.2)" : "#e5e7eb",
                     padding: "1px 6px", borderRadius: 100,
                   }}>
-                    {inventoryDetails.length}
+                    {isCheckout ? checkoutInventoryItems.length : inventoryDetails.length}
                   </span>
                 </button>
               )}
@@ -3169,7 +3179,100 @@ export function InspectionClient({
           })()}
 
           {/* ── INVENTORY TAB CONTENT ── */}
-          {activeReviewRoom === "inventory" && (
+          {activeReviewRoom === "inventory" && isCheckout && checkoutInventoryItems.length > 0 && (
+            <div style={{ flex:1, overflowY:'auto', padding:'16px 16px 160px', WebkitOverflowScrolling:'touch' as any }}>
+              <div style={{ marginBottom:16, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:18, margin:0, color:'#1a1a2e' }}>
+                  Inventory
+                </p>
+                <span style={{ fontSize:11, fontWeight:700, color:'#9A88FD', background:'#EDE9FF', padding:'3px 10px', borderRadius:99 }}>
+                  {checkoutInventoryItems.length} items
+                </span>
+              </div>
+
+              {/* Summary pills */}
+              <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+                {[
+                  { label:'OK', status:'ok', bg:'#EEFAD5', color:'#3A7A00' },
+                  { label:'Damaged', status:'damaged', bg:'#FFF8DC', color:'#8A6000' },
+                  { label:'Missing', status:'missing', bg:'#FEE2E2', color:'#7A0000' },
+                ].map(({ label, status, bg, color }) => (
+                  <div key={status} style={{ flex:1, background:bg, borderRadius:12, padding:'10px 4px', textAlign:'center' }}>
+                    <p style={{ fontSize:18, fontWeight:800, color, margin:0, fontFamily:'Poppins, sans-serif' }}>
+                      {checkoutInventoryItems.filter(i => i.status_checkout === status).length}
+                    </p>
+                    <p style={{ fontSize:10, fontWeight:700, color, margin:'2px 0 0' }}>{label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Item rows */}
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {checkoutInventoryItems.map((item, idx) => (
+                  <div key={idx} style={{
+                    display:'flex', alignItems:'center', gap:12,
+                    padding:'12px 14px', borderRadius:14,
+                    background:
+                      item.status_checkout === 'missing' ? '#FEF2F2' :
+                      item.status_checkout === 'damaged' ? '#FFFBEB' : '#F8F7F4',
+                  }}>
+                    {/* Photo */}
+                    {(item.photo_url ?? item.photo_url_checkin) ? (
+                      <img src={(item.photo_url ?? item.photo_url_checkin)!} alt={item.name}
+                        style={{ width:44, height:44, borderRadius:10, objectFit:'cover', flexShrink:0 }}/>
+                    ) : (
+                      <div style={{ width:44, height:44, borderRadius:10, background:'#EEEDE9', flexShrink:0,
+                        display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round">
+                          <rect x="3" y="3" width="18" height="18" rx="2"/>
+                          <circle cx="8.5" cy="8.5" r="1.5"/>
+                          <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                      </div>
+                    )}
+
+                    {/* Name + checkin condition */}
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <p style={{ fontSize:13, fontWeight:600, margin:0, color:'#1A1A1A' }}>
+                        {item.name}
+                        {item.quantity > 1 && <span style={{ fontSize:11, color:'#999', marginLeft:6 }}>×{item.quantity}</span>}
+                      </p>
+                      {item.condition_checkin && (
+                        <p style={{ fontSize:11, color:'#9ca3af', margin:'2px 0 0' }}>
+                          Check-in: {item.condition_checkin}
+                        </p>
+                      )}
+                      {item.notes && (
+                        <p style={{ fontSize:11, color:'#888', margin:'2px 0 0' }}>{item.notes}</p>
+                      )}
+                    </div>
+
+                    {/* Status badge */}
+                    <div style={{
+                      padding:'4px 10px', borderRadius:99, flexShrink:0,
+                      background:
+                        item.status_checkout === 'ok'      ? '#EEFAD5' :
+                        item.status_checkout === 'damaged' ? '#FFF8DC' : '#FEE2E2',
+                    }}>
+                      <span style={{
+                        fontSize:11, fontWeight:700,
+                        color:
+                          item.status_checkout === 'ok'      ? '#3A7A00' :
+                          item.status_checkout === 'damaged' ? '#8A6000' : '#7A0000',
+                        fontFamily:'Poppins, sans-serif',
+                      }}>
+                        {item.status_checkout === 'ok'      ? '✓ OK' :
+                         item.status_checkout === 'damaged' ? '⚠ Damaged' :
+                         item.status_checkout === 'missing' ? '✗ Missing' : '—'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeReviewRoom === "inventory" && !isCheckout && (
             <div style={{ flex:1, overflowY:'auto', padding:'16px 16px 160px', WebkitOverflowScrolling:'touch' as any }}>
 
               <div style={{ marginBottom:16, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
