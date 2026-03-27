@@ -155,6 +155,8 @@ interface Props {
   rooms: RoomData[];
   initialKeyHandover?: { item: string; qty: number }[];
   initialCheckinKeyHandover?: { item: string; qty: number }[];
+  initialWantsInventory?: boolean;
+  initialIsFurnished?: boolean | null;
 }
 
 // ─── Constants ───────────────────────────────────
@@ -467,6 +469,8 @@ export function InspectionClient({
   rooms: initialRooms,
   initialKeyHandover = [],
   initialCheckinKeyHandover = [],
+  initialWantsInventory = false,
+  initialIsFurnished = null,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -484,8 +488,8 @@ export function InspectionClient({
 
   const [keyHandover, setKeyHandover] = useState<{ item: string; qty: number }[]>([]);
 
-  const [isFurnished, setIsFurnished] = useState<boolean | null>(null)
-  const [wantsInventory, setWantsInventory] = useState<boolean | null>(null)
+  const [isFurnished, setIsFurnished] = useState<boolean | null>(initialIsFurnished ?? null)
+  const [wantsInventory, setWantsInventory] = useState<boolean | null>(initialWantsInventory ?? null)
   const [inventoryReferenceItems, setInventoryReferenceItems] = useState<{
     id: string; name: string; category: string; quantity: number; source: string
   }[]>([])
@@ -600,7 +604,7 @@ export function InspectionClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount for autostart deep-link
   }, []);
 
-  // Read wants_inventory + is_furnished from URL (set during wizard)
+  // URL params take priority over DB values (fresh inspection from wizard)
   useEffect(() => {
     const wi = searchParams.get("wants_inventory")
     if (wi === "1") setWantsInventory(true)
@@ -1995,6 +1999,11 @@ export function InspectionClient({
                       .eq('id', inspData.tenancy_id)
                   }
                 } catch { /* silent */ }
+                // Persist wants_inventory on inspection
+                await supabase
+                  .from('inspections')
+                  .update({ wants_inventory: wantsInventory === true })
+                  .eq('id', inspectionId)
                 setScreen('inspect')
               }}
               style={{
