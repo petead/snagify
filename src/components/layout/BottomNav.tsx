@@ -33,6 +33,7 @@ export default function BottomNav() {
               <Link
                 key="new"
                 href="/inspection/new"
+                data-tour="nav-new"
                 className="flex items-center justify-center w-14 h-14 rounded-2xl shadow-lg -mt-5 transition-transform active:scale-95"
                 style={{
                   background: "linear-gradient(135deg, #9A88FD, #7B65FC)",
@@ -47,6 +48,17 @@ export default function BottomNav() {
             <Link
               key={tab.path}
               href={tab.path}
+              data-tour={
+                tab.path === "/dashboard"
+                  ? "nav-home"
+                  : tab.path === "/properties"
+                    ? "nav-properties"
+                    : tab.path === "/reports"
+                      ? "nav-reports"
+                      : tab.path === "/profile"
+                        ? "nav-profile"
+                        : undefined
+              }
               className="flex flex-col items-center justify-center gap-1 flex-1 h-full transition-all active:scale-95"
             >
               <tab.icon

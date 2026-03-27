@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 import { PenLine, AlertTriangle, Bell, Check } from "lucide-react";
 import { useCredits } from "@/hooks/useCredits";
 import { BuyCreditsModal } from "@/components/credits/BuyCreditsModal";
-import { OnboardingTutorial } from "@/components/onboarding/OnboardingTutorial";
+import { GuidedTour } from "@/components/onboarding/GuidedTour";
 import { trackAction } from "@/lib/breadcrumb";
 import { createClient } from "@/lib/supabase/client";
 import { planSlugForBuyCredits, pricePerCreditForBuy } from "@/lib/buyCreditsPlan";
@@ -181,7 +181,7 @@ export function DashboardClient({
     }
   }, [userId, tourCompleted]);
 
-  const completeTour = async () => {
+  const markTourDone = async () => {
     setShowOnboarding(false);
     if (!userId) return;
     await supabase.from("profiles").update({ tour_completed: true }).eq("id", userId);
@@ -398,6 +398,7 @@ export function DashboardClient({
           }}
         >
           <h1
+            data-tour="dashboard-greeting"
             style={{
               fontFamily: "'Poppins', sans-serif",
               fontSize: 30,
@@ -1036,10 +1037,50 @@ export function DashboardClient({
           document.body
         )}
       {showOnboarding && (
-        <OnboardingTutorial
-          accountType={profileAccountType}
+        <GuidedTour
+          steps={[
+            {
+              targetId: "dashboard-greeting",
+              title: "Your dashboard",
+              desc: "Your properties, active tenancies, and alerts all live here.",
+              spotlightPadding: 12,
+              spotlightRadius: 14,
+            },
+            {
+              targetId: "nav-new",
+              title: "Start a check-in",
+              desc: "This button launches a new inspection. Upload the contract and let AI do the rest.",
+              spotlightPadding: 12,
+              spotlightRadius: 18,
+            },
+            {
+              targetId: "nav-properties",
+              title: "Your properties",
+              desc: "All your managed units. Tap any property to see its history — or start a check-out from an active tenancy.",
+              spotlightPadding: 8,
+              spotlightRadius: 10,
+            },
+            {
+              targetId: "nav-reports",
+              title: "Reports",
+              desc: "Every generated PDF lands here. Track who has signed and send reminders in one tap.",
+              spotlightPadding: 8,
+              spotlightRadius: 10,
+            },
+            {
+              targetId: "nav-profile",
+              title: "Profile & settings",
+              desc:
+                accountType === "pro"
+                  ? "Manage your credits, subscription plan and team members."
+                  : "Manage your credits and account settings.",
+              spotlightPadding: 8,
+              spotlightRadius: 10,
+            },
+          ]}
           onDone={() => {
-            void completeTour();
+            setShowOnboarding(false);
+            void markTourDone();
           }}
         />
       )}
