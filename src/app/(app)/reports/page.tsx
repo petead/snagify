@@ -9,12 +9,14 @@ export default async function ReportsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, role, company_id")
+    .select("full_name, role, company_id, account_type")
     .eq("id", user.id)
     .single();
 
   const fullName = (profile as { full_name?: string | null } | null)?.full_name ?? null;
-  const isOwner = (profile as { role?: string } | null)?.role === "owner";
+  const isOwner =
+    (profile as { role?: string } | null)?.role === "owner" &&
+    (profile as { account_type?: string } | null)?.account_type === "pro";
   const companyId = (profile as { company_id?: string } | null)?.company_id ?? null;
 
   const { data: reportsData } = await supabase
