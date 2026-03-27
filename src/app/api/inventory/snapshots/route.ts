@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
           name: item.name,
           category: item.category,
           quantity: item.quantity ?? 1,
-          status_checkout: item.status_checkout ?? 'ok',
+          status_checkout: item.status_checkout ?? 'good',
           notes: item.notes,
           is_tenant_item: item.is_tenant_item ?? false,
           source: item.source ?? 'manual',

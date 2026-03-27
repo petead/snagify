@@ -1682,9 +1682,10 @@ export function CheckoutPDFDocument({
               {/* Summary pills */}
               <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
                 {[
-                  { label: 'OK', status: 'ok', bg: '#EEFAD5', color: '#3A7A00' },
-                  { label: 'Damaged', status: 'damaged', bg: '#FFF8DC', color: '#8A6000' },
-                  { label: 'Missing', status: 'missing', bg: '#FEE2E2', color: '#7A0000' },
+                  { label: 'Good', status: 'good', bg: '#EEFAD5', color: '#3A7A00' },
+                  { label: 'Fair', status: 'fair', bg: '#FFF8DC', color: '#8A6000' },
+                  { label: 'Poor', status: 'poor', bg: '#FEE2E2', color: '#7A0000' },
+                  { label: 'Missing', status: 'missing', bg: '#F3F1EB', color: '#374151' },
                 ].map(({ label, status, bg, color }) => (
                   <View key={status} style={{
                     flex: 1, backgroundColor: bg,
@@ -1716,9 +1717,10 @@ export function CheckoutPDFDocument({
                   borderBottomColor: '#F3F3F8',
                   backgroundColor:
                     item.status_checkout === 'missing' ? '#FEF2F2' :
-                    item.status_checkout === 'damaged' ? '#FFFBEB' : 'transparent',
+                    item.status_checkout === 'poor' ? '#FFFBEB' :
+                    item.status_checkout === 'fair' ? '#FFFBF0' : 'transparent',
                   borderRadius: 4,
-                  paddingHorizontal: item.status_checkout !== 'ok' ? 6 : 0,
+                  paddingHorizontal: item.status_checkout !== 'good' ? 6 : 0,
                   marginBottom: 2,
                 }}>
                   <Text style={{ flex: 3, fontSize: 9, color: '#1A1A2E' }}>
@@ -1744,18 +1746,21 @@ export function CheckoutPDFDocument({
                   <View style={{ flex: 1, alignItems: 'center' }}>
                     <View style={{
                       backgroundColor:
-                        item.status_checkout === 'ok'      ? '#EEFAD5' :
-                        item.status_checkout === 'damaged' ? '#FFF8DC' : '#FEE2E2',
+                        item.status_checkout === 'good' ? '#EEFAD5' :
+                        item.status_checkout === 'fair' ? '#FFF8DC' :
+                        item.status_checkout === 'poor' ? '#FEE2E2' : '#F3F3F3',
                       paddingHorizontal: 6, paddingVertical: 2, borderRadius: 99,
                     }}>
                       <Text style={{
                         fontSize: 8, fontFamily: 'Helvetica-Bold',
                         color:
-                          item.status_checkout === 'ok'      ? '#3A7A00' :
-                          item.status_checkout === 'damaged' ? '#8A6000' : '#7A0000',
+                          item.status_checkout === 'good' ? '#3A7A00' :
+                          item.status_checkout === 'fair' ? '#8A6000' :
+                          item.status_checkout === 'poor' ? '#7A0000' : '#666',
                       }}>
-                        {item.status_checkout === 'ok'      ? 'OK' :
-                         item.status_checkout === 'damaged' ? 'Damaged' :
+                        {item.status_checkout === 'good' ? 'Good' :
+                         item.status_checkout === 'fair' ? 'Fair' :
+                         item.status_checkout === 'poor' ? 'Poor' :
                          item.status_checkout === 'missing' ? 'Missing' : '-'}
                       </Text>
                     </View>

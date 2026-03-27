@@ -529,7 +529,7 @@ export function InspectionClient({
     photo_url_checkin: string | null
     notes: string
     source: string
-    status_checkout: 'ok' | 'missing' | 'damaged' | null
+    status_checkout: 'good' | 'fair' | 'poor' | 'missing' | null
   }[]>([])
   const [checkoutInventoryIndex, setCheckoutInventoryIndex] = useState(0)
   const [showCheckoutInventory, setShowCheckoutInventory] = useState(false)
@@ -953,7 +953,7 @@ export function InspectionClient({
               photo_url: null as string | null,
               notes: '',
               source: i.source ?? 'history',
-              status_checkout: null as 'ok' | 'missing' | 'damaged' | null,
+              status_checkout: null as 'good' | 'fair' | 'poor' | 'missing' | null,
               condition_checkin: i.condition_checkin,
               photo_url_checkin: i.photo_url,
             }))
@@ -3193,9 +3193,10 @@ export function InspectionClient({
               {/* Summary pills */}
               <div style={{ display:'flex', gap:8, marginBottom:16 }}>
                 {[
-                  { label:'OK', status:'ok', bg:'#EEFAD5', color:'#3A7A00' },
-                  { label:'Damaged', status:'damaged', bg:'#FFF8DC', color:'#8A6000' },
-                  { label:'Missing', status:'missing', bg:'#FEE2E2', color:'#7A0000' },
+                  { label:'Good', status:'good', bg:'#EEFAD5', color:'#3A7A00' },
+                  { label:'Fair', status:'fair', bg:'#FFF8DC', color:'#8A6000' },
+                  { label:'Poor', status:'poor', bg:'#FEE2E2', color:'#7A0000' },
+                  { label:'Missing', status:'missing', bg:'#F3F1EB', color:'#374151' },
                 ].map(({ label, status, bg, color }) => (
                   <div key={status} style={{ flex:1, background:bg, borderRadius:12, padding:'10px 4px', textAlign:'center' }}>
                     <p style={{ fontSize:18, fontWeight:800, color, margin:0, fontFamily:'Poppins, sans-serif' }}>
@@ -3214,7 +3215,8 @@ export function InspectionClient({
                     padding:'12px 14px', borderRadius:14,
                     background:
                       item.status_checkout === 'missing' ? '#FEF2F2' :
-                      item.status_checkout === 'damaged' ? '#FFFBEB' : '#F8F7F4',
+                      item.status_checkout === 'poor' ? '#FFFBEB' :
+                      item.status_checkout === 'fair' ? '#FFFBF0' : '#F8F7F4',
                   }}>
                     {/* Photo */}
                     {(item.photo_url ?? item.photo_url_checkin) ? (
@@ -3251,18 +3253,23 @@ export function InspectionClient({
                     <div style={{
                       padding:'4px 10px', borderRadius:99, flexShrink:0,
                       background:
-                        item.status_checkout === 'ok'      ? '#EEFAD5' :
-                        item.status_checkout === 'damaged' ? '#FFF8DC' : '#FEE2E2',
+                        item.status_checkout === 'good'    ? '#EEFAD5' :
+                        item.status_checkout === 'fair'    ? '#FFF8DC' :
+                        item.status_checkout === 'poor'    ? '#FEE2E2' :
+                        item.status_checkout === 'missing' ? '#F3F1EB' : '#F3F1EB',
                     }}>
                       <span style={{
                         fontSize:11, fontWeight:700,
                         color:
-                          item.status_checkout === 'ok'      ? '#3A7A00' :
-                          item.status_checkout === 'damaged' ? '#8A6000' : '#7A0000',
+                          item.status_checkout === 'good'    ? '#3A7A00' :
+                          item.status_checkout === 'fair'    ? '#8A6000' :
+                          item.status_checkout === 'poor'    ? '#7A0000' :
+                          item.status_checkout === 'missing' ? '#374151' : '#9ca3af',
                         fontFamily:'Poppins, sans-serif',
                       }}>
-                        {item.status_checkout === 'ok'      ? '✓ OK' :
-                         item.status_checkout === 'damaged' ? '⚠ Damaged' :
+                        {item.status_checkout === 'good'    ? 'Good' :
+                         item.status_checkout === 'fair'    ? 'Fair' :
+                         item.status_checkout === 'poor'    ? 'Poor' :
                          item.status_checkout === 'missing' ? '✗ Missing' : '—'}
                       </span>
                     </div>
@@ -4253,11 +4260,12 @@ export function InspectionClient({
               {/* Status */}
               <div>
                 <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:'0 0 10px' }}>Current status</p>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:8 }}>
                   {([
-                    { value: 'ok', label: 'OK', bg:'#EEFAD5', active:'#CAFE87', color:'#1A4A00' },
-                    { value: 'damaged', label: 'Damaged', bg:'#FFF8DC', active:'#FEDE80', color:'#6B4A00' },
-                    { value: 'missing', label: 'Missing', bg:'#FEE2E2', active:'#FCA5A5', color:'#7A0000' },
+                    { value: 'good', label: 'Good', bg:'#EEFAD5', active:'#CAFE87', color:'#1A4A00' },
+                    { value: 'fair', label: 'Fair', bg:'#FFF8DC', active:'#FEDE80', color:'#6B4A00' },
+                    { value: 'poor', label: 'Poor', bg:'#FEE2E2', active:'#FCA5A5', color:'#7A0000' },
+                    { value: 'missing', label: 'Missing', bg:'#F3F1EB', active:'#0E0E10', color:'white' },
                   ] as const).map(opt => (
                     <button
                       key={opt.value}
@@ -4281,12 +4289,12 @@ export function InspectionClient({
               </div>
 
               {/* Photo at check-out */}
-              {item.status_checkout && item.status_checkout !== 'ok' && (
+              {item.status_checkout && (
                 <div>
                   <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:'0 0 8px' }}>
                     Photo
                     <span style={{ fontSize:11, color:'rgba(14,14,16,0.4)', fontWeight:400, marginLeft:6 }}>
-                      {item.status_checkout === 'damaged' ? 'recommended' : 'optional'}
+                      {item.status_checkout === 'poor' ? 'recommended' : 'optional'}
                     </span>
                   </p>
                   {item.photo_url ? (
@@ -4340,7 +4348,7 @@ export function InspectionClient({
               )}
 
               {/* Note */}
-              {item.status_checkout && item.status_checkout !== 'ok' && (
+              {item.status_checkout && (
                 <div>
                   <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:'0 0 8px' }}>
                     Note <span style={{ fontSize:11, color:'rgba(14,14,16,0.4)', fontWeight:400 }}>optional</span>

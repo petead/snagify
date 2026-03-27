@@ -733,8 +733,9 @@ export function CheckoutReportView({
         {/* ── INVENTORY COMPARISON ── */}
         {inventorySnapshots && inventorySnapshots.filter(s => !s.is_tenant_item).length > 0 && (() => {
           const items = inventorySnapshots.filter(s => !s.is_tenant_item)
-          const okCount = items.filter(i => i.status_checkout === 'ok').length
-          const damagedCount = items.filter(i => i.status_checkout === 'damaged').length
+          const goodCount = items.filter(i => i.status_checkout === 'good').length
+          const fairCount = items.filter(i => i.status_checkout === 'fair').length
+          const poorCount = items.filter(i => i.status_checkout === 'poor').length
           const missingCount = items.filter(i => i.status_checkout === 'missing').length
 
           return (
@@ -761,16 +762,20 @@ export function CheckoutReportView({
               {/* Summary pills */}
               <div className="flex gap-2 px-4 pt-3 pb-2">
                 <div className="flex-1 bg-[#EEFAD5] rounded-xl p-2.5 text-center">
-                  <p className="text-[18px] font-extrabold text-[#3A7A00]">{okCount}</p>
-                  <p className="text-[10px] font-semibold text-[#3A7A00]">OK</p>
+                  <p className="text-[18px] font-extrabold text-[#3A7A00]">{goodCount}</p>
+                  <p className="text-[10px] font-semibold text-[#3A7A00]">Good</p>
                 </div>
                 <div className="flex-1 bg-[#FFF8DC] rounded-xl p-2.5 text-center">
-                  <p className="text-[18px] font-extrabold text-[#8A6000]">{damagedCount}</p>
-                  <p className="text-[10px] font-semibold text-[#8A6000]">Damaged</p>
+                  <p className="text-[18px] font-extrabold text-[#8A6000]">{fairCount}</p>
+                  <p className="text-[10px] font-semibold text-[#8A6000]">Fair</p>
                 </div>
                 <div className="flex-1 bg-[#FEE2E2] rounded-xl p-2.5 text-center">
-                  <p className="text-[18px] font-extrabold text-[#7A0000]">{missingCount}</p>
-                  <p className="text-[10px] font-semibold text-[#7A0000]">Missing</p>
+                  <p className="text-[18px] font-extrabold text-[#7A0000]">{poorCount}</p>
+                  <p className="text-[10px] font-semibold text-[#7A0000]">Poor</p>
+                </div>
+                <div className="flex-1 bg-[#F3F1EB] rounded-xl p-2.5 text-center">
+                  <p className="text-[18px] font-extrabold text-[#374151]">{missingCount}</p>
+                  <p className="text-[10px] font-semibold text-[#374151]">Missing</p>
                 </div>
               </div>
 
@@ -783,7 +788,8 @@ export function CheckoutReportView({
                     style={{
                       background:
                         item.status_checkout === 'missing' ? '#FEF2F2' :
-                        item.status_checkout === 'damaged' ? '#FFFBEB' : '#F8F7F4',
+                        item.status_checkout === 'poor' ? '#FFFBEB' :
+                        item.status_checkout === 'fair' ? '#FFFBF0' : '#F8F7F4',
                     }}
                   >
                     {/* Photo — checkout first, fallback to checkin */}
@@ -827,20 +833,25 @@ export function CheckoutReportView({
                       className="flex-shrink-0 px-2.5 py-1 rounded-full"
                       style={{
                         background:
-                          item.status_checkout === 'ok'      ? '#EEFAD5' :
-                          item.status_checkout === 'damaged' ? '#FFF8DC' : '#FEE2E2',
+                          item.status_checkout === 'good'    ? '#EEFAD5' :
+                          item.status_checkout === 'fair'    ? '#FFF8DC' :
+                          item.status_checkout === 'poor'    ? '#FEE2E2' :
+                          item.status_checkout === 'missing' ? '#F3F1EB' : '#F3F1EB',
                       }}
                     >
                       <span
                         className="text-[11px] font-bold"
                         style={{
                           color:
-                            item.status_checkout === 'ok'      ? '#3A7A00' :
-                            item.status_checkout === 'damaged' ? '#8A6000' : '#7A0000',
+                            item.status_checkout === 'good'    ? '#3A7A00' :
+                            item.status_checkout === 'fair'    ? '#8A6000' :
+                            item.status_checkout === 'poor'    ? '#7A0000' :
+                            item.status_checkout === 'missing' ? '#374151' : '#9ca3af',
                         }}
                       >
-                        {item.status_checkout === 'ok'      ? '✓ OK' :
-                         item.status_checkout === 'damaged' ? '⚠ Damaged' :
+                        {item.status_checkout === 'good'    ? 'Good' :
+                         item.status_checkout === 'fair'    ? 'Fair' :
+                         item.status_checkout === 'poor'    ? 'Poor' :
                          item.status_checkout === 'missing' ? '✗ Missing' : '—'}
                       </span>
                     </div>
