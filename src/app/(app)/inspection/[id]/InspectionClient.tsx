@@ -506,6 +506,7 @@ export function InspectionClient({
   }[]>([])
   const [inventoryScreen, setInventoryScreen] = useState<'selection' | 'detail'>('selection')
   const [inventoryDetailIndex, setInventoryDetailIndex] = useState(0)
+  const [inventorySaving, setInventorySaving] = useState(false)
   const [inventoryDetails, setInventoryDetails] = useState<{
     referenceItemId?: string
     name: string
@@ -1496,6 +1497,47 @@ export function InspectionClient({
 
   function suggestFurnished(): boolean | null {
     return null
+  }
+
+  async function loadExistingSnapshots(): Promise<boolean> {
+    try {
+      const res = await fetch(`/api/inventory/snapshots?inspection_id=${inspectionId}`)
+      const data = await res.json() as { items?: {
+        id: string
+        name: string
+        category: string
+        quantity: number
+        condition_checkin?: string | null
+        photo_url?: string | null
+        notes?: string | null
+        source?: string | null
+        reference_item_id?: string | null
+      }[] }
+      if (data.items && data.items.length > 0) {
+        // Re-hydrate inventoryDetails from DB snapshots
+        setInventoryDetails(data.items.map(item => ({
+          referenceItemId: item.reference_item_id ?? undefined,
+          name: item.name,
+          category: item.category,
+          quantity: item.quantity,
+          condition: (item.condition_checkin ?? null) as 'good' | 'fair' | 'poor' | null,
+          photo_url: item.photo_url ?? null,
+          notes: item.notes ?? '',
+          source: item.source ?? 'manual',
+        })))
+        // Also re-hydrate inventorySelection from these items
+        setInventorySelection(data.items.map(item => ({
+          referenceItemId: item.reference_item_id ?? undefined,
+          name: item.name,
+          category: item.category,
+          quantity: item.quantity,
+          source: item.source ?? 'manual',
+          selected: true,
+        })))
+        return true
+      }
+    } catch { /* silent */ }
+    return false
   }
 
   async function loadInventoryReference() {
@@ -3125,7 +3167,18 @@ export function InspectionClient({
               {/* Edit button */}
               <button
                 type="button"
-                onClick={() => { setInventoryScreen('selection'); setScreen('inventory') }}
+                onClick={async () => {
+                  // Load existing snapshots from DB before editing
+                  const hasExisting = await loadExistingSnapshots()
+                  if (!hasExisting) {
+                    // No saved snapshots — rebuild from reference + AI
+                    await loadInventoryReference()
+                    buildInventorySelection()
+                  }
+                  setInventoryDetailIndex(0)
+                  setInventoryScreen('selection')
+                  setScreen('inventory')
+                }}
                 style={{
                   width:'100%', padding:'12px', background:'transparent',
                   border:'1.5px dashed rgba(154,136,253,0.4)',
@@ -3814,14 +3867,15 @@ export function InspectionClient({
             </button>
             <button
               type="button"
-              disabled={!inventoryDetails[inventoryDetailIndex]?.condition}
+              disabled={!inventoryDetails[inventoryDetailIndex]?.condition || inventorySaving}
               onClick={async () => {
                 const isLast = inventoryDetailIndex === inventoryDetails.length - 1
                 if (!isLast) {
                   setInventoryDetailIndex(prev => prev + 1)
                   return
                 }
-                // Last item — save snapshots then generate
+                setInventorySaving(true)
+                // Last item — save snapshots then go to review
                 try {
                   await fetch('/api/inventory/snapshots', {
                     method: 'POST',
@@ -3856,19 +3910,30 @@ export function InspectionClient({
                       }),
                     })
                   }
-                } catch { /* silent — don't block report generation */ }
-                // Navigate to review — generate will happen from there
+                } catch { /* silent */ } finally {
+                  setInventorySaving(false)
+                }
                 setInventoryScreen('selection')
                 setScreen('review')
               }}
               style={{
                 flex:2, padding:'14px',
-                background: inventoryDetails[inventoryDetailIndex]?.condition ? '#0E0E10' : 'rgba(14,14,16,0.2)',
-                border:'none', borderRadius:14, cursor:'pointer',
+                background: inventoryDetails[inventoryDetailIndex]?.condition && !inventorySaving ? '#0E0E10' : 'rgba(14,14,16,0.2)',
+                border:'none', borderRadius:14, cursor: inventorySaving ? 'default' : 'pointer',
                 fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15, color:'white',
+                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
               }}
             >
-              {inventoryDetailIndex === inventoryDetails.length - 1 ? 'Save & go to Review →' : 'Next item →'}
+              {inventoryDetailIndex === inventoryDetails.length - 1 ? (
+                inventorySaving ? (
+                  <>
+                    <svg style={{ animation:'spin 0.8s linear infinite' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                    </svg>
+                    Saving...
+                  </>
+                ) : 'Save & go to Review →'
+              ) : 'Next item →'}
             </button>
           </div>
         </div>
