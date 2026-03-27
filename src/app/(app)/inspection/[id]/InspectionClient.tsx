@@ -3108,7 +3108,7 @@ export function InspectionClient({
             {isFurnished ? (
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   const selected = inventorySelection.filter(i => i.selected)
                   const details = selected.map(item => ({
                     referenceItemId: item.referenceItemId,
@@ -3123,6 +3123,20 @@ export function InspectionClient({
                   setInventoryDetails(details)
                   setInventoryDetailIndex(0)
                   setInventoryScreen('detail')
+                  // Persist is_furnished on the tenancy
+                  try {
+                    const { data: inspData } = await supabase
+                      .from('inspections')
+                      .select('tenancy_id')
+                      .eq('id', inspectionId)
+                      .single()
+                    if (inspData?.tenancy_id) {
+                      await supabase
+                        .from('tenancies')
+                        .update({ is_furnished: isFurnished })
+                        .eq('id', inspData.tenancy_id)
+                    }
+                  } catch { /* silent */ }
                 }}
                 style={{
                   width:'100%', padding:'15px',
