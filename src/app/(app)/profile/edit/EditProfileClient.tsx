@@ -291,7 +291,7 @@ export function EditProfileClient({ userId, userEmail }: EditProfileClientProps)
       : profile.company
     : null;
 
-  /** Subscription tier (not company Stripe plan — that lives in SubscriptionSection). */
+  /** Subscription tier (not company Stripe plan — that lives in SubscriptionSheet / PricingGrid). */
   const accountTierLabel = formatAccountTierLabel(normalizeAccountTier(profile?.account_type));
   const roleLabel = formatProfileRoleLabel(normalizeProfileRole(profile?.role));
   const initials = form.fullName

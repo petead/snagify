@@ -162,7 +162,7 @@ export function PricingGrid({ currentPlan, creditsBalance, companyId: _companyId
                 borderRadius: 20,
               }}
             >
-              1 month free
+              2 months free
             </span>
           </button>
         </div>
