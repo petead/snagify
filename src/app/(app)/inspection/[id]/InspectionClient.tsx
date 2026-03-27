@@ -600,11 +600,15 @@ export function InspectionClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount for autostart deep-link
   }, []);
 
-  // Read wants_inventory from URL (set during wizard)
+  // Read wants_inventory + is_furnished from URL (set during wizard)
   useEffect(() => {
     const wi = searchParams.get("wants_inventory")
     if (wi === "1") setWantsInventory(true)
     else if (wi === "0") setWantsInventory(false)
+
+    const fi = searchParams.get("is_furnished")
+    if (fi === "1") setIsFurnished(true)
+    else if (fi === "0") setIsFurnished(false)
   }, [])
 
   // Lock body scroll

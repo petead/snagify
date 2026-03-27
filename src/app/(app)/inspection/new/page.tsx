@@ -663,7 +663,7 @@ function NewInspectionContent() {
         await supabase.from("rooms").insert(roomInserts);
       }
 
-      router.push(`/inspection/${inspection.id}?autostart=1&wants_inventory=${wantsInventory ? "1" : "0"}`);
+      router.push(`/inspection/${inspection.id}?autostart=1&wants_inventory=${wantsInventory ? "1" : "0"}&is_furnished=${isFurnished ? "1" : "0"}`);
     } catch (err: unknown) {
       const e = err as { message?: string; details?: string; hint?: string; code?: string };
       console.error("=== INSPECTION CREATION ERROR ===");
