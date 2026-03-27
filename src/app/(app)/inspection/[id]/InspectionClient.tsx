@@ -477,7 +477,7 @@ export function InspectionClient({
   const [activeRoom, setActiveRoom] = useState(0);
   const [activeReviewRoom, setActiveReviewRoom] = useState<string | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
-  const [screen, setScreen] = useState<"rooms" | "inspect" | "review" | "inventory">(
+  const [screen, setScreen] = useState<"rooms" | "furnished_setup" | "inspect" | "review" | "inventory">(
     initialRooms.length > 0 ? "inspect" : "rooms"
   );
   const [toast, setToast] = useState<string | null>(null);
@@ -485,6 +485,7 @@ export function InspectionClient({
   const [keyHandover, setKeyHandover] = useState<{ item: string; qty: number }[]>([]);
 
   const [isFurnished, setIsFurnished] = useState<boolean | null>(null)
+  const [wantsInventory, setWantsInventory] = useState<boolean | null>(null)
   const [inventoryReferenceItems, setInventoryReferenceItems] = useState<{
     id: string; name: string; category: string; quantity: number; source: string
   }[]>([])
@@ -991,7 +992,14 @@ export function InspectionClient({
     // Do NOT reset photos — loadPhotos useEffect will reload from DB
     setActiveRoom(0);
     setCreatingRooms(false);
-    setScreen("inspect");
+    // Only show furnished setup for check-in
+    if (inspectionType === 'check-in') {
+      const suggested = suggestFurnished()
+      setIsFurnished(suggested)
+      setScreen("furnished_setup")
+    } else {
+      setScreen("inspect")
+    }
   };
 
   const handlePhotoCapture = async (
@@ -1694,6 +1702,265 @@ export function InspectionClient({
           document.body
         )}
 
+      {screen === "furnished_setup" && (
+        <div style={{ height:'100vh', background:'#F8F7F4', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+
+          {/* Header */}
+          <div style={{
+            padding:'20px 20px 16px',
+            borderBottom:'1px solid rgba(14,14,16,0.08)',
+            background:'white',
+            flexShrink:0,
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+              <button
+                type="button"
+                onClick={() => setScreen('rooms')}
+                style={{ background:'none', border:'none', cursor:'pointer', padding:4 }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E0E10" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M19 12H5M12 5l-7 7 7 7"/>
+                </svg>
+              </button>
+              <div>
+                <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:16, margin:0, color:'#0E0E10' }}>
+                  Furnished apartment?
+                </p>
+                <p style={{ fontSize:12, color:'rgba(14,14,16,0.5)', margin:0 }}>
+                  Step 3 of 5
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'24px 20px' }}>
+
+            {/* Magic suggestion banner */}
+            {isFurnished !== null && (() => {
+              const ratio = null
+              if (!ratio) return null
+              return (
+                <div style={{
+                  background:'#EDE9FF', borderRadius:14, padding:'12px 16px',
+                  marginBottom:20, display:'flex', alignItems:'flex-start', gap:10,
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round" style={{ flexShrink:0, marginTop:1 }}>
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 8v4M12 16h.01"/>
+                  </svg>
+                  <p style={{ fontSize:12, color:'#534AB7', margin:0, lineHeight:1.5 }}>
+                    Based on a <strong>{ratio}% deposit ratio</strong>, this apartment appears to be{" "}
+                    <strong>{isFurnished ? 'furnished' : 'unfurnished'}</strong>.
+                    You can change this below.
+                  </p>
+                </div>
+              )
+            })()}
+
+            {/* Furnished toggle */}
+            <div style={{
+              background:'white', borderRadius:16,
+              border:`1.5px solid ${isFurnished ? '#9A88FD' : 'rgba(14,14,16,0.1)'}`,
+              padding:'18px 20px', marginBottom:12,
+              display:'flex', alignItems:'center', justifyContent:'space-between',
+              cursor:'pointer',
+            }}
+              onClick={() => {
+                setIsFurnished(true)
+                setWantsInventory(null)
+              }}
+            >
+              <div>
+                <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15, margin:0, color:'#0E0E10' }}>
+                  Furnished
+                </p>
+                <p style={{ fontSize:12, color:'rgba(14,14,16,0.5)', margin:'3px 0 0' }}>
+                  Includes furniture, appliances or electronics
+                </p>
+              </div>
+              <div style={{
+                width:22, height:22, borderRadius:'50%',
+                border:`2px solid ${isFurnished ? '#9A88FD' : 'rgba(14,14,16,0.2)'}`,
+                background: isFurnished ? '#9A88FD' : 'transparent',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                flexShrink:0,
+              }}>
+                {isFurnished && (
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                )}
+              </div>
+            </div>
+
+            <div style={{
+              background:'white', borderRadius:16,
+              border:`1.5px solid ${isFurnished === false ? '#9A88FD' : 'rgba(14,14,16,0.1)'}`,
+              padding:'18px 20px', marginBottom:24,
+              display:'flex', alignItems:'center', justifyContent:'space-between',
+              cursor:'pointer',
+            }}
+              onClick={() => {
+                setIsFurnished(false)
+                setWantsInventory(false)
+              }}
+            >
+              <div>
+                <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15, margin:0, color:'#0E0E10' }}>
+                  Unfurnished
+                </p>
+                <p style={{ fontSize:12, color:'rgba(14,14,16,0.5)', margin:'3px 0 0' }}>
+                  Empty apartment, no furniture included
+                </p>
+              </div>
+              <div style={{
+                width:22, height:22, borderRadius:'50%',
+                border:`2px solid ${isFurnished === false ? '#9A88FD' : 'rgba(14,14,16,0.2)'}`,
+                background: isFurnished === false ? '#9A88FD' : 'transparent',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                flexShrink:0,
+              }}>
+                {isFurnished === false && (
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                )}
+              </div>
+            </div>
+
+            {/* Inventory option — only if furnished */}
+            {isFurnished === true && (
+              <div style={{
+                background:'white', borderRadius:16,
+                border:'0.5px solid rgba(14,14,16,0.1)',
+                overflow:'hidden',
+              }}>
+                <div style={{ padding:'16px 20px', borderBottom:'0.5px solid rgba(14,14,16,0.06)' }}>
+                  <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:14, margin:'0 0 6px', color:'#0E0E10' }}>
+                    Document the inventory?
+                  </p>
+                  <p style={{ fontSize:12, color:'rgba(14,14,16,0.5)', margin:0, lineHeight:1.6 }}>
+                    An inventory lists and photographs each piece of furniture and appliance.
+                    Both parties sign it — giving you legal proof of what was present and its condition at move-in.
+                    This protects landlord and tenant in case of a dispute.
+                  </p>
+                </div>
+
+                <div
+                  onClick={() => setWantsInventory(true)}
+                  style={{
+                    padding:'14px 20px', cursor:'pointer',
+                    background: wantsInventory === true ? '#EDE9FF' : 'white',
+                    borderBottom:'0.5px solid rgba(14,14,16,0.06)',
+                    display:'flex', alignItems:'center', gap:12,
+                  }}
+                >
+                  <div style={{
+                    width:20, height:20, borderRadius:'50%',
+                    border:`2px solid ${wantsInventory === true ? '#9A88FD' : 'rgba(14,14,16,0.2)'}`,
+                    background: wantsInventory === true ? '#9A88FD' : 'transparent',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    flexShrink:0,
+                  }}>
+                    {wantsInventory === true && (
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    )}
+                  </div>
+                  <div>
+                    <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:0, fontFamily:'Poppins, sans-serif' }}>
+                      Yes — document inventory
+                    </p>
+                    <p style={{ fontSize:11, color:'rgba(14,14,16,0.45)', margin:'2px 0 0' }}>
+                      Recommended · adds ~5 min · included in the signed PDF
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setWantsInventory(false)}
+                  style={{
+                    padding:'14px 20px', cursor:'pointer',
+                    background: wantsInventory === false ? '#F3F1EB' : 'white',
+                    display:'flex', alignItems:'center', gap:12,
+                  }}
+                >
+                  <div style={{
+                    width:20, height:20, borderRadius:'50%',
+                    border:`2px solid ${wantsInventory === false ? '#9A88FD' : 'rgba(14,14,16,0.2)'}`,
+                    background: wantsInventory === false ? '#9A88FD' : 'transparent',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    flexShrink:0,
+                  }}>
+                    {wantsInventory === false && (
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    )}
+                  </div>
+                  <div>
+                    <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:0, fontFamily:'Poppins, sans-serif' }}>
+                      No — skip inventory
+                    </p>
+                    <p style={{ fontSize:11, color:'rgba(14,14,16,0.45)', margin:'2px 0 0' }}>
+                      Furnished status will still appear in the report
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* CTA */}
+          <div style={{
+            padding:'12px 20px',
+            paddingBottom:'max(16px, calc(env(safe-area-inset-bottom) + 80px))',
+            background:'white',
+            borderTop:'1px solid rgba(14,14,16,0.08)',
+            flexShrink:0,
+          }}>
+            <button
+              type="button"
+              disabled={
+                isFurnished === null ||
+                (isFurnished === true && wantsInventory === null)
+              }
+              onClick={async () => {
+                // Persist is_furnished on tenancy
+                try {
+                  const { data: inspData } = await supabase
+                    .from('inspections')
+                    .select('tenancy_id')
+                    .eq('id', inspectionId)
+                    .single()
+                  if (inspData?.tenancy_id) {
+                    await supabase
+                      .from('tenancies')
+                      .update({ is_furnished: isFurnished })
+                      .eq('id', inspData.tenancy_id)
+                  }
+                } catch { /* silent */ }
+                setScreen('inspect')
+              }}
+              style={{
+                width:'100%', padding:'15px',
+                background: (isFurnished !== null && (isFurnished === false || wantsInventory !== null))
+                  ? '#0E0E10' : 'rgba(14,14,16,0.15)',
+                border:'none', borderRadius:14,
+                cursor:(isFurnished !== null && (isFurnished === false || wantsInventory !== null))
+                  ? 'pointer' : 'default',
+                fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15, color:'white',
+              }}
+            >
+              Continue to inspection →
+            </button>
+          </div>
+
+        </div>
+      )}
+
       {/* ═══ ROOMS SCREEN ═══ */}
       {screen === "rooms" && (
         <div style={{ minHeight: "100vh", background: "white", display: "flex", flexDirection: "column" }}>
@@ -1922,15 +2189,8 @@ export function InspectionClient({
                 </p>
               </div>
               <button type="button" onClick={async () => {
-                if (!isCheckout && isFurnished === null) {
-                  const suggested = suggestFurnished()
-                  setIsFurnished(suggested)
+                if (!isCheckout && isFurnished === true && wantsInventory === true && inventoryDetails.length === 0) {
                   await loadInventoryReference()
-                  buildInventorySelection()
-                  setScreen('inventory')
-                  return
-                }
-                if (!isCheckout && isFurnished === true && inventoryDetails.length === 0) {
                   buildInventorySelection()
                   setScreen('inventory')
                   return
@@ -3055,40 +3315,6 @@ export function InspectionClient({
               </div>
             </div>
 
-            {/* Furnished toggle */}
-            <div style={{
-              display:'flex', alignItems:'center', justifyContent:'space-between',
-              padding:'10px 14px',
-              background: isFurnished ? '#EDE9FF' : '#F3F1EB',
-              borderRadius:12,
-            }}>
-              <div>
-                <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:0, fontFamily:'Poppins, sans-serif' }}>
-                  Furnished apartment
-                </p>
-                {isFurnished === null && suggestFurnished() !== null && (
-                  <p style={{ fontSize:11, color:'rgba(14,14,16,0.5)', margin:'2px 0 0' }}>
-                    Suggested based on deposit ratio
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsFurnished(prev => !prev)}
-                style={{
-                  width:44, height:26, borderRadius:999,
-                  background: isFurnished ? '#9A88FD' : 'rgba(14,14,16,0.15)',
-                  border:'none', cursor:'pointer', position:'relative', transition:'background .2s',
-                }}
-              >
-                <span style={{
-                  position:'absolute', top:3,
-                  left: isFurnished ? 21 : 3,
-                  width:20, height:20, borderRadius:'50%',
-                  background:'white', transition:'left .2s',
-                }}/>
-              </button>
-            </div>
           </div>
 
           {isFurnished && (
@@ -3209,65 +3435,33 @@ export function InspectionClient({
 
           {/* CTA */}
           <div style={{ padding:'12px 20px', paddingBottom:'max(16px, calc(env(safe-area-inset-bottom) + 80px))', background:'white', borderTop:'1px solid rgba(14,14,16,0.08)' }}>
-            {isFurnished ? (
-              <button
-                type="button"
-                onClick={async () => {
-                  const selected = inventorySelection.filter(i => i.selected)
-                  const details = selected.map(item => ({
-                    referenceItemId: item.referenceItemId,
-                    name: item.name,
-                    category: item.category,
-                    quantity: item.quantity,
-                    condition: null as 'good' | 'fair' | 'poor' | null,
-                    photo_url: null,
-                    notes: '',
-                    source: item.source,
-                  }))
-                  setInventoryDetails(details)
-                  setInventoryDetailIndex(0)
-                  setInventoryScreen('detail')
-                  // Persist is_furnished on the tenancy
-                  try {
-                    const { data: inspData } = await supabase
-                      .from('inspections')
-                      .select('tenancy_id')
-                      .eq('id', inspectionId)
-                      .single()
-                    if (inspData?.tenancy_id) {
-                      await supabase
-                        .from('tenancies')
-                        .update({ is_furnished: isFurnished })
-                        .eq('id', inspData.tenancy_id)
-                    }
-                  } catch { /* silent */ }
-                }}
-                style={{
-                  width:'100%', padding:'15px',
-                  background:'#0E0E10', color:'white', border:'none',
-                  borderRadius:14, cursor:'pointer',
-                  fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15,
-                }}
-              >
-                Confirm {inventorySelection.filter(i => i.selected).length} items →
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setInventoryDetails([])
-                  setScreen('review')
-                }}
-                style={{
-                  width:'100%', padding:'15px',
-                  background:'#0E0E10', color:'white', border:'none',
-                  borderRadius:14, cursor:'pointer',
-                  fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15,
-                }}
-              >
-                Continue without inventory →
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                const selected = inventorySelection.filter(i => i.selected)
+                const details = selected.map(item => ({
+                  referenceItemId: item.referenceItemId,
+                  name: item.name,
+                  category: item.category,
+                  quantity: item.quantity,
+                  condition: null as 'good' | 'fair' | 'poor' | null,
+                  photo_url: null,
+                  notes: '',
+                  source: item.source,
+                }))
+                setInventoryDetails(details)
+                setInventoryDetailIndex(0)
+                setInventoryScreen('detail')
+              }}
+              style={{
+                width:'100%', padding:'15px',
+                background:'#0E0E10', color:'white', border:'none',
+                borderRadius:14, cursor:'pointer',
+                fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15,
+              }}
+            >
+              Confirm {inventorySelection.filter(i => i.selected).length} items →
+            </button>
           </div>
         </div>
       )}
