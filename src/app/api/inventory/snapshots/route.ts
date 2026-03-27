@@ -116,6 +116,7 @@ export async function POST(req: NextRequest) {
     quantity: item.quantity ?? 1,
     condition_checkin: item.condition_checkin ?? null,
     photo_url: item.photo_url ?? null,
+    notes: item.notes ?? null,
     is_tenant_item: item.is_tenant_item ?? false,
     source: item.source ?? 'manual',
   }))
