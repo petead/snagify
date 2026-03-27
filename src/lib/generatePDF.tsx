@@ -1086,6 +1086,17 @@ interface InspectionMeta {
   signatureEmbeds?: PdfSignatureEmbeds;
   /** Maps the inspection agent to landlord / tenant / inspector column in the PDF */
   creatorPdfRole?: CreatorPdfRole;
+  inventorySnapshots?: {
+    id: string
+    name: string
+    category: string
+    quantity: number
+    condition_checkin?: string | null
+    photo_url?: string | null
+    status_checkout?: string | null
+    notes?: string | null
+    is_tenant_item?: boolean | null
+  }[]
 }
 
 function isValidHex(s: string | undefined): boolean {
@@ -1116,6 +1127,7 @@ function InspectionReport({
   const property = meta.property ?? {};
   const inspection = meta.inspection;
   const sigE = meta.signatureEmbeds;
+  const inventorySnapshots = meta.inventorySnapshots;
   const creatorPdfRole =
     meta.creatorPdfRole ??
     resolveCreatorPdfRole(meta.agent?.account_type, meta.agent?.individual_role);
@@ -1614,6 +1626,61 @@ function InspectionReport({
             );
           })()}
         </View>
+
+        {/* ── INVENTORY ── */}
+        {inventorySnapshots && inventorySnapshots.length > 0 && (
+          <>
+            <View style={s.sectionHd}>
+              <Text style={s.sectionHdText}>Inventory</Text>
+              <View style={s.sectionHdLine} />
+            </View>
+
+            <View style={{ backgroundColor: '#FAFAFA', borderRadius: 8, padding: 10 }}>
+              {/* Column headers */}
+              <View style={{
+                flexDirection: 'row', paddingBottom: 5, marginBottom: 4,
+                borderBottomWidth: 0.5, borderBottomColor: '#E5E5E5',
+              }}>
+                <Text style={{ flex: 3, fontSize: 7, color: '#9B9BA8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Item</Text>
+                <Text style={{ flex: 1, fontSize: 7, color: '#9B9BA8', textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 }}>Qty</Text>
+                <Text style={{ flex: 1, fontSize: 7, color: '#9B9BA8', textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 }}>Condition</Text>
+              </View>
+
+              {inventorySnapshots.map((item, i) => (
+                <View key={i} style={{
+                  flexDirection: 'row', alignItems: 'center',
+                  paddingVertical: 6,
+                  borderBottomWidth: 0.5,
+                  borderBottomColor: i < inventorySnapshots.length - 1 ? '#F3F3F8' : 'transparent',
+                }}>
+                  <Text style={{ flex: 3, fontSize: 9, color: '#1A1A2E' }}>{item.name}</Text>
+                  <Text style={{ flex: 1, fontSize: 9, color: '#9B9BA8', textAlign: 'center' }}>{item.quantity}</Text>
+                  <View style={{ flex: 1, alignItems: 'center' }}>
+                    <View style={{
+                      backgroundColor:
+                        item.condition_checkin === 'good' ? '#EEFAD5' :
+                        item.condition_checkin === 'fair' ? '#FFF8DC' : '#FEE2E2',
+                      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 99,
+                    }}>
+                      <Text style={{
+                        fontSize: 8, fontFamily: 'Helvetica-Bold',
+                        color:
+                          item.condition_checkin === 'good' ? '#3A7A00' :
+                          item.condition_checkin === 'fair' ? '#8A6000' : '#7A0000',
+                      }}>
+                        {item.condition_checkin ?? '—'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+
+              <Text style={{ fontSize: 7, color: '#9B9BA8', marginTop: 8, fontFamily: 'Helvetica-Oblique' }}>
+                Both parties confirm this inventory at handover.
+              </Text>
+            </View>
+          </>
+        )}
 
         <View style={[s.pdfFooter, { backgroundColor: tokens.primary }]} fixed>
           <View style={s.footerLeft}>

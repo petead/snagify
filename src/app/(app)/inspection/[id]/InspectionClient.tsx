@@ -1289,7 +1289,7 @@ export function InspectionClient({
     if (generating || navigating) return;
     // If check-in and furnished status not yet determined, go to inventory first
     if (
-      (inspection as any)?.type === 'check-in' &&
+      inspectionType === 'check-in' &&
       isFurnished === null
     ) {
       const suggested = suggestFurnished()
@@ -1300,7 +1300,7 @@ export function InspectionClient({
       return
     }
     if (
-      (inspection as any)?.type === 'check-in' &&
+      inspectionType === 'check-in' &&
       isFurnished === true &&
       inventoryDetails.length === 0
     ) {
@@ -1368,17 +1368,10 @@ export function InspectionClient({
   const accentColor = inspectionType === "check-in" ? "#9A88FD" : "#FF8A65";
 
   function suggestFurnished(): boolean | null {
-    const rent = (inspection as any)?.tenancy?.annual_rent
-    const deposit = (inspection as any)?.tenancy?.deposit_amount
-    if (!rent || !deposit || Number(rent) === 0) return null
-    const ratio = Number(deposit) / Number(rent)
-    if (ratio >= 0.04 && ratio <= 0.06) return false  // ~5% = unfurnished
-    if (ratio >= 0.09 && ratio <= 0.11) return true   // ~10% = furnished
     return null
   }
 
   async function loadInventoryReference() {
-    const propertyId = (inspection as any)?.property_id
     if (!propertyId) return
     try {
       const res = await fetch(`/api/inventory/reference?property_id=${propertyId}`)
@@ -3284,7 +3277,6 @@ export function InspectionClient({
                     }),
                   })
                   // Update inventory_reference
-                  const propertyId = (inspection as any)?.property_id
                   if (propertyId) {
                     await fetch('/api/inventory/reference', {
                       method: 'POST',

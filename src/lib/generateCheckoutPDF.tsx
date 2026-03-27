@@ -196,6 +196,18 @@ export interface CheckoutPDFProps {
   agencyLogoUrl?: string | null;
   tokens: BrandTokens;
   qrCodeDataUrl?: string;
+  inventorySnapshots?: {
+    id: string
+    name: string
+    category: string
+    quantity: number
+    condition_checkin?: string | null
+    photo_url?: string | null
+    status_checkout?: string | null
+    notes?: string | null
+    quantity_checkout?: number | null
+    is_tenant_item?: boolean | null
+  }[]
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -1179,6 +1191,7 @@ export function CheckoutPDFDocument({
   agencyLogoUrl,
   tokens: tokensProp,
   qrCodeDataUrl,
+  inventorySnapshots,
 }: CheckoutPDFProps) {
   /** Same derivation as check-in PDF — agency primary + shades */
   const tokens = getBrandTokens(tokensProp.primary);
@@ -1654,6 +1667,103 @@ export function CheckoutPDFDocument({
             </>
           )}
         </View>
+
+          {/* ── INVENTORY COMPARISON ── */}
+          {inventorySnapshots && inventorySnapshots.length > 0 && (
+            <View style={{ marginTop: 20 }}>
+              <Text style={{
+                fontSize: 9, fontFamily: 'Helvetica-Bold',
+                textTransform: 'uppercase', color: '#1A1A2E',
+                letterSpacing: 1, marginBottom: 10,
+              }}>
+                Inventory comparison
+              </Text>
+
+              {/* Summary pills */}
+              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
+                {[
+                  { label: 'OK', status: 'ok', bg: '#EEFAD5', color: '#3A7A00' },
+                  { label: 'Damaged', status: 'damaged', bg: '#FFF8DC', color: '#8A6000' },
+                  { label: 'Missing', status: 'missing', bg: '#FEE2E2', color: '#7A0000' },
+                ].map(({ label, status, bg, color }) => (
+                  <View key={status} style={{
+                    flex: 1, backgroundColor: bg,
+                    padding: 8, borderRadius: 8, alignItems: 'center',
+                  }}>
+                    <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color }}>
+                      {inventorySnapshots.filter(i => i.status_checkout === status).length}
+                    </Text>
+                    <Text style={{ fontSize: 7, color, marginTop: 2 }}>{label}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Column headers */}
+              <View style={{
+                flexDirection: 'row', paddingBottom: 4, marginBottom: 4,
+                borderBottomWidth: 0.5, borderBottomColor: '#E5E5E5',
+              }}>
+                <Text style={{ flex: 3, fontSize: 7, color: '#9B9BA8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Item</Text>
+                <Text style={{ flex: 1, fontSize: 7, color: '#9B9BA8', textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 }}>At check-in</Text>
+                <Text style={{ flex: 1, fontSize: 7, color: '#9B9BA8', textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 }}>Status</Text>
+              </View>
+
+              {inventorySnapshots.map((item, i) => (
+                <View key={i} style={{
+                  flexDirection: 'row', alignItems: 'center',
+                  paddingVertical: 7,
+                  borderBottomWidth: 0.5,
+                  borderBottomColor: '#F3F3F8',
+                  backgroundColor:
+                    item.status_checkout === 'missing' ? '#FEF2F2' :
+                    item.status_checkout === 'damaged' ? '#FFFBEB' : 'transparent',
+                  borderRadius: 4,
+                  paddingHorizontal: item.status_checkout !== 'ok' ? 6 : 0,
+                  marginBottom: 2,
+                }}>
+                  <Text style={{ flex: 3, fontSize: 9, color: '#1A1A2E' }}>
+                    {item.name}{(item.quantity ?? 1) > 1 ? ` (x${item.quantity})` : ''}
+                  </Text>
+                  <View style={{ flex: 1, alignItems: 'center' }}>
+                    <View style={{
+                      backgroundColor:
+                        item.condition_checkin === 'good' ? '#EEFAD5' :
+                        item.condition_checkin === 'fair' ? '#FFF8DC' : '#FEE2E2',
+                      paddingHorizontal: 5, paddingVertical: 2, borderRadius: 99,
+                    }}>
+                      <Text style={{
+                        fontSize: 7, fontFamily: 'Helvetica-Bold',
+                        color:
+                          item.condition_checkin === 'good' ? '#3A7A00' :
+                          item.condition_checkin === 'fair' ? '#8A6000' : '#7A0000',
+                      }}>
+                        {item.condition_checkin ?? '—'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={{ flex: 1, alignItems: 'center' }}>
+                    <View style={{
+                      backgroundColor:
+                        item.status_checkout === 'ok'      ? '#EEFAD5' :
+                        item.status_checkout === 'damaged' ? '#FFF8DC' : '#FEE2E2',
+                      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 99,
+                    }}>
+                      <Text style={{
+                        fontSize: 8, fontFamily: 'Helvetica-Bold',
+                        color:
+                          item.status_checkout === 'ok'      ? '#3A7A00' :
+                          item.status_checkout === 'damaged' ? '#8A6000' : '#7A0000',
+                      }}>
+                        {item.status_checkout === 'ok'      ? 'OK' :
+                         item.status_checkout === 'damaged' ? 'Damaged' :
+                         item.status_checkout === 'missing' ? 'Missing' : '-'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
         <View style={[s.pdfFooter, { backgroundColor: tokens.primary }]} fixed>
           <View style={s.footerLeft}>

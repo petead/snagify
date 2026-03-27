@@ -127,6 +127,19 @@ type InspectionRow = {
   tenancies?: TenancyRow | TenancyRow[] | null;
   rooms?: RoomRow[] | null;
   signatures?: unknown[] | null;
+  inventory_snapshots?: {
+    id: string
+    name: string
+    category: string
+    quantity: number
+    condition_checkin?: string | null
+    photo_url?: string | null
+    status_checkout?: string | null
+    notes?: string | null
+    photo_url_checkout?: string | null
+    quantity_checkout?: number | null
+    is_tenant_item?: boolean | null
+  }[] | null;
 };
 
 type PropRow = {
@@ -235,6 +248,19 @@ const INSPECTION_SELECT = `
     otp_verified,
     signed_at,
     signature_data
+  ),
+  inventory_snapshots (
+    id,
+    name,
+    category,
+    quantity,
+    condition_checkin,
+    photo_url,
+    status_checkout,
+    notes,
+    photo_url_checkout,
+    quantity_checkout,
+    is_tenant_item
   )
 `;
 
@@ -275,6 +301,10 @@ export async function buildPdfAndUpload(
         const rec = k as Record<string, unknown>;
         return typeof rec.item === "string" && typeof rec.qty === "number";
       });
+
+    // Inventory snapshots (exclude tenant's own items)
+    const inventorySnapshots = (row.inventory_snapshots ?? [])
+      .filter(s => !s.is_tenant_item)
 
     const inspectionType = (
       (row as Record<string, unknown>).inspection_type ??
@@ -589,6 +619,7 @@ export async function buildPdfAndUpload(
       })),
       signatureEmbeds,
       creatorPdfRole,
+      inventorySnapshots,
     };
 
     /** Smaller JPEG data URLs for PDF embedding only — document_hash uses original meta above */
@@ -705,6 +736,7 @@ export async function buildPdfAndUpload(
         agencyLogoUrl: (agentData as { company_logo_url?: string }).company_logo_url ?? null,
         tokens,
         qrCodeDataUrl: undefined,
+        inventorySnapshots,
       };
 
       pdfBuffer = await renderCheckoutPDFToBuffer(checkoutProps);
