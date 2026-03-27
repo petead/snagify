@@ -1469,7 +1469,7 @@ function NewInspectionContent() {
                 {/* Explanation */}
                 <div style={{ padding:'14px 16px', borderBottom:'1px solid #f3f4f6' }}>
                   <p style={{ fontSize:12, color:'#6b7280', margin:0, lineHeight:1.7 }}>
-                    Photo each item, note its condition. Both parties sign. If something goes missing or gets damaged later — you have proof.
+                    ⚠️ This choice cannot be changed once the inspection starts. If you skip the inventory now, it won&apos;t be part of the signed report.
                   </p>
                 </div>
 
