@@ -4054,7 +4054,7 @@ export function InspectionClient({
         const progress = ((checkoutInventoryIndex + 1) / checkoutInventoryItems.length) * 100
 
         return (
-          <div style={{ height:'100vh', background:'#F8F7F4', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+          <div style={{ position:'fixed', inset:0, zIndex:50, background:'#F8F7F4', display:'flex', flexDirection:'column', overflow:'hidden' }}>
 
             {/* Header */}
             <div style={{ padding:'16px 20px', background:'white', borderBottom:'1px solid rgba(14,14,16,0.08)' }}>
