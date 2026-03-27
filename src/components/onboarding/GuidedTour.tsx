@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 
 interface TourStep {
@@ -31,6 +31,8 @@ export function GuidedTour({ steps, onDone }: GuidedTourProps) {
   const [current, setCurrent] = useState(0)
   const [rect, setRect] = useState<Rect | null>(null)
   const [visible, setVisible] = useState(false)
+  const tooltipRef = useRef<HTMLDivElement>(null)
+  const [tooltipHeight, setTooltipHeight] = useState(140)
 
   const step = steps[current]
   const isLast = current === steps.length - 1
@@ -46,8 +48,12 @@ export function GuidedTour({ steps, onDone }: GuidedTourProps) {
     setVisible(false)
     const timer = setTimeout(() => {
       updateRect()
+      // Measure tooltip height after render
+      if (tooltipRef.current) {
+        setTooltipHeight(tooltipRef.current.offsetHeight || 140)
+      }
       setVisible(true)
-    }, 120)
+    }, 160)
     window.addEventListener('resize', updateRect)
     window.addEventListener('scroll', updateRect, true)
     return () => {
@@ -56,6 +62,14 @@ export function GuidedTour({ steps, onDone }: GuidedTourProps) {
       window.removeEventListener('scroll', updateRect, true)
     }
   }, [current, updateRect])
+
+  useLayoutEffect(() => {
+    if (!visible || !rect) return
+    const el = tooltipRef.current
+    if (!el) return
+    const h = el.offsetHeight || 140
+    setTooltipHeight((prev) => (prev !== h ? h : prev))
+  }, [visible, rect, current, step.title, step.desc, isLast])
 
   const handleNext = () => {
     if (isLast) { onDone(); return }
@@ -79,14 +93,16 @@ export function GuidedTour({ steps, onDone }: GuidedTourProps) {
     const isInBottomHalf = rect.top + rect.height / 2 > vh / 2
 
     if (isInBottomHalf) {
-      // Tooltip above element
-      tooltipTop = spotTop - 16 - 120 // estimate tooltip height
+      // Tooltip above element — use measured height
+      tooltipTop = spotTop - 16 - tooltipHeight
       arrowAbove = false
     } else {
       // Tooltip below element
       tooltipTop = spotBottom + 16
       arrowAbove = true
     }
+    // Clamp to viewport
+    tooltipTop = Math.max(12, Math.min(tooltipTop, vh - tooltipHeight - 12))
 
     // Center horizontally on element, clamp to viewport
     tooltipLeft = rect.left + rect.width / 2 - tooltipWidth / 2
@@ -110,7 +126,7 @@ export function GuidedTour({ steps, onDone }: GuidedTourProps) {
       }}
     >
       {/* Overlay */}
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(5,4,14,0.78)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(5,4,14,0.55)' }} />
 
       {/* Spotlight cutout */}
       {spotlight && (
@@ -122,7 +138,7 @@ export function GuidedTour({ steps, onDone }: GuidedTourProps) {
             width: spotlight.width,
             height: spotlight.height,
             borderRadius: RADIUS,
-            boxShadow: '0 0 0 9999px rgba(5,4,14,0.78)',
+            boxShadow: '0 0 0 9999px rgba(5,4,14,0.55)',
             pointerEvents: 'none',
             transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)',
             zIndex: 1,
@@ -133,6 +149,7 @@ export function GuidedTour({ steps, onDone }: GuidedTourProps) {
       {/* Tooltip bubble */}
       {rect && (
         <div
+          ref={tooltipRef}
           style={{
             position: 'absolute',
             top: tooltipTop,
