@@ -1381,7 +1381,7 @@ function NewInspectionContent() {
                 </svg>
                 <p style={{ fontSize:12, color:'#534AB7', margin:0, lineHeight:1.6 }}>
                   {ratio}% deposit — looks <strong>{isFurnished ? 'furnished' : 'unfurnished'}</strong> to us.
-                  Tap below if that's wrong.
+                  Tap below if that&apos;s wrong.
                 </p>
               </div>
             )
@@ -1462,7 +1462,7 @@ function NewInspectionContent() {
           {isFurnished === true && (
             <>
               <p style={{ fontSize:11, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>
-                Document what's inside?
+                Document what&apos;s inside?
               </p>
               <div style={{ background:'white', borderRadius:16, border:'1px solid #e5e7eb', overflow:'hidden', marginBottom:8 }}>
 
