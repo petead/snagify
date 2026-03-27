@@ -600,6 +600,13 @@ export function InspectionClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount for autostart deep-link
   }, []);
 
+  // Read wants_inventory from URL (set during wizard)
+  useEffect(() => {
+    const wi = searchParams.get("wants_inventory")
+    if (wi === "1") setWantsInventory(true)
+    else if (wi === "0") setWantsInventory(false)
+  }, [])
+
   // Lock body scroll
   useEffect(() => {
     document.body.style.overflow = "hidden";

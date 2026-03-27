@@ -15,7 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 // ─────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────
-type Step = 0 | 1 | 2 | 3 | 4;
+type Step = 0 | 1 | 2 | 3 | 4 | 5;
 type Mode = "upload" | "manual" | null;
 
 interface FormData {
@@ -174,7 +174,8 @@ const stepTitles: Record<Step, string> = {
   1: "Contract Details",
   2: "Verify Info",
   3: "Room Selection",
-  4: "Key Handover",
+  4: "Furnished Setup",
+  5: "Key Handover",
 };
 
 const HANDOVER_ITEMS = [
@@ -294,7 +295,11 @@ function NewInspectionContent() {
   const [selectedRooms, setSelectedRooms] = useState<string[]>(ROOM_TEMPLATES["Studio"]);
   const [customRoom, setCustomRoom] = useState("");
 
-  // Key handover state (step 4)
+  // Furnished setup state (step 4)
+  const [isFurnished, setIsFurnished] = useState<boolean | null>(null);
+  const [wantsInventory, setWantsInventory] = useState<boolean>(false);
+
+  // Key handover state (step 5)
   const [keyHandover, setKeyHandover] = useState<{ item: string; qty: number }[]>([]);
   const [customItemInput, setCustomItemInput] = useState("");
 
@@ -619,6 +624,7 @@ function NewInspectionContent() {
           security_deposit: cleanNumber(formData.security_deposit),
           tenancy_type: "standard",
           status: "active",
+          is_furnished: isFurnished ?? false,
         })
         .select()
         .single();
@@ -657,7 +663,7 @@ function NewInspectionContent() {
         await supabase.from("rooms").insert(roomInserts);
       }
 
-      router.push(`/inspection/${inspection.id}?autostart=1`);
+      router.push(`/inspection/${inspection.id}?autostart=1&wants_inventory=${wantsInventory ? "1" : "0"}`);
     } catch (err: unknown) {
       const e = err as { message?: string; details?: string; hint?: string; code?: string };
       console.error("=== INSPECTION CREATION ERROR ===");
@@ -705,7 +711,7 @@ function NewInspectionContent() {
           </div>
           {/* Step dots */}
           <div className="flex gap-1 items-center">
-            {([0, 1, 2, 3, 4] as Step[]).map((i) => (
+            {([0, 1, 2, 3, 4, 5] as Step[]).map((i) => (
               <div
                 key={i}
                 className={`h-1.5 rounded-full transition-all ${
@@ -1348,8 +1354,191 @@ function NewInspectionContent() {
         </div>
       )}
 
-      {/* STEP 4 — Key Handover */}
       {step === 4 && (
+        <div className="px-4 pt-6 pb-48">
+
+          {/* Magic suggestion banner */}
+          {isFurnished !== null && (() => {
+            const rent = parseFloat(formData.annual_rent ?? '0')
+            const deposit = parseFloat(formData.security_deposit ?? '0')
+            const ratio = rent > 0 && deposit > 0 ? Math.round((deposit / rent) * 100) : null
+            if (!ratio) return null
+            return (
+              <div style={{
+                background:'#EDE9FF', borderRadius:14, padding:'12px 16px',
+                marginBottom:20, display:'flex', alignItems:'flex-start', gap:10,
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2" strokeLinecap="round" style={{ flexShrink:0, marginTop:2 }}>
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 8v4M12 16h.01"/>
+                </svg>
+                <p style={{ fontSize:12, color:'#534AB7', margin:0, lineHeight:1.6 }}>
+                  Based on a <strong>{ratio}% deposit/rent ratio</strong>, this apartment
+                  appears to be <strong>{isFurnished ? 'furnished' : 'unfurnished'}</strong>.
+                  You can change this below.
+                </p>
+              </div>
+            )
+          })()}
+
+          {/* Furnished / Unfurnished toggle */}
+          <p style={{ fontSize:11, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>
+            Apartment type
+          </p>
+
+          <div
+            onClick={() => { setIsFurnished(true) }}
+            style={{
+              background:'white', borderRadius:16,
+              border:`1.5px solid ${isFurnished === true ? '#9A88FD' : '#e5e7eb'}`,
+              padding:'16px 18px', marginBottom:10,
+              display:'flex', alignItems:'center', justifyContent:'space-between',
+              cursor:'pointer',
+              boxShadow: isFurnished === true ? '0 2px 12px rgba(154,136,253,0.2)' : 'none',
+            }}
+          >
+            <div>
+              <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:14, margin:'0 0 3px', color:'#0E0E10' }}>
+                Furnished
+              </p>
+              <p style={{ fontSize:12, color:'#9ca3af', margin:0 }}>
+                Includes furniture, appliances or electronics
+              </p>
+            </div>
+            <div style={{
+              width:22, height:22, borderRadius:'50%', flexShrink:0,
+              border:`2px solid ${isFurnished === true ? '#9A88FD' : '#e5e7eb'}`,
+              background: isFurnished === true ? '#9A88FD' : 'transparent',
+              display:'flex', alignItems:'center', justifyContent:'center',
+            }}>
+              {isFurnished === true && (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              )}
+            </div>
+          </div>
+
+          <div
+            onClick={() => { setIsFurnished(false); setWantsInventory(false) }}
+            style={{
+              background:'white', borderRadius:16,
+              border:`1.5px solid ${isFurnished === false ? '#9A88FD' : '#e5e7eb'}`,
+              padding:'16px 18px', marginBottom:24,
+              display:'flex', alignItems:'center', justifyContent:'space-between',
+              cursor:'pointer',
+              boxShadow: isFurnished === false ? '0 2px 12px rgba(154,136,253,0.2)' : 'none',
+            }}
+          >
+            <div>
+              <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:14, margin:'0 0 3px', color:'#0E0E10' }}>
+                Unfurnished
+              </p>
+              <p style={{ fontSize:12, color:'#9ca3af', margin:0 }}>
+                Empty apartment, no furniture included
+              </p>
+            </div>
+            <div style={{
+              width:22, height:22, borderRadius:'50%', flexShrink:0,
+              border:`2px solid ${isFurnished === false ? '#9A88FD' : '#e5e7eb'}`,
+              background: isFurnished === false ? '#9A88FD' : 'transparent',
+              display:'flex', alignItems:'center', justifyContent:'center',
+            }}>
+              {isFurnished === false && (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              )}
+            </div>
+          </div>
+
+          {/* Inventory option — only if furnished */}
+          {isFurnished === true && (
+            <>
+              <p style={{ fontSize:11, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>
+                Furniture inventory
+              </p>
+              <div style={{ background:'white', borderRadius:16, border:'1px solid #e5e7eb', overflow:'hidden', marginBottom:8 }}>
+
+                {/* Explanation */}
+                <div style={{ padding:'14px 16px', borderBottom:'1px solid #f3f4f6' }}>
+                  <p style={{ fontSize:12, color:'#6b7280', margin:0, lineHeight:1.7 }}>
+                    An inventory lists and photographs each piece of furniture and appliance.
+                    Both parties sign it — giving you legal proof of what was present and its
+                    condition at move-in. This protects both landlord and tenant in case of a deposit dispute.
+                  </p>
+                </div>
+
+                {/* Yes */}
+                <div
+                  onClick={() => setWantsInventory(true)}
+                  style={{
+                    padding:'14px 16px', cursor:'pointer',
+                    background: wantsInventory === true ? '#EDE9FF' : 'white',
+                    borderBottom:'1px solid #f3f4f6',
+                    display:'flex', alignItems:'center', gap:12,
+                  }}
+                >
+                  <div style={{
+                    width:20, height:20, borderRadius:'50%', flexShrink:0,
+                    border:`2px solid ${wantsInventory === true ? '#9A88FD' : '#e5e7eb'}`,
+                    background: wantsInventory === true ? '#9A88FD' : 'transparent',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                  }}>
+                    {wantsInventory === true && (
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    )}
+                  </div>
+                  <div>
+                    <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:0, fontFamily:'Poppins, sans-serif' }}>
+                      Yes — document the inventory
+                    </p>
+                    <p style={{ fontSize:11, color:'#9ca3af', margin:'2px 0 0' }}>
+                      Recommended · ~5 min · included in the signed PDF
+                    </p>
+                  </div>
+                </div>
+
+                {/* No */}
+                <div
+                  onClick={() => setWantsInventory(false)}
+                  style={{
+                    padding:'14px 16px', cursor:'pointer',
+                    background: wantsInventory === false && isFurnished === true ? '#fafafa' : 'white',
+                    display:'flex', alignItems:'center', gap:12,
+                  }}
+                >
+                  <div style={{
+                    width:20, height:20, borderRadius:'50%', flexShrink:0,
+                    border:`2px solid ${wantsInventory === false && isFurnished === true ? '#9A88FD' : '#e5e7eb'}`,
+                    background: wantsInventory === false && isFurnished === true ? '#9A88FD' : 'transparent',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                  }}>
+                    {wantsInventory === false && isFurnished === true && (
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    )}
+                  </div>
+                  <div>
+                    <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:0, fontFamily:'Poppins, sans-serif' }}>
+                      No — skip inventory
+                    </p>
+                    <p style={{ fontSize:11, color:'#9ca3af', margin:'2px 0 0' }}>
+                      Furnished status still appears in the report
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* STEP 5 — Key Handover */}
+      {step === 5 && (
         <div className="px-4 pt-5 pb-48">
           {/* Section label */}
           <p style={{
@@ -1510,7 +1699,18 @@ function NewInspectionContent() {
         <BottomBar>
           <button
             type="button"
-            onClick={() => selectedRooms.length > 0 && setStep(4)}
+            onClick={() => {
+              if (selectedRooms.length === 0) return
+              // Pre-compute furnished suggestion from deposit/rent ratio
+              const rent = parseFloat(formData.annual_rent ?? '0')
+              const deposit = parseFloat(formData.security_deposit ?? '0')
+              if (rent > 0 && deposit > 0) {
+                const ratio = deposit / rent
+                if (ratio >= 0.04 && ratio <= 0.06) setIsFurnished(false)
+                else if (ratio >= 0.09 && ratio <= 0.11) setIsFurnished(true)
+              }
+              setStep(4)
+            }}
             disabled={selectedRooms.length === 0}
             className="w-full h-12 rounded-xl font-bold text-base active:scale-[0.98] transition-transform disabled:opacity-50"
             style={{
@@ -1520,13 +1720,34 @@ function NewInspectionContent() {
             }}
           >
             {selectedRooms.length > 0
-              ? `Continue → ${selectedRooms.length} rooms`
+              ? `Continue → ${selectedRooms.length} rooms selected`
               : "Select rooms to continue"}
           </button>
         </BottomBar>
       )}
 
       {step === 4 && (
+        <BottomBar>
+          <button
+            type="button"
+            disabled={
+              isFurnished === null ||
+              (isFurnished === true && wantsInventory === null)
+            }
+            onClick={() => setStep(5)}
+            className="w-full h-12 rounded-xl font-bold text-base active:scale-[0.98] transition-transform disabled:opacity-50"
+            style={{
+              background: isFurnished !== null ? "linear-gradient(135deg,#9A88FD,#7B65FC)" : "#e5e7eb",
+              color: isFurnished !== null ? "white" : "#9ca3af",
+              fontFamily: "Poppins,sans-serif",
+            }}
+          >
+            Continue → Key Handover
+          </button>
+        </BottomBar>
+      )}
+
+      {step === 5 && (
         <BottomBar>
           <button
             type="button"
