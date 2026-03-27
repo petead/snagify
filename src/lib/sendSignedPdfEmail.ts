@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { buildPdfFileName } from "@/lib/pdfFileName";
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -16,6 +17,8 @@ interface SendSignedPdfEmailParams {
   primaryColor: string
   propertyAddress: string
   inspectionType: 'check-in' | 'check-out' | string
+  buildingName?: string | null
+  unitNumber?: string | null
   inspectionDate: string
   pdfUrl: string
   /** When set, email explains a party refused to sign (disputed flow). */
@@ -33,7 +36,7 @@ export async function sendSignedPdfEmail(params: SendSignedPdfEmailParams) {
     inspectorName, inspectorEmail,
     includeInspectorRecipient = true,
     agencyName, agencyLogo, primaryColor,
-    propertyAddress, inspectionType, inspectionDate,
+    propertyAddress, inspectionType, buildingName, unitNumber, inspectionDate,
     pdfUrl,
     refusalInfo,
   } = params
@@ -43,7 +46,7 @@ export async function sendSignedPdfEmail(params: SendSignedPdfEmailParams) {
   const pdfBuffer = await pdfRes.arrayBuffer()
   const pdfBase64 = Buffer.from(pdfBuffer).toString('base64')
 
-  const fileName = `Inspection_Report_${propertyAddress.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
+  const fileName = buildPdfFileName(inspectionType, buildingName, unitNumber)
 
   const typeLabel = inspectionType === 'check-in' ? 'Check-in' : 'Check-out'
 

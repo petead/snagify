@@ -29,6 +29,7 @@ import {
   deductCredits,
   InsufficientCreditsError,
 } from "@/lib/credits";
+import { buildPdfFileName } from "@/lib/pdfFileName";
 
 export const maxDuration = 60;
 
@@ -747,10 +748,16 @@ export async function buildPdfAndUpload(
     if (!agentId) {
       throw new Error("Inspection has no agent_id; cannot upload report to user path");
     }
-    const fileName = `${agentId}/${inspectionId}/report.pdf`;
+    const pdfFileName = buildPdfFileName(
+      row.type ?? row.inspection_type ?? "check-in",
+      prop?.building_name,
+      prop?.unit_number
+    );
+    const fileName = `${agentId}/${inspectionId}/${pdfFileName}`;
     const legacyReportPaths = [
       `report_${inspectionId}.pdf`,
       `${inspectionId}/${inspectionId}.pdf`,
+      `${agentId}/${inspectionId}/report.pdf`,
     ];
 
     const storageClient = supabaseAdmin ?? supabase;
@@ -819,12 +826,31 @@ export async function POST(request: NextRequest) {
     step = "buildPdfAndUpload";
     const { report_url: _reportUrl, buffer } = await buildPdfAndUpload(inspectionId);
 
+    // Derive clean filename for Content-Disposition
+    const { data: inspForName } = await supabaseAuth
+      .from("inspections")
+      .select("type, properties(building_name, unit_number)")
+      .eq("id", inspectionId)
+      .maybeSingle();
+    const propsRel = inspForName?.properties;
+    const propForName =
+      propsRel == null
+        ? null
+        : Array.isArray(propsRel)
+          ? propsRel[0] ?? null
+          : (propsRel as { building_name?: string | null; unit_number?: string | null });
+    const pdfFileNameForDownload = buildPdfFileName(
+      inspForName?.type ?? "check-in",
+      propForName?.building_name,
+      propForName?.unit_number
+    );
+
     step = "return pdf response";
     return new NextResponse(Buffer.from(buffer), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="Snagify_Report_${inspectionId}.pdf"`,
+        "Content-Disposition": `attachment; filename="${pdfFileNameForDownload}"`,
         "Cache-Control": "no-store, no-cache, must-revalidate",
         "Content-Length": buffer.length.toString(),
       },

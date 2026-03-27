@@ -125,6 +125,8 @@ export async function POST(request: Request) {
         primaryColor: company?.primary_color || "#9A88FD",
         propertyAddress,
         inspectionType: insp?.type || "check-in",
+        buildingName: propertyRow?.building_name ?? null,
+        unitNumber: propertyRow?.unit_number ?? null,
         inspectionDate: insp?.created_at
           ? new Date(insp.created_at).toLocaleDateString("en-AE", {
               day: "numeric",

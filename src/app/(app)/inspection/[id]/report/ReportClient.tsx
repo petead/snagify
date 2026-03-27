@@ -1005,7 +1005,15 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
     if (downloadLoading) return;
     setDownloadLoading(true);
     try {
-      await regenerateAndDownloadInspectionPdf(inspectionId);
+      const prop = Array.isArray(inspection.properties)
+        ? inspection.properties[0]
+        : (inspection.properties as { building_name?: string | null; unit_number?: string | null } | null);
+      await regenerateAndDownloadInspectionPdf(
+        inspectionId,
+        prop?.building_name,
+        prop?.unit_number,
+        inspection.type
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Download failed";
       console.error("[DownloadPDF]", msg);

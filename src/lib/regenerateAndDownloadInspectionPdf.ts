@@ -1,8 +1,15 @@
+import { buildPdfFileName } from "@/lib/pdfFileName";
+
 /**
  * Regenerates the inspection PDF via POST /api/generate-pdf and triggers a browser download
  * of the response blob — same flow as the purple "Download PDF" on the report page.
  */
-export async function regenerateAndDownloadInspectionPdf(inspectionId: string): Promise<void> {
+export async function regenerateAndDownloadInspectionPdf(
+  inspectionId: string,
+  buildingName?: string | null,
+  unitNumber?: string | null,
+  inspectionType?: string | null
+): Promise<void> {
   const response = await fetch("/api/generate-pdf", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -28,7 +35,7 @@ export async function regenerateAndDownloadInspectionPdf(inspectionId: string): 
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `Snagify_Report_${inspectionId}.pdf`;
+  link.download = buildPdfFileName(inspectionType ?? "check-in", buildingName, unitNumber);
   link.style.display = "none";
   document.body.appendChild(link);
   link.click();

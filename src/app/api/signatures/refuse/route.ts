@@ -138,6 +138,11 @@ export async function POST(req: NextRequest) {
 
       const bothRefused = !!landlordSig?.refused_at && !!tenantSig?.refused_at;
 
+      const propRow = insp?.property as {
+        building_name?: string | null;
+        unit_number?: string | null;
+      } | null;
+
       await sendSignedPdfEmail({
         landlordName: landlordSig?.signer_name || "Landlord",
         landlordEmail: landlordSig?.email || "",
@@ -151,6 +156,8 @@ export async function POST(req: NextRequest) {
         primaryColor: company?.primary_color || "#9A88FD",
         propertyAddress,
         inspectionType: insp?.type || "check-out",
+        buildingName: propRow?.building_name ?? null,
+        unitNumber: propRow?.unit_number ?? null,
         inspectionDate: insp?.created_at
           ? new Date(insp.created_at).toLocaleDateString("en-AE", {
               day: "numeric",

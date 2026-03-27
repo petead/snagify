@@ -175,6 +175,8 @@ export async function POST(req: NextRequest) {
           primaryColor:  company?.primary_color  || '#9A88FD',
           propertyAddress,
           inspectionType: fullInspection.type,
+          buildingName: property?.building_name ?? null,
+          unitNumber: property?.unit_number ?? null,
           inspectionDate,
           pdfUrl: freshReportUrl.split('?')[0],
         })
@@ -242,6 +244,8 @@ export async function POST(req: NextRequest) {
         primaryColor: company?.primary_color || '#9A88FD',
         propertyAddress: propertyLabel !== '—' ? propertyLabel : 'the property',
         inspectionType: fullInspection.type,
+        buildingName: property?.building_name ?? null,
+        unitNumber: property?.unit_number ?? null,
         inspectionDate: new Date(fullInspection.created_at).toLocaleDateString('en-AE', {
           day: 'numeric',
           month: 'long',
