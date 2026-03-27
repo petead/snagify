@@ -1380,9 +1380,8 @@ function NewInspectionContent() {
                   <path d="M12 8v4M12 16h.01"/>
                 </svg>
                 <p style={{ fontSize:12, color:'#534AB7', margin:0, lineHeight:1.6 }}>
-                  Based on a <strong>{ratio}% deposit/rent ratio</strong>, this apartment
-                  appears to be <strong>{isFurnished ? 'furnished' : 'unfurnished'}</strong>.
-                  You can change this below.
+                  {ratio}% deposit — looks <strong>{isFurnished ? 'furnished' : 'unfurnished'}</strong> to us.
+                  Tap below if that's wrong.
                 </p>
               </div>
             )
@@ -1390,7 +1389,7 @@ function NewInspectionContent() {
 
           {/* Furnished / Unfurnished toggle */}
           <p style={{ fontSize:11, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>
-            Apartment type
+            Is it furnished?
           </p>
 
           <div
@@ -1409,7 +1408,7 @@ function NewInspectionContent() {
                 Furnished
               </p>
               <p style={{ fontSize:12, color:'#9ca3af', margin:0 }}>
-                Includes furniture, appliances or electronics
+                Sofas, appliances, AC remotes — anything left behind
               </p>
             </div>
             <div style={{
@@ -1442,7 +1441,7 @@ function NewInspectionContent() {
                 Unfurnished
               </p>
               <p style={{ fontSize:12, color:'#9ca3af', margin:0 }}>
-                Empty apartment, no furniture included
+                Bare walls. Tenant brings their own stuff.
               </p>
             </div>
             <div style={{
@@ -1463,16 +1462,14 @@ function NewInspectionContent() {
           {isFurnished === true && (
             <>
               <p style={{ fontSize:11, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>
-                Furniture inventory
+                Document what's inside?
               </p>
               <div style={{ background:'white', borderRadius:16, border:'1px solid #e5e7eb', overflow:'hidden', marginBottom:8 }}>
 
                 {/* Explanation */}
                 <div style={{ padding:'14px 16px', borderBottom:'1px solid #f3f4f6' }}>
                   <p style={{ fontSize:12, color:'#6b7280', margin:0, lineHeight:1.7 }}>
-                    An inventory lists and photographs each piece of furniture and appliance.
-                    Both parties sign it — giving you legal proof of what was present and its
-                    condition at move-in. This protects both landlord and tenant in case of a deposit dispute.
+                    Photo each item, note its condition. Both parties sign. If something goes missing or gets damaged later — you have proof.
                   </p>
                 </div>
 
@@ -1500,10 +1497,10 @@ function NewInspectionContent() {
                   </div>
                   <div>
                     <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:0, fontFamily:'Poppins, sans-serif' }}>
-                      Yes — document the inventory
+                      Yes, let's document it
                     </p>
                     <p style={{ fontSize:11, color:'#9ca3af', margin:'2px 0 0' }}>
-                      Recommended · ~5 min · included in the signed PDF
+                      ~5 min · goes in the signed PDF · worth it
                     </p>
                   </div>
                 </div>
@@ -1531,10 +1528,10 @@ function NewInspectionContent() {
                   </div>
                   <div>
                     <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:0, fontFamily:'Poppins, sans-serif' }}>
-                      No — skip inventory
+                      Skip for now
                     </p>
                     <p style={{ fontSize:11, color:'#9ca3af', margin:'2px 0 0' }}>
-                      Furnished status still appears in the report
+                      Furnished status still noted in the report
                     </p>
                   </div>
                 </div>
@@ -1713,8 +1710,7 @@ function NewInspectionContent() {
               const deposit = parseFloat(formData.security_deposit ?? '0')
               if (rent > 0 && deposit > 0) {
                 const ratio = deposit / rent
-                if (ratio >= 0.04 && ratio <= 0.06) setIsFurnished(false)
-                else if (ratio >= 0.09 && ratio <= 0.11) setIsFurnished(true)
+                setIsFurnished(ratio >= 0.075)
               }
               setStep(4)
             }}
