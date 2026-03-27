@@ -489,7 +489,7 @@ export function InspectionClient({
   const [keyHandover, setKeyHandover] = useState<{ item: string; qty: number }[]>([]);
 
   const [isFurnished, setIsFurnished] = useState<boolean | null>(initialIsFurnished ?? null)
-  const [wantsInventory, setWantsInventory] = useState<boolean | null>(initialWantsInventory ?? null)
+  const [wantsInventory, setWantsInventory] = useState<boolean | null>(initialWantsInventory || null)
   const [inventoryReferenceItems, setInventoryReferenceItems] = useState<{
     id: string; name: string; category: string; quantity: number; source: string
   }[]>([])
@@ -604,7 +604,7 @@ export function InspectionClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount for autostart deep-link
   }, []);
 
-  // URL params take priority over DB values (fresh inspection from wizard)
+  // URL params override DB values (fresh inspection just created from wizard)
   useEffect(() => {
     const wi = searchParams.get("wants_inventory")
     if (wi === "1") setWantsInventory(true)
@@ -1985,25 +1985,23 @@ export function InspectionClient({
                 (isFurnished === true && wantsInventory === null)
               }
               onClick={async () => {
-                // Persist is_furnished on tenancy
                 try {
                   const { data: inspData } = await supabase
                     .from('inspections')
                     .select('tenancy_id')
                     .eq('id', inspectionId)
                     .single()
-                  if (inspData?.tenancy_id) {
+                  const tenancyId = inspData?.tenancy_id
+                  if (tenancyId) {
                     await supabase
                       .from('tenancies')
-                      .update({ is_furnished: isFurnished })
-                      .eq('id', inspData.tenancy_id)
+                      .update({
+                        is_furnished: isFurnished,
+                        wants_inventory: wantsInventory === true,
+                      })
+                      .eq('id', tenancyId)
                   }
                 } catch { /* silent */ }
-                // Persist wants_inventory on inspection
-                await supabase
-                  .from('inspections')
-                  .update({ wants_inventory: wantsInventory === true })
-                  .eq('id', inspectionId)
                 setScreen('inspect')
               }}
               style={{

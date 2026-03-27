@@ -631,6 +631,7 @@ function NewInspectionContent() {
           tenancy_type: "standard",
           status: "active",
           is_furnished: isFurnished ?? false,
+          wants_inventory: wantsInventory === true,
         })
         .select()
         .single();

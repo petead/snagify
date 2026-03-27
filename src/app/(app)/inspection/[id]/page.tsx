@@ -16,7 +16,7 @@ export default async function InspectionPage({
       `
       *,
       properties (building_name, unit_number),
-      tenancies (tenant_name, landlord_name, is_furnished),
+      tenancies (tenant_name, landlord_name, is_furnished, wants_inventory),
       rooms (
         id, name, order_index, condition,
         photos (id, url, ai_analysis, damage_tags, notes)
@@ -67,11 +67,11 @@ export default async function InspectionPage({
     : [];
 
   const propertyId = (inspection as { property_id?: string }).property_id ?? "";
-  const wantsInventory = (inspection as { wants_inventory?: boolean | null }).wants_inventory ?? false;
   const tenancy = Array.isArray(inspection.tenancies)
     ? inspection.tenancies[0]
     : inspection.tenancies;
   const isFurnished = (tenancy as { is_furnished?: boolean | null } | null)?.is_furnished ?? null;
+  const wantsInventory = (tenancy as { wants_inventory?: boolean | null } | null)?.wants_inventory ?? false;
 
   return (
     <InspectionClient
