@@ -2218,7 +2218,11 @@ export function InspectionClient({
                   background: totalPhotos > 0 ? accentColor : "rgba(255,255,255,0.1)",
                   color: "white",
                 }}>
-                Review
+                {!isCheckout && isFurnished === true && wantsInventory === true && inventoryDetails.length === 0
+                  ? "Inventory →"
+                  : isCheckout && checkoutInventoryItems.length > 0
+                  ? "Inventory →"
+                  : "Review"}
               </button>
             </div>
 

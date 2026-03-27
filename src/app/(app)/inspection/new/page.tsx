@@ -421,9 +421,15 @@ function NewInspectionContent() {
       setStep(2);
     } catch (e) {
       console.error("Extraction error:", e);
-      setExtractError(
-        e instanceof Error ? e.message : "Could not extract contract data. Please fill in manually."
-      );
+      const raw = e instanceof Error ? e.message : String(e);
+      // Strip raw JSON blobs from error messages shown to the user
+      const isOverloaded = raw.includes("overloaded") || raw.includes("529");
+      const userMessage = isOverloaded
+        ? "AI service is temporarily overloaded. Please try again in a few seconds, or enter details manually."
+        : raw.startsWith("{") || raw.includes('"type":"error"')
+          ? "Could not read the contract. Please try again or enter details manually."
+          : raw;
+      setExtractError(userMessage);
       setStep(2);
     } finally {
       setExtracting(false);
