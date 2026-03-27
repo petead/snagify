@@ -319,10 +319,10 @@ export default function SignupPage() {
           price: 'Free to start',
           priceDetail: 'Pay per inspection',
           features: [
-            { icon: '🏠', text: 'Up to 3 properties' },
-            { icon: '📋', text: 'Digital inspection reports' },
-            { icon: '✍️', text: 'E-signature included' },
-            { icon: '📸', text: 'AI photo analysis' },
+            { text: 'Up to 3 properties' },
+            { text: 'Digital inspection reports' },
+            { text: 'E-signature included' },
+            { text: 'AI photo analysis' },
           ],
           highlight: 'Great for managing your own rental',
         },
@@ -348,15 +348,15 @@ export default function SignupPage() {
             </svg>
           ),
           color: '#7C3AED',
-          tag: '⭐ Most Popular',
-          tagColor: 'bg-gradient-to-r from-[#7C3AED] to-[#9A88FD]',
+          tag: null as string | null,
+          tagColor: null as string | null,
           price: 'Credits based',
           priceDetail: 'Volume discounts available',
           features: [
-            { icon: '∞', text: 'Unlimited properties' },
-            { icon: '🎨', text: 'White-label reports' },
-            { icon: '👥', text: 'Team collaboration' },
-            { icon: '✍️', text: 'Saved inspector signature' },
+            { text: 'Unlimited properties' },
+            { text: 'White-label reports' },
+            { text: 'Team collaboration' },
+            { text: 'Saved inspector signature' },
           ],
           highlight: 'Trusted by 500+ agents in Dubai',
         },
@@ -1086,7 +1086,19 @@ export default function SignupPage() {
                                     transition={{ delay: 0.1 + fi * 0.03 }}
                                     style={{ display: 'flex', alignItems: 'center', gap: 6 }}
                                   >
-                                    <span style={{ fontSize: 13, lineHeight: 1 }}>{feat.icon}</span>
+                                    <svg
+                                      width="11"
+                                      height="11"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke={isSelected ? plan.color : '#9CA3AF'}
+                                      strokeWidth="2.5"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      style={{ flexShrink: 0 }}
+                                    >
+                                      <polyline points="20 6 9 17 4 12" />
+                                    </svg>
                                     <motion.span
                                       animate={{ color: isSelected && isPro ? 'rgba(255,255,255,0.6)' : 'rgba(14,14,16,0.55)' }}
                                       style={{ fontSize: 11, lineHeight: 1.3 }}
