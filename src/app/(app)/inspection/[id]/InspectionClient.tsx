@@ -1712,48 +1712,6 @@ export function InspectionClient({
                   <path d="M18 6L6 18M6 6l12 12" />
                 </svg>
               </button>
-              {/* Inventory tab — only if furnished with inventory */}
-              {!isCheckout && inventoryDetails.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setActiveReviewRoom("inventory")}
-                  style={{
-                    flexShrink: 0,
-                    padding: "8px 16px",
-                    borderRadius: 100,
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: 12, fontWeight: 700,
-                    whiteSpace: "nowrap",
-                    transition: "all 0.15s",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    background: activeReviewRoom === "inventory" ? "#9A88FD" : "#f5f5f5",
-                    color: activeReviewRoom === "inventory" ? "white" : "#374151",
-                  }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"
-                      stroke={activeReviewRoom === "inventory" ? "white" : "#9A88FD"}
-                      strokeWidth="1.8" strokeLinecap="round"/>
-                    <rect x="9" y="3" width="6" height="4" rx="1"
-                      stroke={activeReviewRoom === "inventory" ? "white" : "#9A88FD"}
-                      strokeWidth="1.8"/>
-                    <path d="M9 12h6M9 16h4"
-                      stroke={activeReviewRoom === "inventory" ? "white" : "#9A88FD"}
-                      strokeWidth="1.8" strokeLinecap="round"/>
-                  </svg>
-                  Inventory
-                  <span style={{
-                    marginLeft: 2, opacity: 0.7, fontSize: 11,
-                    background: activeReviewRoom === "inventory" ? "rgba(255,255,255,0.2)" : "#e5e7eb",
-                    padding: "1px 6px", borderRadius: 100,
-                  }}>
-                    {inventoryDetails.length}
-                  </span>
-                </button>
-              )}
             </div>
           </div>,
           document.body
@@ -2642,6 +2600,41 @@ export function InspectionClient({
                   </span>
                 )}
               </button>
+              {/* Inventory pill — check-in only, when items exist */}
+              {!isCheckout && inventoryDetails.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveReviewRoom("inventory")}
+                  style={{
+                    flexShrink: 0, padding: "8px 16px", borderRadius: 100,
+                    border: "none", cursor: "pointer",
+                    fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+                    transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6,
+                    background: activeReviewRoom === "inventory" ? "#9A88FD" : "#f5f5f5",
+                    color: activeReviewRoom === "inventory" ? "white" : "#374151",
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"
+                      stroke={activeReviewRoom === "inventory" ? "white" : "#9A88FD"}
+                      strokeWidth="1.8" strokeLinecap="round"/>
+                    <rect x="9" y="3" width="6" height="4" rx="1"
+                      stroke={activeReviewRoom === "inventory" ? "white" : "#9A88FD"}
+                      strokeWidth="1.8"/>
+                    <path d="M9 12h6M9 16h4"
+                      stroke={activeReviewRoom === "inventory" ? "white" : "#9A88FD"}
+                      strokeWidth="1.8" strokeLinecap="round"/>
+                  </svg>
+                  Inventory
+                  <span style={{
+                    marginLeft: 2, opacity: 0.7, fontSize: 11,
+                    background: activeReviewRoom === "inventory" ? "rgba(255,255,255,0.2)" : "#e5e7eb",
+                    padding: "1px 6px", borderRadius: 100,
+                  }}>
+                    {inventoryDetails.length}
+                  </span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -3132,17 +3125,12 @@ export function InspectionClient({
               {/* Edit button */}
               <button
                 type="button"
-                onClick={() => {
-                  setInventoryScreen('selection')
-                  setScreen('inventory')
-                }}
+                onClick={() => { setInventoryScreen('selection'); setScreen('inventory') }}
                 style={{
-                  width:'100%', padding:'12px',
-                  background:'transparent',
+                  width:'100%', padding:'12px', background:'transparent',
                   border:'1.5px dashed rgba(154,136,253,0.4)',
                   borderRadius:12, cursor:'pointer',
-                  fontSize:13, fontWeight:600, color:'#9A88FD',
-                  marginTop:8,
+                  fontSize:13, fontWeight:600, color:'#9A88FD', marginTop:8,
                 }}
               >
                 Edit inventory
@@ -3203,6 +3191,29 @@ export function InspectionClient({
                     </div>
                   );
                 })()}
+
+                {/* Add photos shortcut */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const roomIndex = liveRooms.findIndex((r) => r.id === activeReviewRoom);
+                    if (roomIndex >= 0) setActiveRoom(roomIndex);
+                    setScreen("inspect");
+                  }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "8px 14px", marginBottom: 14,
+                    background: "white", border: "1px solid rgba(154,136,253,0.3)",
+                    borderRadius: 100, cursor: "pointer",
+                    fontSize: 12, fontWeight: 700, color: "#9A88FD",
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9A88FD" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                  </svg>
+                  Add photos
+                </button>
 
                 {/* Photos */}
                 {roomPhotos.length > 0 ? (
@@ -3857,7 +3868,7 @@ export function InspectionClient({
                 fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15, color:'white',
               }}
             >
-              {inventoryDetailIndex === inventoryDetails.length - 1 ? 'Save & Generate Report' : 'Next item →'}
+              {inventoryDetailIndex === inventoryDetails.length - 1 ? 'Save & go to Review →' : 'Next item →'}
             </button>
           </div>
         </div>
@@ -4128,7 +4139,7 @@ export function InspectionClient({
                   fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15, color:'white',
                 }}
               >
-                {isLast ? 'Save & Generate Report' : 'Next item →'}
+                {isLast ? 'Save & go to Review →' : 'Next item →'}
               </button>
             </div>
           </div>
