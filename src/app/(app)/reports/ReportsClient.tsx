@@ -21,12 +21,17 @@ type ReportRow = {
   tenancies?: unknown;
   signatures?: { signer_type: string; otp_verified: boolean; signed_at?: string | null }[];
   rooms?: { id: string; photos?: { id: string }[] }[];
+  agent_id?: string;
+  agent_name?: string | null;
 };
 
 interface ReportsClientProps {
   initialReports: ReportRow[];
   fullName: string | null;
   userEmail: string | null;
+  isOwner?: boolean;
+  teamMembers?: { id: string; full_name: string | null }[];
+  teamReports?: (ReportRow & { agent_id?: string; agent_name?: string | null })[];
 }
 
 function first<T>(x: T | T[] | null | undefined): T | null {
@@ -73,14 +78,26 @@ function formatDate(dateStr: string): string {
 const TABS = ["All", "Pending", "Signed", "Disputed"] as const;
 type Tab = (typeof TABS)[number];
 
-export function ReportsClient({ initialReports, fullName, userEmail }: ReportsClientProps) {
+export function ReportsClient({
+  initialReports,
+  fullName,
+  userEmail,
+  isOwner = false,
+  teamMembers = [],
+  teamReports = [],
+}: ReportsClientProps) {
   const router = useRouter();
   const [reports, setReports] = useState(initialReports);
+  const [teamReportsState, setTeamReportsState] = useState(teamReports);
   const rollbackRef = useRef<ReportRow[]>([]);
+  const teamRollbackRef = useRef<ReportRow[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("All");
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"mine" | "team">("mine");
+  const [teamMemberFilter, setTeamMemberFilter] = useState<string | null>(null);
+  const [teamSearch, setTeamSearch] = useState("");
 
   const handleReportPdfDownload = useCallback(
     async (id: string) => {
@@ -102,6 +119,10 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
   useEffect(() => {
     setReports(initialReports);
   }, [initialReports]);
+
+  useEffect(() => {
+    setTeamReportsState(teamReports);
+  }, [teamReports]);
 
   const initials = getInitials(fullName, userEmail);
 
@@ -138,6 +159,30 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
       (ten?.tenant_name ?? "").toLowerCase().includes(q);
     return matchesTab && matchesSearch;
   });
+
+  const filteredTeam = teamReportsState.filter((r) => {
+    const prop = first(r.properties) as { building_name?: string | null; unit_number?: string | null } | null;
+    const ten = first(r.tenancies) as { tenant_name?: string | null } | null;
+    const signed = isSigned(r);
+    const matchesTab =
+      activeTab === "All" ||
+      (activeTab === "Pending" && r.status === "completed" && !signed) ||
+      (activeTab === "Signed" && signed) ||
+      (activeTab === "Disputed" &&
+        (r.status === "disputed" || r.status === "expired"));
+    const matchesMember = !teamMemberFilter || r.agent_id === teamMemberFilter;
+    const q = teamSearch.toLowerCase();
+    const matchesSearch =
+      !q ||
+      (prop?.building_name ?? "").toLowerCase().includes(q) ||
+      (prop?.unit_number ?? "").toLowerCase().includes(q) ||
+      (ten?.tenant_name ?? "").toLowerCase().includes(q) ||
+      (r.agent_name ?? "").toLowerCase().includes(q);
+    return matchesTab && matchesMember && matchesSearch;
+  });
+
+  const displayedList = viewMode === "team" ? filteredTeam : filtered;
+  const activeSearch = viewMode === "team" ? teamSearch : search;
 
   const handleRefresh = useCallback(async () => {
     router.refresh();
@@ -239,6 +284,66 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
         </div>
 
         <div className="" style={{ paddingTop: 12 }}>
+              {/* Team switcher — owner only */}
+              {isOwner && (
+                <div style={{ display:'flex', gap:6, marginBottom:12 }}>
+                  {(["mine", "team"] as const).map(mode => (
+                    <button key={mode} type="button" onClick={() => setViewMode(mode)}
+                      style={{
+                        padding:'7px 16px', borderRadius:999, border:'none',
+                        fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:12,
+                        cursor:'pointer', transition:'all .15s',
+                        background: viewMode === mode ? '#0E0E10' : 'white',
+                        color: viewMode === mode ? 'white' : 'rgba(14,14,16,0.5)',
+                        boxShadow: viewMode === mode ? 'none' : '0 1px 4px rgba(0,0,0,0.06)',
+                        display:'flex', alignItems:'center', gap:5,
+                      }}
+                    >
+                      {mode === 'mine' ? 'My reports' : 'Team'}
+                      {mode === 'team' && teamReportsState.length > 0 && (
+                        <span style={{
+                          fontSize:10, fontWeight:700,
+                          background: viewMode === 'team' ? 'rgba(255,255,255,0.2)' : '#EDE9FF',
+                          color: viewMode === 'team' ? 'white' : '#9A88FD',
+                          padding:'1px 6px', borderRadius:99,
+                        }}>
+                          {teamReportsState.length}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Member chips */}
+              {isOwner && viewMode === 'team' && teamMembers.length > 0 && (
+                <div style={{ display:'flex', gap:6, overflowX:'auto', marginBottom:10, paddingBottom:2 }}
+                  className="no-scrollbar">
+                  <button type="button" onClick={() => setTeamMemberFilter(null)}
+                    style={{
+                      flexShrink:0, padding:'4px 12px', borderRadius:999, border:'none',
+                      fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:11,
+                      cursor:'pointer',
+                      background: !teamMemberFilter ? '#9A88FD' : 'rgba(14,14,16,0.07)',
+                      color: !teamMemberFilter ? 'white' : 'rgba(14,14,16,0.5)',
+                    }}
+                  >All</button>
+                  {teamMembers.map(m => (
+                    <button key={m.id} type="button"
+                      onClick={() => setTeamMemberFilter(m.id === teamMemberFilter ? null : m.id)}
+                      style={{
+                        flexShrink:0, padding:'4px 12px', borderRadius:999, border:'none',
+                        fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:11,
+                        cursor:'pointer',
+                        background: teamMemberFilter === m.id ? '#9A88FD' : 'rgba(14,14,16,0.07)',
+                        color: teamMemberFilter === m.id ? 'white' : 'rgba(14,14,16,0.5)',
+                      }}
+                    >
+                      {(m.full_name ?? 'Inspector').split(' ')[0]}
+                    </button>
+                  ))}
+                </div>
+              )}
           <div style={{ position: "relative" }}>
             <svg
               width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -252,8 +357,8 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
               className="search-input"
               type="text"
               placeholder="Search by property or tenant..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={viewMode === 'team' ? teamSearch : search}
+              onChange={(e) => viewMode === 'team' ? setTeamSearch(e.target.value) : setSearch(e.target.value)}
               style={{
                 width: "100%",
                 padding: "14px 16px 14px 46px",
@@ -361,7 +466,7 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
       <div style={{ paddingBottom: 24 }}>
         <div style={{ padding: "14px 24px 0" }}>
 
-          {filtered.length === 0 ? (
+          {displayedList.length === 0 ? (
             <div style={{ textAlign: "center", padding: "70px 0" }}>
               <div
                 style={{
@@ -379,16 +484,17 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                 </svg>
               </div>
               <h3 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 17, fontWeight: 700, color: "#1A1A1A", margin: 0 }}>
-                {search ? "No reports found" : "No reports yet"}
+                {activeSearch ? "No reports found" : "No reports yet"}
               </h3>
               <p style={{ fontSize: 13, color: "#BBB", margin: "8px 0 0", lineHeight: 1.5 }}>
-                {search
+                {activeSearch
                   ? "Try a different search"
                   : "Complete an inspection to generate your first report"}
               </p>
             </div>
           ) : (
-            filtered.map((report, i) => {
+            displayedList.map((report, i) => {
+              const isTeamCard = viewMode === "team";
               const prop = first(report.properties) as { building_name?: string | null; unit_number?: string | null } | null;
               const ten = first(report.tenancies) as { tenant_name?: string | null } | null;
               const signed = isSigned(report);
@@ -532,6 +638,24 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                     </div>
                   )}
 
+                {viewMode === 'team' && (report as { agent_name?: string | null }).agent_name && (
+                  <div style={{
+                    display:'inline-flex', alignItems:'center', gap:5, marginTop:6,
+                    background:'#F3F1EB', borderRadius:99, padding:'3px 10px',
+                  }}>
+                    <div style={{
+                      width:14, height:14, borderRadius:'50%', background:'#9A88FD',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      fontSize:7, fontWeight:800, color:'white', flexShrink:0,
+                    }}>
+                      {((report as { agent_name?: string | null }).agent_name ?? 'I').charAt(0).toUpperCase()}
+                    </div>
+                    <span style={{ fontSize:11, fontWeight:600, color:'rgba(14,14,16,0.55)' }}>
+                      {((report as { agent_name?: string | null }).agent_name ?? 'Inspector').split(' ')[0]}
+                    </span>
+                  </div>
+                )}
+
                   {/* Stats + Actions */}
                   <div style={{ marginTop: 14, display: "flex", gap: 8, alignItems: "center" }}>
                     <div
@@ -649,15 +773,28 @@ export function ReportsClient({ initialReports, fullName, userEmail }: ReportsCl
                         redirectTo="/reports"
                         variant="icon"
                         onOptimisticRemove={() => {
-                          rollbackRef.current = [...reports];
-                          setDeletingId(report.id);
-                          setTimeout(() => {
-                            setReports((prev) => prev.filter((r) => r.id !== report.id));
-                            setDeletingId(null);
-                          }, 320);
+                          if (isTeamCard) {
+                            teamRollbackRef.current = [...teamReportsState];
+                            setDeletingId(report.id);
+                            setTimeout(() => {
+                              setTeamReportsState((prev) => prev.filter((r) => r.id !== report.id));
+                              setDeletingId(null);
+                            }, 320);
+                          } else {
+                            rollbackRef.current = [...reports];
+                            setDeletingId(report.id);
+                            setTimeout(() => {
+                              setReports((prev) => prev.filter((r) => r.id !== report.id));
+                              setDeletingId(null);
+                            }, 320);
+                          }
                         }}
                         onRollback={() => {
-                          setReports(rollbackRef.current);
+                          if (isTeamCard) {
+                            setTeamReportsState(teamRollbackRef.current);
+                          } else {
+                            setReports(rollbackRef.current);
+                          }
                           setDeletingId(null);
                         }}
                       />

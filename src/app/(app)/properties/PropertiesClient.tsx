@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -31,13 +31,20 @@ type PropertyRow = {
   location: string | null;
   property_type: string | null;
   created_at: string | null;
+  agent_id?: string;
+  agent_name?: string | null;
   tenancies?: TenancyRow[] | TenancyRow | null;
 };
 
+type PropertyItem = PropertyRow;
+
 interface PropertiesClientProps {
-  properties: PropertyRow[];
+  properties: PropertyItem[];
   fullName: string | null;
   userEmail: string | null;
+  isOwner?: boolean;
+  teamMembers?: { id: string; full_name: string | null }[];
+  teamProperties?: (PropertyItem & { agent_id?: string; agent_name?: string | null })[];
 }
 
 function normalizeTenancies(t: TenancyRow[] | TenancyRow | null | undefined): TenancyRow[] {
@@ -80,9 +87,19 @@ function getInitials(fullName: string | null, email: string | null): string {
   return "?";
 }
 
-export function PropertiesClient({ properties: initialProperties, fullName, userEmail }: PropertiesClientProps) {
+export function PropertiesClient({
+  properties: initialProperties,
+  fullName,
+  userEmail,
+  isOwner = false,
+  teamMembers = [],
+  teamProperties = [],
+}: PropertiesClientProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"mine" | "team">("mine");
+  const [teamMemberFilter, setTeamMemberFilter] = useState<string | null>(null);
+  const [teamSearch, setTeamSearch] = useState("");
 
   const normalizeProperties = useCallback(
     (rows: PropertyRow[]) =>
@@ -113,6 +130,26 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
             active?.tenant_name?.toLowerCase().includes(q)
           );
         });
+
+  const normalizedTeamProperties = useMemo(
+    () => normalizeProperties(teamProperties as PropertyRow[]),
+    [teamProperties, normalizeProperties]
+  );
+
+  const filteredTeam = normalizedTeamProperties.filter((p) => {
+    const matchesMember = !teamMemberFilter || p.agent_id === teamMemberFilter;
+    const q = teamSearch.toLowerCase();
+    const matchesSearch =
+      !q ||
+      (p.building_name ?? "").toLowerCase().includes(q) ||
+      (p.unit_number ?? "").toLowerCase().includes(q) ||
+      (p.agent_name ?? "").toLowerCase().includes(q) ||
+      (p.location ?? "").toLowerCase().includes(q);
+    return matchesMember && matchesSearch;
+  });
+
+  const displayed = viewMode === "team" ? filteredTeam : filtered;
+  const activeSearch = viewMode === "team" ? teamSearch : search;
 
   const activeCount = properties.filter((p) => getPropertyStatus(p) === "active").length;
   const vacantCount = properties.filter((p) => getPropertyStatus(p) === "vacant").length;
@@ -224,6 +261,39 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
         </div>
 
         <div className="" style={{ paddingTop: 12 }}>
+              {/* Team switcher — owner only */}
+              {isOwner && (
+                <div style={{ display:'flex', gap:6, marginBottom:12 }}>
+                  {(["mine", "team"] as const).map(mode => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setViewMode(mode)}
+                      style={{
+                        padding:'7px 16px', borderRadius:999, border:'none',
+                        fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:12,
+                        cursor:'pointer', transition:'all .15s',
+                        background: viewMode === mode ? '#0E0E10' : 'white',
+                        color: viewMode === mode ? 'white' : 'rgba(14,14,16,0.5)',
+                        boxShadow: viewMode === mode ? 'none' : '0 1px 4px rgba(0,0,0,0.06)',
+                        display:'flex', alignItems:'center', gap:5,
+                      }}
+                    >
+                      {mode === 'mine' ? 'My properties' : 'Team'}
+                      {mode === 'team' && teamProperties.length > 0 && (
+                        <span style={{
+                          fontSize:10, fontWeight:700,
+                          background: viewMode === 'team' ? 'rgba(255,255,255,0.2)' : '#EDE9FF',
+                          color: viewMode === 'team' ? 'white' : '#9A88FD',
+                          padding:'1px 6px', borderRadius:99,
+                        }}>
+                          {teamProperties.length}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
           <div style={{ position: "relative" }}>
             <svg
               width="18"
@@ -242,8 +312,8 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
               className="search-input"
               type="text"
               placeholder="Search by location, unit, or tenant..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={viewMode === 'team' ? teamSearch : search}
+              onChange={(e) => viewMode === 'team' ? setTeamSearch(e.target.value) : setSearch(e.target.value)}
               style={{
                 width: "100%",
                 padding: "14px 16px 14px 46px",
@@ -258,6 +328,35 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
               }}
             />
           </div>
+              {/* Member filter chips — team mode only */}
+              {isOwner && viewMode === 'team' && teamMembers.length > 0 && (
+                <div style={{ display:'flex', gap:6, overflowX:'auto', marginTop:10, paddingBottom:2 }}
+                  className="no-scrollbar">
+                  <button type="button" onClick={() => setTeamMemberFilter(null)}
+                    style={{
+                      flexShrink:0, padding:'4px 12px', borderRadius:999, border:'none',
+                      fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:11,
+                      cursor:'pointer',
+                      background: !teamMemberFilter ? '#9A88FD' : 'rgba(14,14,16,0.07)',
+                      color: !teamMemberFilter ? 'white' : 'rgba(14,14,16,0.5)',
+                    }}
+                  >All</button>
+                  {teamMembers.map(m => (
+                    <button key={m.id} type="button"
+                      onClick={() => setTeamMemberFilter(m.id === teamMemberFilter ? null : m.id)}
+                      style={{
+                        flexShrink:0, padding:'4px 12px', borderRadius:999, border:'none',
+                        fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:11,
+                        cursor:'pointer',
+                        background: teamMemberFilter === m.id ? '#9A88FD' : 'rgba(14,14,16,0.07)',
+                        color: teamMemberFilter === m.id ? 'white' : 'rgba(14,14,16,0.5)',
+                      }}
+                    >
+                      {(m.full_name ?? 'Inspector').split(' ')[0]}
+                    </button>
+                  ))}
+                </div>
+              )}
         </div>
       </div>
 
@@ -328,7 +427,7 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
       {/* Property Cards */}
       <div style={{ paddingBottom: 24 }}>
         <div style={{ padding: "16px 24px 0" }}>
-          {filtered.map((property, i) => {
+          {displayed.map((property, i) => {
             const status = getPropertyStatus(property);
             const name = property.building_name ?? property.location ?? "Property";
             const unit = property.unit_number ? `Unit ${property.unit_number}` : "—";
@@ -398,6 +497,23 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
                   <p style={{ fontSize: 13, color: "#999", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {[unit, type].filter(Boolean).join(" · ")}
                   </p>
+                {viewMode === 'team' && (property as { agent_name?: string | null }).agent_name && (
+                  <div style={{
+                    display:'inline-flex', alignItems:'center', gap:5, marginTop:6,
+                    background:'#F3F1EB', borderRadius:99, padding:'3px 10px',
+                  }}>
+                    <div style={{
+                      width:14, height:14, borderRadius:'50%', background:'#9A88FD',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      fontSize:7, fontWeight:800, color:'white', flexShrink:0,
+                    }}>
+                      {((property as { agent_name?: string | null }).agent_name ?? 'I').charAt(0).toUpperCase()}
+                    </div>
+                    <span style={{ fontSize:11, fontWeight:600, color:'rgba(14,14,16,0.55)' }}>
+                      {((property as { agent_name?: string | null }).agent_name ?? 'Inspector').split(' ')[0]}
+                    </span>
+                  </div>
+                )}
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
@@ -423,7 +539,7 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
             );
           })}
 
-          {filtered.length === 0 && (
+          {displayed.length === 0 && (
             <div style={{ textAlign: "center", padding: "60px 0" }}>
               <div
                 style={{
@@ -452,12 +568,12 @@ export function PropertiesClient({ properties: initialProperties, fullName, user
                 </svg>
               </div>
               <h3 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 17, fontWeight: 700, color: "#1A1A1A", margin: 0 }}>
-                {search ? "No properties found" : "No properties yet"}
+                {activeSearch ? "No properties found" : "No properties yet"}
               </h3>
               <p style={{ fontSize: 13, color: "#BBB", margin: "8px 0 0" }}>
-                {search ? "Try a different search term" : "Start a new inspection to add a property"}
+                {activeSearch ? "Try a different search term" : "Start a new inspection to add a property"}
               </p>
-              {!search && (
+              {!activeSearch && (
                 <Link
                   href="/inspection/new"
                   style={{

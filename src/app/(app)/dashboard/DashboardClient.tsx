@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -71,8 +71,6 @@ type PropertyRow = {
   location: string | null;
   property_type: string | null;
   created_at: string | null;
-  agent_id?: string;
-  agent_name?: string | null;
   tenancies?: TenancyRow[] | null;
   inspections?: InspectionRow[] | null;
 };
@@ -99,9 +97,6 @@ interface DashboardClientProps {
   stripeSubscriptionId?: string | null;
   properties: PropertyRow[];
   alerts?: AlertItem[];
-  isOwner?: boolean;
-  teamMembers?: { id: string; full_name: string | null }[];
-  teamProperties?: PropertyRow[];
 }
 
 function getInitials(fullName: string | null, email: string | null): string {
@@ -141,9 +136,6 @@ export function DashboardClient({
   stripeSubscriptionId = null,
   properties: initialProperties,
   alerts = [],
-  isOwner = false,
-  teamMembers = [],
-  teamProperties = [],
 }: DashboardClientProps) {
   const supabase = createClient();
   const { balance, plan, accountType, refresh: refreshCredits } = useCredits();
@@ -151,9 +143,6 @@ export function DashboardClient({
   const [showNoSubscriptionAlert, setShowNoSubscriptionAlert] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [properties, setProperties] = useState(() => normalizeProperties(initialProperties));
-  const [viewMode, setViewMode] = useState<"mine" | "team">("mine");
-  const [teamSearch, setTeamSearch] = useState("");
-  const [teamMemberFilter, setTeamMemberFilter] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const router = useRouter();
 
@@ -181,26 +170,6 @@ export function DashboardClient({
   const totalProperties = properties.length;
   const totalInspections = allInspections.length;
   const pendingSigCount = allInspections.filter((i) => i?.status === "completed").length;
-
-  const normalizedTeamProperties = useMemo(
-    () => normalizeProperties(teamProperties),
-    [teamProperties]
-  );
-  const filteredTeamProperties = useMemo(
-    () =>
-      normalizedTeamProperties.filter((p) => {
-        const matchesMember = !teamMemberFilter || p.agent_id === teamMemberFilter;
-        const q = teamSearch.toLowerCase();
-        const matchesSearch =
-          !q ||
-          (p.building_name ?? "").toLowerCase().includes(q) ||
-          (p.unit_number ?? "").toLowerCase().includes(q) ||
-          (p.agent_name ?? "").toLowerCase().includes(q) ||
-          (p.location ?? "").toLowerCase().includes(q);
-        return matchesMember && matchesSearch;
-      }),
-    [normalizedTeamProperties, teamMemberFilter, teamSearch]
-  );
 
   const initials = getInitials(fullName, userEmail);
 
@@ -631,67 +600,6 @@ export function DashboardClient({
         </div>
       )}
 
-      {/* Team switcher — owner only */}
-      {isOwner && (
-        <div style={{ padding: "0 24px 16px", display: "flex", gap: 6 }}>
-          <button
-            type="button"
-            onClick={() => setViewMode("mine")}
-            style={{
-              padding: "8px 18px",
-              borderRadius: 999,
-              border: "none",
-              fontFamily: "Poppins, sans-serif",
-              fontWeight: 700,
-              fontSize: 12,
-              cursor: "pointer",
-              transition: "all .15s",
-              background: viewMode === "mine" ? "#0E0E10" : "white",
-              color: viewMode === "mine" ? "white" : "rgba(14,14,16,0.5)",
-              boxShadow: viewMode === "mine" ? "none" : "0 1px 4px rgba(0,0,0,0.06)",
-            }}
-          >
-            My work
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("team")}
-            style={{
-              padding: "8px 18px",
-              borderRadius: 999,
-              border: "none",
-              fontFamily: "Poppins, sans-serif",
-              fontWeight: 700,
-              fontSize: 12,
-              cursor: "pointer",
-              transition: "all .15s",
-              background: viewMode === "team" ? "#0E0E10" : "white",
-              color: viewMode === "team" ? "white" : "rgba(14,14,16,0.5)",
-              boxShadow: viewMode === "team" ? "none" : "0 1px 4px rgba(0,0,0,0.06)",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            Team
-            {teamProperties.length > 0 && (
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  background: viewMode === "team" ? "rgba(255,255,255,0.2)" : "#EDE9FF",
-                  color: viewMode === "team" ? "white" : "#9A88FD",
-                  padding: "1px 6px",
-                  borderRadius: 99,
-                }}
-              >
-                {teamProperties.length}
-              </span>
-            )}
-          </button>
-        </div>
-      )}
-
       {/* Stat Cards — 2×2 Grid */}
       <div
         className={loaded ? "fade-up" : ""}
@@ -910,229 +818,6 @@ export function DashboardClient({
           </div>
         </Link>
       </div>
-
-      {/* Team view panel */}
-      {isOwner && viewMode === "team" && (
-        <div style={{ padding: "20px 24px 0" }}>
-          <div style={{ position: "relative", marginBottom: 12 }}>
-            <svg
-              style={{
-                position: "absolute",
-                left: 12,
-                top: "50%",
-                transform: "translateY(-50%)",
-                pointerEvents: "none",
-              }}
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="rgba(14,14,16,0.4)"
-              strokeWidth="2"
-              strokeLinecap="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="M21 21l-4.35-4.35" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search by inspector, building, unit..."
-              value={teamSearch}
-              onChange={(e) => setTeamSearch(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px 12px 10px 34px",
-                borderRadius: 12,
-                border: "1px solid rgba(14,14,16,0.1)",
-                background: "white",
-                fontSize: 13,
-                fontFamily: "DM Sans, sans-serif",
-                outline: "none",
-                boxSizing: "border-box",
-                color: "#0E0E10",
-              }}
-            />
-          </div>
-
-          {teamMembers.length > 0 && (
-            <div
-              style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 16, paddingBottom: 2 }}
-              className="no-scrollbar"
-            >
-              <button
-                type="button"
-                onClick={() => setTeamMemberFilter(null)}
-                style={{
-                  flexShrink: 0,
-                  padding: "5px 14px",
-                  borderRadius: 999,
-                  border: "none",
-                  fontFamily: "Poppins, sans-serif",
-                  fontWeight: 700,
-                  fontSize: 11,
-                  cursor: "pointer",
-                  background: !teamMemberFilter ? "#0E0E10" : "white",
-                  color: !teamMemberFilter ? "white" : "rgba(14,14,16,0.5)",
-                  boxShadow: !teamMemberFilter ? "none" : "0 1px 4px rgba(0,0,0,0.06)",
-                }}
-              >
-                All
-              </button>
-              {teamMembers.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setTeamMemberFilter(m.id === teamMemberFilter ? null : m.id)}
-                  style={{
-                    flexShrink: 0,
-                    padding: "5px 14px",
-                    borderRadius: 999,
-                    border: "none",
-                    fontFamily: "Poppins, sans-serif",
-                    fontWeight: 700,
-                    fontSize: 11,
-                    cursor: "pointer",
-                    background: teamMemberFilter === m.id ? "#9A88FD" : "white",
-                    color: teamMemberFilter === m.id ? "white" : "rgba(14,14,16,0.5)",
-                    boxShadow: teamMemberFilter === m.id ? "none" : "0 1px 4px rgba(0,0,0,0.06)",
-                  }}
-                >
-                  {(m.full_name ?? "Inspector").split(" ")[0]}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {filteredTeamProperties.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 0", color: "rgba(14,14,16,0.35)", fontSize: 13 }}>
-              No properties found
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {filteredTeamProperties.map((p) => {
-                const lastInspection = (p.inspections ?? []).sort(
-                  (a, b) =>
-                    new Date(b.created_at ?? "").getTime() - new Date(a.created_at ?? "").getTime()
-                )[0];
-                const activeTenancy = (p.tenancies ?? [])[0];
-                return (
-                  <Link
-                    key={p.id}
-                    href={`/property/${p.id}`}
-                    style={{
-                      background: "white",
-                      borderRadius: 16,
-                      border: "0.5px solid rgba(14,14,16,0.08)",
-                      padding: "14px 16px",
-                      textDecoration: "none",
-                      display: "block",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        justifyContent: "space-between",
-                        marginBottom: 6,
-                      }}
-                    >
-                      <div>
-                        <p
-                          style={{
-                            fontFamily: "Poppins, sans-serif",
-                            fontWeight: 700,
-                            fontSize: 14,
-                            margin: 0,
-                            color: "#0E0E10",
-                          }}
-                        >
-                          {p.building_name ?? "—"}
-                        </p>
-                        <p style={{ fontSize: 12, color: "rgba(14,14,16,0.45)", margin: "2px 0 0" }}>
-                          Unit {p.unit_number ?? "—"}
-                          {p.location ? ` · ${p.location}` : ""}
-                        </p>
-                      </div>
-                      {lastInspection && (
-                        <span
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            padding: "3px 8px",
-                            borderRadius: 99,
-                            background:
-                              lastInspection.status === "signed"
-                                ? "#EEFAD5"
-                                : lastInspection.status === "completed"
-                                  ? "#EDE9FF"
-                                  : "#F3F1EB",
-                            color:
-                              lastInspection.status === "signed"
-                                ? "#3A7A00"
-                                : lastInspection.status === "completed"
-                                  ? "#9A88FD"
-                                  : "#9ca3af",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.5px",
-                          }}
-                        >
-                          {lastInspection.type === "check-in" ? "IN" : "OUT"} · {lastInspection.status}
-                        </span>
-                      )}
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        marginTop: 8,
-                      }}
-                    >
-                      {activeTenancy?.tenant_name && (
-                        <p style={{ fontSize: 11, color: "rgba(14,14,16,0.4)", margin: 0 }}>
-                          {activeTenancy.tenant_name}
-                        </p>
-                      )}
-                      <div
-                        style={{
-                          marginLeft: "auto",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 5,
-                          background: "#F3F1EB",
-                          borderRadius: 99,
-                          padding: "3px 10px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 16,
-                            height: 16,
-                            borderRadius: "50%",
-                            background: "#9A88FD",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 8,
-                            fontWeight: 800,
-                            color: "white",
-                            flexShrink: 0,
-                          }}
-                        >
-                          {(p.agent_name ?? "I").charAt(0).toUpperCase()}
-                        </div>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(14,14,16,0.6)" }}>
-                          {(p.agent_name ?? "Inspector").split(" ")[0]}
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
 
       <div className="flex items-center justify-between px-4 pb-2 pt-7">
         <div className="flex items-center gap-2">
