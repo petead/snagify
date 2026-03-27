@@ -506,6 +506,8 @@ export function InspectionClient({
   }[]>([])
   const [inventoryScreen, setInventoryScreen] = useState<'selection' | 'detail'>('selection')
   const [inventoryDetailIndex, setInventoryDetailIndex] = useState(0)
+  const [editingInventoryIdx, setEditingInventoryIdx] = useState<number | null>(null)
+  const [editingInventoryIsCheckout, setEditingInventoryIsCheckout] = useState(false)
   const [inventorySaving, setInventorySaving] = useState(false)
   const [inventoryDetails, setInventoryDetails] = useState<{
     referenceItemId?: string
@@ -3331,6 +3333,27 @@ export function InspectionClient({
                               {checkoutNote || checkinNote}
                             </p>
                           )}
+
+                          {/* Edit button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingInventoryIdx(idx)
+                              setEditingInventoryIsCheckout(isCheckout)
+                            }}
+                            style={{
+                              marginTop:8, padding:'5px 12px',
+                              background:'#F3F1EB', border:'none', borderRadius:99,
+                              cursor:'pointer', fontSize:11, fontWeight:700, color:'#0E0E10',
+                              display:'inline-flex', alignItems:'center', gap:5,
+                            }}
+                          >
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                            Edit
+                          </button>
                         </div>
                       </div>
                     )
@@ -4121,6 +4144,326 @@ export function InspectionClient({
           </div>
         </div>
       )}
+
+      {/* ── SINGLE ITEM EDIT SCREEN ── */}
+      {editingInventoryIdx !== null && (() => {
+        const isCoEdit = editingInventoryIsCheckout
+        const item = isCoEdit
+          ? checkoutInventoryItems[editingInventoryIdx]
+          : inventoryDetails[editingInventoryIdx]
+        if (!item) return null
+
+        const setCondition = (val: 'good' | 'fair' | 'poor' | 'missing') => {
+          if (isCoEdit) {
+            setCheckoutInventoryItems(prev =>
+              prev.map((it, i) => i === editingInventoryIdx ? { ...it, status_checkout: val } : it)
+            )
+          } else {
+            if (val === 'missing') return
+            setInventoryDetails(prev =>
+              prev.map((it, i) => i === editingInventoryIdx ? { ...it, condition: val } : it)
+            )
+          }
+        }
+
+        const setNote = (val: string) => {
+          if (isCoEdit) {
+            setCheckoutInventoryItems(prev =>
+              prev.map((it, i) => i === editingInventoryIdx ? { ...it, notes: val } : it)
+            )
+          } else {
+            setInventoryDetails(prev =>
+              prev.map((it, i) => i === editingInventoryIdx ? { ...it, notes: val } : it)
+            )
+          }
+        }
+
+        const setPhoto = (val: string | null) => {
+          if (isCoEdit) {
+            setCheckoutInventoryItems(prev =>
+              prev.map((it, i) => i === editingInventoryIdx ? { ...it, photo_url: val } : it)
+            )
+          } else {
+            setInventoryDetails(prev =>
+              prev.map((it, i) => i === editingInventoryIdx ? { ...it, photo_url: val } : it)
+            )
+          }
+        }
+
+        const currentCondition = isCoEdit
+          ? (item as typeof checkoutInventoryItems[0]).status_checkout
+          : (item as typeof inventoryDetails[0]).condition
+        const currentPhoto = item.photo_url
+        const currentNote = item.notes
+
+        const condButtons = isCoEdit
+          ? [
+              { value: 'good' as const, label: 'Good', bg:'#EEFAD5', active:'#CAFE87', color:'#1A4A00' },
+              { value: 'fair' as const, label: 'Fair', bg:'#FFF8DC', active:'#FEDE80', color:'#6B4A00' },
+              { value: 'poor' as const, label: 'Poor', bg:'#FEE2E2', active:'#FCA5A5', color:'#7A0000' },
+              { value: 'missing' as const, label: 'Missing', bg:'#F3F1EB', active:'#0E0E10', color:'white' },
+            ]
+          : [
+              { value: 'good' as const, label: 'Good', bg:'#EEFAD5', active:'#CAFE87', color:'#1A4A00' },
+              { value: 'fair' as const, label: 'Fair', bg:'#FFF8DC', active:'#FEDE80', color:'#6B4A00' },
+              { value: 'poor' as const, label: 'Poor', bg:'#FEE2E2', active:'#FCA5A5', color:'#7A0000' },
+            ]
+
+        return (
+          <div style={{ position:'fixed', inset:0, zIndex:50, background:'#F8F7F4', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+
+            {/* Header */}
+            <div style={{ padding:'16px 20px', background:'white', borderBottom:'1px solid rgba(14,14,16,0.08)', flexShrink:0 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                <button
+                  type="button"
+                  onClick={() => setEditingInventoryIdx(null)}
+                  style={{ background:'none', border:'none', cursor:'pointer', padding:4 }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E0E10" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M19 12H5M12 5l-7 7 7 7"/>
+                  </svg>
+                </button>
+                <div>
+                  <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:16, margin:0, color:'#0E0E10' }}>
+                    {item.name}
+                  </p>
+                  <p style={{ fontSize:12, color:'rgba(14,14,16,0.4)', margin:0 }}>{item.category}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div style={{ flex:1, overflowY:'auto', padding:'24px 20px', display:'flex', flexDirection:'column', gap:20, WebkitOverflowScrolling:'touch' as any }}>
+
+              {/* Check-in reference — checkout only */}
+              {isCoEdit && (item as typeof checkoutInventoryItems[0]).condition_checkin && (
+                <div style={{
+                  background:'white', borderRadius:12,
+                  border:'0.5px solid rgba(14,14,16,0.1)',
+                  padding:'12px 14px',
+                  display:'flex', alignItems:'center', gap:12,
+                }}>
+                  {(item as typeof checkoutInventoryItems[0]).photo_url_checkin && (
+                    <img
+                      src={(item as typeof checkoutInventoryItems[0]).photo_url_checkin!}
+                      alt="check-in"
+                      style={{ width:48, height:48, borderRadius:8, objectFit:'cover', flexShrink:0 }}
+                    />
+                  )}
+                  <div>
+                    <p style={{ fontSize:10, color:'rgba(14,14,16,0.4)', margin:'0 0 3px', textTransform:'uppercase', letterSpacing:'1px' }}>At check-in</p>
+                    <div style={{
+                      display:'inline-flex', padding:'3px 10px', borderRadius:99,
+                      background:
+                        (item as typeof checkoutInventoryItems[0]).condition_checkin === 'good' ? '#EEFAD5' :
+                        (item as typeof checkoutInventoryItems[0]).condition_checkin === 'fair' ? '#FFF8DC' : '#FEE2E2',
+                    }}>
+                      <span style={{
+                        fontSize:12, fontWeight:700,
+                        color:
+                          (item as typeof checkoutInventoryItems[0]).condition_checkin === 'good' ? '#3A7A00' :
+                          (item as typeof checkoutInventoryItems[0]).condition_checkin === 'fair' ? '#8A6000' : '#7A0000',
+                      }}>
+                        {(item as typeof checkoutInventoryItems[0]).condition_checkin}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Condition */}
+              <div>
+                <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:'0 0 10px' }}>Condition</p>
+                <div style={{ display:'grid', gridTemplateColumns: isCoEdit ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap:8 }}>
+                  {condButtons.map(btn => (
+                    <button
+                      key={btn.value}
+                      type="button"
+                      onClick={() => setCondition(btn.value)}
+                      style={{
+                        padding:'12px 4px', borderRadius:12, border:'none', cursor:'pointer',
+                        fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:12,
+                        background: currentCondition === btn.value ? btn.active : btn.bg,
+                        color: currentCondition === btn.value ? btn.color : 'rgba(14,14,16,0.5)',
+                      }}
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Photo */}
+              <div>
+                <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:'0 0 10px' }}>
+                  Photo <span style={{ fontSize:11, color:'rgba(14,14,16,0.4)', fontWeight:400 }}>recommended</span>
+                </p>
+                {currentPhoto ? (
+                  <div style={{ position:'relative' }}>
+                    <img src={currentPhoto} alt={item.name}
+                      style={{ width:'100%', borderRadius:12, maxHeight:200, objectFit:'cover' }}/>
+                    <button
+                      type="button"
+                      onClick={() => setPhoto(null)}
+                      style={{ position:'absolute', top:8, right:8, background:'rgba(0,0,0,0.5)', border:'none', borderRadius:999, width:28, height:28, cursor:'pointer', color:'white', fontSize:14 }}
+                    >✕</button>
+                  </div>
+                ) : (
+                  <label style={{
+                    display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                    padding:'20px', borderRadius:12, border:'1.5px dashed rgba(14,14,16,0.15)',
+                    background:'white', cursor:'pointer', fontSize:13, color:'rgba(14,14,16,0.5)',
+                  }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                      <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                    Take photo
+                    <input
+                      type="file" accept="image/*" capture="environment"
+                      style={{ display:'none' }}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        const reader = new FileReader()
+                        reader.onload = async (ev) => {
+                          const dataUrl = ev.target?.result as string
+                          setPhoto(dataUrl)
+                          const publicUrl = await uploadInventoryPhoto(dataUrl)
+                          if (publicUrl) setPhoto(publicUrl)
+                        }
+                        reader.readAsDataURL(file)
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Note */}
+              <div>
+                <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:'0 0 8px' }}>
+                  Note <span style={{ fontSize:11, color:'rgba(14,14,16,0.4)', fontWeight:400 }}>optional</span>
+                </p>
+                <textarea
+                  value={currentNote}
+                  onChange={e => setNote(e.target.value)}
+                  placeholder="Any observation..."
+                  rows={3}
+                  style={{
+                    width:'100%', padding:'12px', borderRadius:12,
+                    border:'1px solid rgba(14,14,16,0.1)',
+                    background:'white', fontSize:14, fontFamily:'DM Sans, sans-serif',
+                    resize:'none', outline:'none', boxSizing:'border-box',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Save CTA */}
+            <div style={{
+              padding:'12px 20px',
+              paddingBottom:'max(16px, calc(env(safe-area-inset-bottom) + 80px))',
+              background:'white', borderTop:'1px solid rgba(14,14,16,0.08)', flexShrink:0,
+            }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  setInventorySaving(true)
+                  try {
+                    if (isCoEdit) {
+                      await fetch('/api/inventory/snapshots', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          inspection_id: inspectionId,
+                          items: checkoutInventoryItems.map(it => ({
+                            reference_item_id: it.referenceItemId ?? null,
+                            name: it.name,
+                            category: it.category,
+                            quantity: it.quantity,
+                            status_checkout: it.status_checkout,
+                            notes: it.notes,
+                            photo_url_checkout: it.photo_url?.startsWith('http') ? it.photo_url : null,
+                            quantity_checkout: it.quantity,
+                          })),
+                        }),
+                      })
+                      if (propertyId) {
+                        const activeItems = checkoutInventoryItems
+                          .filter(it => it.status_checkout !== 'missing')
+                          .map(it => ({
+                            name: it.name,
+                            category: it.category,
+                            quantity: it.quantity,
+                            source: it.source,
+                          }))
+                        await fetch('/api/inventory/reference', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ property_id: propertyId, items: activeItems }),
+                        })
+                      }
+                    } else {
+                      await fetch('/api/inventory/snapshots', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          inspection_id: inspectionId,
+                          items: inventoryDetails.map(it => ({
+                            reference_item_id: it.referenceItemId ?? null,
+                            name: it.name,
+                            category: it.category,
+                            quantity: it.quantity,
+                            condition_checkin: it.condition,
+                            photo_url: it.photo_url?.startsWith('http') ? it.photo_url : null,
+                            notes: it.notes,
+                            source: it.source,
+                          })),
+                        }),
+                      })
+                      if (propertyId) {
+                        await fetch('/api/inventory/reference', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            property_id: propertyId,
+                            items: inventoryDetails.map(it => ({
+                              name: it.name,
+                              category: it.category,
+                              quantity: it.quantity,
+                              source: it.source,
+                            })),
+                          }),
+                        })
+                      }
+                    }
+                  } catch { /* silent */ } finally {
+                    setInventorySaving(false)
+                  }
+                  setEditingInventoryIdx(null)
+                  setActiveReviewRoom('inventory')
+                }}
+                style={{
+                  width:'100%', padding:'15px',
+                  background:'#0E0E10', border:'none', borderRadius:14,
+                  cursor:'pointer', fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15, color:'white',
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                }}
+              >
+                {inventorySaving ? (
+                  <>
+                    <svg style={{ animation:'spin 0.8s linear infinite' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                    </svg>
+                    Saving...
+                  </>
+                ) : 'Save changes'}
+              </button>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* CHECK-OUT INVENTORY REVIEW */}
       {isCheckout && showCheckoutInventory && checkoutInventoryItems[checkoutInventoryIndex] && (() => {
