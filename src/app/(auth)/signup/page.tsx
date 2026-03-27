@@ -908,291 +908,275 @@ export default function SignupPage() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -40 }}
                   transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                  className="flex flex-col gap-6"
+                  className="flex flex-col"
+                  style={{ gap: 0 }}
                 >
-                  <motion.div
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.05 }}
-                  >
-                    <h2 className="text-2xl font-bold text-gray-900">
+                  {/* Header */}
+                  <div style={{ marginBottom: 28 }}>
+                    <h2 style={{
+                      fontFamily: 'Poppins, sans-serif', fontWeight: 800,
+                      fontSize: 26, color: '#0E0E10', margin: '0 0 6px', lineHeight: 1.2,
+                    }}>
                       How will you use Snagify?
                     </h2>
-                    <p className="mt-1 text-sm text-gray-400">
+                    <p style={{ fontSize: 14, color: 'rgba(14,14,16,0.45)', margin: 0 }}>
                       Pick the plan that fits your world.
                     </p>
-                  </motion.div>
+                  </div>
 
-                  <div className="mt-5 flex flex-col gap-3">
-                    {plans.map((plan, idx) => (
-                      <motion.div
-                        key={plan.id}
-                        initial={{ opacity: 0, y: 16 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.08 + idx * 0.06, ease: [0.16, 1, 0.3, 1] }}
-                        whileHover={{ y: -2, transition: { duration: 0.2 } }}
-                        onClick={() => {
-                          setAccountType(plan.id)
-                          setIndividualRole(null)
-                        }}
-                        className="cursor-pointer"
-                      >
+                  {/* Plan cards */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {plans.map((plan, idx) => {
+                      const isSelected = accountType === plan.id
+                      const isPro = plan.id === 'pro'
+
+                      return (
                         <motion.div
-                          animate={{
-                            borderColor: accountType === plan.id ? plan.color : '#E5E7EB',
-                            boxShadow:
-                              accountType === plan.id
-                                ? `0 0 0 2px ${plan.color}33, 0 8px 32px ${plan.color}28`
-                                : '0 2px 8px rgba(0,0,0,0.04)',
-                          }}
-                          whileHover={{
-                            boxShadow: `0 4px 24px ${plan.color}40`,
-                            borderColor: `${plan.color}80`,
-                          }}
-                          transition={{ duration: 0.2 }}
-                          className="overflow-hidden rounded-2xl border-2 bg-white"
+                          key={plan.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.06 + idx * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                          onClick={() => { setAccountType(plan.id); setIndividualRole(null) }}
+                          style={{ cursor: 'pointer', position: 'relative' }}
                         >
+                          {/* Most popular badge */}
+                          {plan.tag && (
+                            <div style={{
+                              position: 'absolute', top: -11, left: 20, zIndex: 10,
+                              background: 'linear-gradient(135deg, #7C3AED, #9A88FD)',
+                              color: 'white', fontSize: 9, fontWeight: 800,
+                              letterSpacing: '1.2px', textTransform: 'uppercase',
+                              padding: '4px 12px', borderRadius: 999,
+                              boxShadow: '0 4px 14px rgba(124,58,237,0.4)',
+                              fontFamily: 'Poppins, sans-serif',
+                            }}>
+                              ⭐ Most Popular
+                            </div>
+                          )}
+
                           <motion.div
                             animate={{
-                              opacity: accountType === plan.id ? 1 : 0,
+                              background: isSelected
+                                ? isPro
+                                  ? 'linear-gradient(145deg, #0E0E10 0%, #1C1A2E 100%)'
+                                  : '#FAFAFA'
+                                : '#FFFFFF',
+                              borderColor: isSelected
+                                ? isPro ? '#7C3AED' : '#9A88FD'
+                                : 'rgba(14,14,16,0.1)',
+                              boxShadow: isSelected
+                                ? isPro
+                                  ? '0 8px 40px rgba(124,58,237,0.25), inset 0 1px 0 rgba(255,255,255,0.05)'
+                                  : '0 4px 24px rgba(154,136,253,0.2)'
+                                : '0 1px 4px rgba(0,0,0,0.04)',
                             }}
-                            className="h-1 w-full"
+                            transition={{ duration: 0.25 }}
                             style={{
-                              background:
-                                accountType === plan.id
-                                  ? `linear-gradient(90deg, ${plan.color}, ${plan.color}99)`
-                                  : 'transparent',
+                              borderRadius: 20, border: '1.5px solid',
+                              overflow: 'hidden',
+                              paddingTop: plan.tag ? 18 : 0,
                             }}
-                          />
+                          >
+                            {/* Animated top bar */}
+                            <motion.div
+                              animate={{
+                                opacity: isSelected ? 1 : 0,
+                                scaleX: isSelected ? 1 : 0,
+                              }}
+                              transition={{ duration: 0.3 }}
+                              style={{
+                                height: 3, transformOrigin: 'left',
+                                background: isPro
+                                  ? 'linear-gradient(90deg, #7C3AED, #9A88FD, #CAFE87)'
+                                  : 'linear-gradient(90deg, #9A88FD, #B8AEFF)',
+                              }}
+                            />
 
-                          <div className="p-5">
-                            <div className="mb-3 flex items-start justify-between">
-                              <div className="flex items-center gap-3">
-                                <motion.div
-                                  animate={{
-                                    backgroundColor:
-                                      accountType === plan.id ? plan.color : '#F3F4F6',
-                                    color: accountType === plan.id ? '#fff' : '#9CA3AF',
-                                  }}
-                                  transition={{ duration: 0.2 }}
-                                  className="flex h-11 w-11 items-center justify-center rounded-xl"
-                                >
-                                  {plan.icon}
-                                </motion.div>
-
-                                <div>
-                                  <p className="text-[15px] font-bold text-gray-900">{plan.title}</p>
-                                  <p className="text-xs text-gray-400">{plan.subtitle}</p>
-                                </div>
-                              </div>
-
-                              <div className="flex flex-col items-end gap-1.5">
-                                {plan.tag && plan.tagColor ? (
-                                  <motion.span
-                                    initial={{ scale: 0.8, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    transition={{
-                                      delay: 0.15 + idx * 0.06,
-                                      type: 'spring',
-                                      stiffness: 400,
+                            <div style={{ padding: '18px 20px' }}>
+                              {/* Title row */}
+                              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                  <motion.div
+                                    animate={{
+                                      background: isSelected
+                                        ? isPro ? 'rgba(154,136,253,0.15)' : 'rgba(154,136,253,0.12)'
+                                        : '#F3F4F6',
                                     }}
-                                    className={cn(
-                                      'rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-white',
-                                      plan.tagColor
-                                    )}
+                                    style={{
+                                      width: 44, height: 44, borderRadius: 14,
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                    }}
                                   >
-                                    {plan.tag}
-                                  </motion.span>
-                                ) : null}
+                                    <motion.span
+                                      animate={{ color: isSelected ? plan.color : '#9CA3AF' }}
+                                    >
+                                      {plan.icon}
+                                    </motion.span>
+                                  </motion.div>
+                                  <div>
+                                    <motion.p
+                                      animate={{ color: isSelected && isPro ? '#FFFFFF' : '#0E0E10' }}
+                                      style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 16, margin: 0 }}
+                                    >
+                                      {plan.title}
+                                    </motion.p>
+                                    <motion.p
+                                      animate={{ color: isSelected && isPro ? 'rgba(255,255,255,0.45)' : 'rgba(14,14,16,0.45)' }}
+                                      style={{ fontSize: 12, margin: '2px 0 0' }}
+                                    >
+                                      {plan.subtitle}
+                                    </motion.p>
+                                  </div>
+                                </div>
+
+                                {/* Radio */}
                                 <motion.div
                                   animate={{
-                                    borderColor:
-                                      accountType === plan.id ? plan.color : '#D1D5DB',
-                                    backgroundColor:
-                                      accountType === plan.id ? plan.color : 'transparent',
+                                    borderColor: isSelected ? plan.color : '#D1D5DB',
+                                    backgroundColor: isSelected ? plan.color : 'transparent',
+                                    scale: isSelected ? 1.1 : 1,
                                   }}
-                                  className="flex h-5 w-5 items-center justify-center rounded-full border-2"
+                                  style={{ width: 22, height: 22, borderRadius: '50%', border: '2px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}
                                 >
                                   <AnimatePresence>
-                                    {accountType === plan.id && (
+                                    {isSelected && (
                                       <motion.div
-                                        key="radio-dot"
-                                        initial={{ scale: 0 }}
-                                        animate={{ scale: 1 }}
-                                        exit={{ scale: 0 }}
-                                        className="h-2 w-2 rounded-full bg-white"
+                                        key="dot"
+                                        initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+                                        style={{ width: 8, height: 8, borderRadius: '50%', background: 'white' }}
                                       />
                                     )}
                                   </AnimatePresence>
                                 </motion.div>
                               </div>
-                            </div>
 
-                            <motion.div
-                              animate={{
-                                color: accountType === plan.id ? plan.color : '#6B7280',
-                              }}
-                              className="mb-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1"
-                              style={{
-                                backgroundColor:
-                                  accountType === plan.id ? `${plan.color}18` : '#F9FAFB',
-                              }}
-                            >
-                              <span className="text-xs font-semibold">{plan.price}</span>
-                              <span className="text-[10px] opacity-70">· {plan.priceDetail}</span>
-                            </motion.div>
-
-                            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-                              {plan.features.map((feat, fi) => (
-                                <motion.div
-                                  key={feat.text}
-                                  initial={{ opacity: 0, x: -6 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  transition={{ delay: 0.1 + idx * 0.06 + fi * 0.04 }}
-                                  className="flex items-center gap-1.5"
-                                >
-                                  <span className="text-sm">{feat.icon}</span>
-                                  <span className="text-[11px] leading-tight text-gray-500">
-                                    {feat.text}
-                                  </span>
-                                </motion.div>
-                              ))}
-                            </div>
-
-                            <motion.div
-                              animate={{
-                                opacity: accountType === plan.id ? 1 : 0,
-                                height: accountType === plan.id ? 'auto' : 0,
-                                marginTop: accountType === plan.id ? 14 : 0,
-                              }}
-                              transition={{ duration: 0.25 }}
-                              className="overflow-hidden"
-                            >
-                              <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill={plan.color}>
-                                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                                </svg>
-                                <span className="text-[11px] font-medium" style={{ color: plan.color }}>
-                                  {plan.highlight}
-                                </span>
-                              </div>
-                            </motion.div>
-                          </div>
-
-                          <AnimatePresence>
-                            {plan.id === 'individual' && accountType === 'individual' && (
+                              {/* Price pill */}
                               <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                                className="overflow-hidden border-t border-gray-100"
+                                animate={{
+                                  background: isSelected
+                                    ? isPro ? 'rgba(154,136,253,0.15)' : 'rgba(154,136,253,0.1)'
+                                    : '#F3F4F6',
+                                }}
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                                  padding: '5px 12px', borderRadius: 999, marginBottom: 14,
+                                }}
                               >
-                                <div className="px-5 py-4">
-                                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                                    I am a...
-                                  </p>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    {(
-                                      [
-                                        {
-                                          value: 'owner' as const,
-                                          label: 'Owner',
-                                          sub: 'I own a property',
-                                          icon: (
-                                            <svg
-                                              width="16"
-                                              height="16"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              strokeWidth="2"
-                                              strokeLinecap="round"
-                                            >
-                                              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                                              <polyline points="9 22 9 12 15 12 15 22" />
-                                            </svg>
-                                          ),
-                                        },
-                                        {
-                                          value: 'tenant' as const,
-                                          label: 'Tenant',
-                                          sub: 'I rent a property',
-                                          icon: (
-                                            <svg
-                                              width="16"
-                                              height="16"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              strokeWidth="2"
-                                              strokeLinecap="round"
-                                            >
-                                              <circle cx="12" cy="8" r="4" />
-                                              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-                                            </svg>
-                                          ),
-                                        },
-                                      ] as const
-                                    ).map((opt) => (
-                                      <motion.button
-                                        key={opt.value}
-                                        type="button"
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.97 }}
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          setIndividualRole(opt.value)
-                                        }}
-                                        animate={{
-                                          borderColor:
-                                            individualRole === opt.value ? '#9A88FD' : '#E5E7EB',
-                                          backgroundColor:
-                                            individualRole === opt.value
-                                              ? 'rgba(154,136,253,0.08)'
-                                              : '#FAFAFA',
-                                          color:
-                                            individualRole === opt.value ? '#9A88FD' : '#6B7280',
-                                          boxShadow:
-                                            individualRole === opt.value
-                                              ? '0 2px 12px rgba(154,136,253,0.2)'
-                                              : 'none',
-                                        }}
-                                        transition={{ duration: 0.15 }}
-                                        className="flex flex-col items-center gap-1.5 rounded-xl border-2 py-3.5"
-                                      >
-                                        {opt.icon}
-                                        <span className="text-[13px] font-bold">{opt.label}</span>
-                                        <span className="text-[10px] opacity-60">{opt.sub}</span>
-                                        {individualRole === opt.value && (
-                                          <motion.div
-                                            initial={{ scale: 0 }}
-                                            animate={{ scale: 1 }}
-                                            className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#9A88FD]"
-                                          >
-                                            <svg
-                                              width="8"
-                                              height="8"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              stroke="white"
-                                              strokeWidth="3"
-                                            >
-                                              <polyline points="20 6 9 17 4 12" />
-                                            </svg>
-                                          </motion.div>
-                                        )}
-                                      </motion.button>
-                                    ))}
-                                  </div>
-                                </div>
+                                <motion.span
+                                  animate={{ color: isSelected ? plan.color : '#374151' }}
+                                  style={{ fontSize: 12, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}
+                                >
+                                  {plan.price}
+                                </motion.span>
+                                <motion.span
+                                  animate={{ color: isSelected && isPro ? 'rgba(255,255,255,0.4)' : 'rgba(14,14,16,0.4)' }}
+                                  style={{ fontSize: 11 }}
+                                >
+                                  · {plan.priceDetail}
+                                </motion.span>
                               </motion.div>
-                            )}
-                          </AnimatePresence>
+
+                              {/* Features grid */}
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 8px' }}>
+                                {plan.features.map((feat, fi) => (
+                                  <motion.div
+                                    key={feat.text}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: 0.1 + fi * 0.03 }}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                                  >
+                                    <span style={{ fontSize: 13, lineHeight: 1 }}>{feat.icon}</span>
+                                    <motion.span
+                                      animate={{ color: isSelected && isPro ? 'rgba(255,255,255,0.6)' : 'rgba(14,14,16,0.55)' }}
+                                      style={{ fontSize: 11, lineHeight: 1.3 }}
+                                    >
+                                      {feat.text}
+                                    </motion.span>
+                                  </motion.div>
+                                ))}
+                              </div>
+
+                              {/* Highlight — selected only */}
+                              <AnimatePresence>
+                                {isSelected && (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                                    animate={{ opacity: 1, height: 'auto', marginTop: 14 }}
+                                    exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                                    transition={{ duration: 0.25 }}
+                                    style={{ overflow: 'hidden' }}
+                                  >
+                                    <div style={{
+                                      display: 'flex', alignItems: 'center', gap: 6,
+                                      borderTop: `1px solid ${isPro ? 'rgba(255,255,255,0.08)' : 'rgba(14,14,16,0.07)'}`,
+                                      paddingTop: 12,
+                                    }}>
+                                      <svg width="11" height="11" viewBox="0 0 24 24" fill={plan.color}>
+                                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                      </svg>
+                                      <span style={{ fontSize: 11, fontWeight: 600, color: isPro ? 'rgba(255,255,255,0.55)' : plan.color }}>
+                                        {plan.highlight}
+                                      </span>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+
+                            {/* Individual role sub-selection */}
+                            <AnimatePresence>
+                              {plan.id === 'individual' && accountType === 'individual' && (
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: 'auto' }}
+                                  exit={{ opacity: 0, height: 0 }}
+                                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                                  style={{ overflow: 'hidden', borderTop: '1px solid rgba(14,14,16,0.07)' }}
+                                >
+                                  <div style={{ padding: '14px 20px' }}>
+                                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'rgba(14,14,16,0.4)', margin: '0 0 10px', fontFamily: 'Poppins, sans-serif' }}>
+                                      I am a...
+                                    </p>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                                      {([
+                                        { value: 'owner' as const, label: 'Owner', sub: 'I own a property', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
+                                        { value: 'tenant' as const, label: 'Tenant', sub: 'I rent a property', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> },
+                                      ]).map(opt => (
+                                        <motion.button
+                                          key={opt.value}
+                                          type="button"
+                                          whileTap={{ scale: 0.97 }}
+                                          onClick={e => { e.stopPropagation(); setIndividualRole(opt.value) }}
+                                          animate={{
+                                            borderColor: individualRole === opt.value ? '#9A88FD' : '#E5E7EB',
+                                            backgroundColor: individualRole === opt.value ? 'rgba(154,136,253,0.08)' : '#FAFAFA',
+                                            color: individualRole === opt.value ? '#9A88FD' : '#6B7280',
+                                          }}
+                                          style={{
+                                            borderRadius: 12, border: '1.5px solid', padding: '10px 12px',
+                                            display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+                                            gap: 4, cursor: 'pointer', background: 'none',
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            {opt.icon}
+                                            <span style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 13 }}>{opt.label}</span>
+                                          </div>
+                                          <span style={{ fontSize: 11, opacity: 0.7, lineHeight: 1 }}>{opt.sub}</span>
+                                        </motion.button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </motion.div>
                         </motion.div>
-                      </motion.div>
-                    ))}
+                      )
+                    })}
                   </div>
+                </motion.div>
 
                   <motion.button
                     type="button"
@@ -1234,7 +1218,6 @@ export default function SignupPage() {
                       )}
                     </span>
                   </motion.button>
-                </motion.div>
 
               </motion.div>
             )}
