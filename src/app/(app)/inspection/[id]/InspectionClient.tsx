@@ -437,6 +437,22 @@ export function InspectionClient({
     source: string
   }[]>([])
 
+  const [checkoutInventoryItems, setCheckoutInventoryItems] = useState<{
+    referenceItemId?: string
+    name: string
+    category: string
+    quantity: number
+    condition: 'good' | 'fair' | 'poor' | null
+    condition_checkin: string | null
+    photo_url: string | null
+    photo_url_checkin: string | null
+    notes: string
+    source: string
+    status_checkout: 'ok' | 'missing' | 'damaged' | null
+  }[]>([])
+  const [checkoutInventoryIndex, setCheckoutInventoryIndex] = useState(0)
+  const [showCheckoutInventory, setShowCheckoutInventory] = useState(false)
+
   // Keys inline edit mode
   const [editingKeys, setEditingKeys] = useState(false);
   const [editableKeys, setEditableKeys] = useState<Array<{ item: string; qty: number }>>([]);
@@ -818,6 +834,40 @@ export function InspectionClient({
       });
       setCheckinGhostMap(ghostMap);
       setCheckinInspectionId(checkinInspection.id);
+      // Load inventory snapshots from check-in
+      try {
+        const res = await fetch(`/api/inventory/snapshots?inspection_id=${checkinInspection.id}`)
+        const data = await res.json() as {
+          items?: {
+            name: string
+            category: string
+            quantity: number
+            condition_checkin: string | null
+            photo_url: string | null
+            reference_item_id?: string | null
+            source?: string | null
+            is_tenant_item?: boolean | null
+          }[]
+        }
+        if (data.items?.length) {
+          const checkoutItems = data.items
+            .filter(i => !i.is_tenant_item)
+            .map(i => ({
+              referenceItemId: i.reference_item_id ?? undefined,
+              name: i.name,
+              category: i.category,
+              quantity: i.quantity,
+              condition: i.condition_checkin as 'good' | 'fair' | 'poor' | null,
+              photo_url: null as string | null,
+              notes: '',
+              source: i.source ?? 'history',
+              status_checkout: null as 'ok' | 'missing' | 'damaged' | null,
+              condition_checkin: i.condition_checkin,
+              photo_url_checkin: i.photo_url,
+            }))
+          setCheckoutInventoryItems(checkoutItems)
+        }
+      } catch { /* silent */ }
     };
     loadCheckinGhost();
   }, [inspectionType, propertyId, supabase]);
@@ -1287,6 +1337,16 @@ export function InspectionClient({
   // ── Generate report (from review screen)
   const handleGenerateReport = async () => {
     if (generating || navigating) return;
+    // If check-out and has inventory items, show checkout inventory review first
+    if (
+      isCheckout &&
+      checkoutInventoryItems.length > 0 &&
+      !showCheckoutInventory
+    ) {
+      setCheckoutInventoryIndex(0)
+      setShowCheckoutInventory(true)
+      return
+    }
     // If check-in and furnished status not yet determined, go to inventory first
     if (
       inspectionType === 'check-in' &&
@@ -3310,6 +3370,278 @@ export function InspectionClient({
           </div>
         </div>
       )}
+
+      {/* CHECK-OUT INVENTORY REVIEW */}
+      {isCheckout && showCheckoutInventory && checkoutInventoryItems[checkoutInventoryIndex] && (() => {
+        const item = checkoutInventoryItems[checkoutInventoryIndex]
+        const isLast = checkoutInventoryIndex === checkoutInventoryItems.length - 1
+        const progress = ((checkoutInventoryIndex + 1) / checkoutInventoryItems.length) * 100
+
+        return (
+          <div style={{ minHeight:'100vh', background:'#F8F7F4', display:'flex', flexDirection:'column' }}>
+
+            {/* Header */}
+            <div style={{ padding:'16px 20px', background:'white', borderBottom:'1px solid rgba(14,14,16,0.08)' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (checkoutInventoryIndex === 0) {
+                      setShowCheckoutInventory(false)
+                    } else {
+                      setCheckoutInventoryIndex(prev => prev - 1)
+                    }
+                  }}
+                  style={{ background:'none', border:'none', cursor:'pointer', padding:4 }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E0E10" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M19 12H5M12 5l-7 7 7 7"/>
+                  </svg>
+                </button>
+                <div style={{ flex:1 }}>
+                  <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15, margin:0, color:'#0E0E10' }}>
+                    Inventory check
+                  </p>
+                  <p style={{ fontSize:12, color:'rgba(14,14,16,0.4)', margin:0 }}>
+                    Item {checkoutInventoryIndex + 1} of {checkoutInventoryItems.length}
+                  </p>
+                </div>
+              </div>
+              {/* Progress bar */}
+              <div style={{ height:3, background:'rgba(14,14,16,0.08)', borderRadius:999, overflow:'hidden' }}>
+                <div style={{ height:'100%', width:`${progress}%`, background:'#9A88FD', borderRadius:999, transition:'width .3s' }}/>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div style={{ flex:1, padding:'24px 20px', display:'flex', flexDirection:'column', gap:20, overflowY:'auto' }}>
+
+              {/* Item name */}
+              <div>
+                <p style={{ fontSize:12, color:'rgba(14,14,16,0.4)', margin:'0 0 4px', textTransform:'uppercase', letterSpacing:'1px' }}>
+                  {item.category}
+                </p>
+                <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:22, margin:0, color:'#0E0E10' }}>
+                  {item.name}
+                </p>
+                {item.quantity > 1 && (
+                  <p style={{ fontSize:12, color:'rgba(14,14,16,0.4)', margin:'4px 0 0' }}>
+                    Quantity at check-in: {item.quantity}
+                  </p>
+                )}
+              </div>
+
+              {/* Check-in reference */}
+              <div style={{
+                background:'white', borderRadius:12,
+                border:'0.5px solid rgba(14,14,16,0.1)',
+                padding:'12px 14px',
+                display:'flex', alignItems:'center', gap:12,
+              }}>
+                {item.photo_url_checkin ? (
+                  <img src={item.photo_url_checkin} alt="check-in" style={{ width:56, height:56, borderRadius:8, objectFit:'cover', flexShrink:0 }}/>
+                ) : (
+                  <div style={{ width:56, height:56, borderRadius:8, background:'#F3F1EB', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(14,14,16,0.25)" strokeWidth="2" strokeLinecap="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2"/>
+                      <circle cx="8.5" cy="8.5" r="1.5"/>
+                      <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                  </div>
+                )}
+                <div>
+                  <p style={{ fontSize:10, color:'rgba(14,14,16,0.4)', margin:'0 0 3px', textTransform:'uppercase', letterSpacing:'1px' }}>At check-in</p>
+                  <div style={{
+                    display:'inline-flex',
+                    background:
+                      item.condition_checkin === 'good' ? '#EEFAD5' :
+                      item.condition_checkin === 'fair' ? '#FFF8DC' : '#FEE2E2',
+                    padding:'3px 10px', borderRadius:999,
+                  }}>
+                    <p style={{
+                      fontSize:12, fontWeight:700, margin:0,
+                      color:
+                        item.condition_checkin === 'good' ? '#3A7A00' :
+                        item.condition_checkin === 'fair' ? '#8A6000' : '#7A0000',
+                      fontFamily:'Poppins, sans-serif',
+                    }}>
+                      {item.condition_checkin ?? '—'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status */}
+              <div>
+                <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:'0 0 10px' }}>Current status</p>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                  {([
+                    { value: 'ok', label: 'OK', bg:'#EEFAD5', active:'#CAFE87', color:'#1A4A00' },
+                    { value: 'damaged', label: 'Damaged', bg:'#FFF8DC', active:'#FEDE80', color:'#6B4A00' },
+                    { value: 'missing', label: 'Missing', bg:'#FEE2E2', active:'#FCA5A5', color:'#7A0000' },
+                  ] as const).map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setCheckoutInventoryItems(prev =>
+                        prev.map((it, i) => i === checkoutInventoryIndex ? { ...it, status_checkout: opt.value } : it)
+                      )}
+                      style={{
+                        padding:'12px 8px', borderRadius:12, border:'none', cursor:'pointer',
+                        fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:13,
+                        background: item.status_checkout === opt.value ? opt.active : opt.bg,
+                        color: opt.color,
+                        outline: item.status_checkout === opt.value ? `2px solid ${opt.color}` : 'none',
+                        outlineOffset: 1,
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Photo at check-out */}
+              {item.status_checkout && item.status_checkout !== 'ok' && (
+                <div>
+                  <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:'0 0 8px' }}>
+                    Photo
+                    <span style={{ fontSize:11, color:'rgba(14,14,16,0.4)', fontWeight:400, marginLeft:6 }}>
+                      {item.status_checkout === 'damaged' ? 'recommended' : 'optional'}
+                    </span>
+                  </p>
+                  {item.photo_url ? (
+                    <div style={{ position:'relative' }}>
+                      <img src={item.photo_url} alt="checkout" style={{ width:'100%', borderRadius:12, maxHeight:180, objectFit:'cover' }}/>
+                      <button
+                        type="button"
+                        onClick={() => setCheckoutInventoryItems(prev =>
+                          prev.map((it, i) => i === checkoutInventoryIndex ? { ...it, photo_url: null } : it)
+                        )}
+                        style={{ position:'absolute', top:8, right:8, background:'rgba(0,0,0,0.5)', border:'none', borderRadius:999, width:28, height:28, cursor:'pointer', color:'white', fontSize:14 }}
+                      >✕</button>
+                    </div>
+                  ) : (
+                    <label style={{
+                      display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                      padding:'16px', borderRadius:12,
+                      border:'1.5px dashed rgba(14,14,16,0.15)',
+                      background:'white', cursor:'pointer', fontSize:13, color:'rgba(14,14,16,0.5)',
+                    }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                      </svg>
+                      Take photo
+                      <input
+                        type="file" accept="image/*" capture="environment"
+                        style={{ display:'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          const reader = new FileReader()
+                          reader.onload = (ev) => {
+                            setCheckoutInventoryItems(prev =>
+                              prev.map((it, i) => i === checkoutInventoryIndex
+                                ? { ...it, photo_url: ev.target?.result as string }
+                                : it
+                              )
+                            )
+                          }
+                          reader.readAsDataURL(file)
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+
+              {/* Note */}
+              {item.status_checkout && item.status_checkout !== 'ok' && (
+                <div>
+                  <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:'0 0 8px' }}>
+                    Note <span style={{ fontSize:11, color:'rgba(14,14,16,0.4)', fontWeight:400 }}>optional</span>
+                  </p>
+                  <textarea
+                    value={item.notes}
+                    onChange={e => setCheckoutInventoryItems(prev =>
+                      prev.map((it, i) => i === checkoutInventoryIndex ? { ...it, notes: e.target.value } : it)
+                    )}
+                    placeholder="Describe the issue..."
+                    rows={3}
+                    style={{
+                      width:'100%', padding:'12px', borderRadius:12,
+                      border:'1px solid rgba(14,14,16,0.1)',
+                      background:'white', fontSize:14, fontFamily:'DM Sans, sans-serif',
+                      resize:'none', outline:'none',
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* CTA */}
+            <div style={{ padding:'16px 20px', background:'white', borderTop:'1px solid rgba(14,14,16,0.08)' }}>
+              <button
+                type="button"
+                disabled={!item.status_checkout}
+                onClick={async () => {
+                  if (!isLast) {
+                    setCheckoutInventoryIndex(prev => prev + 1)
+                    return
+                  }
+                  // Last item — save checkout snapshots, update reference, then generate
+                  try {
+                    await fetch('/api/inventory/snapshots', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        inspection_id: inspectionId,
+                        items: checkoutInventoryItems.map(it => ({
+                          reference_item_id: it.referenceItemId ?? null,
+                          name: it.name,
+                          category: it.category,
+                          quantity: it.quantity,
+                          status_checkout: it.status_checkout,
+                          notes: it.notes,
+                          photo_url_checkout: it.photo_url,
+                          quantity_checkout: it.quantity,
+                        })),
+                      }),
+                    })
+                    if (propertyId) {
+                      const activeItems = checkoutInventoryItems
+                        .filter(it => it.status_checkout !== 'missing')
+                        .map(it => ({
+                          name: it.name,
+                          category: it.category,
+                          quantity: it.quantity,
+                          source: it.source,
+                        }))
+                      await fetch('/api/inventory/reference', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ property_id: propertyId, items: activeItems }),
+                      })
+                    }
+                  } catch { /* silent */ }
+
+                  setShowCheckoutInventory(false)
+                  void handleGenerateReport()
+                }}
+                style={{
+                  width:'100%', padding:'15px',
+                  background: item.status_checkout ? '#0E0E10' : 'rgba(14,14,16,0.15)',
+                  border:'none', borderRadius:14, cursor: item.status_checkout ? 'pointer' : 'default',
+                  fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15, color:'white',
+                }}
+              >
+                {isLast ? 'Save & Generate Report' : 'Next item →'}
+              </button>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Checkout credit confirmation modal */}
       {showCreditConfirm && (
