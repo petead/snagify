@@ -69,9 +69,9 @@ export default async function InspectionPage({
   const propertyId = (inspection as { property_id?: string }).property_id ?? "";
   const tenancy = Array.isArray(inspection.tenancies)
     ? inspection.tenancies[0]
-    : inspection.tenancies;
-  const isFurnished = (tenancy as { is_furnished?: boolean | null } | null)?.is_furnished ?? null;
-  const wantsInventory = (tenancy as { wants_inventory?: boolean | null } | null)?.wants_inventory ?? false;
+    : (inspection.tenancies as { is_furnished?: boolean | null; wants_inventory?: boolean | null } | null);
+  const initialIsFurnished = tenancy?.is_furnished ?? null;
+  const initialWantsInventory = tenancy?.wants_inventory ?? false;
 
   return (
     <InspectionClient
@@ -83,8 +83,8 @@ export default async function InspectionPage({
       rooms={rooms}
       initialKeyHandover={initialKeyHandover}
       initialCheckinKeyHandover={initialCheckinKeyHandover}
-      initialWantsInventory={wantsInventory}
-      initialIsFurnished={isFurnished}
+      initialIsFurnished={initialIsFurnished}
+      initialWantsInventory={initialWantsInventory}
     />
   );
 }
