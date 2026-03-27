@@ -3160,24 +3160,49 @@ export function InspectionClient({
           {activeReviewRoom === "inventory" && (() => {
             const items = isCheckout ? checkoutInventoryItems : inventoryDetails
 
-            const rank = (c: string | null) => c === 'good' ? 3 : c === 'fair' ? 2 : c === 'poor' ? 1 : 0
-            const getDelta = (ci: string | null, co: string | null) => {
-              if (co === 'missing') return { label: '✗ Missing', color: '#7A0000', bg: '#FEE2E2' }
+            const rank = (c: string | null | undefined) =>
+              c === 'good' ? 3 : c === 'fair' ? 2 : c === 'poor' ? 1 : 0
+
+            const getDelta = (ci: string | null | undefined, co: string | null | undefined) => {
+              if (co === 'missing') return { label: '✗ Missing', color: '#7A0000', bg: '#FEE2E2', key: 'missing' as const }
               if (!ci || !co) return null
-              if (rank(co) < rank(ci)) return { label: 'Deterioration proven', color: '#8A6000', bg: '#FFF8DC' }
-              if (rank(co) === rank(ci)) return { label: 'No change', color: '#3A7A00', bg: '#EEFAD5' }
-              return null
+              const r = rank(co) - rank(ci)
+              if (r < 0) return { label: 'Deterioration proven', color: '#8A6000', bg: '#FFF8DC', key: 'deterioration' as const }
+              if (r > 0) return { label: 'Improved', color: '#3A7A00', bg: '#EEFAD5', key: 'improved' as const }
+              return { label: 'No change', color: '#3A7A00', bg: '#EEFAD5', key: 'nochange' as const }
             }
-            const condBadge = (c: string | null) => ({
+
+            const condBadge = (c: string | null | undefined) => ({
               bg: c === 'good' ? '#EEFAD5' : c === 'fair' ? '#FFF8DC' : c === 'poor' ? '#FEE2E2' : '#F3F1EB',
               color: c === 'good' ? '#3A7A00' : c === 'fair' ? '#8A6000' : c === 'poor' ? '#7A0000' : '#9ca3af',
               label: c ? c.charAt(0).toUpperCase() + c.slice(1) : '—',
             })
 
-            const goodCount = checkoutInventoryItems.filter(i => i.condition === 'good').length
-            const fairCount = checkoutInventoryItems.filter(i => i.condition === 'fair').length
-            const poorCount = checkoutInventoryItems.filter(i => i.condition === 'poor').length
-            const missingCount = checkoutInventoryItems.filter(i => i.condition === 'missing').length
+            // Delta counts for summary pills
+            const noChangeCount = isCheckout
+              ? checkoutInventoryItems.filter(i => {
+                  const d = getDelta(i.checkin_condition, i.condition)
+                  return d?.key === 'nochange'
+                }).length : 0
+            const deteriorationCount = isCheckout
+              ? checkoutInventoryItems.filter(i => {
+                  const d = getDelta(i.checkin_condition, i.condition)
+                  return d?.key === 'deterioration'
+                }).length : 0
+            const missingCount = isCheckout
+              ? checkoutInventoryItems.filter(i => i.condition === 'missing').length : 0
+            const improvedCount = isCheckout
+              ? checkoutInventoryItems.filter(i => {
+                  const d = getDelta(i.checkin_condition, i.condition)
+                  return d?.key === 'improved'
+                }).length : 0
+
+            const summaryPills = [
+              noChangeCount > 0      && { label: 'No change',            count: noChangeCount,     bg: '#EEFAD5', color: '#3A7A00' },
+              deteriorationCount > 0 && { label: 'Deterioration proven', count: deteriorationCount, bg: '#FFF8DC', color: '#8A6000' },
+              missingCount > 0       && { label: 'Missing',              count: missingCount,       bg: '#FEE2E2', color: '#7A0000' },
+              improvedCount > 0      && { label: 'Improved',             count: improvedCount,      bg: '#EEFAD5', color: '#2A6A00' },
+            ].filter(Boolean) as { label: string; count: number; bg: string; color: string }[]
 
             return (
               <div style={{ flex:1, overflowY:'auto', padding:'16px 16px 160px', WebkitOverflowScrolling:'touch' as any }}>
@@ -3192,33 +3217,22 @@ export function InspectionClient({
                   </span>
                 </div>
 
-                {/* Summary pills — checkout only */}
-                {isCheckout && (goodCount + fairCount + poorCount + missingCount) > 0 && (
+                {/* Delta summary pills — checkout only */}
+                {isCheckout && summaryPills.length > 0 && (
                   <div style={{ display:'flex', gap:8, marginBottom:16 }}>
-                    {goodCount > 0 && (
-                      <div style={{ flex:1, background:'#EEFAD5', borderRadius:10, padding:'8px 4px', textAlign:'center' }}>
-                        <p style={{ fontSize:16, fontWeight:700, color:'#3A7A00', margin:0, fontFamily:'Poppins, sans-serif' }}>{goodCount}</p>
-                        <p style={{ fontSize:10, fontWeight:700, color:'#3A7A00', margin:'1px 0 0', letterSpacing:'.5px' }}>GOOD</p>
+                    {summaryPills.map(pill => (
+                      <div key={pill.label} style={{
+                        flex:1, background:pill.bg, borderRadius:12,
+                        padding:'10px 6px', textAlign:'center',
+                      }}>
+                        <p style={{ fontSize:18, fontWeight:800, color:pill.color, margin:0, fontFamily:'Poppins, sans-serif', lineHeight:1 }}>
+                          {pill.count}
+                        </p>
+                        <p style={{ fontSize:9, fontWeight:700, color:pill.color, margin:'4px 0 0', letterSpacing:'.5px', textTransform:'uppercase', lineHeight:1.2 }}>
+                          {pill.label}
+                        </p>
                       </div>
-                    )}
-                    {fairCount > 0 && (
-                      <div style={{ flex:1, background:'#FFF8DC', borderRadius:10, padding:'8px 4px', textAlign:'center' }}>
-                        <p style={{ fontSize:16, fontWeight:700, color:'#8A6000', margin:0, fontFamily:'Poppins, sans-serif' }}>{fairCount}</p>
-                        <p style={{ fontSize:10, fontWeight:700, color:'#8A6000', margin:'1px 0 0', letterSpacing:'.5px' }}>FAIR</p>
-                      </div>
-                    )}
-                    {poorCount > 0 && (
-                      <div style={{ flex:1, background:'#FEE2E2', borderRadius:10, padding:'8px 4px', textAlign:'center' }}>
-                        <p style={{ fontSize:16, fontWeight:700, color:'#7A0000', margin:0, fontFamily:'Poppins, sans-serif' }}>{poorCount}</p>
-                        <p style={{ fontSize:10, fontWeight:700, color:'#7A0000', margin:'1px 0 0', letterSpacing:'.5px' }}>POOR</p>
-                      </div>
-                    )}
-                    {missingCount > 0 && (
-                      <div style={{ flex:1, background:'#F3F1EB', borderRadius:10, padding:'8px 4px', textAlign:'center', border:'0.5px solid rgba(14,14,16,0.08)' }}>
-                        <p style={{ fontSize:16, fontWeight:700, color:'#374151', margin:0, fontFamily:'Poppins, sans-serif' }}>{missingCount}</p>
-                        <p style={{ fontSize:10, fontWeight:700, color:'#374151', margin:'1px 0 0', letterSpacing:'.5px' }}>MISSING</p>
-                      </div>
-                    )}
+                    ))}
                   </div>
                 )}
 
@@ -3245,7 +3259,7 @@ export function InspectionClient({
                     const co = condBadge(checkoutCond)
 
                     const PhotoThumb = ({ src, label }: { src: string | null | undefined; label: string }) => (
-                      <div style={{ width:40, height:40, borderRadius:8, flexShrink:0, overflow:'hidden', position:'relative', background:'#F3F1EB', border:'0.5px solid rgba(14,14,16,0.08)' }}>
+                      <div style={{ width:40, height:40, borderRadius:8, flexShrink:0, overflow:'hidden', background:'#F3F1EB', border:'0.5px solid rgba(14,14,16,0.08)' }}>
                         {src ? (
                           <img src={src} alt={label} style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
                         ) : (
@@ -3261,42 +3275,24 @@ export function InspectionClient({
                     )
 
                     return (
-                      <div key={idx} style={{
-                        background:'white', borderRadius:14,
-                        border:'0.5px solid rgba(14,14,16,0.08)',
-                        overflow:'hidden',
-                      }}>
-                        {/* Header row: name + delta + edit */}
-                        <div style={{
-                          display:'flex', alignItems:'center', justifyContent:'space-between',
-                          padding:'11px 14px', gap:8,
-                          borderBottom:'0.5px solid rgba(14,14,16,0.06)',
-                        }}>
+                      <div key={idx} style={{ background:'white', borderRadius:14, border:'0.5px solid rgba(14,14,16,0.08)', overflow:'hidden' }}>
+
+                        {/* Header: name + delta + edit */}
+                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'11px 14px', gap:8, borderBottom:'0.5px solid rgba(14,14,16,0.06)' }}>
                           <p style={{ fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:13, margin:0, color:'#0E0E10', flex:1, minWidth:0 }}>
                             {item.name}
                             {item.quantity > 1 && <span style={{ fontSize:10, color:'#9ca3af', marginLeft:5, fontWeight:400 }}>×{item.quantity}</span>}
                           </p>
                           <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
                             {delta && (
-                              <span style={{
-                                fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:99,
-                                background:delta.bg, color:delta.color,
-                                fontFamily:'Poppins, sans-serif',
-                              }}>
+                              <span style={{ fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:99, background:delta.bg, color:delta.color, fontFamily:'Poppins, sans-serif' }}>
                                 {delta.label}
                               </span>
                             )}
                             <button
                               type="button"
-                              onClick={() => {
-                                setEditingInventoryIdx(idx)
-                                setEditingInventoryIsCheckout(isCheckout)
-                              }}
-                              style={{
-                                fontSize:11, fontWeight:600, color:'#555',
-                                background:'#F3F1EB', border:'none',
-                                borderRadius:6, padding:'4px 10px', cursor:'pointer',
-                              }}
+                              onClick={() => { setEditingInventoryIdx(idx); setEditingInventoryIsCheckout(isCheckout) }}
+                              style={{ fontSize:11, fontWeight:600, color:'#555', background:'#F3F1EB', border:'none', borderRadius:6, padding:'4px 10px', cursor:'pointer' }}
                             >
                               Edit
                             </button>
@@ -3310,23 +3306,18 @@ export function InspectionClient({
                             <p style={{ fontSize:9, fontWeight:700, color:'#9ca3af', letterSpacing:'.8px', textTransform:'uppercase', margin:'0 0 7px' }}>Check-in</p>
                             <div style={{ display:'flex', gap:8, alignItems:'flex-start' }}>
                               <PhotoThumb src={checkinPhoto} label="check-in"/>
-                              <div>
-                                <div style={{ display:'inline-flex', padding:'2px 8px', borderRadius:99, background:ci.bg, marginBottom:4 }}>
-                                  <span style={{ fontSize:10, fontWeight:700, color:ci.color }}>{ci.label}</span>
-                                </div>
+                              <div style={{ display:'inline-flex', padding:'2px 8px', borderRadius:99, background:ci.bg }}>
+                                <span style={{ fontSize:10, fontWeight:700, color:ci.color }}>{ci.label}</span>
                               </div>
                             </div>
                           </div>
 
                           {/* Check-out */}
                           {isCheckout && (
-                            <div style={{
-                              flex:1, padding:'10px 14px',
-                              background: checkoutCond === 'missing' ? '#FEF2F2' : 'transparent',
-                            }}>
-                              <p style={{ fontSize:9, fontWeight:700, letterSpacing:'.8px', textTransform:'uppercase', margin:'0 0 7px',
-                                color: checkoutCond === 'missing' ? '#C0998E' : '#9ca3af',
-                              }}>Check-out</p>
+                            <div style={{ flex:1, padding:'10px 14px', background: checkoutCond === 'missing' ? '#FEF2F2' : 'transparent' }}>
+                              <p style={{ fontSize:9, fontWeight:700, letterSpacing:'.8px', textTransform:'uppercase', margin:'0 0 7px', color: checkoutCond === 'missing' ? '#C0998E' : '#9ca3af' }}>
+                                Check-out
+                              </p>
                               {checkoutCond === 'missing' ? (
                                 <p style={{ fontSize:12, fontWeight:600, color:'#B45A5A', margin:0 }}>Not found in apartment</p>
                               ) : (
@@ -3336,9 +3327,7 @@ export function InspectionClient({
                                     <div style={{ display:'inline-flex', padding:'2px 8px', borderRadius:99, background:co.bg, marginBottom:4 }}>
                                       <span style={{ fontSize:10, fontWeight:700, color:co.color }}>{co.label}</span>
                                     </div>
-                                    {note && (
-                                      <p style={{ fontSize:11, color:'#888', margin:0, lineHeight:1.4 }}>{note}</p>
-                                    )}
+                                    {note && <p style={{ fontSize:11, color:'#888', margin:0, lineHeight:1.4 }}>{note}</p>}
                                   </div>
                                 </div>
                               )}
@@ -3362,11 +3351,7 @@ export function InspectionClient({
                       setInventoryScreen('selection')
                       setScreen('inventory')
                     }}
-                    style={{
-                      width:'100%', padding:'12px', background:'transparent', marginTop:16,
-                      border:'1.5px dashed rgba(154,136,253,0.4)', borderRadius:12, cursor:'pointer',
-                      fontSize:13, fontWeight:600, color:'#9A88FD',
-                    }}
+                    style={{ width:'100%', padding:'12px', background:'transparent', marginTop:16, border:'1.5px dashed rgba(154,136,253,0.4)', borderRadius:12, cursor:'pointer', fontSize:13, fontWeight:600, color:'#9A88FD' }}
                   >
                     Edit all items
                   </button>
