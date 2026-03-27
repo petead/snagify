@@ -3028,7 +3028,7 @@ export function InspectionClient({
       )}
 
       {screen === "inventory" && inventoryScreen === 'selection' && (
-        <div style={{ minHeight:'100vh', background:'#F8F7F4', display:'flex', flexDirection:'column' }}>
+        <div style={{ height:'100vh', background:'#F8F7F4', display:'flex', flexDirection:'column', overflow:'hidden' }}>
           {/* Header */}
           <div style={{
             padding:'20px 20px 16px',
@@ -3038,7 +3038,7 @@ export function InspectionClient({
             <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
               <button
                 type="button"
-                onClick={() => setScreen('review')}
+                onClick={() => setScreen('inspect')}
                 style={{ background:'none', border:'none', cursor:'pointer', padding:4 }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E0E10" strokeWidth="2.5" strokeLinecap="round">
@@ -3092,7 +3092,7 @@ export function InspectionClient({
           </div>
 
           {isFurnished && (
-            <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }}>
+            <div style={{ flex:1, overflowY:'auto', padding:'16px 20px', WebkitOverflowScrolling:'touch' }}>
 
               {/* AI suggestion banner */}
               {(aiDetectedItems.length > 0 || inventoryReferenceItems.length === 0) && (
@@ -3273,7 +3273,7 @@ export function InspectionClient({
       )}
 
       {screen === "inventory" && inventoryScreen === 'detail' && (
-        <div style={{ minHeight:'100vh', background:'#F8F7F4', display:'flex', flexDirection:'column' }}>
+        <div style={{ height:'100vh', background:'#F8F7F4', display:'flex', flexDirection:'column', overflow:'hidden' }}>
           {/* Progress dots */}
           <div style={{ padding:'16px 20px 0', display:'flex', justifyContent:'center', gap:6 }}>
             {inventoryDetails.map((_, i) => (
@@ -3290,7 +3290,7 @@ export function InspectionClient({
             const item = inventoryDetails[inventoryDetailIndex]
 
             return (
-              <div style={{ flex:1, padding:'24px 20px', display:'flex', flexDirection:'column', gap:20 }}>
+              <div style={{ flex:1, padding:'24px 20px', display:'flex', flexDirection:'column', gap:20, overflowY:'auto', WebkitOverflowScrolling:'touch' }}>
                 <div>
                   <p style={{ fontSize:12, color:'rgba(14,14,16,0.4)', margin:'0 0 4px', textTransform:'uppercase', letterSpacing:'1px' }}>
                     Item {inventoryDetailIndex + 1} of {inventoryDetails.length}
@@ -3495,7 +3495,7 @@ export function InspectionClient({
         const progress = ((checkoutInventoryIndex + 1) / checkoutInventoryItems.length) * 100
 
         return (
-          <div style={{ minHeight:'100vh', background:'#F8F7F4', display:'flex', flexDirection:'column' }}>
+          <div style={{ height:'100vh', background:'#F8F7F4', display:'flex', flexDirection:'column', overflow:'hidden' }}>
 
             {/* Header */}
             <div style={{ padding:'16px 20px', background:'white', borderBottom:'1px solid rgba(14,14,16,0.08)' }}>
@@ -3531,7 +3531,7 @@ export function InspectionClient({
             </div>
 
             {/* Content */}
-            <div style={{ flex:1, padding:'24px 20px', display:'flex', flexDirection:'column', gap:20, overflowY:'auto' }}>
+            <div style={{ flex:1, padding:'24px 20px', display:'flex', flexDirection:'column', gap:20, overflowY:'auto', WebkitOverflowScrolling:'touch' }}>
 
               {/* Item name */}
               <div>
