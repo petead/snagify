@@ -133,13 +133,13 @@ type InspectionRow = {
     name: string
     category: string
     quantity: number
-    condition_checkin?: string | null
+    condition?: string | null
     photo_url?: string | null
-    status_checkout?: string | null
     notes?: string | null
-    photo_url_checkout?: string | null
-    quantity_checkout?: number | null
+    inspection_type?: string | null
     is_tenant_item?: boolean | null
+    /** Merged from linked check-in inspection for checkout PDF only */
+    checkin_condition?: string | null
   }[] | null;
 };
 
@@ -255,12 +255,10 @@ const INSPECTION_SELECT = `
     name,
     category,
     quantity,
-    condition_checkin,
+    condition,
     photo_url,
-    status_checkout,
     notes,
-    photo_url_checkout,
-    quantity_checkout,
+    inspection_type,
     is_tenant_item
   )
 `;
@@ -303,16 +301,16 @@ export async function buildPdfAndUpload(
         return typeof rec.item === "string" && typeof rec.qty === "number";
       });
 
-    // Inventory snapshots (exclude tenant's own items)
-    const inventorySnapshots = (row.inventory_snapshots ?? [])
-      .filter(s => !s.is_tenant_item)
-
     const inspectionType = (
       (row as Record<string, unknown>).inspection_type ??
       (row as Record<string, unknown>).type ??
       ""
     ) as string;
     const isCheckout = inspectionType.toLowerCase().includes("check-out");
+
+    // Inventory snapshots (exclude tenant's own items)
+    let inventorySnapshots = (row.inventory_snapshots ?? [])
+      .filter(s => !s.is_tenant_item)
 
     let checkinInspectionForPdf: { id: string; created_at: string; document_hash?: string } | null = null;
     let checkinPhotosById: Map<string, { id: string; url: string; damage_tags?: string[]; ai_analysis?: string | null; width?: number | null; height?: number | null; taken_at?: string | null }> = new Map();
@@ -420,6 +418,23 @@ export async function buildPdfAndUpload(
             })
           );
       }
+    }
+
+    if (isCheckout && checkinInspectionForPdf) {
+      const { data: checkinInvRows } = await supabase
+        .from("inventory_snapshots")
+        .select("name, condition")
+        .eq("inspection_id", checkinInspectionForPdf.id);
+      const checkinCondByName = new Map<string, string | null>(
+        (checkinInvRows ?? []).map((r: { name: string; condition?: string | null }) => [
+          r.name.toLowerCase(),
+          r.condition ?? null,
+        ])
+      );
+      inventorySnapshots = inventorySnapshots.map((s) => ({
+        ...s,
+        checkin_condition: checkinCondByName.get(s.name.toLowerCase()) ?? null,
+      }));
     }
 
     const prop = Array.isArray(row.properties) ? row.properties[0] : row.properties;

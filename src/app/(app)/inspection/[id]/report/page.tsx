@@ -29,8 +29,7 @@ export default async function ReportPage({
       signatures (signer_type, otp_verified, signed_at, signature_data, refused_at, refused_reason),
       inventory_snapshots (
         id, name, category, quantity,
-        condition_checkin, photo_url, notes, source, is_tenant_item,
-        status_checkout, photo_url_checkout, quantity_checkout
+        condition, photo_url, notes, source, is_tenant_item, inspection_type
       )
     `
     )
@@ -38,6 +37,41 @@ export default async function ReportPage({
     .single();
 
   if (error || !inspection) notFound();
+
+  const isCheckout = (inspection.type ?? "").toLowerCase().includes("check-out");
+
+  let inspectionForView = inspection as InspectionWithRelations;
+
+  if (isCheckout && inspection.property_id) {
+    const { data: checkinRow } = await supabase
+      .from("inspections")
+      .select("id")
+      .eq("property_id", inspection.property_id)
+      .eq("type", "check-in")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (checkinRow?.id) {
+      const { data: checkinSnaps } = await supabase
+        .from("inventory_snapshots")
+        .select("name, condition")
+        .eq("inspection_id", checkinRow.id);
+      const checkinByName = new Map<string, string | null>(
+        (checkinSnaps ?? []).map((r: { name: string; condition?: string | null }) => [
+          r.name.toLowerCase(),
+          r.condition ?? null,
+        ])
+      );
+      inspectionForView = {
+        ...inspection,
+        inventory_snapshots: (inspection.inventory_snapshots ?? []).map((s) => ({
+          ...s,
+          checkin_condition: checkinByName.get(s.name.toLowerCase()) ?? null,
+        })),
+      } as InspectionWithRelations;
+    }
+  }
 
   let profile: { full_name: string | null; agency_name: string | null } | null = null;
   if (inspection.agent_id) {
@@ -54,7 +88,6 @@ export default async function ReportPage({
 
   // Fetch check-in data when viewing a check-out inspection
   let checkinData: CheckinData | null = null;
-  const isCheckout = (inspection.type ?? "").toLowerCase().includes("check-out");
   if (isCheckout && inspection.property_id) {
     const { data } = await supabase
       .from("inspections")
@@ -75,7 +108,7 @@ export default async function ReportPage({
 
   return (
     <ReportClient
-      inspection={inspection as InspectionWithRelations}
+      inspection={inspectionForView}
       profile={profile}
       checkinData={checkinData}
     />
@@ -157,14 +190,13 @@ export type InspectionWithRelations = {
     name: string;
     category: string;
     quantity: number;
-    condition_checkin: string | null;
+    condition: string | null;
     photo_url: string | null;
     notes: string | null;
     source: string | null;
     is_tenant_item: boolean | null;
-    status_checkout?: string | null;
-    photo_url_checkout?: string | null;
-    quantity_checkout?: number | null;
+    inspection_type?: string | null;
+    checkin_condition?: string | null;
   }[] | null;
 };
 

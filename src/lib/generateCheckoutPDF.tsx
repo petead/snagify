@@ -201,11 +201,11 @@ export interface CheckoutPDFProps {
     name: string
     category: string
     quantity: number
-    condition_checkin?: string | null
+    condition?: string | null
+    checkin_condition?: string | null
     photo_url?: string | null
-    status_checkout?: string | null
     notes?: string | null
-    quantity_checkout?: number | null
+    inspection_type?: string | null
     is_tenant_item?: boolean | null
   }[]
 }
@@ -1682,17 +1682,16 @@ export function CheckoutPDFDocument({
               {/* Summary pills */}
               <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
                 {[
-                  { label: 'Good', status: 'good', bg: '#EEFAD5', color: '#3A7A00' },
-                  { label: 'Fair', status: 'fair', bg: '#FFF8DC', color: '#8A6000' },
-                  { label: 'Poor', status: 'poor', bg: '#FEE2E2', color: '#7A0000' },
-                  { label: 'Missing', status: 'missing', bg: '#F3F1EB', color: '#374151' },
-                ].map(({ label, status, bg, color }) => (
-                  <View key={status} style={{
+                  { label: 'Good', count: inventorySnapshots.filter(i => i.condition === 'good').length, bg: '#EEFAD5', color: '#3A7A00' },
+                  { label: 'Fair / Poor', count: inventorySnapshots.filter(i => i.condition === 'fair' || i.condition === 'poor').length, bg: '#FFF8DC', color: '#8A6000' },
+                  { label: 'Missing', count: inventorySnapshots.filter(i => i.condition === 'missing').length, bg: '#F3F1EB', color: '#374151' },
+                ].map(({ label, count, bg, color }) => (
+                  <View key={label} style={{
                     flex: 1, backgroundColor: bg,
                     padding: 8, borderRadius: 8, alignItems: 'center',
                   }}>
                     <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color }}>
-                      {inventorySnapshots.filter(i => i.status_checkout === status).length}
+                      {count}
                     </Text>
                     <Text style={{ fontSize: 7, color, marginTop: 2 }}>{label}</Text>
                   </View>
@@ -1716,11 +1715,11 @@ export function CheckoutPDFDocument({
                   borderBottomWidth: 0.5,
                   borderBottomColor: '#F3F3F8',
                   backgroundColor:
-                    item.status_checkout === 'missing' ? '#FEF2F2' :
-                    item.status_checkout === 'poor' ? '#FFFBEB' :
-                    item.status_checkout === 'fair' ? '#FFFBF0' : 'transparent',
+                    item.condition === 'missing' ? '#FEF2F2' :
+                    item.condition === 'poor' ? '#FFFBEB' :
+                    item.condition === 'fair' ? '#FFFBF0' : 'transparent',
                   borderRadius: 4,
-                  paddingHorizontal: item.status_checkout !== 'good' ? 6 : 0,
+                  paddingHorizontal: item.condition !== 'good' ? 6 : 0,
                   marginBottom: 2,
                 }}>
                   <Text style={{ flex: 3, fontSize: 9, color: '#1A1A2E' }}>
@@ -1729,39 +1728,39 @@ export function CheckoutPDFDocument({
                   <View style={{ flex: 1, alignItems: 'center' }}>
                     <View style={{
                       backgroundColor:
-                        item.condition_checkin === 'good' ? '#EEFAD5' :
-                        item.condition_checkin === 'fair' ? '#FFF8DC' : '#FEE2E2',
+                        item.checkin_condition === 'good' ? '#EEFAD5' :
+                        item.checkin_condition === 'fair' ? '#FFF8DC' : '#FEE2E2',
                       paddingHorizontal: 5, paddingVertical: 2, borderRadius: 99,
                     }}>
                       <Text style={{
                         fontSize: 7, fontFamily: 'Helvetica-Bold',
                         color:
-                          item.condition_checkin === 'good' ? '#3A7A00' :
-                          item.condition_checkin === 'fair' ? '#8A6000' : '#7A0000',
+                          item.checkin_condition === 'good' ? '#3A7A00' :
+                          item.checkin_condition === 'fair' ? '#8A6000' : '#7A0000',
                       }}>
-                        {item.condition_checkin ?? '—'}
+                        {item.checkin_condition ?? '—'}
                       </Text>
                     </View>
                   </View>
                   <View style={{ flex: 1, alignItems: 'center' }}>
                     <View style={{
                       backgroundColor:
-                        item.status_checkout === 'good' ? '#EEFAD5' :
-                        item.status_checkout === 'fair' ? '#FFF8DC' :
-                        item.status_checkout === 'poor' ? '#FEE2E2' : '#F3F3F3',
+                        item.condition === 'good' ? '#EEFAD5' :
+                        item.condition === 'fair' ? '#FFF8DC' :
+                        item.condition === 'poor' ? '#FEE2E2' : '#F3F3F3',
                       paddingHorizontal: 6, paddingVertical: 2, borderRadius: 99,
                     }}>
                       <Text style={{
                         fontSize: 8, fontFamily: 'Helvetica-Bold',
                         color:
-                          item.status_checkout === 'good' ? '#3A7A00' :
-                          item.status_checkout === 'fair' ? '#8A6000' :
-                          item.status_checkout === 'poor' ? '#7A0000' : '#666',
+                          item.condition === 'good' ? '#3A7A00' :
+                          item.condition === 'fair' ? '#8A6000' :
+                          item.condition === 'poor' ? '#7A0000' : '#666',
                       }}>
-                        {item.status_checkout === 'good' ? 'Good' :
-                         item.status_checkout === 'fair' ? 'Fair' :
-                         item.status_checkout === 'poor' ? 'Poor' :
-                         item.status_checkout === 'missing' ? 'Missing' : '-'}
+                        {item.condition === 'good' ? 'Good' :
+                         item.condition === 'fair' ? 'Fair' :
+                         item.condition === 'poor' ? 'Poor' :
+                         item.condition === 'missing' ? 'Missing' : '-'}
                       </Text>
                     </View>
                   </View>

@@ -1091,10 +1091,10 @@ interface InspectionMeta {
     name: string
     category: string
     quantity: number
-    condition_checkin?: string | null
+    condition?: string | null
     photo_url?: string | null
-    status_checkout?: string | null
     notes?: string | null
+    inspection_type?: string | null
     is_tenant_item?: boolean | null
   }[]
 }
@@ -1658,17 +1658,17 @@ function InspectionReport({
                   <View style={{ flex: 1, alignItems: 'center' }}>
                     <View style={{
                       backgroundColor:
-                        item.condition_checkin === 'good' ? '#EEFAD5' :
-                        item.condition_checkin === 'fair' ? '#FFF8DC' : '#FEE2E2',
+                        item.condition === 'good' ? '#EEFAD5' :
+                        item.condition === 'fair' ? '#FFF8DC' : '#FEE2E2',
                       paddingHorizontal: 6, paddingVertical: 2, borderRadius: 99,
                     }}>
                       <Text style={{
                         fontSize: 8, fontFamily: 'Helvetica-Bold',
                         color:
-                          item.condition_checkin === 'good' ? '#3A7A00' :
-                          item.condition_checkin === 'fair' ? '#8A6000' : '#7A0000',
+                          item.condition === 'good' ? '#3A7A00' :
+                          item.condition === 'fair' ? '#8A6000' : '#7A0000',
                       }}>
-                        {item.condition_checkin ?? '—'}
+                        {item.condition ?? '—'}
                       </Text>
                     </View>
                   </View>
