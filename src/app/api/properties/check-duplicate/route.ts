@@ -48,8 +48,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ duplicates: [] });
     }
 
-    const inputNormalized = normalize(building_name) + "|" + normalize(unit_number);
-
     // Fetch all properties for this agent
     const { data: properties } = await supabase
       .from("properties")
@@ -74,7 +72,7 @@ export async function POST(req: NextRequest) {
 
       // Building name similarity must be > 0.5
       const score = similarity(inputBuildingNorm, pBuildingNorm);
-      return score > 0.5 && inputNormalized !== (p.normalized_key ?? "");
+      return score > 0.5;
     });
 
     return NextResponse.json({ duplicates: similar });
