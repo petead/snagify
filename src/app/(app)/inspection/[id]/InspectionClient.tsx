@@ -15,6 +15,81 @@ import { ProGateSheet } from "@/components/ProGateSheet";
 import { checkProAccess, type ProAccessState } from "@/lib/checkProAccess";
 import { trackAction } from "@/lib/breadcrumb";
 
+const STANDARD_INVENTORY: Record<number, { name: string; category: string; quantity: number }[]> = {
+  0: [
+    { name: 'Bed (single)', category: 'Furniture', quantity: 1 },
+    { name: 'Wardrobe', category: 'Furniture', quantity: 1 },
+    { name: 'Sofa', category: 'Furniture', quantity: 1 },
+    { name: 'Coffee table', category: 'Furniture', quantity: 1 },
+    { name: 'Dining table', category: 'Furniture', quantity: 1 },
+    { name: 'Dining chairs', category: 'Furniture', quantity: 2 },
+    { name: 'Refrigerator', category: 'Appliances', quantity: 1 },
+    { name: 'Washing machine', category: 'Appliances', quantity: 1 },
+    { name: 'Microwave', category: 'Appliances', quantity: 1 },
+    { name: 'TV', category: 'Electronics', quantity: 1 },
+    { name: 'AC remote', category: 'Electronics', quantity: 1 },
+    { name: 'Curtains', category: 'Other', quantity: 1 },
+  ],
+  1: [
+    { name: 'Bed (double)', category: 'Furniture', quantity: 1 },
+    { name: 'Bedside tables', category: 'Furniture', quantity: 2 },
+    { name: 'Wardrobe', category: 'Furniture', quantity: 1 },
+    { name: 'Sofa', category: 'Furniture', quantity: 1 },
+    { name: 'Coffee table', category: 'Furniture', quantity: 1 },
+    { name: 'Dining table', category: 'Furniture', quantity: 1 },
+    { name: 'Dining chairs', category: 'Furniture', quantity: 4 },
+    { name: 'Refrigerator', category: 'Appliances', quantity: 1 },
+    { name: 'Washing machine', category: 'Appliances', quantity: 1 },
+    { name: 'Oven', category: 'Appliances', quantity: 1 },
+    { name: 'Microwave', category: 'Appliances', quantity: 1 },
+    { name: 'TV', category: 'Electronics', quantity: 2 },
+    { name: 'AC remote', category: 'Electronics', quantity: 2 },
+    { name: 'Curtains', category: 'Other', quantity: 1 },
+  ],
+  2: [
+    { name: 'Bed (king)', category: 'Furniture', quantity: 1 },
+    { name: 'Bed (double)', category: 'Furniture', quantity: 1 },
+    { name: 'Bedside tables', category: 'Furniture', quantity: 4 },
+    { name: 'Wardrobe', category: 'Furniture', quantity: 2 },
+    { name: 'Sofa', category: 'Furniture', quantity: 1 },
+    { name: 'Coffee table', category: 'Furniture', quantity: 1 },
+    { name: 'Dining table', category: 'Furniture', quantity: 1 },
+    { name: 'Dining chairs', category: 'Furniture', quantity: 4 },
+    { name: 'Refrigerator', category: 'Appliances', quantity: 1 },
+    { name: 'Washing machine', category: 'Appliances', quantity: 1 },
+    { name: 'Dishwasher', category: 'Appliances', quantity: 1 },
+    { name: 'Oven', category: 'Appliances', quantity: 1 },
+    { name: 'Microwave', category: 'Appliances', quantity: 1 },
+    { name: 'TV', category: 'Electronics', quantity: 2 },
+    { name: 'AC remote', category: 'Electronics', quantity: 3 },
+    { name: 'Curtains', category: 'Other', quantity: 1 },
+  ],
+  3: [
+    { name: 'Bed (king)', category: 'Furniture', quantity: 1 },
+    { name: 'Bed (double)', category: 'Furniture', quantity: 2 },
+    { name: 'Bedside tables', category: 'Furniture', quantity: 6 },
+    { name: 'Wardrobe', category: 'Furniture', quantity: 3 },
+    { name: 'Sofa', category: 'Furniture', quantity: 2 },
+    { name: 'Coffee table', category: 'Furniture', quantity: 1 },
+    { name: 'Dining table', category: 'Furniture', quantity: 1 },
+    { name: 'Dining chairs', category: 'Furniture', quantity: 6 },
+    { name: 'Refrigerator', category: 'Appliances', quantity: 1 },
+    { name: 'Washing machine', category: 'Appliances', quantity: 1 },
+    { name: 'Dryer', category: 'Appliances', quantity: 1 },
+    { name: 'Dishwasher', category: 'Appliances', quantity: 1 },
+    { name: 'Oven', category: 'Appliances', quantity: 1 },
+    { name: 'Microwave', category: 'Appliances', quantity: 1 },
+    { name: 'TV', category: 'Electronics', quantity: 3 },
+    { name: 'AC remote', category: 'Electronics', quantity: 4 },
+    { name: 'Curtains', category: 'Other', quantity: 1 },
+  ],
+}
+
+function getStandardInventory(bedroomCount: number) {
+  const key = Math.min(bedroomCount, 3)
+  return STANDARD_INVENTORY[key] ?? STANDARD_INVENTORY[1]
+}
+
 // ─── Types ───────────────────────────────────────
 type RoomData = {
   id: string;
@@ -1414,6 +1489,40 @@ export function InspectionClient({
   function buildInventorySelection() {
     const merged: typeof inventorySelection = []
     const seen = new Set<string>()
+
+    // If no reference items → use standard inventory based on bedroom count
+    if (inventoryReferenceItems.length === 0) {
+      const bedroomCount = liveRooms.filter(r =>
+        r.name.toLowerCase().includes('bedroom') ||
+        r.name.toLowerCase().includes('bed') ||
+        r.name.toLowerCase().includes('chambre')
+      ).length
+      const standard = getStandardInventory(bedroomCount)
+      const standardItems: typeof inventorySelection = standard.map(item => ({
+        name: item.name,
+        category: item.category,
+        quantity: item.quantity,
+        source: 'standard',
+        selected: true,
+      }))
+      // Merge with AI detected items
+      const seen2 = new Set(standard.map(i => i.name.toLowerCase()))
+      for (const ai of aiDetectedItems) {
+        const key = ai.name.toLowerCase()
+        if (!seen2.has(key)) {
+          seen2.add(key)
+          standardItems.push({
+            name: ai.name,
+            category: 'other',
+            quantity: 1,
+            source: 'ai',
+            selected: true,
+          })
+        }
+      }
+      setInventorySelection(standardItems)
+      return
+    }
 
     // From reference (history)
     for (const ref of inventoryReferenceItems) {
@@ -2986,7 +3095,7 @@ export function InspectionClient({
             <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }}>
 
               {/* AI suggestion banner */}
-              {aiDetectedItems.length > 0 && (
+              {(aiDetectedItems.length > 0 || inventoryReferenceItems.length === 0) && (
                 <div style={{
                   background:'#EDE9FF', borderRadius:12, padding:'10px 14px',
                   marginBottom:16, display:'flex', alignItems:'center', gap:8,
@@ -2995,7 +3104,10 @@ export function InspectionClient({
                     <path d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m1.636-6.364.707.707M6 18l.343-.343A7.963 7.963 0 0 1 4 12a8 8 0 0 1 16 0"/>
                   </svg>
                   <p style={{ fontSize:12, color:'#534AB7', margin:0, fontWeight:600 }}>
-                    AI detected {aiDetectedItems.length} items in your photos
+                    {inventoryReferenceItems.length === 0
+                      ? `Standard list for ${liveRooms.filter(r => r.name.toLowerCase().includes('bed')).length}BR · ${aiDetectedItems.length > 0 ? `+ ${aiDetectedItems.length} AI detected` : 'edit as needed'}`
+                      : `AI detected ${aiDetectedItems.length} item${aiDetectedItems.length > 1 ? 's' : ''} in your photos`
+                    }
                   </p>
                 </div>
               )}
@@ -3047,6 +3159,9 @@ export function InspectionClient({
                           {item.source === 'history' && (
                             <span style={{ marginLeft:6, color:'#3A7A00', fontWeight:600 }}>· History</span>
                           )}
+                          {item.source === 'standard' && (
+                            <span style={{ marginLeft:6, color:'#D97706', fontWeight:600 }}>· Standard</span>
+                          )}
                         </p>
                       </div>
 
@@ -3093,7 +3208,7 @@ export function InspectionClient({
           )}
 
           {/* CTA */}
-          <div style={{ padding:'16px 20px', background:'white', borderTop:'1px solid rgba(14,14,16,0.08)' }}>
+          <div style={{ padding:'12px 20px', paddingBottom:'max(16px, calc(env(safe-area-inset-bottom) + 80px))', background:'white', borderTop:'1px solid rgba(14,14,16,0.08)' }}>
             {isFurnished ? (
               <button
                 type="button"
@@ -3292,7 +3407,7 @@ export function InspectionClient({
           })()}
 
           {/* Navigation */}
-          <div style={{ padding:'16px 20px', background:'white', borderTop:'1px solid rgba(14,14,16,0.08)', display:'flex', gap:10 }}>
+          <div style={{ padding:'12px 20px', paddingBottom:'max(16px, calc(env(safe-area-inset-bottom) + 80px))', background:'white', borderTop:'1px solid rgba(14,14,16,0.08)', display:'flex', gap:10 }}>
             <button
               type="button"
               onClick={() => {
@@ -3583,7 +3698,7 @@ export function InspectionClient({
             </div>
 
             {/* CTA */}
-            <div style={{ padding:'16px 20px', background:'white', borderTop:'1px solid rgba(14,14,16,0.08)' }}>
+            <div style={{ padding:'12px 20px', paddingBottom:'max(16px, calc(env(safe-area-inset-bottom) + 80px))', background:'white', borderTop:'1px solid rgba(14,14,16,0.08)' }}>
               <button
                 type="button"
                 disabled={!item.status_checkout}
