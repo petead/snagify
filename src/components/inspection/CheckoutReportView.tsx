@@ -54,12 +54,11 @@ interface Props {
     name: string
     category: string
     quantity: number
-    condition_checkin?: string | null
+    condition?: string | null
+    checkin_condition?: string | null
     photo_url?: string | null
-    status_checkout?: string | null
     notes?: string | null
-    photo_url_checkout?: string | null
-    quantity_checkout?: number | null
+    inspection_type?: string | null
     is_tenant_item?: boolean | null
   }>
 }
@@ -733,10 +732,10 @@ export function CheckoutReportView({
         {/* ── INVENTORY COMPARISON ── */}
         {inventorySnapshots && inventorySnapshots.filter(s => !s.is_tenant_item).length > 0 && (() => {
           const items = inventorySnapshots.filter(s => !s.is_tenant_item)
-          const goodCount = items.filter(i => i.status_checkout === 'good').length
-          const fairCount = items.filter(i => i.status_checkout === 'fair').length
-          const poorCount = items.filter(i => i.status_checkout === 'poor').length
-          const missingCount = items.filter(i => i.status_checkout === 'missing').length
+          const goodCount = items.filter(i => i.condition === 'good').length
+          const fairCount = items.filter(i => i.condition === 'fair').length
+          const poorCount = items.filter(i => i.condition === 'poor').length
+          const missingCount = items.filter(i => i.condition === 'missing').length
 
           return (
             <div className="bg-white rounded-2xl border border-[#EEECFF] mx-4 mb-3">
@@ -787,15 +786,15 @@ export function CheckoutReportView({
                     className="flex items-center gap-3 p-3 rounded-xl"
                     style={{
                       background:
-                        item.status_checkout === 'missing' ? '#FEF2F2' :
-                        item.status_checkout === 'poor' ? '#FFFBEB' :
-                        item.status_checkout === 'fair' ? '#FFFBF0' : '#F8F7F4',
+                        item.condition === 'missing' ? '#FEF2F2' :
+                        item.condition === 'poor' ? '#FFFBEB' :
+                        item.condition === 'fair' ? '#FFFBF0' : '#F8F7F4',
                     }}
                   >
                     {/* Photo — checkout first, fallback to checkin */}
-                    {(item.photo_url_checkout ?? item.photo_url) ? (
+                    {item.photo_url ? (
                       <img
-                        src={(item.photo_url_checkout ?? item.photo_url)!}
+                        src={item.photo_url}
                         alt={item.name}
                         className="w-11 h-11 rounded-lg object-cover flex-shrink-0"
                       />
@@ -818,9 +817,9 @@ export function CheckoutReportView({
                         )}
                       </p>
                       {/* Check-in condition */}
-                      {item.condition_checkin && (
+                      {item.checkin_condition && (
                         <p className="text-[11px] text-[#9ca3af]">
-                          Check-in: {item.condition_checkin}
+                          Check-in: {item.checkin_condition}
                         </p>
                       )}
                       {item.notes && (
@@ -833,26 +832,26 @@ export function CheckoutReportView({
                       className="flex-shrink-0 px-2.5 py-1 rounded-full"
                       style={{
                         background:
-                          item.status_checkout === 'good'    ? '#EEFAD5' :
-                          item.status_checkout === 'fair'    ? '#FFF8DC' :
-                          item.status_checkout === 'poor'    ? '#FEE2E2' :
-                          item.status_checkout === 'missing' ? '#F3F1EB' : '#F3F1EB',
+                          item.condition === 'good'    ? '#EEFAD5' :
+                          item.condition === 'fair'    ? '#FFF8DC' :
+                          item.condition === 'poor'    ? '#FEE2E2' :
+                          item.condition === 'missing' ? '#F3F1EB' : '#F3F1EB',
                       }}
                     >
                       <span
                         className="text-[11px] font-bold"
                         style={{
                           color:
-                            item.status_checkout === 'good'    ? '#3A7A00' :
-                            item.status_checkout === 'fair'    ? '#8A6000' :
-                            item.status_checkout === 'poor'    ? '#7A0000' :
-                            item.status_checkout === 'missing' ? '#374151' : '#9ca3af',
+                            item.condition === 'good'    ? '#3A7A00' :
+                            item.condition === 'fair'    ? '#8A6000' :
+                            item.condition === 'poor'    ? '#7A0000' :
+                            item.condition === 'missing' ? '#374151' : '#9ca3af',
                         }}
                       >
-                        {item.status_checkout === 'good'    ? 'Good' :
-                         item.status_checkout === 'fair'    ? 'Fair' :
-                         item.status_checkout === 'poor'    ? 'Poor' :
-                         item.status_checkout === 'missing' ? '✗ Missing' : '—'}
+                        {item.condition === 'good'    ? 'Good' :
+                         item.condition === 'fair'    ? 'Fair' :
+                         item.condition === 'poor'    ? 'Poor' :
+                         item.condition === 'missing' ? '✗ Missing' : '—'}
                       </span>
                     </div>
                   </div>

@@ -65,7 +65,7 @@ export default async function ReportPage({
       );
       inspectionForView = {
         ...inspection,
-        inventory_snapshots: (inspection.inventory_snapshots ?? []).map((s) => ({
+        inventory_snapshots: (inspection.inventory_snapshots ?? []).map((s: { name: string }) => ({
           ...s,
           checkin_condition: checkinByName.get(s.name.toLowerCase()) ?? null,
         })),

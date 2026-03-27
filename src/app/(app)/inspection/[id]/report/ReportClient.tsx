@@ -954,8 +954,9 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
   const inventorySnapshots = (
     (inspection as { inventory_snapshots?: {
       id: string; name: string; category: string; quantity: number;
-      condition_checkin: string | null; photo_url: string | null;
+      condition: string | null; photo_url: string | null;
       notes: string | null; source: string | null; is_tenant_item: boolean | null;
+      checkin_condition?: string | null;
     }[] | null }).inventory_snapshots ?? []
   ).filter(s => !s.is_tenant_item);
   const totalPhotos = sortedRooms.reduce((acc, r) => acc + (r.photos?.length ?? 0), 0);
@@ -1190,10 +1191,9 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
             inventorySnapshots={(inspection as {
               inventory_snapshots?: Array<{
                 id: string; name: string; category: string; quantity: number;
-                condition_checkin?: string | null; photo_url?: string | null;
-                status_checkout?: string | null; notes?: string | null;
-                photo_url_checkout?: string | null; quantity_checkout?: number | null;
-                is_tenant_item?: boolean | null;
+                condition?: string | null; checkin_condition?: string | null;
+                photo_url?: string | null; notes?: string | null;
+                inspection_type?: string | null; is_tenant_item?: boolean | null;
               }>
             }).inventory_snapshots ?? []}
           />
@@ -1974,22 +1974,22 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
                     </div>
 
                     {/* Condition badge */}
-                    {item.condition_checkin && (
+                    {item.condition && (
                       <div style={{
                         padding: "4px 12px", borderRadius: 99,
                         background:
-                          item.condition_checkin === "good" ? "#EEFAD5" :
-                          item.condition_checkin === "fair" ? "#FFF8DC" : "#FEE2E2",
+                          item.condition === "good" ? "#EEFAD5" :
+                          item.condition === "fair" ? "#FFF8DC" : "#FEE2E2",
                         flexShrink: 0,
                       }}>
                         <span style={{
                           fontSize: 12, fontWeight: 700,
                           color:
-                            item.condition_checkin === "good" ? "#3A7A00" :
-                            item.condition_checkin === "fair" ? "#8A6000" : "#7A0000",
+                            item.condition === "good" ? "#3A7A00" :
+                            item.condition === "fair" ? "#8A6000" : "#7A0000",
                           fontFamily: "'Poppins', sans-serif",
                         }}>
-                          {item.condition_checkin.charAt(0).toUpperCase() + item.condition_checkin.slice(1)}
+                          {item.condition.charAt(0).toUpperCase() + item.condition.slice(1)}
                         </span>
                       </div>
                     )}

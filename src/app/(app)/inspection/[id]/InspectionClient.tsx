@@ -522,17 +522,15 @@ export function InspectionClient({
   }[]>([])
 
   const [checkoutInventoryItems, setCheckoutInventoryItems] = useState<{
-    referenceItemId?: string
     name: string
     category: string
     quantity: number
-    condition: 'good' | 'fair' | 'poor' | null
-    condition_checkin: string | null
+    condition: 'good' | 'fair' | 'poor' | 'missing' | null
     photo_url: string | null
-    photo_url_checkin: string | null
     notes: string
     source: string
-    status_checkout: 'good' | 'fair' | 'poor' | 'missing' | null
+    checkin_condition: string | null
+    checkin_photo_url: string | null
   }[]>([])
   const [checkoutInventoryIndex, setCheckoutInventoryIndex] = useState(0)
   const [showCheckoutInventory, setShowCheckoutInventory] = useState(false)
@@ -937,28 +935,25 @@ export function InspectionClient({
             name: string
             category: string
             quantity: number
-            condition_checkin: string | null
-            photo_url: string | null
-            reference_item_id?: string | null
+            condition?: string | null
+            photo_url?: string | null
             source?: string | null
             is_tenant_item?: boolean | null
           }[]
         }
         if (data.items?.length) {
           const checkoutItems = data.items
-            .filter(i => !i.is_tenant_item)
-            .map(i => ({
-              referenceItemId: i.reference_item_id ?? undefined,
+            .filter((i: { is_tenant_item?: boolean | null }) => !i.is_tenant_item)
+            .map((i: { name: string; category: string; quantity: number; condition?: string | null; photo_url?: string | null; source?: string | null }) => ({
               name: i.name,
               category: i.category,
               quantity: i.quantity,
-              condition: i.condition_checkin as 'good' | 'fair' | 'poor' | null,
+              condition: null as 'good' | 'fair' | 'poor' | 'missing' | null,
               photo_url: null as string | null,
               notes: '',
               source: i.source ?? 'history',
-              status_checkout: null as 'good' | 'fair' | 'poor' | 'missing' | null,
-              condition_checkin: i.condition_checkin,
-              photo_url_checkin: i.photo_url,
+              checkin_condition: i.condition ?? null,
+              checkin_photo_url: i.photo_url ?? null,
             }))
           setCheckoutInventoryItems(checkoutItems)
         }
@@ -1535,21 +1530,24 @@ export function InspectionClient({
         name: string
         category: string
         quantity: number
-        condition_checkin?: string | null
+        condition?: string | null
         photo_url?: string | null
         notes?: string | null
         source?: string | null
-        reference_item_id?: string | null
       }[] }
-      return (data.items ?? []).map(item => ({
+      return (data.items ?? []).map((item: {
+        name: string; category: string; quantity: number;
+        condition?: string | null; photo_url?: string | null;
+        notes?: string | null; source?: string | null;
+      }) => ({
         name: item.name,
         category: item.category,
         quantity: item.quantity,
-        condition_checkin: item.condition_checkin ?? null,
+        condition_checkin: item.condition ?? null,
         photo_url: item.photo_url ?? null,
         notes: item.notes ?? '',
         source: item.source ?? 'manual',
-        reference_item_id: item.reference_item_id ?? null,
+        reference_item_id: null,
       }))
     } catch { return [] }
   }
@@ -3176,10 +3174,10 @@ export function InspectionClient({
               label: c ? c.charAt(0).toUpperCase() + c.slice(1) : '—',
             })
 
-            const goodCount = checkoutInventoryItems.filter(i => i.status_checkout === 'good').length
-            const fairCount = checkoutInventoryItems.filter(i => i.status_checkout === 'fair').length
-            const poorCount = checkoutInventoryItems.filter(i => i.status_checkout === 'poor').length
-            const missingCount = checkoutInventoryItems.filter(i => i.status_checkout === 'missing').length
+            const goodCount = checkoutInventoryItems.filter(i => i.condition === 'good').length
+            const fairCount = checkoutInventoryItems.filter(i => i.condition === 'fair').length
+            const poorCount = checkoutInventoryItems.filter(i => i.condition === 'poor').length
+            const missingCount = checkoutInventoryItems.filter(i => i.condition === 'missing').length
 
             return (
               <div style={{ flex:1, overflowY:'auto', padding:'16px 16px 160px', WebkitOverflowScrolling:'touch' as any }}>
@@ -3228,13 +3226,13 @@ export function InspectionClient({
                 <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                   {items.map((item, idx) => {
                     const checkinCond = isCheckout
-                      ? (item as typeof checkoutInventoryItems[0]).condition_checkin
+                      ? (item as typeof checkoutInventoryItems[0]).checkin_condition
                       : (item as typeof inventoryDetails[0]).condition
                     const checkoutCond = isCheckout
-                      ? (item as typeof checkoutInventoryItems[0]).status_checkout
+                      ? (item as typeof checkoutInventoryItems[0]).condition
                       : null
                     const checkinPhoto = isCheckout
-                      ? (item as typeof checkoutInventoryItems[0]).photo_url_checkin
+                      ? (item as typeof checkoutInventoryItems[0]).checkin_photo_url
                       : (item as typeof inventoryDetails[0]).photo_url
                     const checkoutPhoto = isCheckout
                       ? (item as typeof checkoutInventoryItems[0]).photo_url
@@ -4082,14 +4080,14 @@ export function InspectionClient({
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       inspection_id: inspectionId,
+                      inspection_type: 'check-in',
                       items: inventoryDetails.map(it => ({
-                        reference_item_id: it.referenceItemId ?? null,
                         name: it.name,
                         category: it.category,
                         quantity: it.quantity,
-                        condition_checkin: it.condition,
+                        condition: it.condition,
                         photo_url: it.photo_url?.startsWith('http') ? it.photo_url : null,
-                        notes: it.notes,
+                        notes: it.notes || null,
                         source: it.source,
                       })),
                     }),
@@ -4150,7 +4148,7 @@ export function InspectionClient({
         const setCondition = (val: 'good' | 'fair' | 'poor' | 'missing') => {
           if (isCoEdit) {
             setCheckoutInventoryItems(prev =>
-              prev.map((it, i) => i === editingInventoryIdx ? { ...it, status_checkout: val } : it)
+              prev.map((it, i) => i === editingInventoryIdx ? { ...it, condition: val } : it)
             )
           } else {
             if (val === 'missing') return
@@ -4185,7 +4183,7 @@ export function InspectionClient({
         }
 
         const currentCondition = isCoEdit
-          ? (item as typeof checkoutInventoryItems[0]).status_checkout
+          ? (item as typeof checkoutInventoryItems[0]).condition
           : (item as typeof inventoryDetails[0]).condition
         const currentPhoto = item.photo_url
         const currentNote = item.notes
@@ -4231,16 +4229,16 @@ export function InspectionClient({
             <div style={{ flex:1, overflowY:'auto', padding:'24px 20px', display:'flex', flexDirection:'column', gap:20, WebkitOverflowScrolling:'touch' as any }}>
 
               {/* Check-in reference — checkout only */}
-              {isCoEdit && (item as typeof checkoutInventoryItems[0]).condition_checkin && (
+              {isCoEdit && (item as typeof checkoutInventoryItems[0]).checkin_condition && (
                 <div style={{
                   background:'white', borderRadius:12,
                   border:'0.5px solid rgba(14,14,16,0.1)',
                   padding:'12px 14px',
                   display:'flex', alignItems:'center', gap:12,
                 }}>
-                  {(item as typeof checkoutInventoryItems[0]).photo_url_checkin && (
+                  {(item as typeof checkoutInventoryItems[0]).checkin_photo_url && (
                     <img
-                      src={(item as typeof checkoutInventoryItems[0]).photo_url_checkin!}
+                      src={(item as typeof checkoutInventoryItems[0]).checkin_photo_url!}
                       alt="check-in"
                       style={{ width:48, height:48, borderRadius:8, objectFit:'cover', flexShrink:0 }}
                     />
@@ -4250,16 +4248,16 @@ export function InspectionClient({
                     <div style={{
                       display:'inline-flex', padding:'3px 10px', borderRadius:99,
                       background:
-                        (item as typeof checkoutInventoryItems[0]).condition_checkin === 'good' ? '#EEFAD5' :
-                        (item as typeof checkoutInventoryItems[0]).condition_checkin === 'fair' ? '#FFF8DC' : '#FEE2E2',
+                        (item as typeof checkoutInventoryItems[0]).checkin_condition === 'good' ? '#EEFAD5' :
+                        (item as typeof checkoutInventoryItems[0]).checkin_condition === 'fair' ? '#FFF8DC' : '#FEE2E2',
                     }}>
                       <span style={{
                         fontSize:12, fontWeight:700,
                         color:
-                          (item as typeof checkoutInventoryItems[0]).condition_checkin === 'good' ? '#3A7A00' :
-                          (item as typeof checkoutInventoryItems[0]).condition_checkin === 'fair' ? '#8A6000' : '#7A0000',
+                          (item as typeof checkoutInventoryItems[0]).checkin_condition === 'good' ? '#3A7A00' :
+                          (item as typeof checkoutInventoryItems[0]).checkin_condition === 'fair' ? '#8A6000' : '#7A0000',
                       }}>
-                        {(item as typeof checkoutInventoryItems[0]).condition_checkin}
+                        {(item as typeof checkoutInventoryItems[0]).checkin_condition}
                       </span>
                     </div>
                   </div>
@@ -4371,21 +4369,21 @@ export function InspectionClient({
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                           inspection_id: inspectionId,
+                          inspection_type: 'check-out',
                           items: checkoutInventoryItems.map(it => ({
-                            reference_item_id: it.referenceItemId ?? null,
                             name: it.name,
                             category: it.category,
                             quantity: it.quantity,
-                            status_checkout: it.status_checkout,
-                            notes: it.notes,
-                            photo_url_checkout: it.photo_url?.startsWith('http') ? it.photo_url : null,
-                            quantity_checkout: it.quantity,
+                            condition: it.condition,
+                            photo_url: it.photo_url?.startsWith('http') ? it.photo_url : null,
+                            notes: it.notes || null,
+                            source: it.source,
                           })),
                         }),
                       })
                       if (propertyId) {
                         const activeItems = checkoutInventoryItems
-                          .filter(it => it.status_checkout !== 'missing')
+                          .filter(it => it.condition !== 'missing')
                           .map(it => ({
                             name: it.name,
                             category: it.category,
@@ -4404,14 +4402,14 @@ export function InspectionClient({
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                           inspection_id: inspectionId,
+                          inspection_type: 'check-in',
                           items: inventoryDetails.map(it => ({
-                            reference_item_id: it.referenceItemId ?? null,
                             name: it.name,
                             category: it.category,
                             quantity: it.quantity,
-                            condition_checkin: it.condition,
+                            condition: it.condition,
                             photo_url: it.photo_url?.startsWith('http') ? it.photo_url : null,
-                            notes: it.notes,
+                            notes: it.notes || null,
                             source: it.source,
                           })),
                         }),
@@ -4526,8 +4524,8 @@ export function InspectionClient({
                 padding:'12px 14px',
                 display:'flex', alignItems:'center', gap:12,
               }}>
-                {item.photo_url_checkin ? (
-                  <img src={item.photo_url_checkin} alt="check-in" style={{ width:56, height:56, borderRadius:8, objectFit:'cover', flexShrink:0 }}/>
+                {item.checkin_photo_url ? (
+                  <img src={item.checkin_photo_url} alt="check-in" style={{ width:56, height:56, borderRadius:8, objectFit:'cover', flexShrink:0 }}/>
                 ) : (
                   <div style={{ width:56, height:56, borderRadius:8, background:'#F3F1EB', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(14,14,16,0.25)" strokeWidth="2" strokeLinecap="round">
@@ -4542,18 +4540,18 @@ export function InspectionClient({
                   <div style={{
                     display:'inline-flex',
                     background:
-                      item.condition_checkin === 'good' ? '#EEFAD5' :
-                      item.condition_checkin === 'fair' ? '#FFF8DC' : '#FEE2E2',
+                      item.checkin_condition === 'good' ? '#EEFAD5' :
+                      item.checkin_condition === 'fair' ? '#FFF8DC' : '#FEE2E2',
                     padding:'3px 10px', borderRadius:999,
                   }}>
                     <p style={{
                       fontSize:12, fontWeight:700, margin:0,
                       color:
-                        item.condition_checkin === 'good' ? '#3A7A00' :
-                        item.condition_checkin === 'fair' ? '#8A6000' : '#7A0000',
+                        item.checkin_condition === 'good' ? '#3A7A00' :
+                        item.checkin_condition === 'fair' ? '#8A6000' : '#7A0000',
                       fontFamily:'Poppins, sans-serif',
                     }}>
-                      {item.condition_checkin ?? '—'}
+                      {item.checkin_condition ?? '—'}
                     </p>
                   </div>
                 </div>
@@ -4573,14 +4571,14 @@ export function InspectionClient({
                       key={opt.value}
                       type="button"
                       onClick={() => setCheckoutInventoryItems(prev =>
-                        prev.map((it, i) => i === checkoutInventoryIndex ? { ...it, status_checkout: opt.value } : it)
+                        prev.map((it, i) => i === checkoutInventoryIndex ? { ...it, condition: opt.value } : it)
                       )}
                       style={{
                         padding:'12px 8px', borderRadius:12, border:'none', cursor:'pointer',
                         fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:13,
-                        background: item.status_checkout === opt.value ? opt.active : opt.bg,
+                        background: item.condition === opt.value ? opt.active : opt.bg,
                         color: opt.color,
-                        outline: item.status_checkout === opt.value ? `2px solid ${opt.color}` : 'none',
+                        outline: item.condition === opt.value ? `2px solid ${opt.color}` : 'none',
                         outlineOffset: 1,
                       }}
                     >
@@ -4591,12 +4589,12 @@ export function InspectionClient({
               </div>
 
               {/* Photo at check-out */}
-              {item.status_checkout && (
+              {item.condition && (
                 <div>
                   <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:'0 0 8px' }}>
                     Photo
                     <span style={{ fontSize:11, color:'rgba(14,14,16,0.4)', fontWeight:400, marginLeft:6 }}>
-                      {item.status_checkout === 'poor' ? 'recommended' : 'optional'}
+                      {item.condition === 'poor' ? 'recommended' : 'optional'}
                     </span>
                   </p>
                   {item.photo_url ? (
@@ -4650,7 +4648,7 @@ export function InspectionClient({
               )}
 
               {/* Note */}
-              {item.status_checkout && (
+              {item.condition && (
                 <div>
                   <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:'0 0 8px' }}>
                     Note <span style={{ fontSize:11, color:'rgba(14,14,16,0.4)', fontWeight:400 }}>optional</span>
@@ -4677,7 +4675,7 @@ export function InspectionClient({
             <div style={{ padding:'12px 20px', paddingBottom:'max(16px, calc(env(safe-area-inset-bottom) + 80px))', background:'white', borderTop:'1px solid rgba(14,14,16,0.08)' }}>
               <button
                 type="button"
-                disabled={!item.status_checkout}
+                disabled={!item.condition}
                 onClick={async () => {
                   if (!isLast) {
                     setCheckoutInventoryIndex(prev => prev + 1)
@@ -4690,21 +4688,21 @@ export function InspectionClient({
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
                         inspection_id: inspectionId,
+                        inspection_type: 'check-out',
                         items: checkoutInventoryItems.map(it => ({
-                          reference_item_id: it.referenceItemId ?? null,
                           name: it.name,
                           category: it.category,
                           quantity: it.quantity,
-                          status_checkout: it.status_checkout,
-                          notes: it.notes,
-                          photo_url_checkout: it.photo_url?.startsWith('http') ? it.photo_url : null,
-                          quantity_checkout: it.quantity,
+                          condition: it.condition,
+                          photo_url: it.photo_url?.startsWith('http') ? it.photo_url : null,
+                          notes: it.notes || null,
+                          source: it.source,
                         })),
                       }),
                     })
                     if (propertyId) {
                       const activeItems = checkoutInventoryItems
-                        .filter(it => it.status_checkout !== 'missing')
+                        .filter(it => it.condition !== 'missing')
                         .map(it => ({
                           name: it.name,
                           category: it.category,
@@ -4724,8 +4722,8 @@ export function InspectionClient({
                 }}
                 style={{
                   width:'100%', padding:'15px',
-                  background: item.status_checkout ? '#0E0E10' : 'rgba(14,14,16,0.15)',
-                  border:'none', borderRadius:14, cursor: item.status_checkout ? 'pointer' : 'default',
+                  background: item.condition ? '#0E0E10' : 'rgba(14,14,16,0.15)',
+                  border:'none', borderRadius:14, cursor: item.condition ? 'pointer' : 'default',
                   fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:15, color:'white',
                 }}
               >
