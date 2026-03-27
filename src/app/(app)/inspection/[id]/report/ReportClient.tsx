@@ -951,6 +951,13 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
   const unitLabel = unitNumber ? `Unit ${unitNumber}` : "";
   const rooms = (inspection.rooms ?? []) as Room[];
   const sortedRooms = rooms.slice().sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+  const inventorySnapshots = (
+    (inspection as { inventory_snapshots?: {
+      id: string; name: string; category: string; quantity: number;
+      condition_checkin: string | null; photo_url: string | null;
+      notes: string | null; source: string | null; is_tenant_item: boolean | null;
+    }[] | null }).inventory_snapshots ?? []
+  ).filter(s => !s.is_tenant_item);
   const totalPhotos = sortedRooms.reduce((acc, r) => acc + (r.photos?.length ?? 0), 0);
   const signatures = inspection.signatures ?? [];
   const landlordSig = signatures.find((s) => s.signer_type === "landlord");
@@ -1883,6 +1890,106 @@ export function ReportClient({ inspection, profile, checkinData }: ReportClientP
             );
           })}
         </Section>
+
+        {/* Inventory */}
+        {inventorySnapshots.length > 0 && (
+          <Section
+            delay="0.37s"
+            loaded={loaded}
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+                <rect x="9" y="3" width="6" height="4" rx="1"/>
+                <path d="M9 12h6M9 16h4"/>
+              </svg>
+            }
+            title={`Inventory (${inventorySnapshots.length} items)`}
+          >
+            {Object.entries(
+              inventorySnapshots.reduce((acc, item) => {
+                const cat = item.category ?? 'other'
+                if (!acc[cat]) acc[cat] = []
+                acc[cat].push(item)
+                return acc
+              }, {} as Record<string, typeof inventorySnapshots>)
+            ).map(([category, items]) => (
+              <div key={category} style={{ marginBottom: 16 }}>
+                <p style={{
+                  fontSize: 10, fontWeight: 700, color: "#9ca3af",
+                  textTransform: "uppercase", letterSpacing: 1.5,
+                  margin: "0 0 8px",
+                }}>
+                  {category}
+                </p>
+                {items.map((item, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12,
+                      padding: "12px 14px",
+                      background: "#F8F7F4", borderRadius: 14,
+                      marginBottom: idx < items.length - 1 ? 8 : 0,
+                    }}
+                  >
+                    {/* Photo thumbnail */}
+                    {item.photo_url ? (
+                      <img
+                        src={item.photo_url} alt={item.name}
+                        style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover", flexShrink: 0 }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: 44, height: 44, borderRadius: 10,
+                        background: "#EEEDE9", flexShrink: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round">
+                          <rect x="3" y="3" width="18" height="18" rx="2"/>
+                          <circle cx="8.5" cy="8.5" r="1.5"/>
+                          <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                      </div>
+                    )}
+
+                    {/* Name + notes */}
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
+                        {item.name}
+                        {item.quantity > 1 && (
+                          <span style={{ fontSize: 12, color: "#999", marginLeft: 6 }}>×{item.quantity}</span>
+                        )}
+                      </p>
+                      {item.notes && (
+                        <p style={{ fontSize: 12, color: "#888", margin: "3px 0 0" }}>{item.notes}</p>
+                      )}
+                    </div>
+
+                    {/* Condition badge */}
+                    {item.condition_checkin && (
+                      <div style={{
+                        padding: "4px 12px", borderRadius: 99,
+                        background:
+                          item.condition_checkin === "good" ? "#EEFAD5" :
+                          item.condition_checkin === "fair" ? "#FFF8DC" : "#FEE2E2",
+                        flexShrink: 0,
+                      }}>
+                        <span style={{
+                          fontSize: 12, fontWeight: 700,
+                          color:
+                            item.condition_checkin === "good" ? "#3A7A00" :
+                            item.condition_checkin === "fair" ? "#8A6000" : "#7A0000",
+                          fontFamily: "'Poppins', sans-serif",
+                        }}>
+                          {item.condition_checkin.charAt(0).toUpperCase() + item.condition_checkin.slice(1)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </Section>
+        )}
 
         {/* Handover Keys */}
         <Section delay="0.4s" loaded={loaded} icon={iconKeys} title="Handover Keys">

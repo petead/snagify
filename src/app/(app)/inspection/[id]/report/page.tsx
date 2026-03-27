@@ -26,7 +26,11 @@ export default async function ReportPage({
         id, name, condition, order_index,
         photos (id, url, ai_analysis, damage_tags, notes, checkin_photo_id)
       ),
-      signatures (signer_type, otp_verified, signed_at, signature_data, refused_at, refused_reason)
+      signatures (signer_type, otp_verified, signed_at, signature_data, refused_at, refused_reason),
+      inventory_snapshots (
+        id, name, category, quantity,
+        condition_checkin, photo_url, notes, source, is_tenant_item
+      )
     `
     )
     .eq("id", id)
@@ -147,6 +151,17 @@ export type InspectionWithRelations = {
   tenancies?: TenancyRelation | TenancyRelation[] | null;
   rooms?: Room[] | null;
   signatures?: Signature[] | null;
+  inventory_snapshots?: {
+    id: string;
+    name: string;
+    category: string;
+    quantity: number;
+    condition_checkin: string | null;
+    photo_url: string | null;
+    notes: string | null;
+    source: string | null;
+    is_tenant_item: boolean | null;
+  }[] | null;
 };
 
 export type CheckinData = {
