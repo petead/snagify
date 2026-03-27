@@ -53,20 +53,42 @@ export function TopLoader() {
       return true;
     };
 
-    const onStart = (e: TouchEvent | MouseEvent) => {
-      const t = e.target;
-      if (t instanceof Element && t.closest("[data-pull-scroll]")) return;
-      if (isInternalLink(t)) startBar();
+    // Track touch start position to distinguish tap from scroll
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchTarget: EventTarget | null = null;
+
+    const onTouchStart = (e: TouchEvent) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      touchTarget = e.target;
     };
 
-    // touchstart = instantane sur mobile (pas de delai 300ms)
-    document.addEventListener("touchstart", onStart, { passive: true });
-    // mousedown = instantane sur desktop
-    document.addEventListener("mousedown", onStart);
+    const onTouchEnd = (e: TouchEvent) => {
+      const dx = Math.abs(e.changedTouches[0].clientX - touchStartX);
+      const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+      // Only trigger if movement < 8px (tap, not scroll)
+      if (dx < 8 && dy < 8) {
+        const t = touchTarget;
+        if (t instanceof Element && t.closest("[data-pull-scroll]")) return;
+        if (isInternalLink(t)) startBar();
+      }
+      touchTarget = null;
+    };
+
+    // mousedown stays instant on desktop (no scroll risk)
+    const onMouseDown = (e: MouseEvent) => {
+      if (isInternalLink(e.target)) startBar();
+    };
+
+    document.addEventListener("touchstart", onTouchStart, { passive: true });
+    document.addEventListener("touchend", onTouchEnd, { passive: true });
+    document.addEventListener("mousedown", onMouseDown);
 
     return () => {
-      document.removeEventListener("touchstart", onStart as EventListener);
-      document.removeEventListener("mousedown", onStart as EventListener);
+      document.removeEventListener("touchstart", onTouchStart);
+      document.removeEventListener("touchend", onTouchEnd);
+      document.removeEventListener("mousedown", onMouseDown);
     };
   }, []);
 
