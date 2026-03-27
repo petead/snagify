@@ -1337,37 +1337,6 @@ export function InspectionClient({
   // ── Generate report (from review screen)
   const handleGenerateReport = async () => {
     if (generating || navigating) return;
-    // If check-out and has inventory items, show checkout inventory review first
-    if (
-      isCheckout &&
-      checkoutInventoryItems.length > 0 &&
-      !showCheckoutInventory
-    ) {
-      setCheckoutInventoryIndex(0)
-      setShowCheckoutInventory(true)
-      return
-    }
-    // If check-in and furnished status not yet determined, go to inventory first
-    if (
-      inspectionType === 'check-in' &&
-      isFurnished === null
-    ) {
-      const suggested = suggestFurnished()
-      setIsFurnished(suggested)
-      await loadInventoryReference()
-      buildInventorySelection()
-      setScreen('inventory')
-      return
-    }
-    if (
-      inspectionType === 'check-in' &&
-      isFurnished === true &&
-      inventoryDetails.length === 0
-    ) {
-      buildInventorySelection()
-      setScreen('inventory')
-      return
-    }
     setGenerating(true);
 
     for (const [photoId, timer] of Object.entries(notesTimers.current)) {
@@ -1843,7 +1812,27 @@ export function InspectionClient({
                   {inspectionType === "check-in" ? "Check-in" : "Check-out"}
                 </p>
               </div>
-              <button type="button" onClick={() => setScreen("review")}
+              <button type="button" onClick={async () => {
+                if (!isCheckout && isFurnished === null) {
+                  const suggested = suggestFurnished()
+                  setIsFurnished(suggested)
+                  await loadInventoryReference()
+                  buildInventorySelection()
+                  setScreen('inventory')
+                  return
+                }
+                if (!isCheckout && isFurnished === true && inventoryDetails.length === 0) {
+                  buildInventorySelection()
+                  setScreen('inventory')
+                  return
+                }
+                if (isCheckout && checkoutInventoryItems.length > 0) {
+                  setCheckoutInventoryIndex(0)
+                  setShowCheckoutInventory(true)
+                  return
+                }
+                setScreen('review')
+              }}
                 className="text-xs font-semibold px-3 py-1.5 rounded-lg"
                 style={{
                   background: totalPhotos > 0 ? accentColor : "rgba(255,255,255,0.1)",
@@ -3152,7 +3141,7 @@ export function InspectionClient({
                 type="button"
                 onClick={() => {
                   setInventoryDetails([])
-                  void handleGenerateReport()
+                  setScreen('review')
                 }}
                 style={{
                   width:'100%', padding:'15px',
@@ -3367,10 +3356,9 @@ export function InspectionClient({
                     })
                   }
                 } catch { /* silent — don't block report generation */ }
-                // Back to normal generate flow
-                setScreen('review')
+                // Navigate to review — generate will happen from there
                 setInventoryScreen('selection')
-                void handleGenerateReport()
+                setScreen('review')
               }}
               style={{
                 flex:2, padding:'14px',
@@ -3641,7 +3629,7 @@ export function InspectionClient({
                   } catch { /* silent */ }
 
                   setShowCheckoutInventory(false)
-                  void handleGenerateReport()
+                  setScreen('review')
                 }}
                 style={{
                   width:'100%', padding:'15px',
