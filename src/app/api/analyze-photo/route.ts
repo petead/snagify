@@ -36,8 +36,21 @@ OUTPUT FORMAT (strict JSON only, no extra text):
 {
   "condition_summary": "keyword · fragment · keyword",
   "damage_found": true or false,
-  "suggested_tags": [] or ["tag1", "tag2"]
+  "suggested_tags": [] or ["tag1", "tag2"],
+  "detected_items": [
+    { "name": "item name in English", "condition": "good" | "fair" | "poor" }
+  ]
 }
+
+DETECTED ITEMS RULES:
+- Only list furniture, appliances, and electronics — never structural elements
+- Examples of valid items: sofa, TV, refrigerator, washing machine, bed, wardrobe,
+  dining table, coffee table, microwave, oven, AC unit, water heater, curtains
+- Examples of INVALID items: wall, floor, ceiling, door, window, tile, paint
+- Use simple English names, lowercase
+- Condition based on visual appearance only
+- If no furniture/appliances visible: return empty array []
+- Max 10 items per photo
 
 EXAMPLES:
 
@@ -287,6 +300,7 @@ Analyze the property condition visible in this photo only.`,
       condition_summary: string;
       damage_found: boolean;
       suggested_tags: string[];
+      detected_items?: { name: string; condition: string }[];
     } = { condition_summary: "", damage_found: false, suggested_tags: [] };
     try {
       const jsonStr = raw.replace(/```json|```/g, "").trim();
@@ -333,10 +347,13 @@ Analyze the property condition visible in this photo only.`,
       }
     }
 
+    const detectedItems = Array.isArray(parsed.detected_items) ? parsed.detected_items : []
+
     return NextResponse.json({
       success: true,
       ai_analysis: conditionSummary,
       damage_tags: finalDamageTags,
+      detected_items: detectedItems,
     });
   } catch (err) {
     console.error("analyze-photo error:", err);
