@@ -187,48 +187,40 @@ export function SubscriptionSection({ company }: Props) {
       </div>
 
       {/* Billing toggle */}
-      <div style={{ display:'flex', justifyContent:'center', marginBottom:28 }}>
+      <div style={{ display:'flex', justifyContent:'center', marginBottom:32 }}>
         <div style={{
-          display:'flex', gap:4, padding:5,
-          background:'white',
-          border:'0.5px solid rgba(14,14,16,0.12)',
+          display:'inline-flex', gap:3, padding:4,
+          background:'#F3F1EB',
           borderRadius:999,
         }}>
-          <button
-            type="button"
-            onClick={() => setBilling('monthly')}
-            style={{
-              padding:'10px 22px', borderRadius:999, border:'none',
-              fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:13,
-              cursor:'pointer', lineHeight:1,
-              background: billing === 'monthly' ? '#0E0E10' : 'transparent',
-              color: billing === 'monthly' ? 'white' : 'rgba(14,14,16,0.5)',
-              transition:'all .2s',
-            }}
-          >
-            Monthly
-          </button>
-          <button
-            type="button"
-            onClick={() => setBilling('annual')}
-            style={{
-              padding:'10px 22px', borderRadius:999, border:'none',
-              fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:13,
-              cursor:'pointer', display:'flex', flexDirection:'column',
-              alignItems:'center', gap:1, lineHeight:1.2,
-              background: billing === 'annual' ? '#0E0E10' : 'transparent',
-              color: billing === 'annual' ? 'white' : 'rgba(14,14,16,0.5)',
-              transition:'all .2s',
-            }}
-          >
-            Annual
-            <span style={{
-              fontSize:10, fontWeight:600,
-              color: billing === 'annual' ? '#CAFE87' : '#3A7A00',
-            }}>
-              2 months free
-            </span>
-          </button>
+          {(['monthly', 'annual'] as const).map(mode => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setBilling(mode)}
+              style={{
+                padding:'9px 24px', borderRadius:999, border:'none',
+                fontFamily:'Poppins, sans-serif', fontWeight:700, fontSize:13,
+                cursor:'pointer', display:'flex', alignItems:'center', gap:6,
+                background: billing === mode ? '#0E0E10' : 'transparent',
+                color: billing === mode ? 'white' : 'rgba(14,14,16,0.5)',
+                transition:'all .2s',
+                lineHeight:1,
+              }}
+            >
+              {mode === 'monthly' ? 'Monthly' : 'Annual'}
+              {mode === 'annual' && (
+                <span style={{
+                  fontSize:10, fontWeight:700,
+                  color: billing === 'annual' ? '#CAFE87' : '#3A7A00',
+                  background: billing === 'annual' ? 'rgba(202,254,135,0.15)' : 'rgba(58,122,0,0.08)',
+                  padding:'2px 7px', borderRadius:99,
+                }}>
+                  2 months free
+                </span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -236,7 +228,8 @@ export function SubscriptionSection({ company }: Props) {
       <div style={{
         display:'grid',
         gridTemplateColumns:'repeat(3, minmax(0, 1fr))',
-        gap:12,
+        gap:14,
+        alignItems:'start',
       }}>
         {plans.map((plan) => {
           const isPopular    = plan.highlight
@@ -258,26 +251,29 @@ export function SubscriptionSection({ company }: Props) {
               style={{
                 background: dark ? '#0E0E10' : 'white',
                 border: dark
-                  ? '0.5px solid #0E0E10'
+                  ? '1.5px solid #0E0E10'
                   : isCurrent
                     ? '1.5px solid #9A88FD'
-                    : '0.5px solid rgba(14,14,16,0.12)',
-                borderRadius:20,
-                padding:'28px 20px',
+                    : '1px solid rgba(14,14,16,0.1)',
+                borderRadius:24,
+                padding: dark ? '32px 24px' : '28px 22px',
                 position:'relative',
                 display:'flex', flexDirection:'column',
+                marginTop: dark ? '-8px' : '0',
+                boxShadow: dark ? '0 8px 40px rgba(14,14,16,0.18)' : 'none',
               }}
             >
               {/* Popular badge */}
               {isPopular && (
                 <div style={{
-                  position:'absolute', top:-12, left:'50%',
+                  position:'absolute', top:-14, left:'50%',
                   transform:'translateX(-50%)',
-                  background:'#9A88FD', color:'#0E0E10',
-                  fontSize:10, fontWeight:800,
-                  padding:'4px 14px', borderRadius:999,
+                  background:'#9A88FD', color:'white',
+                  fontSize:11, fontWeight:700,
+                  padding:'5px 16px', borderRadius:999,
                   fontFamily:'Poppins, sans-serif',
-                  whiteSpace:'nowrap', letterSpacing:'0.3px',
+                  whiteSpace:'nowrap', letterSpacing:'0.2px',
+                  boxShadow:'0 2px 12px rgba(154,136,253,0.4)',
                 }}>
                   Most Popular
                 </div>
@@ -294,17 +290,18 @@ export function SubscriptionSection({ company }: Props) {
               </p>
 
               {/* Price */}
-              <div style={{ display:'flex', alignItems:'baseline', gap:4, marginBottom:4 }}>
+              <div style={{ display:'flex', alignItems:'baseline', gap:6, marginBottom:6 }}>
                 <span style={{
-                  fontSize:42, fontWeight:800, letterSpacing:'-2px', lineHeight:1,
+                  fontSize:48, fontWeight:800, letterSpacing:'-3px', lineHeight:1,
                   color: dark ? 'white' : '#0E0E10',
                   fontFamily:'Poppins, sans-serif',
                 }}>
                   {displayPrice}
                 </span>
                 <span style={{
-                  fontSize:13, fontWeight:400,
-                  color: dark ? 'rgba(255,255,255,0.45)' : 'rgba(14,14,16,0.5)',
+                  fontSize:14, fontWeight:400,
+                  color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(14,14,16,0.45)',
+                  marginBottom:6,
                 }}>
                   AED/mo
                 </span>
@@ -335,36 +332,36 @@ export function SubscriptionSection({ company }: Props) {
               {/* Stats block */}
               <div style={{
                 display:'grid', gridTemplateColumns:'1fr 1px 1fr',
-                background: dark ? 'rgba(255,255,255,0.07)' : '#F3F1EB',
-                borderRadius:12, overflow:'hidden', marginBottom:10,
+                background: dark ? 'rgba(255,255,255,0.06)' : '#F3F1EB',
+                borderRadius:14, overflow:'hidden', marginBottom:12,
               }}>
-                <div style={{ padding:'12px 14px', textAlign:'center' }}>
+                <div style={{ padding:'14px 16px', textAlign:'center' }}>
                   <p style={{
-                    fontSize:26, fontWeight:800, letterSpacing:'-1.5px',
+                    fontSize:28, fontWeight:800, letterSpacing:'-1.5px',
                     lineHeight:1, margin:0,
                     color: dark ? 'white' : '#0E0E10',
                     fontFamily:'Poppins, sans-serif',
                   }}>
                     {plan.credits_per_month}
                   </p>
-                  <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', margin:'3px 0 0', color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(14,14,16,0.45)' }}>
+                  <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'1px', margin:'4px 0 2px', color: dark ? 'rgba(255,255,255,0.35)' : 'rgba(14,14,16,0.4)' }}>
                     CREDITS
                   </p>
-                  <p style={{ fontSize:10, fontWeight:700, color:'#9A88FD', margin:'3px 0 0' }}>
-                    {pricePerCredit} AED / cr
+                  <p style={{ fontSize:10, fontWeight:700, color: dark ? '#B8AEFF' : '#9A88FD', margin:0 }}>
+                    {pricePerCredit} AED / credit
                   </p>
                 </div>
-                <div style={{ background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(14,14,16,0.07)' }} />
-                <div style={{ padding:'12px 14px', textAlign:'center' }}>
+                <div style={{ background: dark ? 'rgba(255,255,255,0.07)' : 'rgba(14,14,16,0.07)' }} />
+                <div style={{ padding:'14px 16px', textAlign:'center' }}>
                   <p style={{
-                    fontSize:26, fontWeight:800, letterSpacing:'-1.5px',
+                    fontSize:28, fontWeight:800, letterSpacing:'-1.5px',
                     lineHeight:1, margin:0,
                     color: dark ? 'white' : '#0E0E10',
                     fontFamily:'Poppins, sans-serif',
                   }}>
                     {plan.max_users ?? '∞'}
                   </p>
-                  <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', margin:'3px 0 0', color: dark ? 'rgba(255,255,255,0.4)' : 'rgba(14,14,16,0.45)' }}>
+                  <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'1px', margin:'4px 0 2px', color: dark ? 'rgba(255,255,255,0.35)' : 'rgba(14,14,16,0.4)' }}>
                     USERS
                   </p>
                 </div>
@@ -418,12 +415,13 @@ export function SubscriptionSection({ company }: Props) {
                     color: dark ? 'rgba(255,255,255,0.3)' : 'rgba(14,14,16,0.3)',
                     border: 'none',
                   } : isPopular ? {
-                    background:'#9A88FD', color:'#0E0E10',
+                    background:'#9A88FD', color:'white',
                     border:'none',
+                    boxShadow:'0 4px 16px rgba(154,136,253,0.35)',
                   } : {
                     background:'transparent',
                     color:'#0E0E10',
-                    border:'1.5px solid rgba(14,14,16,0.2)',
+                    border:'1.5px solid rgba(14,14,16,0.18)',
                   }),
                 }}
               >
