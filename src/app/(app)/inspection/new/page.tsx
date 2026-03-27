@@ -1497,7 +1497,7 @@ function NewInspectionContent() {
                   </div>
                   <div>
                     <p style={{ fontSize:13, fontWeight:600, color:'#0E0E10', margin:0, fontFamily:'Poppins, sans-serif' }}>
-                      Yes, let's document it
+                      Yes, document it
                     </p>
                     <p style={{ fontSize:11, color:'#9ca3af', margin:'2px 0 0' }}>
                       ~5 min · goes in the signed PDF · worth it
