@@ -50,7 +50,7 @@ export default function LoginPage() {
     if (!email.trim()) { setError('Enter your email above first.'); return }
     setError(null)
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback`,
+      redirectTo: `https://app.snagify.net/auth/callback`,
     })
     if (resetError) { setError(resetError.message); return }
     setForgotSent(true)
@@ -64,7 +64,7 @@ export default function LoginPage() {
     const { error: otpError } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `https://app.snagify.net/auth/callback`,
         shouldCreateUser: false, // only existing users
       },
     })
