@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { Eye, EyeOff, ArrowRight, Loader2, Mail, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight, Loader2, Hash } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -15,18 +15,20 @@ export default function LoginPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail]               = useState('')
+  const [password, setPassword]         = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [magicLoading, setMagicLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [emailTouched, setEmailTouched] = useState(false)
-  const [forgotSent, setForgotSent] = useState(false)
-  const [magicSent, setMagicSent] = useState(false)
+  const [loading, setLoading]           = useState(false)
+  const [otpLoading, setOtpLoading]     = useState(false)
+  const [verifyLoading, setVerifyLoading] = useState(false)
+  const [error, setError]               = useState<string | null>(null)
+  const [forgotSent, setForgotSent]     = useState(false)
+  const [otpSent, setOtpSent]           = useState(false)
+  const [otpDigits, setOtpDigits]       = useState(['', '', '', '', '', ''])
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-  const emailError = emailTouched && email && !emailValid
+  const otpCode = otpDigits.join('')
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -34,11 +36,7 @@ export default function LoginPage() {
     setError(null)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
-      setError(
-        error.message.includes('Invalid')
-          ? 'Incorrect email or password. Please try again.'
-          : error.message
-      )
+      setError(error.message.includes('Invalid') ? 'Incorrect email or password.' : error.message)
       setLoading(false)
       return
     }
@@ -50,332 +48,337 @@ export default function LoginPage() {
     if (!email.trim()) { setError('Enter your email above first.'); return }
     setError(null)
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `https://app.snagify.net/auth/callback`,
+      redirectTo: 'https://app.snagify.net/auth/callback',
     })
     if (resetError) { setError(resetError.message); return }
     setForgotSent(true)
   }
 
-  async function handleMagicLink() {
-    if (!email.trim()) { setError('Enter your email above first.'); return }
-    if (!emailValid) { setError('Please enter a valid email address.'); return }
-    setMagicLoading(true)
+  async function handleSendOtp() {
+    if (!email.trim() || !emailValid) { setError('Enter a valid email address first.'); return }
+    setOtpLoading(true)
     setError(null)
     const { error: otpError } = await supabase.auth.signInWithOtp({
       email,
-      options: {
-        emailRedirectTo: `https://app.snagify.net/auth/callback`,
-        shouldCreateUser: false, // only existing users
-      },
+      options: { shouldCreateUser: false },
     })
-    setMagicLoading(false)
+    setOtpLoading(false)
     if (otpError) {
       setError(otpError.message.includes('not found') || otpError.message.includes('User')
-        ? 'No account found with this email. Please sign up first.'
-        : otpError.message
-      )
+        ? 'No account found with this email.'
+        : otpError.message)
       return
     }
-    setMagicSent(true)
+    setOtpDigits(['', '', '', '', '', ''])
+    setOtpSent(true)
+    setTimeout(() => inputRefs.current[0]?.focus(), 100)
   }
 
-  // Magic link sent — show confirmation screen
-  if (magicSent) {
+  async function handleVerifyOtp() {
+    if (otpCode.length < 6) return
+    setVerifyLoading(true)
+    setError(null)
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email,
+      token: otpCode,
+      type: 'email',
+    })
+    if (verifyError) {
+      setError('Invalid or expired code. Please try again.')
+      setVerifyLoading(false)
+      setOtpDigits(['', '', '', '', '', ''])
+      setTimeout(() => inputRefs.current[0]?.focus(), 100)
+      return
+    }
+    router.push('/dashboard')
+    router.refresh()
+  }
+
+  function handleDigitChange(index: number, value: string) {
+    const digit = value.replace(/\D/g, '').slice(-1)
+    const newDigits = [...otpDigits]
+    newDigits[index] = digit
+    setOtpDigits(newDigits)
+    setError(null)
+    if (digit && index < 5) {
+      inputRefs.current[index + 1]?.focus()
+    }
+    if (newDigits.every(d => d !== '') && newDigits.join('').length === 6) {
+      // Auto-submit when complete
+      setTimeout(() => {
+        setVerifyLoading(true)
+        setError(null)
+        supabase.auth.verifyOtp({ email, token: newDigits.join(''), type: 'email' })
+          .then(({ error: verifyError }) => {
+            if (verifyError) {
+              setError('Invalid or expired code. Please try again.')
+              setVerifyLoading(false)
+              setOtpDigits(['', '', '', '', '', ''])
+              setTimeout(() => inputRefs.current[0]?.focus(), 100)
+              return
+            }
+            router.push('/dashboard')
+            router.refresh()
+          })
+      }, 100)
+    }
+  }
+
+  function handleDigitKeyDown(index: number, e: React.KeyboardEvent) {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus()
+    }
+  }
+
+  function handleDigitPaste(e: React.ClipboardEvent) {
+    e.preventDefault()
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (!pasted) return
+    const newDigits = [...otpDigits]
+    pasted.split('').forEach((d, i) => { if (i < 6) newDigits[i] = d })
+    setOtpDigits(newDigits)
+    const nextEmpty = newDigits.findIndex(d => d === '')
+    const focusIdx = nextEmpty === -1 ? 5 : nextEmpty
+    inputRefs.current[focusIdx]?.focus()
+  }
+
+  // ── OTP code entry screen ──
+  if (otpSent) {
     return (
-      <div className="min-h-screen bg-[#F8F7F4] flex items-center justify-center p-4">
+      <div style={{ minHeight:'100dvh', background:'#0A0812', display:'flex', alignItems:'center', justifyContent:'center', padding:'24px 20px', position:'relative', overflow:'hidden' }}>
+        <style>{`
+          @keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+          @keyframes drift { 0%,100%{transform:translate(0,0)} 50%{transform:translate(20px,-15px)} }
+          .otp-input { width:44px; height:54px; border-radius:14px; border:1.5px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:white; font-size:22px; font-weight:700; text-align:center; font-family:Poppins,sans-serif; outline:none; transition:all 0.15s; caret-color:transparent; }
+          .otp-input:focus { border-color:rgba(154,136,253,0.7); background:rgba(154,136,253,0.1); box-shadow:0 0 0 3px rgba(154,136,253,0.15); }
+          .otp-input.filled { border-color:rgba(154,136,253,0.4); background:rgba(154,136,253,0.08); }
+          .shimmer-btn { background:linear-gradient(90deg,#9A88FD 0%,#b8a9ff 40%,#9A88FD 100%); background-size:200% auto; animation:shimmer 2.5s linear infinite; }
+          @keyframes spin { to{transform:rotate(360deg)} }
+        `}</style>
+        <div style={{ position:'absolute', inset:0, pointerEvents:'none', overflow:'hidden' }}>
+          <div style={{ position:'absolute', width:400, height:400, borderRadius:'50%', background:'radial-gradient(circle, rgba(154,136,253,0.1) 0%, transparent 70%)', top:-100, left:'50%', transform:'translateX(-50%)', animation:'drift 18s ease-in-out infinite' }}/>
+          <div style={{ position:'absolute', inset:0, backgroundImage:'linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px)', backgroundSize:'48px 48px' }}/>
+        </div>
+
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-md"
+          initial={{ opacity:0, y:24 }}
+          animate={{ opacity:1, y:0 }}
+          transition={{ duration:0.45, ease:[0.16,1,0.3,1] }}
+          style={{ width:'100%', maxWidth:400, position:'relative', zIndex:1 }}
         >
+          {/* Logo */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:36 }}>
+            <div style={{ width:40, height:40, borderRadius:12, overflow:'hidden', boxShadow:'0 0 20px rgba(154,136,253,0.4)', flexShrink:0 }}>
+              <Image src="/icon-512x512.png" alt="Snagify" width={40} height={40} />
+            </div>
+            <span style={{ fontFamily:'Poppins,sans-serif', fontWeight:800, fontSize:22, color:'white', letterSpacing:'-0.3px' }}>Snagify</span>
+          </div>
+
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 text-center"
+            initial={{ opacity:0, y:16 }}
+            animate={{ opacity:1, y:0 }}
+            transition={{ delay:0.1 }}
+            style={{ background:'linear-gradient(160deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))', border:'1px solid rgba(255,255,255,0.1)', borderRadius:28, padding:'36px 32px', boxShadow:'0 32px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)' }}
           >
-            {/* Animated envelope */}
-            <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2, type: 'spring', stiffness: 300 }}
-              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
-              style={{ background: 'linear-gradient(135deg, #EDE9FF, #F8F7F4)' }}
-            >
-              <Mail size={28} color="#9A88FD" />
-            </motion.div>
-
-            <h2
-              className="text-xl font-extrabold text-[#1A1A2E] mb-2"
-              style={{ fontFamily: 'var(--font-heading), Poppins, sans-serif' }}
-            >
-              Check your inbox
-            </h2>
-            <p className="text-sm text-gray-500 mb-2 leading-relaxed">
-              We sent a sign-in link to
-            </p>
-            <p className="text-sm font-semibold text-[#9A88FD] mb-5 break-all">
-              {email}
-            </p>
-            <p className="text-xs text-gray-400 leading-relaxed mb-6">
-              Click the link in the email to sign in instantly.
-              It expires in 60 minutes.
-            </p>
-
-            <div className="border-t border-gray-100 pt-5">
-              <p className="text-xs text-gray-400 mb-3">Didn&apos;t receive it?</p>
-              <div className="flex gap-2 justify-center">
-                <button
-                  onClick={() => { setMagicSent(false) }}
-                  className="text-xs text-[#9A88FD] font-semibold hover:underline"
-                >
-                  Change email
-                </button>
-                <span className="text-gray-200">·</span>
-                <button
-                  onClick={() => { setMagicSent(false); void handleMagicLink() }}
-                  className="text-xs text-[#9A88FD] font-semibold hover:underline"
-                >
-                  Resend link
-                </button>
+            <div style={{ textAlign:'center', marginBottom:28 }}>
+              <div style={{ width:56, height:56, borderRadius:18, background:'rgba(154,136,253,0.12)', border:'1px solid rgba(154,136,253,0.25)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
+                <Hash size={24} color="#9A88FD" />
               </div>
+              <h1 style={{ fontFamily:'Poppins,sans-serif', fontWeight:800, fontSize:22, color:'white', margin:'0 0 8px', letterSpacing:'-0.3px' }}>
+                Enter your code
+              </h1>
+              <p style={{ fontSize:13, color:'rgba(255,255,255,0.4)', margin:0, lineHeight:1.6 }}>
+                We sent a 6-digit code to<br/>
+                <span style={{ color:'#9A88FD', fontWeight:600 }}>{email}</span>
+              </p>
             </div>
-          </motion.div>
 
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="text-center text-sm text-gray-500 mt-6"
-          >
-            <button
-              onClick={() => setMagicSent(false)}
-              className="text-[#9A88FD] font-semibold hover:underline"
-            >
-              ← Back to sign in
-            </button>
-          </motion.p>
-        </motion.div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-[#F8F7F4] flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="w-full max-w-md"
-      >
-        {/* Logo */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.1 }}
-          className="flex items-center justify-center gap-2 mb-8"
-        >
-          <Image src="/icon-512x512.png" alt="Snagify" width={36} height={36} className="rounded-xl" />
-          <span
-            className="text-xl font-extrabold text-[#1A1A2E]"
-            style={{ fontFamily: 'var(--font-heading), Poppins, sans-serif' }}
-          >
-            Snagify
-          </span>
-        </motion.div>
-
-        {/* Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100"
-        >
-          <h1
-            className="text-2xl font-extrabold text-[#1A1A2E] mb-1"
-            style={{ fontFamily: 'var(--font-heading), Poppins, sans-serif' }}
-          >
-            Welcome back
-          </h1>
-          <p className="text-sm text-gray-500 mb-6">Sign in to your Snagify account</p>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            {/* Email */}
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
-                Email
-              </label>
-              <div className="relative">
+            {/* 6 digit inputs */}
+            <div style={{ display:'flex', gap:8, justifyContent:'center', marginBottom:20 }}>
+              {otpDigits.map((digit, i) => (
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => { setEmail(e.target.value); setError(null) }}
-                  onBlur={() => setEmailTouched(true)}
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                  className={`w-full px-4 py-3 rounded-xl border text-base transition-all duration-200 outline-none
-                    ${emailError
-                      ? 'border-red-300 bg-red-50 focus:border-red-400'
-                      : emailTouched && emailValid
-                        ? 'border-green-300 bg-green-50 focus:border-green-400'
-                        : 'border-gray-200 bg-gray-50 focus:border-[#9A88FD] focus:bg-white focus:ring-2 focus:ring-[#9A88FD]/10'
-                    }`}
+                  key={i}
+                  ref={el => { inputRefs.current[i] = el }}
+                  className={`otp-input${digit ? ' filled' : ''}`}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={e => handleDigitChange(i, e.target.value)}
+                  onKeyDown={e => handleDigitKeyDown(i, e)}
+                  onPaste={i === 0 ? handleDigitPaste : undefined}
                 />
-                <AnimatePresence>
-                  {emailTouched && emailValid && (
-                    <motion.span
-                      initial={{ opacity: 0, scale: 0 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0 }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-lg"
-                    >✓</motion.span>
-                  )}
-                </AnimatePresence>
-              </div>
-              <AnimatePresence>
-                {emailError && (
-                  <motion.p
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="text-xs text-red-500 mt-1"
-                  >
-                    Please enter a valid email address
-                  </motion.p>
-                )}
-              </AnimatePresence>
+              ))}
             </div>
 
-            {/* Password */}
-            <div>
-              <div className="flex justify-between items-center mb-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Password
-                </label>
-                <button
-                  type="button"
-                  onClick={handleForgotPassword}
-                  className="text-xs text-[#9A88FD] font-semibold hover:underline"
-                >
-                  Forgot password?
-                </button>
-              </div>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 bg-gray-50
-                    text-base transition-all duration-200 outline-none
-                    focus:border-[#9A88FD] focus:bg-white focus:ring-2 focus:ring-[#9A88FD]/10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            {/* Forgot sent success */}
-            <AnimatePresence>
-              {forgotSent && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700"
-                >
-                  Reset link sent to your email
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Error */}
             <AnimatePresence>
               {error && (
                 <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600"
+                  initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}
+                  style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:12, padding:'10px 14px', fontSize:13, color:'#FCA5A5', marginBottom:16, display:'flex', alignItems:'center', gap:8 }}
                 >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink:0 }}>
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
                   {error}
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Submit */}
             <motion.button
-              type="submit"
-              disabled={loading || !email || !password}
-              whileTap={{ scale: 0.98 }}
-              className="w-full py-3.5 rounded-xl bg-[#9A88FD] text-white font-semibold text-sm
-                flex items-center justify-center gap-2 transition-all duration-150
-                hover:bg-[#8674FC] disabled:opacity-50 disabled:cursor-not-allowed"
+              type="button"
+              onClick={handleVerifyOtp}
+              disabled={otpCode.length < 6 || verifyLoading}
+              whileTap={{ scale:0.98 }}
+              className={otpCode.length === 6 && !verifyLoading ? 'shimmer-btn' : ''}
+              style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', fontFamily:'Poppins,sans-serif', fontWeight:700, fontSize:14, color:'white', cursor:otpCode.length < 6 ? 'not-allowed' : 'pointer', opacity:otpCode.length < 6 ? 0.4 : 1, display:'flex', alignItems:'center', justifyContent:'center', gap:8, background:otpCode.length < 6 ? 'rgba(154,136,253,0.3)' : undefined, transition:'opacity 0.2s', boxSizing:'border-box' as const }}
             >
-              {loading ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <>Sign In <ArrowRight size={16} /></>
+              {verifyLoading
+                ? <Loader2 size={16} style={{ animation:'spin 0.8s linear infinite' }} />
+                : <>Verify code <ArrowRight size={15} /></>
+              }
+            </motion.button>
+
+            <div style={{ textAlign:'center', marginTop:20 }}>
+              <button
+                type="button"
+                onClick={() => { setOtpSent(false); setOtpDigits(['','','','','','']); setError(null) }}
+                style={{ fontSize:12, color:'rgba(255,255,255,0.25)', background:'none', border:'none', cursor:'pointer' }}
+              >
+                ← Change email
+              </button>
+              <span style={{ color:'rgba(255,255,255,0.1)', margin:'0 10px' }}>·</span>
+              <button
+                type="button"
+                onClick={handleSendOtp}
+                style={{ fontSize:12, color:'rgba(154,136,253,0.7)', fontWeight:600, background:'none', border:'none', cursor:'pointer' }}
+              >
+                Resend code
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      </div>
+    )
+  }
+
+  // ── Main login screen ──
+  return (
+    <div style={{ minHeight:'100dvh', background:'#0A0812', display:'flex', alignItems:'center', justifyContent:'center', padding:'24px 20px', position:'relative', overflow:'hidden' }}>
+      <style>{`
+        @keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+        @keyframes drift { 0%,100%{transform:translate(0,0)} 50%{transform:translate(20px,-15px)} }
+        @keyframes spin { to{transform:rotate(360deg)} }
+        .shimmer-btn { background:linear-gradient(90deg,#9A88FD 0%,#b8a9ff 40%,#9A88FD 100%); background-size:200% auto; animation:shimmer 2.5s linear infinite; }
+        .input-field { width:100%; padding:13px 16px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:14px; color:white; font-size:15px; font-family:'DM Sans',sans-serif; outline:none; transition:all 0.2s; box-sizing:border-box; }
+        .input-field::placeholder { color:rgba(255,255,255,0.2); }
+        .input-field:focus { border-color:rgba(154,136,253,0.6); background:rgba(154,136,253,0.08); box-shadow:0 0 0 3px rgba(154,136,253,0.12); }
+        .input-field:-webkit-autofill { -webkit-box-shadow:0 0 0 1000px #130f24 inset; -webkit-text-fill-color:white; border-color:rgba(154,136,253,0.4); }
+      `}</style>
+
+      <div style={{ position:'absolute', inset:0, pointerEvents:'none', overflow:'hidden' }}>
+        <div style={{ position:'absolute', width:400, height:400, borderRadius:'50%', background:'radial-gradient(circle, rgba(154,136,253,0.12) 0%, transparent 70%)', top:-100, left:'50%', transform:'translateX(-50%)', animation:'drift 18s ease-in-out infinite' }}/>
+        <div style={{ position:'absolute', width:300, height:300, borderRadius:'50%', background:'radial-gradient(circle, rgba(202,254,135,0.06) 0%, transparent 70%)', bottom:-50, right:-50, animation:'drift 22s ease-in-out infinite reverse' }}/>
+        <div style={{ position:'absolute', inset:0, backgroundImage:'linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px)', backgroundSize:'48px 48px' }}/>
+      </div>
+
+      <motion.div
+        initial={{ opacity:0, y:28 }}
+        animate={{ opacity:1, y:0 }}
+        transition={{ duration:0.5, ease:[0.16,1,0.3,1] }}
+        style={{ width:'100%', maxWidth:420, position:'relative', zIndex:1 }}
+      >
+        {/* Logo */}
+        <motion.div
+          initial={{ opacity:0, scale:0.85 }}
+          animate={{ opacity:1, scale:1 }}
+          transition={{ delay:0.1, type:'spring', stiffness:300 }}
+          style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:36 }}
+        >
+          <div style={{ width:40, height:40, borderRadius:12, boxShadow:'0 0 20px rgba(154,136,253,0.4)', overflow:'hidden', flexShrink:0 }}>
+            <Image src="/icon-512x512.png" alt="Snagify" width={40} height={40} />
+          </div>
+          <span style={{ fontFamily:'Poppins,sans-serif', fontWeight:800, fontSize:22, color:'white', letterSpacing:'-0.3px' }}>Snagify</span>
+        </motion.div>
+
+        {/* Card */}
+        <motion.div
+          initial={{ opacity:0, y:20 }}
+          animate={{ opacity:1, y:0 }}
+          transition={{ delay:0.18 }}
+          style={{ background:'linear-gradient(160deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:28, padding:'36px 32px', boxShadow:'0 32px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)' }}
+        >
+          <div style={{ marginBottom:28 }}>
+            <h1 style={{ fontFamily:'Poppins,sans-serif', fontWeight:800, fontSize:26, color:'white', margin:'0 0 6px', letterSpacing:'-0.4px', lineHeight:1.2 }}>Sign in</h1>
+            <p style={{ fontSize:14, color:'rgba(255,255,255,0.4)', margin:0 }}>Welcome back to Snagify</p>
+          </div>
+
+          <form onSubmit={handleLogin} style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            {/* Email */}
+            <div>
+              <label style={{ display:'block', fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.4)', letterSpacing:'1.2px', textTransform:'uppercase', marginBottom:8, fontFamily:'Poppins,sans-serif' }}>Email</label>
+              <input className="input-field" type="email" value={email} onChange={e => { setEmail(e.target.value); setError(null) }} placeholder="you@example.com" autoComplete="email"/>
+            </div>
+
+            {/* Password */}
+            <div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.4)', letterSpacing:'1.2px', textTransform:'uppercase', fontFamily:'Poppins,sans-serif' }}>Password</label>
+                <button type="button" onClick={handleForgotPassword} style={{ fontSize:12, fontWeight:600, color:'rgba(154,136,253,0.8)', background:'none', border:'none', cursor:'pointer' }}>Forgot?</button>
+              </div>
+              <div style={{ position:'relative' }}>
+                <input className="input-field" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" style={{ paddingRight:44 }}/>
+                <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position:'absolute', right:14, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.3)', display:'flex', alignItems:'center' }}>
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            <AnimatePresence mode="wait">
+              {forgotSent && (
+                <motion.div key="forgot" initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}
+                  style={{ background:'rgba(202,254,135,0.1)', border:'1px solid rgba(202,254,135,0.2)', borderRadius:12, padding:'10px 14px', fontSize:13, color:'#CAFE87' }}>
+                  Reset link sent — check your inbox.
+                </motion.div>
               )}
+              {error && (
+                <motion.div key="error" initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}
+                  style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:12, padding:'10px 14px', fontSize:13, color:'#FCA5A5', display:'flex', alignItems:'center', gap:8 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink:0 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  {error}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <motion.button type="submit" disabled={loading || !email || !password} whileTap={{ scale:0.98 }}
+              className={!loading && email && password ? 'shimmer-btn' : ''}
+              style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', fontFamily:'Poppins,sans-serif', fontWeight:700, fontSize:14, color:'white', cursor:loading || !email || !password ? 'not-allowed' : 'pointer', opacity:loading || !email || !password ? 0.4 : 1, display:'flex', alignItems:'center', justifyContent:'center', gap:8, background:loading || !email || !password ? 'rgba(154,136,253,0.3)' : undefined, transition:'opacity 0.2s', boxShadow:email && password ? '0 8px 28px rgba(154,136,253,0.3)' : 'none', boxSizing:'border-box' as const }}>
+              {loading ? <Loader2 size={16} style={{ animation:'spin 0.8s linear infinite' }} /> : <>Sign in <ArrowRight size={15} /></>}
             </motion.button>
           </form>
 
           {/* Divider */}
-          <div className="flex items-center gap-3 my-5">
-            <div className="flex-1 h-px bg-gray-100" />
-            <span className="text-xs text-gray-400 font-medium">or</span>
-            <div className="flex-1 h-px bg-gray-100" />
+          <div style={{ display:'flex', alignItems:'center', gap:14, margin:'20px 0' }}>
+            <div style={{ flex:1, height:1, background:'rgba(255,255,255,0.07)' }}/>
+            <span style={{ fontSize:11, color:'rgba(255,255,255,0.2)', fontWeight:600, letterSpacing:'0.5px' }}>OR</span>
+            <div style={{ flex:1, height:1, background:'rgba(255,255,255,0.07)' }}/>
           </div>
 
-          {/* Magic link button */}
-          <motion.button
-            type="button"
-            onClick={handleMagicLink}
-            disabled={magicLoading}
-            whileTap={{ scale: 0.98 }}
-            className="w-full py-3.5 rounded-xl border-2 border-dashed text-sm font-semibold
-              flex items-center justify-center gap-2 transition-all duration-200
-              disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              borderColor: 'rgba(154,136,253,0.35)',
-              color: '#9A88FD',
-              background: 'rgba(154,136,253,0.04)',
-            }}
-          >
-            {magicLoading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <>
-                <Sparkles size={15} />
-                Send me a magic link
-              </>
-            )}
+          {/* OTP button */}
+          <motion.button type="button" onClick={handleSendOtp} disabled={otpLoading} whileTap={{ scale:0.98 }}
+            style={{ width:'100%', padding:'13px', borderRadius:14, border:'1.5px dashed rgba(154,136,253,0.3)', background:'rgba(154,136,253,0.05)', fontFamily:'Poppins,sans-serif', fontWeight:700, fontSize:13, color:'rgba(154,136,253,0.8)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, transition:'all 0.2s', opacity:otpLoading ? 0.6 : 1, boxSizing:'border-box' as const }}>
+            {otpLoading ? <Loader2 size={14} style={{ animation:'spin 0.8s linear infinite' }} /> : <><Hash size={14} /> Send me a 6-digit code</>}
           </motion.button>
-          <p className="text-center text-xs text-gray-400 mt-2">
-            No password needed — we&apos;ll email you a sign-in link
-          </p>
+          <p style={{ textAlign:'center', fontSize:11, color:'rgba(255,255,255,0.2)', margin:'8px 0 0' }}>No password needed · works great on mobile</p>
         </motion.div>
 
-        {/* Sign up link */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="text-center text-sm text-gray-500 mt-6"
-        >
-          Don&apos;t have an account?{' '}
-          <Link href="/signup" className="text-[#9A88FD] font-semibold hover:underline">
-            Sign up
-          </Link>
+        <motion.p initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.35 }}
+          style={{ textAlign:'center', fontSize:13, color:'rgba(255,255,255,0.3)', marginTop:24 }}>
+          No account yet?{' '}
+          <Link href="/signup" style={{ color:'#9A88FD', fontWeight:700, textDecoration:'none' }}>Create one</Link>
         </motion.p>
       </motion.div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
