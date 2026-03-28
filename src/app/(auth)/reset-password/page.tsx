@@ -23,15 +23,20 @@ export default function ResetPasswordPage() {
   const [hasSession, setHasSession]     = useState(false)
 
   useEffect(() => {
-    // Verify we have a recovery session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        router.replace('/login')
-      } else {
+    // Listen for PASSWORD_RECOVERY event (fired by callback page)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
         setHasSession(true)
       }
     })
-  }, [supabase, router])
+
+    // Also check if session already exists (user arrived directly)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setHasSession(true)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [supabase])
 
   async function handleReset(e: React.FormEvent) {
     e.preventDefault()
