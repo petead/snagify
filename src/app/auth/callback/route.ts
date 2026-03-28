@@ -11,14 +11,16 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
 
   if (token_hash && type) {
-    // Magic link / OTP / password reset via email
     const { error } = await supabase.auth.verifyOtp({ token_hash, type });
     if (error) {
       console.error("[auth/callback] verifyOtp error:", error.message);
       return NextResponse.redirect(new URL("/login?error=invalid_link", request.url));
     }
+    // Recovery = password reset → send to reset page
+    if (type === "recovery") {
+      return NextResponse.redirect(new URL("/reset-password", request.url));
+    }
   } else if (code) {
-    // OAuth / PKCE code exchange
     await supabase.auth.exchangeCodeForSession(code);
   }
 

@@ -24,7 +24,7 @@ export default function LoginPage() {
   const [error, setError]               = useState<string | null>(null)
   const [forgotSent, setForgotSent]     = useState(false)
   const [otpSent, setOtpSent]           = useState(false)
-  const [otpDigits, setOtpDigits]       = useState(['', '', '', '', '', ''])
+  const [otpDigits, setOtpDigits]       = useState(['', '', '', '', '', '', '', ''])
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
@@ -69,13 +69,13 @@ export default function LoginPage() {
         : otpError.message)
       return
     }
-    setOtpDigits(['', '', '', '', '', ''])
+    setOtpDigits(['', '', '', '', '', '', '', ''])
     setOtpSent(true)
     setTimeout(() => inputRefs.current[0]?.focus(), 100)
   }
 
   async function handleVerifyOtp() {
-    if (otpCode.length < 6) return
+    if (otpCode.length < 8) return
     setVerifyLoading(true)
     setError(null)
     const { error: verifyError } = await supabase.auth.verifyOtp({
@@ -86,7 +86,7 @@ export default function LoginPage() {
     if (verifyError) {
       setError('Invalid or expired code. Please try again.')
       setVerifyLoading(false)
-      setOtpDigits(['', '', '', '', '', ''])
+      setOtpDigits(['', '', '', '', '', '', '', ''])
       setTimeout(() => inputRefs.current[0]?.focus(), 100)
       return
     }
@@ -100,10 +100,10 @@ export default function LoginPage() {
     newDigits[index] = digit
     setOtpDigits(newDigits)
     setError(null)
-    if (digit && index < 5) {
+    if (digit && index < 7) {
       inputRefs.current[index + 1]?.focus()
     }
-    if (newDigits.every(d => d !== '') && newDigits.join('').length === 6) {
+    if (newDigits.every(d => d !== '') && newDigits.join('').length === 8) {
       // Auto-submit when complete
       setTimeout(() => {
         setVerifyLoading(true)
@@ -113,7 +113,7 @@ export default function LoginPage() {
             if (verifyError) {
               setError('Invalid or expired code. Please try again.')
               setVerifyLoading(false)
-              setOtpDigits(['', '', '', '', '', ''])
+              setOtpDigits(['', '', '', '', '', '', '', ''])
               setTimeout(() => inputRefs.current[0]?.focus(), 100)
               return
             }
@@ -132,13 +132,13 @@ export default function LoginPage() {
 
   function handleDigitPaste(e: React.ClipboardEvent) {
     e.preventDefault()
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 8)
     if (!pasted) return
     const newDigits = [...otpDigits]
-    pasted.split('').forEach((d, i) => { if (i < 6) newDigits[i] = d })
+    pasted.split('').forEach((d, i) => { if (i < 8) newDigits[i] = d })
     setOtpDigits(newDigits)
     const nextEmpty = newDigits.findIndex(d => d === '')
-    const focusIdx = nextEmpty === -1 ? 5 : nextEmpty
+    const focusIdx = nextEmpty === -1 ? 7 : nextEmpty
     inputRefs.current[focusIdx]?.focus()
   }
 
@@ -149,7 +149,7 @@ export default function LoginPage() {
         <style>{`
           @keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
           @keyframes drift { 0%,100%{transform:translate(0,0)} 50%{transform:translate(20px,-15px)} }
-          .otp-input { width:44px; height:54px; border-radius:14px; border:1.5px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:white; font-size:22px; font-weight:700; text-align:center; font-family:Poppins,sans-serif; outline:none; transition:all 0.15s; caret-color:transparent; }
+          .otp-input { width:36px; height:50px; border-radius:12px; border:1.5px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:white; font-size:18px; font-weight:700; text-align:center; font-family:Poppins,sans-serif; outline:none; transition:all 0.15s; caret-color:transparent; }
           .otp-input:focus { border-color:rgba(154,136,253,0.7); background:rgba(154,136,253,0.1); box-shadow:0 0 0 3px rgba(154,136,253,0.15); }
           .otp-input.filled { border-color:rgba(154,136,253,0.4); background:rgba(154,136,253,0.08); }
           .shimmer-btn { background:linear-gradient(90deg,#9A88FD 0%,#b8a9ff 40%,#9A88FD 100%); background-size:200% auto; animation:shimmer 2.5s linear infinite; }
@@ -188,13 +188,13 @@ export default function LoginPage() {
                 Enter your code
               </h1>
               <p style={{ fontSize:13, color:'rgba(255,255,255,0.4)', margin:0, lineHeight:1.6 }}>
-                We sent a 6-digit code to<br/>
+                We sent an 8-digit code to<br/>
                 <span style={{ color:'#9A88FD', fontWeight:600 }}>{email}</span>
               </p>
             </div>
 
-            {/* 6 digit inputs */}
-            <div style={{ display:'flex', gap:8, justifyContent:'center', marginBottom:20 }}>
+            {/* 8 digit inputs */}
+            <div style={{ display:'flex', gap:6, justifyContent:'center', marginBottom:20 }}>
               {otpDigits.map((digit, i) => (
                 <input
                   key={i}
@@ -228,10 +228,10 @@ export default function LoginPage() {
             <motion.button
               type="button"
               onClick={handleVerifyOtp}
-              disabled={otpCode.length < 6 || verifyLoading}
+              disabled={otpCode.length < 8 || verifyLoading}
               whileTap={{ scale:0.98 }}
-              className={otpCode.length === 6 && !verifyLoading ? 'shimmer-btn' : ''}
-              style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', fontFamily:'Poppins,sans-serif', fontWeight:700, fontSize:14, color:'white', cursor:otpCode.length < 6 ? 'not-allowed' : 'pointer', opacity:otpCode.length < 6 ? 0.4 : 1, display:'flex', alignItems:'center', justifyContent:'center', gap:8, background:otpCode.length < 6 ? 'rgba(154,136,253,0.3)' : undefined, transition:'opacity 0.2s', boxSizing:'border-box' as const }}
+              className={otpCode.length === 8 && !verifyLoading ? 'shimmer-btn' : ''}
+              style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', fontFamily:'Poppins,sans-serif', fontWeight:700, fontSize:14, color:'white', cursor:otpCode.length < 8 ? 'not-allowed' : 'pointer', opacity:otpCode.length < 8 ? 0.4 : 1, display:'flex', alignItems:'center', justifyContent:'center', gap:8, background:otpCode.length < 8 ? 'rgba(154,136,253,0.3)' : undefined, transition:'opacity 0.2s', boxSizing:'border-box' as const }}
             >
               {verifyLoading
                 ? <Loader2 size={16} style={{ animation:'spin 0.8s linear infinite' }} />
@@ -242,7 +242,7 @@ export default function LoginPage() {
             <div style={{ textAlign:'center', marginTop:20 }}>
               <button
                 type="button"
-                onClick={() => { setOtpSent(false); setOtpDigits(['','','','','','']); setError(null) }}
+                onClick={() => { setOtpSent(false); setOtpDigits(['','','','','','','','']); setError(null) }}
                 style={{ fontSize:12, color:'rgba(255,255,255,0.25)', background:'none', border:'none', cursor:'pointer' }}
               >
                 ← Change email
@@ -367,7 +367,7 @@ export default function LoginPage() {
           {/* OTP button */}
           <motion.button type="button" onClick={handleSendOtp} disabled={otpLoading} whileTap={{ scale:0.98 }}
             style={{ width:'100%', padding:'13px', borderRadius:14, border:'1.5px dashed rgba(154,136,253,0.3)', background:'rgba(154,136,253,0.05)', fontFamily:'Poppins,sans-serif', fontWeight:700, fontSize:13, color:'rgba(154,136,253,0.8)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, transition:'all 0.2s', opacity:otpLoading ? 0.6 : 1, boxSizing:'border-box' as const }}>
-            {otpLoading ? <Loader2 size={14} style={{ animation:'spin 0.8s linear infinite' }} /> : <><Hash size={14} /> Send me a 6-digit code</>}
+            {otpLoading ? <Loader2 size={14} style={{ animation:'spin 0.8s linear infinite' }} /> : <><Hash size={14} /> Send me an 8-digit code</>}
           </motion.button>
           <p style={{ textAlign:'center', fontSize:11, color:'rgba(255,255,255,0.2)', margin:'8px 0 0' }}>No password needed · works great on mobile</p>
         </motion.div>
