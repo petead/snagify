@@ -27,6 +27,7 @@ export default function LoginPage() {
   const [error, setError]               = useState<string | null>(null)
   const [forgotSent, setForgotSent]     = useState(false)
   const [otpSent, setOtpSent]           = useState(false)
+  const [otpMode, setOtpMode]           = useState<'login' | 'recovery'>('login')
   const [otpDigits, setOtpDigits]       = useState(['', '', '', '', '', '', '', ''])
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
@@ -48,13 +49,15 @@ export default function LoginPage() {
   }
 
   async function handleForgotPassword() {
-    if (!email.trim()) { setError('Enter your email above first.'); return }
+    if (!email.trim() || !emailValid) { setError('Enter a valid email address first.'); return }
     setError(null)
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://app.snagify.net/auth/callback',
-    })
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email)
     if (resetError) { setError(resetError.message); return }
-    setForgotSent(true)
+    // Reuse OTP digit screen — but for recovery flow
+    setOtpDigits(['', '', '', '', '', '', '', ''])
+    setOtpMode('recovery')
+    setOtpSent(true)
+    setTimeout(() => inputRefs.current[0]?.focus(), 100)
   }
 
   async function handleSendOtp() {
@@ -73,6 +76,7 @@ export default function LoginPage() {
       return
     }
     setOtpDigits(['', '', '', '', '', '', '', ''])
+    setOtpMode('login')
     setOtpSent(true)
     setTimeout(() => inputRefs.current[0]?.focus(), 100)
   }
@@ -81,6 +85,26 @@ export default function LoginPage() {
     if (otpCode.length < 8) return
     setVerifyLoading(true)
     setError(null)
+
+    if (otpMode === 'recovery') {
+      // Password reset flow — verify then redirect to reset-password page
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email,
+        token: otpCode,
+        type: 'recovery',
+      })
+      if (verifyError) {
+        setError('Invalid or expired code. Please try again.')
+        setVerifyLoading(false)
+        setOtpDigits(['', '', '', '', '', '', '', ''])
+        setTimeout(() => inputRefs.current[0]?.focus(), 100)
+        return
+      }
+      router.push('/reset-password')
+      return
+    }
+
+    // Normal OTP login flow
     const { error: verifyError } = await supabase.auth.verifyOtp({
       email,
       token: otpCode,
@@ -111,7 +135,11 @@ export default function LoginPage() {
       setTimeout(() => {
         setVerifyLoading(true)
         setError(null)
-        supabase.auth.verifyOtp({ email, token: newDigits.join(''), type: 'email' })
+        supabase.auth.verifyOtp({
+          email,
+          token: newDigits.join(''),
+          type: otpMode === 'recovery' ? 'recovery' : 'email',
+        })
           .then(({ error: verifyError }) => {
             if (verifyError) {
               setError('Invalid or expired code. Please try again.')
@@ -120,8 +148,12 @@ export default function LoginPage() {
               setTimeout(() => inputRefs.current[0]?.focus(), 100)
               return
             }
-            router.push('/dashboard')
-            router.refresh()
+            if (otpMode === 'recovery') {
+              router.push('/reset-password')
+            } else {
+              router.push('/dashboard')
+              router.refresh()
+            }
           })
       }, 100)
     }
@@ -188,10 +220,10 @@ export default function LoginPage() {
                 <Hash size={24} color="#9A88FD" />
               </div>
               <h1 style={{ fontFamily:'Poppins,sans-serif', fontWeight:800, fontSize:22, color:'white', margin:'0 0 8px', letterSpacing:'-0.3px' }}>
-                Enter your code
+                {otpMode === 'recovery' ? 'Enter your reset code' : 'Enter your code'}
               </h1>
               <p style={{ fontSize:13, color:'rgba(255,255,255,0.4)', margin:0, lineHeight:1.6 }}>
-                We sent an 8-digit code to<br/>
+                {otpMode === 'recovery' ? 'We sent a password reset code to' : 'We sent a 6-digit code to'}<br/>
                 <span style={{ color:'#9A88FD', fontWeight:600 }}>{email}</span>
               </p>
             </div>
@@ -245,7 +277,7 @@ export default function LoginPage() {
             <div style={{ textAlign:'center', marginTop:20 }}>
               <button
                 type="button"
-                onClick={() => { setOtpSent(false); setOtpDigits(['','','','','','','','']); setError(null) }}
+                onClick={() => { setOtpSent(false); setOtpMode('login'); setOtpDigits(['','','','','','','','']); setError(null) }}
                 style={{ fontSize:12, color:'rgba(255,255,255,0.25)', background:'none', border:'none', cursor:'pointer' }}
               >
                 ← Change email
